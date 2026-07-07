@@ -4,13 +4,17 @@ import {
   API_BASE,
   fetchOverallClassification,
   fetchRecentEvents,
+  fetchSplitClassification,
+  fetchSplitGatesForStage,
   fetchSplitsForRun,
   fetchStageClassification,
   fetchStageRuns,
   fetchStages,
   type ClassificationEntry,
   type DetectionEventRecord,
+  type Gate,
   type OverallClassificationEntry,
+  type SplitClassificationEntry,
   type Stage,
   type StageRun,
   type StageSplit,
@@ -23,6 +27,9 @@ const selectedStageId = ref<string>('');
 const stageClassification = ref<ClassificationEntry[]>([]);
 const overallClassification = ref<OverallClassificationEntry[]>([]);
 const splitsByRun = ref<Record<string, StageSplit[]>>({});
+const splitGates = ref<Gate[]>([]);
+const selectedSplitIndex = ref<number | null>(null);
+const splitClassification = ref<SplitClassificationEntry[]>([]);
 let detectionsSource: EventSource;
 let stageRunsSource: EventSource;
 let stageRunSplitsSource: EventSource;
@@ -70,7 +77,23 @@ async function refreshClassifications() {
   overallClassification.value = await fetchOverallClassification();
 }
 
-watch(selectedStageId, refreshClassifications);
+async function refreshSplitClassification() {
+  if (selectedStageId.value && selectedSplitIndex.value !== null) {
+    splitClassification.value = await fetchSplitClassification(selectedStageId.value, selectedSplitIndex.value);
+  } else {
+    splitClassification.value = [];
+  }
+}
+
+async function onStageSelected() {
+  await refreshClassifications();
+  splitGates.value = selectedStageId.value ? await fetchSplitGatesForStage(selectedStageId.value) : [];
+  selectedSplitIndex.value = splitGates.value.length > 0 ? splitGates.value[0].splitIndex! : null;
+  await refreshSplitClassification();
+}
+
+watch(selectedStageId, onStageSelected);
+watch(selectedSplitIndex, refreshSplitClassification);
 
 onMounted(async () => {
   detections.value = await fetchRecentEvents();
@@ -79,7 +102,7 @@ onMounted(async () => {
   if (stages.value.length > 0) {
     selectedStageId.value = stages.value[0].id;
   }
-  await refreshClassifications();
+  await onStageSelected();
 
   for (const run of stageRuns.value) {
     splitsByRun.value[run.id] = await fetchSplitsForRun(run.id);
@@ -94,11 +117,13 @@ onMounted(async () => {
   stageRunsSource.onmessage = (e) => {
     upsertStageRun(JSON.parse(e.data));
     refreshClassifications();
+    refreshSplitClassification();
   };
 
   stageRunSplitsSource = new EventSource(`${API_BASE}/live/stage-run-splits`);
   stageRunSplitsSource.onmessage = (e) => {
     upsertSplit(JSON.parse(e.data));
+    refreshSplitClassification();
   };
 });
 
@@ -142,6 +167,43 @@ onUnmounted(() => {
             <td>{{ entry.coDriverName ?? '-' }}</td>
             <td>{{ formatDuration(entry.durationMs) }}</td>
             <td>{{ formatGap(entry.gapMs) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Split Classification</h2>
+      <label v-if="splitGates.length > 0">
+        Split:
+        <select v-model="selectedSplitIndex">
+          <option v-for="gate in splitGates" :key="gate.id" :value="gate.splitIndex">
+            Split {{ gate.splitIndex }} ({{ gate.name }})
+          </option>
+        </select>
+      </label>
+      <p v-else>No split gates configured for this stage.</p>
+      <table v-if="splitGates.length > 0">
+        <thead>
+          <tr>
+            <th>Pos</th>
+            <th>#</th>
+            <th>Driver</th>
+            <th>Co-Driver</th>
+            <th>Time</th>
+            <th>Gap</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="entry in splitClassification" :key="entry.vehicleId">
+            <td>{{ entry.position }}</td>
+            <td>{{ entry.startNumber }}</td>
+            <td>{{ entry.driverName }}</td>
+            <td>{{ entry.coDriverName ?? '-' }}</td>
+            <td>{{ formatDuration(entry.elapsedMs) }}</td>
+            <td>{{ formatGap(entry.gapMs) }}</td>
+            <td>{{ entry.stageRunStatus }}</td>
           </tr>
         </tbody>
       </table>

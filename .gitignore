@@ -4,3 +4,12 @@ dist/
 *.sqlite-journal
 .env
 .env.local
+
+# Editor/tooling
+.history/
+.vscode/*
+!.vscode/extensions.json
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

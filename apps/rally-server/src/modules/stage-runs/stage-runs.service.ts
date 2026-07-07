@@ -1,10 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { StageRunStatus } from '@rally-gate/shared';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Gate } from '../gates/gate.entity';
 import { StageRun } from './stage-run.entity';
 import { StageSplit } from './stage-split.entity';
+
+export interface StageRunSplitPair {
+  run: StageRun;
+  split: StageSplit;
+}
 
 @Injectable()
 export class StageRunsService {
@@ -103,5 +108,20 @@ export class StageRunsService {
 
   findSplitsForRun(stageRunId: string): Promise<StageSplit[]> {
     return this.stageSplits.find({ where: { stageRunId }, order: { splitIndex: 'ASC' } });
+  }
+
+  async findSplitsForStageAtIndex(stageId: string, splitIndex: number): Promise<StageRunSplitPair[]> {
+    const runs = await this.stageRuns.find({
+      where: { stageId },
+    });
+    const activeRuns = runs.filter((run) => run.status !== StageRunStatus.CANCELLED);
+    if (activeRuns.length === 0) {
+      return [];
+    }
+    const runById = new Map(activeRuns.map((run) => [run.id, run]));
+    const splits = await this.stageSplits.find({
+      where: { stageRunId: In([...runById.keys()]), splitIndex },
+    });
+    return splits.map((split) => ({ run: runById.get(split.stageRunId)!, split }));
   }
 }

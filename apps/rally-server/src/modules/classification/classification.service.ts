@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { ClassificationEntry, OverallClassificationEntry } from '@rally-gate/shared';
+import { ClassificationEntry, OverallClassificationEntry, SplitClassificationEntry } from '@rally-gate/shared';
+import { GatesService } from '../gates/gates.service';
 import { StageRunsService } from '../stage-runs/stage-runs.service';
 import { StagesService } from '../stages/stages.service';
 import { Vehicle } from '../vehicles/vehicle.entity';
@@ -16,6 +17,7 @@ export class ClassificationService {
     private readonly stageRunsService: StageRunsService,
     private readonly stagesService: StagesService,
     private readonly vehiclesService: VehiclesService,
+    private readonly gatesService: GatesService,
   ) {}
 
   async getStageClassification(stageId: string): Promise<ClassificationEntry[]> {
@@ -46,6 +48,40 @@ export class ClassificationService {
       ...entry,
       stagesCompleted: totals.get(entry.vehicleId)!.stagesCompleted,
     }));
+  }
+
+  async getSplitGates(stageId: string) {
+    const stage = await this.stagesService.findOne(stageId);
+    if (!stage) {
+      throw new NotFoundException(`Stage ${stageId} not found`);
+    }
+    return this.gatesService.findSplitGatesForStage(stageId);
+  }
+
+  async getSplitClassification(stageId: string, splitIndex: number): Promise<SplitClassificationEntry[]> {
+    const stage = await this.stagesService.findOne(stageId);
+    if (!stage) {
+      throw new NotFoundException(`Stage ${stageId} not found`);
+    }
+    const pairs = await this.stageRunsService.findSplitsForStageAtIndex(stageId, splitIndex);
+    const vehicles = await this.vehiclesService.findAll();
+    const vehicleById = new Map<string, Vehicle>(vehicles.map((vehicle) => [vehicle.id, vehicle]));
+    const sorted = [...pairs].sort((a, b) => a.split.elapsedMs - b.split.elapsedMs);
+    const leaderMs = sorted[0]?.split.elapsedMs ?? 0;
+    return sorted.map((pair, index) => {
+      const vehicle = vehicleById.get(pair.run.vehicleId);
+      return {
+        position: index + 1,
+        vehicleId: pair.run.vehicleId,
+        startNumber: vehicle?.startNumber ?? '?',
+        driverName: vehicle?.driverName ?? 'Unknown',
+        coDriverName: vehicle?.coDriverName,
+        splitIndex,
+        elapsedMs: pair.split.elapsedMs,
+        gapMs: pair.split.elapsedMs - leaderMs,
+        stageRunStatus: pair.run.status,
+      };
+    });
   }
 
   private async rank(entries: RankableEntry[]): Promise<ClassificationEntry[]> {

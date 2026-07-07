@@ -49,6 +49,26 @@ export interface OverallClassificationEntry extends ClassificationEntry {
   stagesCompleted: number;
 }
 
+export interface SplitClassificationEntry {
+  position: number;
+  vehicleId: string;
+  startNumber: string;
+  driverName: string;
+  coDriverName?: string;
+  splitIndex: number;
+  elapsedMs: number;
+  gapMs: number;
+  stageRunStatus: string;
+}
+
+export interface Gate {
+  id: string;
+  name: string;
+  role: string;
+  stageId?: string;
+  splitIndex?: number;
+}
+
 export async function fetchRecentEvents(): Promise<DetectionEventRecord[]> {
   const res = await fetch(`${API_BASE}/events`);
   return res.json();
@@ -76,5 +96,18 @@ export async function fetchStageClassification(stageId: string): Promise<Classif
 
 export async function fetchOverallClassification(): Promise<OverallClassificationEntry[]> {
   const res = await fetch(`${API_BASE}/classification/overall`);
+  return res.json();
+}
+
+export async function fetchSplitGatesForStage(stageId: string): Promise<Gate[]> {
+  const res = await fetch(`${API_BASE}/classification/stages/${stageId}/split-gates`);
+  return res.json();
+}
+
+export async function fetchSplitClassification(
+  stageId: string,
+  splitIndex: number,
+): Promise<SplitClassificationEntry[]> {
+  const res = await fetch(`${API_BASE}/classification/stages/${stageId}/splits/${splitIndex}`);
   return res.json();
 }

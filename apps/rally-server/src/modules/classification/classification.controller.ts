@@ -14,4 +14,14 @@ export class ClassificationController {
   getStage(@Param('stageId') stageId: string) {
     return this.classificationService.getStageClassification(stageId);
   }
+
+  @Get('stages/:stageId/split-gates')
+  getSplitGates(@Param('stageId') stageId: string) {
+    return this.classificationService.getSplitGates(stageId);
+  }
+
+  @Get('stages/:stageId/splits/:splitIndex')
+  getSplit(@Param('stageId') stageId: string, @Param('splitIndex') splitIndex: string) {
+    return this.classificationService.getSplitClassification(stageId, Number(splitIndex));
+  }
 }

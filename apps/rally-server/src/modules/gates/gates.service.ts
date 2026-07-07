@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { GateRole } from '@rally-gate/shared';
 import { Repository } from 'typeorm';
 import { Gate } from './gate.entity';
 
@@ -12,6 +13,13 @@ export class GatesService {
 
   findAll(): Promise<Gate[]> {
     return this.gates.find();
+  }
+
+  findSplitGatesForStage(stageId: string): Promise<Gate[]> {
+    return this.gates.find({
+      where: { stageId, role: GateRole.STAGE_SPLIT },
+      order: { splitIndex: 'ASC' },
+    });
   }
 
   findOne(id: string): Promise<Gate | null> {
