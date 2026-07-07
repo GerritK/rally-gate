@@ -1,0 +1,18 @@
+{
+  "name": "rally-gate",
+  "private": true,
+  "version": "0.0.1",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build:shared": "npm run build --workspace=@rally-gate/shared",
+    "dev:server": "npm run start:dev --workspace=@rally-gate/rally-server",
+    "dev:gate-agent": "npm run dev --workspace=@rally-gate/gate-agent",
+    "dev:web": "npm run dev --workspace=@rally-gate/web",
+    "simulate": "npm run simulate --workspace=@rally-gate/gate-agent --",
+    "seed-demo-data": "node scripts/seed-demo-data.js",
+    "build": "npm run build --workspaces --if-present"
+  }
+}

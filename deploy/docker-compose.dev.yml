@@ -1,0 +1,33 @@
+version: "3.8"
+
+# Adds a simulated gate-agent on top of docker-compose.yml, for demoing the
+# full pipeline without any physical gate hardware attached.
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  gate-agent-start:
+    build:
+      context: ..
+      dockerfile: apps/gate-agent/Dockerfile
+    depends_on:
+      - rally-server
+    environment:
+      GATE_ID: START_WP1
+      MQTT_HOST: rally-server
+      MQTT_PORT: 57431
+      TRANSPONDERS: "1234567,7654321"
+      SIMULATE_INTERVAL_MS: 8000
+
+  gate-agent-finish:
+    build:
+      context: ..
+      dockerfile: apps/gate-agent/Dockerfile
+    depends_on:
+      - rally-server
+    environment:
+      GATE_ID: FINISH_WP1
+      MQTT_HOST: rally-server
+      MQTT_PORT: 57431
+      TRANSPONDERS: "1234567,7654321"
+      SIMULATE_INTERVAL_MS: 8000

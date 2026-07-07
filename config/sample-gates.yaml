@@ -1,0 +1,16 @@
+gates:
+  START_WP1:
+    name: "Start WP1"
+    role: "stage_start"
+    stageId: "WP1"
+
+  SPLIT1_WP1:
+    name: "Split 1 WP1"
+    role: "stage_split"
+    stageId: "WP1"
+    splitIndex: 1
+
+  FINISH_WP1:
+    name: "Finish WP1"
+    role: "stage_finish"
+    stageId: "WP1"

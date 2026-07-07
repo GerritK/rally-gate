@@ -1,0 +1,23 @@
+{
+  "name": "@rally-gate/gate-agent",
+  "version": "0.0.1",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "start": "node dist/main.js",
+    "simulate": "ts-node --transpile-only src/simulate-cli.ts"
+  },
+  "dependencies": {
+    "@rally-gate/shared": "0.0.1",
+    "mqtt": "^5.10.1",
+    "ulid": "^2.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.5.4"
+  }
+}

@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rally
+      POSTGRES_PASSWORD: rally
+      POSTGRES_DB: rally_gate
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  rally-server:
+    build:
+      context: ..
+      dockerfile: apps/rally-server/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      DB_TYPE: postgres
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: rally
+      DB_PASSWORD: rally
+      DB_NAME: rally_gate
+      PORT: 57430
+      MQTT_PORT: 57431
+    ports:
+      - "57430:57430"
+      - "57431:57431"
+
+volumes:
+  postgres-data:
