@@ -1,5 +1,19 @@
 # RC Rally Timing System
 
+> **Status note (2026-07-07):** This is the original vision document and is kept
+> as historical context — the "why" behind the architecture. Several concrete
+> decisions below (backend language, message broker, repo layout, database)
+> have since changed from what's written here. For the current, accurate state
+> of the implementation, see:
+> - [`docs/architecture.md`](../docs/architecture.md) — what's actually built
+> - [`docs/development-roadmap.md`](../docs/development-roadmap.md) — done / next / deferred
+> - [`docs/deployment-modes.md`](../docs/deployment-modes.md) — standalone vs. headless, future online mode
+> - [`docs/api.md`](../docs/api.md) — actual current API surface
+>
+> Sections below that are superseded are marked inline; the core design
+> principles (generic gates, centralized rally logic, immutable events,
+> parallel stages) are unchanged and still guide the implementation.
+
 ## Project Summary
 
 This project aims to build an open, modular timing and event management system for RC rally events using existing WTS / MYLAPS-compatible RC transponders.
@@ -93,6 +107,14 @@ HackRF One
 
 A HackRF One may be useful for protocol research, debugging, and RF experiments, but it is not required for normal rally gates.
 
+**Status:** decision confirmed — hardware has been ordered for two gates on this
+basis. RCHourglass (a more proven dedicated decoder) and MYLAPS (commercial)
+were both considered and ruled out — MYLAPS on cost, RCHourglass because gate
+hardware was already committed to the OpenStint/RTL-SDR path. Software
+development is proceeding against the `SimulatedAdapter` first; real OpenStint
+RF integration (overhead loop antenna, RC4 hybrid decode) is not yet validated
+and is deferred until the event pipeline works end-to-end in simulation.
+
 ---
 
 ## Gate Node Concept
@@ -114,10 +136,15 @@ OpenStint
   ↓
 Gate Agent
   ↓
-MQTT / NATS / WebSocket
+MQTT
   ↓
 Rally Server
 ```
+
+The gate agent publishes over MQTT to a broker embedded directly inside the
+rally server process (Aedes, in-process) — there is no separate broker
+container to run in either deployment mode. See [Network Architecture](#network-architecture)
+and [Database](#database) below.
 
 The gate node should:
 
@@ -285,23 +312,26 @@ For stage timing, start and finish gates must have sufficiently synchronized clo
 
 ## Network Architecture
 
-Recommended architecture:
-
 ```text
 Gate Nodes
   ↓
-MQTT or NATS
+MQTT (embedded Aedes broker, in-process inside Rally Server)
   ↓
 Rally Server
   ↓
-PostgreSQL
+SQLite (standalone) or PostgreSQL (headless) — config-driven, one codebase
   ↓
 Web UI / API
 ```
 
-### MQTT vs NATS
+**Decided:** MQTT, not NATS — simpler to set up for a hardware-oriented
+prototype, as originally reasoned below. The broker (Aedes) runs embedded
+in-process inside the rally-server rather than as a separate container, so
+standalone/laptop mode has zero external services to install. See
+[`docs/deployment-modes.md`](../docs/deployment-modes.md) for the two run
+modes this enables.
 
-Both are suitable.
+Original comparison, for reference:
 
 MQTT advantages:
 
@@ -316,14 +346,6 @@ NATS advantages:
 - Simple pub/sub
 - Good for distributed systems
 - Request/reply patterns
-
-Recommended for first implementation:
-
-```text
-MQTT
-```
-
-Reason: simpler to set up for a hardware-oriented prototype.
 
 ---
 
@@ -438,7 +460,7 @@ Possible vehicle states:
 REGISTERED
 SCRUTINEERING
 PARC_FERME
-RELEASED_FROM_PARc_FERME
+RELEASED_FROM_PARC_FERME
 AT_TIME_CONTROL
 PRE_START
 READY_TO_START
@@ -535,7 +557,7 @@ rules:
     actions:
       - type: "check_parc_ferme_release"
       - type: "set_vehicle_state"
-        state: "RELEASED_FROM_PARc_FERME"
+        state: "RELEASED_FROM_PARC_FERME"
 
   - name: "Enter service"
     when:
@@ -551,6 +573,11 @@ rules:
 ```
 
 Rules should be configurable and not hardcoded where possible.
+
+**Status:** not yet built this way. `stage_start`/`stage_finish`/`stage_split`
+rules are currently hardcoded in `EventsService` on the server — fine at the
+current scale. A YAML-driven rule engine like the one above is deliberately
+deferred (see `docs/development-roadmap.md`), not abandoned.
 
 ---
 
@@ -726,25 +753,17 @@ status
 
 ## Database
 
-Recommended database:
+**Decided:** database choice is config-driven per [deployment mode](../docs/deployment-modes.md),
+not a single fixed recommendation:
 
-```text
-PostgreSQL
-```
+- **Standalone/laptop mode:** SQLite — nothing external to install.
+- **Headless/server mode:** PostgreSQL, via `deploy/docker-compose.yml`.
 
-Optional:
-
-```text
-Redis
-```
-
-Redis may be used later for:
-
-- Live timing cache
-- Temporary event queues
-- Fast dashboard updates
-
-For v1, PostgreSQL alone is enough.
+Same TypeORM entities, same codebase — switching is a config change
+(`DB_TYPE`, `DB_HOST`, ...), not a fork. Redis is not currently used; the
+original idea of Redis for live-timing cache / temporary queues is not
+ruled out for later, but Server-Sent Events + the primary DB have been
+sufficient so far.
 
 ---
 
@@ -776,6 +795,17 @@ WebSocket / SSE streams:
 /live/results
 /live/gate-health
 ```
+
+**Status:** this is the full eventual target surface, not what's live today.
+Actual current API (Server-Sent Events, not WebSocket): `/gates`, `/vehicles`,
+`/stages`, `/stage-runs`, `/stage-runs/:id/splits`, `/events`,
+`/classification/stages/:stageId`, `/classification/overall`, plus
+`/live/detections`, `/live/stage-runs`, `/live/stage-run-splits`. No
+`/penalties`, `/results`, `/config`, `/gate-nodes`, or `/live/gate-health` yet,
+and no auth. See [`docs/api.md`](../docs/api.md) for the authoritative list.
+Default ports: rally-server API on `57430`, embedded MQTT broker on `57431`
+(this project's own services use the dedicated `57430`–`57439` range instead
+of framework defaults, to avoid colliding with other local services).
 
 ---
 
@@ -874,112 +904,108 @@ This is important for:
 
 ---
 
-## Suggested Repository Structure
+## Repository Structure
+
+**Superseded** — the structure below (Python-shaped `services/` + separate
+`simulator` service + `web/` + a `deploy/mqtt/` container) was the original
+sketch. The actual repo (`rally-gate`), adapted for the
+[NestJS/TypeScript stack](#suggested-tech-stack) and the
+[standalone/headless deployment model](../docs/deployment-modes.md), is an
+npm-workspaces monorepo:
 
 ```text
-rc-rally-timing/
+rally-gate/
+  package.json                 # npm workspaces root
   README.md
   docs/
     architecture.md
     hardware.md
-    gate-agent.md
-    openstint-integration.md
+    decoder-adapters.md
+    deployment-modes.md
     event-model.md
     api.md
     development-roadmap.md
-
-  services/
-    rally-server/
-      src/
-      tests/
-      Dockerfile
-
-    gate-agent/
-      src/
-      tests/
-      Dockerfile
-
-    simulator/
-      src/
-      tests/
-
-  web/
-    src/
-    public/
-    package.json
-
+  apps/
+    rally-server/               # NestJS
+      src/modules/{gates,gate-nodes,vehicles,transponders,stages,stage-runs,events,penalties,rules-engine,live,config}/
+      packaging/standalone/     # Node SEA/pkg build, tray-icon assets (not built yet)
+      Dockerfile                 # headless mode only
+    gate-agent/                 # runs on Pi or locally; no Dockerfile (needs raw USB/SDR access)
+      src/adapters/{openstint,rchourglass,simulated,manual-entry}.adapter.ts
+    web/                        # Vue 3 + TS + Vite
+  packages/
+    shared/                     # event model, gate-role enums, DTOs shared across all apps
   deploy/
-    docker-compose.yml
+    docker-compose.yml          # headless/full-dev: postgres + rally-server + gate-agent(s)
     docker-compose.dev.yml
-    mqtt/
     postgres/
-
   config/
-    sample-event.yaml
     sample-gates.yaml
     sample-stages.yaml
-    sample-rules.yaml
-
   scripts/
-    dev-start.sh
-    seed-demo-data.sh
+    seed-demo-data.js
 ```
+
+Key differences from the original sketch:
+
+- No separate `simulator` service — it's `simulated.adapter.ts` inside
+  gate-agent's `DecoderAdapter` set.
+- No `deploy/mqtt/` — the MQTT broker is embedded (Aedes) in both deployment
+  modes, not a separate container.
+- A `packages/shared` workspace exists because the whole stack is TypeScript
+  now (wasn't applicable when this doc assumed a Python backend + React
+  frontend).
+- Plain npm workspaces, deliberately not Nx/Turborepo.
 
 ---
 
-## Suggested Tech Stack
+## Tech Stack
+
+**Decided** (superseding the Python/FastAPI recommendation originally
+written here): the whole stack is Node.js/TypeScript, chosen to stay in the
+team's area of expertise rather than introduce Python as an additional
+unknown alongside the hardware/RF work.
 
 ### Backend
 
-Recommended options:
-
 ```text
-Python + FastAPI
-```
-
-or
-
-```text
-Node.js / TypeScript + NestJS
-```
-
-For hardware integration and quick prototyping, Python is a strong choice.
-
-Recommended backend v1:
-
-```text
-Python
-FastAPI
-SQLAlchemy
-Alembic
-PostgreSQL
-Pydantic
-MQTT client
+Node.js / TypeScript
+NestJS
+TypeORM
+SQLite (standalone mode) or PostgreSQL (headless mode) — config-driven
+MQTT (embedded Aedes broker, in-process)
 ```
 
 ### Frontend
 
-Recommended:
-
 ```text
-React
+Vue 3 (Composition API)
 TypeScript
 Vite
 ```
 
+Not React, not Angular — Vue is the team's current day-to-day framework.
+
 ### Deployment
 
-Recommended:
+Two modes from one codebase — see [`docs/deployment-modes.md`](../docs/deployment-modes.md):
 
 ```text
-Docker Compose
+Standalone: single packaged Node executable (Node SEA / pkg), SQLite, no install ceremony
+Headless: Docker Compose, PostgreSQL, managed remotely over the web UI
 ```
 
 ---
 
 ## Development Phases
 
-### Phase 1 – Core Event Pipeline
+**Status:** Phases 1–2 are done and Phase 3 is partially done (splits and
+classification work; gate health dashboard doesn't exist yet). This section
+is kept for the original long-term shape of the plan — for the actual
+up-to-date done/next/deferred list, see
+[`docs/development-roadmap.md`](../docs/development-roadmap.md).
+
+### Phase 1 – Core Event Pipeline (done)
 
 Goals:
 
@@ -992,7 +1018,7 @@ Goals:
 - Store detection events
 - Show live detections in Web UI
 
-### Phase 2 – Start / Finish Timing
+### Phase 2 – Start / Finish Timing (done)
 
 Goals:
 
@@ -1002,15 +1028,15 @@ Goals:
 - Calculate duration
 - Display results
 
-### Phase 3 – Multiple Gates and Multiple Stages
+### Phase 3 – Multiple Gates and Multiple Stages (partially done)
 
 Goals:
 
 - Support any number of gates
 - Support any number of stages
 - Support parallel stages
-- Add split points
-- Add gate health dashboard
+- Add split points — done (`stage_split` role, `StageSplit` entity, live SSE stream)
+- Add gate health dashboard — not started
 
 ### Phase 4 – Rally Controls
 
@@ -1055,6 +1081,12 @@ Goals:
 ---
 
 ## MVP Definition
+
+**Status: achieved and exceeded.** All of the below is working end-to-end via
+simulated detections, plus split timing and per-stage/overall classification
+that go beyond the original MVP scope. See
+[`docs/development-roadmap.md`](../docs/development-roadmap.md) for what's
+built next.
 
 The first useful MVP should support:
 
@@ -1135,26 +1167,37 @@ Long-term features may include:
 - Mobile-friendly event control UI
 - Offline-first rally operation
 
+On "Spectator display" specifically: the decided shape for this is a
+one-way, **push-based** sync from the local rally-server to a cloud service
+(never inbound to the rally network, which stays closed to outsiders for
+security/stability of the actual timing gates). See
+[`docs/deployment-modes.md`](../docs/deployment-modes.md#future-onlinespectator-mode)
+for the current thinking — not built yet.
+
 ---
 
-## First Claude Code Task
+## Original Bootstrap Task (completed)
 
-Use this document as project context and create the initial repository.
+This was the original instruction used to scaffold the repository — kept here
+as historical record. It's done: the repo exists at `rally-gate` with a
+working event pipeline over simulated detections (NestJS instead of FastAPI,
+npm-workspaces monorepo instead of standalone `services/`, SQLite dev DB
+instead of Postgres-only — see the status notes throughout this doc for what
+changed).
 
-Start with:
+1. ~~A Docker Compose development environment~~
+2. ~~PostgreSQL~~ → SQLite for dev/standalone, Postgres for headless (config-driven)
+3. ~~MQTT broker~~ → embedded Aedes, in-process
+4. ~~FastAPI rally-server~~ → NestJS rally-server
+5. Simple gate-agent simulator — done (`SimulatedAdapter`, interval + one-off CLI)
+6. Database schema for gates, vehicles, transponders, detection events, stages, and stage runs — done, plus `StageSplit`
+7. REST API for creating vehicles, gates, stages, and detection events — done
+8. WebSocket or Server-Sent Events endpoint for live detections — done (SSE)
+9. Minimal web UI showing live detections and calculated stage times — done (Vue dashboard), plus splits and classification
 
-1. A Docker Compose development environment
-2. PostgreSQL
-3. MQTT broker
-4. FastAPI rally-server
-5. Simple gate-agent simulator
-6. Database schema for gates, vehicles, transponders, detection events, stages, and stage runs
-7. REST API for creating vehicles, gates, stages, and detection events
-8. WebSocket or Server-Sent Events endpoint for live detections
-9. Minimal web UI showing live detections and calculated stage times
-
-Do not implement OpenStint integration first.
-
-First implement the system using simulated detection events.
-
-After the event pipeline works, add the OpenStint adapter.
+Real OpenStint integration has not started — the software side was, and
+still is, deliberately built and validated against simulated events first.
+For what to work on next, use
+[`docs/development-roadmap.md`](../docs/development-roadmap.md), not this
+section — treat this as an existing, runnable codebase to extend, not a
+green field.
