@@ -28,9 +28,15 @@ echo
 echo "No two gates need a globally unique ID by force, but pick one that"
 echo "won't collide if this gate is ever borrowed/loaned to another club or"
 echo "used at a joint event. Prefix it with your club's short code, e.g."
-echo "CLUB_START_WP1 rather than just START_WP1."
-ask GATE_ID "Gate ID (e.g. CLUB_START_WP1)"
+echo "CLUB_START_WP1 rather than just START_WP1. Defaults to this Pi's"
+echo "current hostname, in case that's already set up the way you want."
+ask GATE_ID "Gate ID (e.g. CLUB_START_WP1)" "$(hostname)"
 while [ -z "$GATE_ID" ]; do ask GATE_ID "Gate ID is required"; done
+
+SET_HOSTNAME="n"
+if [ "$GATE_ID" != "$(hostname)" ]; then
+  ask SET_HOSTNAME "Also rename this Pi's hostname to $GATE_ID? (makes it easier to find on the network, e.g. via mDNS) (Y/n)" "y"
+fi
 
 ask MQTT_HOST "rally-server IP address"
 while [ -z "$MQTT_HOST" ]; do ask MQTT_HOST "rally-server IP is required"; done
@@ -40,6 +46,7 @@ ask HAS_RTC "DS3231 RTC module connected? (y/N)" "n"
 
 echo
 echo "  Gate ID:     $GATE_ID"
+echo "  Hostname:    $([[ "$SET_HOSTNAME" =~ ^[Yy]$ ]] && echo "$GATE_ID (renaming from $(hostname))" || echo "unchanged ($(hostname))")"
 echo "  MQTT host:   $MQTT_HOST:$MQTT_PORT"
 echo "  Install dir: $INSTALL_DIR"
 echo "  RTC:         $([[ "$HAS_RTC" =~ ^[Yy]$ ]] && echo "DS3231" || echo "none")"
@@ -90,6 +97,13 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now rally-gate-agent
 
 REBOOT_NEEDED=0
+
+if [[ "$SET_HOSTNAME" =~ ^[Yy]$ ]]; then
+  echo "-- renaming hostname to $GATE_ID --"
+  sudo raspi-config nonint do_hostname "$GATE_ID"
+  REBOOT_NEEDED=1
+fi
+
 if [[ "$HAS_RTC" =~ ^[Yy]$ ]]; then
   echo "-- configuring DS3231 RTC --"
   BOOT_CONFIG=/boot/firmware/config.txt
@@ -110,6 +124,6 @@ echo "Done. gate-agent ($GATE_ID) is running — logs: journalctl -u rally-gate-
 
 if [ "$REBOOT_NEEDED" = "1" ]; then
   echo
-  read -rp "RTC config needs a reboot to take effect. Reboot now? [Y/n] " reboot_ok < /dev/tty
+  read -rp "Hostname/RTC changes need a reboot to take effect. Reboot now? [Y/n] " reboot_ok < /dev/tty
   [[ "${reboot_ok:-y}" =~ ^[Yy]$ ]] && sudo reboot
 fi
