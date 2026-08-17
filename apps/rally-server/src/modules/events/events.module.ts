@@ -8,7 +8,12 @@ import { EventsController } from './events.controller';
 import { EventsService } from './events.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DetectionEventRecord]), GatesModule, VehiclesModule, StageRunsModule],
+  imports: [
+    TypeOrmModule.forFeature([DetectionEventRecord]),
+    GatesModule,
+    VehiclesModule,
+    StageRunsModule,
+  ],
   controllers: [EventsController],
   providers: [EventsService],
 })

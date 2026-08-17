@@ -37,14 +37,20 @@ export class StageRunsService {
   }
 
   async cancelActiveRuns(stageId: string): Promise<void> {
-    await this.stageRuns.update({ stageId, status: StageRunStatus.STARTED }, { status: StageRunStatus.CANCELLED });
+    await this.stageRuns.update(
+      { stageId, status: StageRunStatus.STARTED },
+      { status: StageRunStatus.CANCELLED },
+    );
   }
 
   findAllFinished(): Promise<StageRun[]> {
     return this.stageRuns.find({ where: { status: StageRunStatus.FINISHED } });
   }
 
-  private findActive(vehicleId: string, stageId: string): Promise<StageRun | null> {
+  private findActive(
+    vehicleId: string,
+    stageId: string,
+  ): Promise<StageRun | null> {
     return this.stageRuns.findOneBy({
       vehicleId,
       stageId,
@@ -52,7 +58,10 @@ export class StageRunsService {
     });
   }
 
-  private findFinished(vehicleId: string, stageId: string): Promise<StageRun | null> {
+  private findFinished(
+    vehicleId: string,
+    stageId: string,
+  ): Promise<StageRun | null> {
     return this.stageRuns.findOneBy({
       vehicleId,
       stageId,
@@ -60,15 +69,23 @@ export class StageRunsService {
     });
   }
 
-  async startRun(vehicleId: string, stageId: string, startTime: Date): Promise<StageRun> {
+  async startRun(
+    vehicleId: string,
+    stageId: string,
+    startTime: Date,
+  ): Promise<StageRun> {
     const existing = await this.findActive(vehicleId, stageId);
     if (existing) {
-      this.logger.warn(`Vehicle ${vehicleId} already has a running stage run on ${stageId}, ignoring duplicate start`);
+      this.logger.warn(
+        `Vehicle ${vehicleId} already has a running stage run on ${stageId}, ignoring duplicate start`,
+      );
       return existing;
     }
     const finished = await this.findFinished(vehicleId, stageId);
     if (finished) {
-      this.logger.warn(`Vehicle ${vehicleId} already finished stage ${stageId}, ignoring restart`);
+      this.logger.warn(
+        `Vehicle ${vehicleId} already finished stage ${stageId}, ignoring restart`,
+      );
       return finished;
     }
     const run = this.stageRuns.create({
@@ -80,10 +97,16 @@ export class StageRunsService {
     return this.stageRuns.save(run);
   }
 
-  async finishRun(vehicleId: string, stageId: string, finishTime: Date): Promise<StageRun | null> {
+  async finishRun(
+    vehicleId: string,
+    stageId: string,
+    finishTime: Date,
+  ): Promise<StageRun | null> {
     const run = await this.findActive(vehicleId, stageId);
     if (!run) {
-      this.logger.warn(`No active stage run for vehicle ${vehicleId} on ${stageId}, ignoring finish event`);
+      this.logger.warn(
+        `No active stage run for vehicle ${vehicleId} on ${stageId}, ignoring finish event`,
+      );
       return null;
     }
     run.finishTime = finishTime;
@@ -101,12 +124,19 @@ export class StageRunsService {
   ): Promise<StageSplit | null> {
     const run = await this.findActive(vehicleId, stageId);
     if (!run) {
-      this.logger.warn(`No active stage run for vehicle ${vehicleId} on ${stageId}, ignoring split event`);
+      this.logger.warn(
+        `No active stage run for vehicle ${vehicleId} on ${stageId}, ignoring split event`,
+      );
       return null;
     }
-    const existing = await this.stageSplits.findOneBy({ stageRunId: run.id, gateId });
+    const existing = await this.stageSplits.findOneBy({
+      stageRunId: run.id,
+      gateId,
+    });
     if (existing) {
-      this.logger.warn(`Split for gate ${gateId} already recorded for run ${run.id}, ignoring duplicate`);
+      this.logger.warn(
+        `Split for gate ${gateId} already recorded for run ${run.id}, ignoring duplicate`,
+      );
       return existing;
     }
     const split = this.stageSplits.create({
@@ -120,14 +150,22 @@ export class StageRunsService {
   }
 
   findSplitsForRun(stageRunId: string): Promise<StageSplit[]> {
-    return this.stageSplits.find({ where: { stageRunId }, order: { splitIndex: 'ASC' } });
+    return this.stageSplits.find({
+      where: { stageRunId },
+      order: { splitIndex: 'ASC' },
+    });
   }
 
-  async findSplitsForStageAtIndex(stageId: string, splitIndex: number): Promise<StageRunSplitPair[]> {
+  async findSplitsForStageAtIndex(
+    stageId: string,
+    splitIndex: number,
+  ): Promise<StageRunSplitPair[]> {
     const runs = await this.stageRuns.find({
       where: { stageId },
     });
-    const activeRuns = runs.filter((run) => run.status !== StageRunStatus.CANCELLED);
+    const activeRuns = runs.filter(
+      (run) => run.status !== StageRunStatus.CANCELLED,
+    );
     if (activeRuns.length === 0) {
       return [];
     }
@@ -135,6 +173,9 @@ export class StageRunsService {
     const splits = await this.stageSplits.find({
       where: { stageRunId: In([...runById.keys()]), splitIndex },
     });
-    return splits.map((split) => ({ run: runById.get(split.stageRunId)!, split }));
+    return splits.map((split) => ({
+      run: runById.get(split.stageRunId)!,
+      split,
+    }));
   }
 }

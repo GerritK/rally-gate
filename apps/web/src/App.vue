@@ -48,7 +48,12 @@ const nonFinishers = ref<StageOutcomeEntry[]>([]);
 const closingStage = ref(false);
 const gates = ref<Gate[]>([]);
 const gateAssignments = ref<GateAssignment[]>([]);
-const newAssignment = ref<{ gateId: string; stageId: string; role: string; splitIndex?: number }>({
+const newAssignment = ref<{
+  gateId: string;
+  stageId: string;
+  role: string;
+  splitIndex?: number;
+}>({
   gateId: '',
   stageId: '',
   role: GATE_ROLES[0],
@@ -70,7 +75,9 @@ function upsertSplit(split: StageSplit) {
   const splits = splitsByRun.value[split.stageRunId] ?? [];
   const idx = splits.findIndex((s) => s.id === split.id);
   if (idx === -1) {
-    splitsByRun.value[split.stageRunId] = [...splits, split].sort((a, b) => a.splitIndex - b.splitIndex);
+    splitsByRun.value[split.stageRunId] = [...splits, split].sort(
+      (a, b) => a.splitIndex - b.splitIndex,
+    );
   } else {
     splits[idx] = split;
     splitsByRun.value[split.stageRunId] = [...splits];
@@ -80,7 +87,9 @@ function upsertSplit(split: StageSplit) {
 function formatSplits(runId: string): string {
   const splits = splitsByRun.value[runId];
   if (!splits || splits.length === 0) return '-';
-  return splits.map((s) => `S${s.splitIndex}: ${(s.elapsedMs / 1000).toFixed(3)}s`).join(', ');
+  return splits
+    .map((s) => `S${s.splitIndex}: ${(s.elapsedMs / 1000).toFixed(3)}s`)
+    .join(', ');
 }
 
 function formatDuration(ms?: number): string {
@@ -95,36 +104,51 @@ function formatGap(ms: number): string {
 
 async function refreshClassifications() {
   if (selectedStageId.value) {
-    stageClassification.value = await fetchStageClassification(selectedStageId.value);
+    stageClassification.value = await fetchStageClassification(
+      selectedStageId.value,
+    );
   }
   overallClassification.value = await fetchOverallClassification();
 }
 
 async function refreshSplitClassification() {
   if (selectedStageId.value && selectedSplitIndex.value !== null) {
-    splitClassification.value = await fetchSplitClassification(selectedStageId.value, selectedSplitIndex.value);
+    splitClassification.value = await fetchSplitClassification(
+      selectedStageId.value,
+      selectedSplitIndex.value,
+    );
   } else {
     splitClassification.value = [];
   }
 }
 
 async function refreshNonFinishers() {
-  nonFinishers.value = selectedStageId.value ? await fetchNonFinishers(selectedStageId.value) : [];
+  nonFinishers.value = selectedStageId.value
+    ? await fetchNonFinishers(selectedStageId.value)
+    : [];
 }
 
 async function onStageSelected() {
   await refreshClassifications();
-  splitGates.value = selectedStageId.value ? await fetchSplitGatesForStage(selectedStageId.value) : [];
-  selectedSplitIndex.value = splitGates.value.length > 0 ? splitGates.value[0].splitIndex! : null;
+  splitGates.value = selectedStageId.value
+    ? await fetchSplitGatesForStage(selectedStageId.value)
+    : [];
+  selectedSplitIndex.value =
+    splitGates.value.length > 0 ? splitGates.value[0].splitIndex! : null;
   await refreshSplitClassification();
   await refreshNonFinishers();
 }
 
-const selectedStage = computed(() => stages.value.find((stage) => stage.id === selectedStageId.value));
+const selectedStage = computed(() =>
+  stages.value.find((stage) => stage.id === selectedStageId.value),
+);
 
 function isOnline(gate: Gate): boolean {
   if (!gate.lastHeartbeatAt) return false;
-  return Date.now() - new Date(gate.lastHeartbeatAt).getTime() < HEARTBEAT_ONLINE_THRESHOLD_MS;
+  return (
+    Date.now() - new Date(gate.lastHeartbeatAt).getTime() <
+    HEARTBEAT_ONLINE_THRESHOLD_MS
+  );
 }
 
 function stageName(stageId: string): string {
@@ -284,7 +308,11 @@ onUnmounted(() => {
       <label v-if="splitGates.length > 0">
         Split:
         <select v-model="selectedSplitIndex">
-          <option v-for="gate in splitGates" :key="gate.gateId" :value="gate.splitIndex">
+          <option
+            v-for="gate in splitGates"
+            :key="gate.gateId"
+            :value="gate.splitIndex"
+          >
             Split {{ gate.splitIndex }} ({{ gate.name }})
           </option>
         </select>
@@ -364,7 +392,13 @@ onUnmounted(() => {
             <td>{{ run.stageId }}</td>
             <td>{{ new Date(run.startTime).toLocaleTimeString() }}</td>
             <td>{{ formatSplits(run.id) }}</td>
-            <td>{{ run.finishTime ? new Date(run.finishTime).toLocaleTimeString() : '-' }}</td>
+            <td>
+              {{
+                run.finishTime
+                  ? new Date(run.finishTime).toLocaleTimeString()
+                  : '-'
+              }}
+            </td>
             <td>{{ formatDuration(run.durationMs) }}</td>
             <td>{{ run.status }}</td>
           </tr>
@@ -390,17 +424,30 @@ onUnmounted(() => {
             <td>{{ gate.id }}</td>
             <td>{{ gate.name }}</td>
             <td>{{ isOnline(gate) ? 'online' : 'offline' }}</td>
-            <td>{{ gate.lastHeartbeatAt ? new Date(gate.lastHeartbeatAt).toLocaleTimeString() : 'never' }}</td>
+            <td>
+              {{
+                gate.lastHeartbeatAt
+                  ? new Date(gate.lastHeartbeatAt).toLocaleTimeString()
+                  : 'never'
+              }}
+            </td>
             <td>{{ gate.capabilities ?? '-' }}</td>
             <td>
-              <template v-for="assignment in gateAssignments.filter((a) => a.gateId === gate.id && a.active)" :key="assignment.id">
+              <template
+                v-for="assignment in gateAssignments.filter(
+                  (a) => a.gateId === gate.id && a.active,
+                )"
+                :key="assignment.id"
+              >
                 {{ assignment.role }} @ {{ stageName(assignment.stageId) }}
               </template>
             </td>
           </tr>
         </tbody>
       </table>
-      <p v-if="gates.length === 0">No gates yet — waiting for a gate-agent heartbeat.</p>
+      <p v-if="gates.length === 0">
+        No gates yet — waiting for a gate-agent heartbeat.
+      </p>
     </section>
 
     <section>
@@ -424,8 +471,15 @@ onUnmounted(() => {
             <td>{{ assignment.splitIndex ?? '-' }}</td>
             <td>{{ assignment.active ? 'yes' : 'no' }}</td>
             <td>
-              <button v-if="!assignment.active" @click="onActivateAssignment(assignment)">Activate</button>
-              <button v-else @click="onDeactivateAssignment(assignment)">Deactivate</button>
+              <button
+                v-if="!assignment.active"
+                @click="onActivateAssignment(assignment)"
+              >
+                Activate
+              </button>
+              <button v-else @click="onDeactivateAssignment(assignment)">
+                Deactivate
+              </button>
               <button @click="onDeleteAssignment(assignment)">Delete</button>
             </td>
           </tr>
@@ -434,14 +488,20 @@ onUnmounted(() => {
       <form @submit.prevent="onCreateAssignment">
         <select v-model="newAssignment.gateId">
           <option value="" disabled>Gate</option>
-          <option v-for="gate in gates" :key="gate.id" :value="gate.id">{{ gate.name }}</option>
+          <option v-for="gate in gates" :key="gate.id" :value="gate.id">
+            {{ gate.name }}
+          </option>
         </select>
         <select v-model="newAssignment.stageId">
           <option value="" disabled>Stage</option>
-          <option v-for="stage in stages" :key="stage.id" :value="stage.id">{{ stage.name }}</option>
+          <option v-for="stage in stages" :key="stage.id" :value="stage.id">
+            {{ stage.name }}
+          </option>
         </select>
         <select v-model="newAssignment.role">
-          <option v-for="role in GATE_ROLES" :key="role" :value="role">{{ role }}</option>
+          <option v-for="role in GATE_ROLES" :key="role" :value="role">
+            {{ role }}
+          </option>
         </select>
         <input
           v-if="newAssignment.role === 'stage_split'"
@@ -492,7 +552,8 @@ table {
   width: 100%;
   border-collapse: collapse;
 }
-th, td {
+th,
+td {
   text-align: left;
   padding: 0.4rem 0.6rem;
   border-bottom: 1px solid #ccc;

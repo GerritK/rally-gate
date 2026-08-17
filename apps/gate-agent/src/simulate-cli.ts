@@ -23,7 +23,9 @@ client.on('connect', () => {
     source: 'simulated-cli',
   };
   client.publish(detectionTopicFor(gateId), JSON.stringify(event), {}, () => {
-    console.log(`Published detection: gate=${gateId} transponder=${transponderId}`);
+    console.log(
+      `Published detection: gate=${gateId} transponder=${transponderId}`,
+    );
     client.end();
   });
 });
