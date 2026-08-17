@@ -1,4 +1,5 @@
-export const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:57430';
+export const API_BASE =
+  import.meta.env.VITE_API_URL ?? 'http://localhost:57430';
 
 export interface DetectionEventRecord {
   eventId: string;
@@ -120,23 +121,33 @@ export async function fetchStages(): Promise<Stage[]> {
   return res.json();
 }
 
-export async function fetchSplitsForRun(stageRunId: string): Promise<StageSplit[]> {
+export async function fetchSplitsForRun(
+  stageRunId: string,
+): Promise<StageSplit[]> {
   const res = await fetch(`${API_BASE}/stage-runs/${stageRunId}/splits`);
   return res.json();
 }
 
-export async function fetchStageClassification(stageId: string): Promise<ClassificationEntry[]> {
+export async function fetchStageClassification(
+  stageId: string,
+): Promise<ClassificationEntry[]> {
   const res = await fetch(`${API_BASE}/classification/stages/${stageId}`);
   return res.json();
 }
 
-export async function fetchOverallClassification(): Promise<OverallClassificationEntry[]> {
+export async function fetchOverallClassification(): Promise<
+  OverallClassificationEntry[]
+> {
   const res = await fetch(`${API_BASE}/classification/overall`);
   return res.json();
 }
 
-export async function fetchSplitGatesForStage(stageId: string): Promise<SplitGateInfo[]> {
-  const res = await fetch(`${API_BASE}/classification/stages/${stageId}/split-gates`);
+export async function fetchSplitGatesForStage(
+  stageId: string,
+): Promise<SplitGateInfo[]> {
+  const res = await fetch(
+    `${API_BASE}/classification/stages/${stageId}/split-gates`,
+  );
   return res.json();
 }
 
@@ -164,13 +175,21 @@ export async function createGateAssignment(assignment: {
   return res.json();
 }
 
-export async function activateGateAssignment(id: string): Promise<GateAssignment> {
-  const res = await fetch(`${API_BASE}/gate-assignments/${id}/activate`, { method: 'POST' });
+export async function activateGateAssignment(
+  id: string,
+): Promise<GateAssignment> {
+  const res = await fetch(`${API_BASE}/gate-assignments/${id}/activate`, {
+    method: 'POST',
+  });
   return res.json();
 }
 
-export async function deactivateGateAssignment(id: string): Promise<GateAssignment> {
-  const res = await fetch(`${API_BASE}/gate-assignments/${id}/deactivate`, { method: 'POST' });
+export async function deactivateGateAssignment(
+  id: string,
+): Promise<GateAssignment> {
+  const res = await fetch(`${API_BASE}/gate-assignments/${id}/deactivate`, {
+    method: 'POST',
+  });
   return res.json();
 }
 
@@ -182,16 +201,24 @@ export async function fetchSplitClassification(
   stageId: string,
   splitIndex: number,
 ): Promise<SplitClassificationEntry[]> {
-  const res = await fetch(`${API_BASE}/classification/stages/${stageId}/splits/${splitIndex}`);
+  const res = await fetch(
+    `${API_BASE}/classification/stages/${stageId}/splits/${splitIndex}`,
+  );
   return res.json();
 }
 
-export async function fetchNonFinishers(stageId: string): Promise<StageOutcomeEntry[]> {
-  const res = await fetch(`${API_BASE}/classification/stages/${stageId}/non-finishers`);
+export async function fetchNonFinishers(
+  stageId: string,
+): Promise<StageOutcomeEntry[]> {
+  const res = await fetch(
+    `${API_BASE}/classification/stages/${stageId}/non-finishers`,
+  );
   return res.json();
 }
 
 export async function closeStage(stageId: string): Promise<Stage> {
-  const res = await fetch(`${API_BASE}/stages/${stageId}/close`, { method: 'POST' });
+  const res = await fetch(`${API_BASE}/stages/${stageId}/close`, {
+    method: 'POST',
+  });
   return res.json();
 }

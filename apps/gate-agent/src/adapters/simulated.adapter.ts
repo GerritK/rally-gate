@@ -16,7 +16,8 @@ export class SimulatedAdapter implements DecoderAdapter {
     }
     let i = 0;
     this.timer = setInterval(() => {
-      const transponderId = this.options.transponderIds[i % this.options.transponderIds.length];
+      const transponderId =
+        this.options.transponderIds[i % this.options.transponderIds.length];
       i += 1;
       onDetection(transponderId, new Date());
     }, this.options.intervalMs);

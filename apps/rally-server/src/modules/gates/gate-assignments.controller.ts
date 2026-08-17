@@ -1,18 +1,38 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { GateRole } from '@rally-gate/shared';
 import { GateAssignmentsService } from './gate-assignments.service';
 
 @Controller('gate-assignments')
 export class GateAssignmentsController {
-  constructor(private readonly gateAssignmentsService: GateAssignmentsService) {}
+  constructor(
+    private readonly gateAssignmentsService: GateAssignmentsService,
+  ) {}
 
   @Get()
   findAll(@Query('gateId') gateId?: string) {
-    return gateId ? this.gateAssignmentsService.findByGate(gateId) : this.gateAssignmentsService.findAll();
+    return gateId
+      ? this.gateAssignmentsService.findByGate(gateId)
+      : this.gateAssignmentsService.findAll();
   }
 
   @Post()
-  create(@Body() body: { gateId: string; stageId: string; role: GateRole; splitIndex?: number }) {
+  create(
+    @Body()
+    body: {
+      gateId: string;
+      stageId: string;
+      role: GateRole;
+      splitIndex?: number;
+    },
+  ) {
     return this.gateAssignmentsService.create(body);
   }
 

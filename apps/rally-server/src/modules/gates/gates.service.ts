@@ -5,7 +5,9 @@ import { DETECTION_TOPIC_PREFIX } from '@rally-gate/shared';
 import { Repository } from 'typeorm';
 import { Gate } from './gate.entity';
 
-const HEARTBEAT_TOPIC_REGEX = new RegExp(`^${DETECTION_TOPIC_PREFIX}/([^/]+)/heartbeat$`);
+const HEARTBEAT_TOPIC_REGEX = new RegExp(
+  `^${DETECTION_TOPIC_PREFIX}/([^/]+)/heartbeat$`,
+);
 
 @Injectable()
 export class GatesService {
@@ -28,7 +30,13 @@ export class GatesService {
   }
 
   @OnEvent('mqtt.message')
-  async handleMqttMessage({ topic, payload }: { topic: string; payload: Buffer }) {
+  async handleMqttMessage({
+    topic,
+    payload,
+  }: {
+    topic: string;
+    payload: Buffer;
+  }) {
     const match = HEARTBEAT_TOPIC_REGEX.exec(topic);
     if (!match) {
       return;
@@ -36,7 +44,8 @@ export class GatesService {
     const [, gateId] = match;
     let capabilities: string | undefined;
     try {
-      capabilities = JSON.parse(payload.toString())?.capabilities;
+      const body = JSON.parse(payload.toString()) as { capabilities?: string };
+      capabilities = body.capabilities;
     } catch {
       // heartbeat with no/invalid body still counts as "alive"
     }
@@ -44,7 +53,9 @@ export class GatesService {
   }
 
   async recordHeartbeat(gateId: string, capabilities?: string): Promise<Gate> {
-    const gate = (await this.gates.findOneBy({ id: gateId })) ?? this.gates.create({ id: gateId, name: gateId });
+    const gate =
+      (await this.gates.findOneBy({ id: gateId })) ??
+      this.gates.create({ id: gateId, name: gateId });
     gate.lastHeartbeatAt = new Date();
     if (capabilities) {
       gate.capabilities = capabilities;

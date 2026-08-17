@@ -30,7 +30,12 @@ export class GateAssignmentsService {
     });
   }
 
-  create(data: { gateId: string; stageId: string; role: GateRole; splitIndex?: number }): Promise<GateAssignment> {
+  create(data: {
+    gateId: string;
+    stageId: string;
+    role: GateRole;
+    splitIndex?: number;
+  }): Promise<GateAssignment> {
     const assignment = this.assignments.create({ ...data, active: false });
     return this.assignments.save(assignment);
   }
@@ -41,7 +46,11 @@ export class GateAssignmentsService {
       throw new NotFoundException(`GateAssignment ${id} not found`);
     }
     await this.assignments.manager.transaction(async (manager) => {
-      await manager.update(GateAssignment, { gateId: assignment.gateId, active: true }, { active: false });
+      await manager.update(
+        GateAssignment,
+        { gateId: assignment.gateId, active: true },
+        { active: false },
+      );
       await manager.update(GateAssignment, { id }, { active: true });
     });
     return this.assignments.findOneBy({ id }) as Promise<GateAssignment>;

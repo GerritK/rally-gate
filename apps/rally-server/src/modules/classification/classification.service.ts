@@ -29,20 +29,33 @@ export class ClassificationService {
     private readonly gateAssignmentsService: GateAssignmentsService,
   ) {}
 
-  async getStageClassification(stageId: string): Promise<ClassificationEntry[]> {
+  async getStageClassification(
+    stageId: string,
+  ): Promise<ClassificationEntry[]> {
     const stage = await this.stagesService.findOne(stageId);
     if (!stage) {
       throw new NotFoundException(`Stage ${stageId} not found`);
     }
     const runs = await this.stageRunsService.findFinishedByStage(stageId);
-    return this.rank(runs.map((run) => ({ vehicleId: run.vehicleId, durationMs: run.durationMs as number })));
+    return this.rank(
+      runs.map((run) => ({
+        vehicleId: run.vehicleId,
+        durationMs: run.durationMs as number,
+      })),
+    );
   }
 
   async getOverallClassification(): Promise<OverallClassificationEntry[]> {
     const runs = await this.stageRunsService.findAllFinished();
-    const totals = new Map<string, { durationMs: number; stagesCompleted: number }>();
+    const totals = new Map<
+      string,
+      { durationMs: number; stagesCompleted: number }
+    >();
     for (const run of runs) {
-      const totalsEntry = totals.get(run.vehicleId) ?? { durationMs: 0, stagesCompleted: 0 };
+      const totalsEntry = totals.get(run.vehicleId) ?? {
+        durationMs: 0,
+        stagesCompleted: 0,
+      };
       totalsEntry.durationMs += run.durationMs ?? 0;
       totalsEntry.stagesCompleted += 1;
       totals.set(run.vehicleId, totalsEntry);
@@ -64,7 +77,8 @@ export class ClassificationService {
     if (!stage) {
       throw new NotFoundException(`Stage ${stageId} not found`);
     }
-    const assignments = await this.gateAssignmentsService.findActiveSplitGatesForStage(stageId);
+    const assignments =
+      await this.gateAssignmentsService.findActiveSplitGatesForStage(stageId);
     const gates = await this.gatesService.findAll();
     const gateById = new Map(gates.map((gate) => [gate.id, gate]));
     return assignments.map((assignment) => ({
@@ -74,15 +88,25 @@ export class ClassificationService {
     }));
   }
 
-  async getSplitClassification(stageId: string, splitIndex: number): Promise<SplitClassificationEntry[]> {
+  async getSplitClassification(
+    stageId: string,
+    splitIndex: number,
+  ): Promise<SplitClassificationEntry[]> {
     const stage = await this.stagesService.findOne(stageId);
     if (!stage) {
       throw new NotFoundException(`Stage ${stageId} not found`);
     }
-    const pairs = await this.stageRunsService.findSplitsForStageAtIndex(stageId, splitIndex);
+    const pairs = await this.stageRunsService.findSplitsForStageAtIndex(
+      stageId,
+      splitIndex,
+    );
     const vehicles = await this.vehiclesService.findAll();
-    const vehicleById = new Map<string, Vehicle>(vehicles.map((vehicle) => [vehicle.id, vehicle]));
-    const sorted = [...pairs].sort((a, b) => a.split.elapsedMs - b.split.elapsedMs);
+    const vehicleById = new Map<string, Vehicle>(
+      vehicles.map((vehicle) => [vehicle.id, vehicle]),
+    );
+    const sorted = [...pairs].sort(
+      (a, b) => a.split.elapsedMs - b.split.elapsedMs,
+    );
     const leaderMs = sorted[0]?.split.elapsedMs ?? 0;
     return sorted.map((pair, index) => {
       const vehicle = vehicleById.get(pair.run.vehicleId);
@@ -107,8 +131,13 @@ export class ClassificationService {
     }
     const runs = await this.stageRunsService.findByStage(stageId);
     const vehicles = await this.vehiclesService.findAll();
-    const vehicleById = new Map<string, Vehicle>(vehicles.map((vehicle) => [vehicle.id, vehicle]));
-    const toEntry = (vehicleId: string, outcome: 'DNF' | 'DNS'): StageOutcomeEntry => {
+    const vehicleById = new Map<string, Vehicle>(
+      vehicles.map((vehicle) => [vehicle.id, vehicle]),
+    );
+    const toEntry = (
+      vehicleId: string,
+      outcome: 'DNF' | 'DNS',
+    ): StageOutcomeEntry => {
       const vehicle = vehicleById.get(vehicleId);
       return {
         vehicleId,
@@ -119,19 +148,25 @@ export class ClassificationService {
       };
     };
 
-    const dnf = runs.filter((run) => run.status === StageRunStatus.CANCELLED).map((run) => toEntry(run.vehicleId, 'DNF'));
+    const dnf = runs
+      .filter((run) => run.status === StageRunStatus.CANCELLED)
+      .map((run) => toEntry(run.vehicleId, 'DNF'));
     if (stage.status !== StageStatus.CLOSED) {
       // Before the stage closes, "no run yet" just means "hasn't started" — not DNS.
       return dnf;
     }
     const startedVehicleIds = new Set(runs.map((run) => run.vehicleId));
-    const dns = vehicles.filter((vehicle) => !startedVehicleIds.has(vehicle.id)).map((vehicle) => toEntry(vehicle.id, 'DNS'));
+    const dns = vehicles
+      .filter((vehicle) => !startedVehicleIds.has(vehicle.id))
+      .map((vehicle) => toEntry(vehicle.id, 'DNS'));
     return [...dnf, ...dns];
   }
 
   private async rank(entries: RankableEntry[]): Promise<ClassificationEntry[]> {
     const vehicles = await this.vehiclesService.findAll();
-    const vehicleById = new Map<string, Vehicle>(vehicles.map((vehicle) => [vehicle.id, vehicle]));
+    const vehicleById = new Map<string, Vehicle>(
+      vehicles.map((vehicle) => [vehicle.id, vehicle]),
+    );
     const sorted = [...entries].sort((a, b) => a.durationMs - b.durationMs);
     const leaderMs = sorted[0]?.durationMs ?? 0;
     return sorted.map((entry, index) => {
