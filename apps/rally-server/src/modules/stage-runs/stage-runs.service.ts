@@ -33,6 +33,14 @@ export class StageRunsService {
     });
   }
 
+  findByStage(stageId: string): Promise<StageRun[]> {
+    return this.stageRuns.find({ where: { stageId } });
+  }
+
+  async cancelActiveRuns(stageId: string): Promise<void> {
+    await this.stageRuns.update({ stageId, status: StageRunStatus.STARTED }, { status: StageRunStatus.CANCELLED });
+  }
+
   findAllFinished(): Promise<StageRun[]> {
     return this.stageRuns.find({ where: { status: StageRunStatus.FINISHED } });
   }

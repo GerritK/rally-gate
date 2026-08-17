@@ -23,3 +23,11 @@ export interface SplitClassificationEntry {
   gapMs: number;
   stageRunStatus: string;
 }
+
+export interface StageOutcomeEntry {
+  vehicleId: string;
+  startNumber: string;
+  driverName: string;
+  coDriverName?: string;
+  outcome: 'DNF' | 'DNS';
+}

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Put } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
 import { Stage } from './stage.entity';
 import { StagesService } from './stages.service';
 
@@ -19,5 +19,10 @@ export class StagesController {
   @Put(':id')
   upsert(@Param('id') id: string, @Body() stage: Omit<Stage, 'id'>) {
     return this.stagesService.upsert({ ...stage, id });
+  }
+
+  @Post(':id/close')
+  close(@Param('id') id: string) {
+    return this.stagesService.close(id);
   }
 }

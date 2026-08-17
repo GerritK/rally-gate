@@ -20,6 +20,44 @@ Switching modes is a config change (`DB_TYPE`, `DB_HOST`, etc. — see
 The MQTT broker (Aedes) is embedded in-process in both modes — there is no
 separate Mosquitto/NATS container to run or configure.
 
+## Event model: one database = one event (planned)
+
+A rally ("event") doesn't need its own `Event` table. `DB_PATH` (SQLite) /
+`DB_NAME` (Postgres) is already configurable per deployment
+(`database.config.ts:4,21`), so mapping "event" to "one database" instead of
+a new entity inside a shared multi-tenant DB gets save/load/transfer almost
+for free:
+
+- **Save** — the SQLite file already *is* the saved event (stages, gates,
+  vehicles, everything in it).
+- **Load** — point `DB_PATH` at that file.
+- **Transfer to another PC running the same software** — copy the file.
+- Same idea for headless/Postgres mode via `DB_NAME` + `pg_dump`/`restore`
+  instead of a file copy.
+
+A real `Event` table (with an `eventId` FK migrated across every entity, plus
+an event-switcher in the UI) would be strictly more work for something the
+filesystem already gives for free — only worth it if multiple events need to
+be live in one running server simultaneously, which isn't the requirement
+here.
+
+"Global" gates (Parc Fermé, service park — not tied to one stage) already
+work with no schema change: `Gate.stageId` is nullable (`gate.entity.ts:15`).
+
+What's actually missing is UX, not data model: a "new event" (create + name
+a fresh DB file) / "open event" (pick an existing one) flow — a detail of
+the standalone packaging work already on the roadmap (Node SEA/pkg + tray
+icon), where "File > New/Open" is a normal desktop-app pattern.
+
+**Known gates across events**: a fresh event file has no gates in it.
+Considered a persistent cross-event device registry to avoid re-discovering
+the same physical hardware every event — not ruled out, just very low
+priority for now. Gates just re-announce via the heartbeat/auto-discovery
+mechanism (`architecture.md` "Gate discovery & heartbeat") each time a new
+event file is loaded; no extra infrastructure needed unless running enough
+events with enough overlapping hardware makes re-assigning gates each time
+genuinely annoying.
+
 ## Future: online/spectator mode
 
 Not built. The idea is a one-way, **push-based** sync from the local
