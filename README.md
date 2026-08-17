@@ -52,3 +52,23 @@ docker compose -f deploy/docker-compose.yml up
 # with simulated gate-agents for a hardware-free demo:
 docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml up
 ```
+
+## Field deployment (Raspberry Pi)
+
+One-shot installers for a stock Raspberry Pi OS Lite image — no manual git clone/build needed.
+
+`rally-server` (Docker Compose, headless/server mode):
+```bash
+curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-server-pi.sh | bash
+```
+
+`gate-agent` (bare-metal, needs direct USB/SDR access — see [docs/decoder-adapters.md](docs/decoder-adapters.md)). Interactive by default; pre-set the env vars to skip prompts:
+```bash
+curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-gate-pi.sh | bash
+# or non-interactive:
+GATE_ID=CLUB_START_WP1 MQTT_HOST=192.168.1.10 bash -c "$(curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-gate-pi.sh)"
+```
+
+No forced global uniqueness on `GATE_ID`, but pick one that won't collide with another club's — prefix it with your club's short code (e.g. `CLUB_START_WP1`) so gates stay collision-free if hardware ever gets shared or a joint event mixes clubs.
+
+Installs as a systemd service (`rally-gate-agent`) — logs via `journalctl -u rally-gate-agent -f`. Optionally configures a DS3231 RTC module if one's connected (asked interactively).

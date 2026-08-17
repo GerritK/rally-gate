@@ -47,7 +47,13 @@ Priority order (1 = next):
    (see `decoder-adapters.md` DS3231 note).
 3. Standalone packaging (`apps/rally-server/packaging/standalone`, Node SEA/pkg + optional tray icon) — needed to hand `rally-server` to a marshal without a dev machine.
 4. Real `OpenStintAdapter` once the RF hardware validation (two ordered gates) confirms reliable reads — critical path, but gated on external hardware validation so it runs in parallel with the above rather than blocking them.
-5. **Gate config web interface** (bigger item, own service): local HTTP server
+5. mDNS/Bonjour broker autodiscovery so a gate can find `rally-server`'s MQTT
+   broker on the local network instead of `MQTT_HOST` being typed in by hand
+   — see "MQTT broker discovery" in `architecture.md`. Smaller and
+   independent of the gate config web interface item below (no AP/hotspot
+   work needed), though it feeds into that item's "MQTT host" field once
+   built. Manual entry stays as a fallback for APs that block multicast.
+6. **Gate config web interface** (bigger item, own service): local HTTP server
    on the gate Pi to set `GATE_ID`, Wi-Fi/network, and MQTT host without
    re-running the install script over SSH. Needs an **AP/hotspot mode**
    fallback (hostapd + dnsmasq, or a lib like balena's wifi-connect) so a
@@ -57,11 +63,17 @@ Priority order (1 = next):
    saved Wi-Fi that fails to connect (wrong password, gate out of range,
    router changed) — not just on first boot with nothing configured. Not
    designed yet.
-6. Parc Fermé / time control / service park gate roles and their state transitions.
+7. Parc Fermé / time control / service park gate roles and their state transitions.
 
 ## Deliberately deferred
 
 - Rule engine YAML DSL (rules are hardcoded in `EventsService` for now — fine at this scale).
 - RC4 learning registry / transponder management UI.
-- Auth on the MQTT broker or REST API.
+- Auth on the MQTT broker, REST API, and web dashboard — MQTT client
+  credentials, web UI login, possibly SSO, with gates authenticating against
+  `rally-server` itself (it's already the one source of truth for what's
+  allowed) rather than a separate identity system. Explicitly deferred until
+  the core timing pipeline is solid — the rally WiFi being closed to
+  outsiders is the security boundary for now (see `deployment-modes.md`
+  "Future: online/spectator mode").
 - Online/spectator sync mode (see `deployment-modes.md`).
