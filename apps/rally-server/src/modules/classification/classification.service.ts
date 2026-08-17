@@ -7,6 +7,7 @@ import {
   StageRunStatus,
   StageStatus,
 } from '@rally-gate/shared';
+import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { GatesService } from '../gates/gates.service';
 import { StageRunsService } from '../stage-runs/stage-runs.service';
 import { StagesService } from '../stages/stages.service';
@@ -25,6 +26,7 @@ export class ClassificationService {
     private readonly stagesService: StagesService,
     private readonly vehiclesService: VehiclesService,
     private readonly gatesService: GatesService,
+    private readonly gateAssignmentsService: GateAssignmentsService,
   ) {}
 
   async getStageClassification(stageId: string): Promise<ClassificationEntry[]> {
@@ -62,7 +64,14 @@ export class ClassificationService {
     if (!stage) {
       throw new NotFoundException(`Stage ${stageId} not found`);
     }
-    return this.gatesService.findSplitGatesForStage(stageId);
+    const assignments = await this.gateAssignmentsService.findActiveSplitGatesForStage(stageId);
+    const gates = await this.gatesService.findAll();
+    const gateById = new Map(gates.map((gate) => [gate.id, gate]));
+    return assignments.map((assignment) => ({
+      gateId: assignment.gateId,
+      name: gateById.get(assignment.gateId)?.name ?? assignment.gateId,
+      splitIndex: assignment.splitIndex ?? 0,
+    }));
   }
 
   async getSplitClassification(stageId: string, splitIndex: number): Promise<SplitClassificationEntry[]> {

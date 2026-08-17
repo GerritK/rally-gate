@@ -64,9 +64,37 @@ export interface SplitClassificationEntry {
 export interface Gate {
   id: string;
   name: string;
+  lastHeartbeatAt?: string;
+  capabilities?: string;
+}
+
+export const GATE_ROLES = [
+  'stage_start',
+  'stage_split',
+  'stage_finish',
+  'time_control',
+  'pre_start',
+  'stop_control',
+  'parc_ferme_in',
+  'parc_ferme_out',
+  'service_in',
+  'service_out',
+  'manual_checkpoint',
+] as const;
+
+export interface GateAssignment {
+  id: string;
+  gateId: string;
+  stageId: string;
   role: string;
-  stageId?: string;
   splitIndex?: number;
+  active: boolean;
+}
+
+export interface SplitGateInfo {
+  gateId: string;
+  name: string;
+  splitIndex: number;
 }
 
 export interface StageOutcomeEntry {
@@ -107,9 +135,47 @@ export async function fetchOverallClassification(): Promise<OverallClassificatio
   return res.json();
 }
 
-export async function fetchSplitGatesForStage(stageId: string): Promise<Gate[]> {
+export async function fetchSplitGatesForStage(stageId: string): Promise<SplitGateInfo[]> {
   const res = await fetch(`${API_BASE}/classification/stages/${stageId}/split-gates`);
   return res.json();
+}
+
+export async function fetchGates(): Promise<Gate[]> {
+  const res = await fetch(`${API_BASE}/gates`);
+  return res.json();
+}
+
+export async function fetchGateAssignments(): Promise<GateAssignment[]> {
+  const res = await fetch(`${API_BASE}/gate-assignments`);
+  return res.json();
+}
+
+export async function createGateAssignment(assignment: {
+  gateId: string;
+  stageId: string;
+  role: string;
+  splitIndex?: number;
+}): Promise<GateAssignment> {
+  const res = await fetch(`${API_BASE}/gate-assignments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(assignment),
+  });
+  return res.json();
+}
+
+export async function activateGateAssignment(id: string): Promise<GateAssignment> {
+  const res = await fetch(`${API_BASE}/gate-assignments/${id}/activate`, { method: 'POST' });
+  return res.json();
+}
+
+export async function deactivateGateAssignment(id: string): Promise<GateAssignment> {
+  const res = await fetch(`${API_BASE}/gate-assignments/${id}/deactivate`, { method: 'POST' });
+  return res.json();
+}
+
+export async function deleteGateAssignment(id: string): Promise<void> {
+  await fetch(`${API_BASE}/gate-assignments/${id}`, { method: 'DELETE' });
 }
 
 export async function fetchSplitClassification(

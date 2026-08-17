@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
+  activateGateAssignment,
   API_BASE,
   closeStage,
+  createGateAssignment,
+  deactivateGateAssignment,
+  deleteGateAssignment,
+  fetchGateAssignments,
+  fetchGates,
   fetchNonFinishers,
   fetchOverallClassification,
   fetchRecentEvents,
@@ -12,16 +18,21 @@ import {
   fetchStageClassification,
   fetchStageRuns,
   fetchStages,
+  GATE_ROLES,
   type ClassificationEntry,
   type DetectionEventRecord,
   type Gate,
+  type GateAssignment,
   type OverallClassificationEntry,
   type SplitClassificationEntry,
+  type SplitGateInfo,
   type Stage,
   type StageOutcomeEntry,
   type StageRun,
   type StageSplit,
 } from './api';
+
+const HEARTBEAT_ONLINE_THRESHOLD_MS = 30_000;
 
 const detections = ref<DetectionEventRecord[]>([]);
 const stageRuns = ref<StageRun[]>([]);
@@ -30,11 +41,18 @@ const selectedStageId = ref<string>('');
 const stageClassification = ref<ClassificationEntry[]>([]);
 const overallClassification = ref<OverallClassificationEntry[]>([]);
 const splitsByRun = ref<Record<string, StageSplit[]>>({});
-const splitGates = ref<Gate[]>([]);
+const splitGates = ref<SplitGateInfo[]>([]);
 const selectedSplitIndex = ref<number | null>(null);
 const splitClassification = ref<SplitClassificationEntry[]>([]);
 const nonFinishers = ref<StageOutcomeEntry[]>([]);
 const closingStage = ref(false);
+const gates = ref<Gate[]>([]);
+const gateAssignments = ref<GateAssignment[]>([]);
+const newAssignment = ref<{ gateId: string; stageId: string; role: string; splitIndex?: number }>({
+  gateId: '',
+  stageId: '',
+  role: GATE_ROLES[0],
+});
 let detectionsSource: EventSource;
 let stageRunsSource: EventSource;
 let stageRunSplitsSource: EventSource;
@@ -104,6 +122,42 @@ async function onStageSelected() {
 
 const selectedStage = computed(() => stages.value.find((stage) => stage.id === selectedStageId.value));
 
+function isOnline(gate: Gate): boolean {
+  if (!gate.lastHeartbeatAt) return false;
+  return Date.now() - new Date(gate.lastHeartbeatAt).getTime() < HEARTBEAT_ONLINE_THRESHOLD_MS;
+}
+
+function stageName(stageId: string): string {
+  return stages.value.find((stage) => stage.id === stageId)?.name ?? stageId;
+}
+
+async function refreshGates() {
+  gates.value = await fetchGates();
+  gateAssignments.value = await fetchGateAssignments();
+}
+
+async function onCreateAssignment() {
+  if (!newAssignment.value.gateId || !newAssignment.value.stageId) return;
+  await createGateAssignment({ ...newAssignment.value });
+  newAssignment.value = { gateId: '', stageId: '', role: GATE_ROLES[0] };
+  await refreshGates();
+}
+
+async function onActivateAssignment(assignment: GateAssignment) {
+  await activateGateAssignment(assignment.id);
+  await refreshGates();
+}
+
+async function onDeactivateAssignment(assignment: GateAssignment) {
+  await deactivateGateAssignment(assignment.id);
+  await refreshGates();
+}
+
+async function onDeleteAssignment(assignment: GateAssignment) {
+  await deleteGateAssignment(assignment.id);
+  await refreshGates();
+}
+
 async function onCloseStage() {
   if (!selectedStageId.value || closingStage.value) return;
   closingStage.value = true;
@@ -129,6 +183,7 @@ onMounted(async () => {
     selectedStageId.value = stages.value[0].id;
   }
   await onStageSelected();
+  await refreshGates();
 
   for (const run of stageRuns.value) {
     splitsByRun.value[run.id] = await fetchSplitsForRun(run.id);
@@ -229,7 +284,7 @@ onUnmounted(() => {
       <label v-if="splitGates.length > 0">
         Split:
         <select v-model="selectedSplitIndex">
-          <option v-for="gate in splitGates" :key="gate.id" :value="gate.splitIndex">
+          <option v-for="gate in splitGates" :key="gate.gateId" :value="gate.splitIndex">
             Split {{ gate.splitIndex }} ({{ gate.name }})
           </option>
         </select>
@@ -315,6 +370,88 @@ onUnmounted(() => {
           </tr>
         </tbody>
       </table>
+    </section>
+
+    <section>
+      <h2>Gates</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Online</th>
+            <th>Last Heartbeat</th>
+            <th>Capabilities</th>
+            <th>Active Assignment</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="gate in gates" :key="gate.id">
+            <td>{{ gate.id }}</td>
+            <td>{{ gate.name }}</td>
+            <td>{{ isOnline(gate) ? 'online' : 'offline' }}</td>
+            <td>{{ gate.lastHeartbeatAt ? new Date(gate.lastHeartbeatAt).toLocaleTimeString() : 'never' }}</td>
+            <td>{{ gate.capabilities ?? '-' }}</td>
+            <td>
+              <template v-for="assignment in gateAssignments.filter((a) => a.gateId === gate.id && a.active)" :key="assignment.id">
+                {{ assignment.role }} @ {{ stageName(assignment.stageId) }}
+              </template>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-if="gates.length === 0">No gates yet — waiting for a gate-agent heartbeat.</p>
+    </section>
+
+    <section>
+      <h2>Gate Assignments</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Gate</th>
+            <th>Stage</th>
+            <th>Role</th>
+            <th>Split #</th>
+            <th>Active</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="assignment in gateAssignments" :key="assignment.id">
+            <td>{{ assignment.gateId }}</td>
+            <td>{{ stageName(assignment.stageId) }}</td>
+            <td>{{ assignment.role }}</td>
+            <td>{{ assignment.splitIndex ?? '-' }}</td>
+            <td>{{ assignment.active ? 'yes' : 'no' }}</td>
+            <td>
+              <button v-if="!assignment.active" @click="onActivateAssignment(assignment)">Activate</button>
+              <button v-else @click="onDeactivateAssignment(assignment)">Deactivate</button>
+              <button @click="onDeleteAssignment(assignment)">Delete</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <form @submit.prevent="onCreateAssignment">
+        <select v-model="newAssignment.gateId">
+          <option value="" disabled>Gate</option>
+          <option v-for="gate in gates" :key="gate.id" :value="gate.id">{{ gate.name }}</option>
+        </select>
+        <select v-model="newAssignment.stageId">
+          <option value="" disabled>Stage</option>
+          <option v-for="stage in stages" :key="stage.id" :value="stage.id">{{ stage.name }}</option>
+        </select>
+        <select v-model="newAssignment.role">
+          <option v-for="role in GATE_ROLES" :key="role" :value="role">{{ role }}</option>
+        </select>
+        <input
+          v-if="newAssignment.role === 'stage_split'"
+          v-model.number="newAssignment.splitIndex"
+          type="number"
+          min="0"
+          placeholder="Split #"
+        />
+        <button type="submit">Add Assignment</button>
+      </form>
     </section>
 
     <section>

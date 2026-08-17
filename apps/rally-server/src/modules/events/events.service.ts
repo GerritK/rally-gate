@@ -4,6 +4,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DetectionEvent, DETECTION_TOPIC_PREFIX, GateRole } from '@rally-gate/shared';
 import { Repository } from 'typeorm';
+import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { Gate } from '../gates/gate.entity';
 import { GatesService } from '../gates/gates.service';
 import { VehiclesService } from '../vehicles/vehicles.service';
@@ -20,6 +21,7 @@ export class EventsService {
     @InjectRepository(DetectionEventRecord)
     private readonly events: Repository<DetectionEventRecord>,
     private readonly gatesService: GatesService,
+    private readonly gateAssignmentsService: GateAssignmentsService,
     private readonly vehiclesService: VehiclesService,
     private readonly stageRunsService: StageRunsService,
     private readonly emitter: EventEmitter2,
@@ -77,20 +79,27 @@ export class EventsService {
   }
 
   private async applyRules(gate: Gate, vehicleId: string, at: Date): Promise<void> {
-    const stageId = gate.stageId;
-    if (!stageId) {
+    const assignment = await this.gateAssignmentsService.findActiveForGate(gate.id);
+    if (!assignment) {
       return;
     }
-    if (gate.role === GateRole.STAGE_START) {
+    const stageId = assignment.stageId;
+    if (assignment.role === GateRole.STAGE_START) {
       const run = await this.stageRunsService.startRun(vehicleId, stageId, at);
       this.emitter.emit('stage-run.updated', run);
-    } else if (gate.role === GateRole.STAGE_FINISH) {
+    } else if (assignment.role === GateRole.STAGE_FINISH) {
       const run = await this.stageRunsService.finishRun(vehicleId, stageId, at);
       if (run) {
         this.emitter.emit('stage-run.updated', run);
       }
-    } else if (gate.role === GateRole.STAGE_SPLIT) {
-      const split = await this.stageRunsService.recordSplit(vehicleId, stageId, gate, at);
+    } else if (assignment.role === GateRole.STAGE_SPLIT) {
+      const split = await this.stageRunsService.recordSplit(
+        vehicleId,
+        stageId,
+        gate.id,
+        assignment.splitIndex ?? 0,
+        at,
+      );
       if (split) {
         this.emitter.emit('stage-run.split', split);
       }
