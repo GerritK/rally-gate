@@ -113,8 +113,16 @@ anything — "plug in a gate, it appears":
   event (`deployment-modes.md`) means nothing stops two clubs' gates from
   ending up on the same network, and a collision there would silently merge
   two physically different gates into one `Gate` row. `deploy/install-gate-pi.sh`'s
-  `GATE_ID` prompt nudges toward this. No central cross-club registry to
-  actually enforce it — same "not ruled out, just very low priority" status as the
+  `GATE_ID` prompt nudges toward this — it defaults the prompt to the Pi's
+  current hostname (so a pre-imaged/pre-named Pi needs no typing), and
+  separately offers (optional, not forced) to rename the Pi's system
+  hostname to match `GATE_ID` via `raspi-config nonint do_hostname` if they
+  differ. Keeping `GATE_ID` and hostname in sync is what makes the gate
+  reachable as `<gateid>.local` via the avahi/mDNS that Raspberry Pi OS
+  already runs — relevant groundwork for "MQTT broker discovery" above,
+  even though that idea is about `rally-server` advertising itself, not
+  gates. No central cross-club registry to actually enforce global
+  uniqueness — same "not ruled out, just very low priority" status as the
   cross-event known-gates registry idea in `deployment-modes.md`.
 - `Gate.lastHeartbeatAt` (nullable `datetime`) is stamped on every heartbeat.
   "Online/offline" is `now - lastHeartbeatAt > threshold`, computed

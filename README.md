@@ -69,6 +69,6 @@ curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/in
 GATE_ID=CLUB_START_WP1 MQTT_HOST=192.168.1.10 bash -c "$(curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-gate-pi.sh)"
 ```
 
-No forced global uniqueness on `GATE_ID`, but pick one that won't collide with another club's — prefix it with your club's short code (e.g. `CLUB_START_WP1`) so gates stay collision-free if hardware ever gets shared or a joint event mixes clubs.
+No forced global uniqueness on `GATE_ID`, but pick one that won't collide with another club's — prefix it with your club's short code (e.g. `CLUB_START_WP1`) so gates stay collision-free if hardware ever gets shared or a joint event mixes clubs. The prompt defaults to the Pi's current hostname, and can optionally rename the Pi's hostname to match `GATE_ID` too, so the gate stays easy to find on the network (e.g. `CLUB_START_WP1.local`).
 
 Installs as a systemd service (`rally-gate-agent`) — logs via `journalctl -u rally-gate-agent -f`. Optionally configures a DS3231 RTC module if one's connected (asked interactively).
