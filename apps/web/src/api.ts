@@ -69,6 +69,14 @@ export interface Gate {
   splitIndex?: number;
 }
 
+export interface StageOutcomeEntry {
+  vehicleId: string;
+  startNumber: string;
+  driverName: string;
+  coDriverName?: string;
+  outcome: 'DNF' | 'DNS';
+}
+
 export async function fetchRecentEvents(): Promise<DetectionEventRecord[]> {
   const res = await fetch(`${API_BASE}/events`);
   return res.json();
@@ -109,5 +117,15 @@ export async function fetchSplitClassification(
   splitIndex: number,
 ): Promise<SplitClassificationEntry[]> {
   const res = await fetch(`${API_BASE}/classification/stages/${stageId}/splits/${splitIndex}`);
+  return res.json();
+}
+
+export async function fetchNonFinishers(stageId: string): Promise<StageOutcomeEntry[]> {
+  const res = await fetch(`${API_BASE}/classification/stages/${stageId}/non-finishers`);
+  return res.json();
+}
+
+export async function closeStage(stageId: string): Promise<Stage> {
+  const res = await fetch(`${API_BASE}/stages/${stageId}/close`, { method: 'POST' });
   return res.json();
 }

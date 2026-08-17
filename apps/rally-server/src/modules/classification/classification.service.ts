@@ -1,5 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { ClassificationEntry, OverallClassificationEntry, SplitClassificationEntry } from '@rally-gate/shared';
+import {
+  ClassificationEntry,
+  OverallClassificationEntry,
+  SplitClassificationEntry,
+  StageOutcomeEntry,
+  StageRunStatus,
+  StageStatus,
+} from '@rally-gate/shared';
 import { GatesService } from '../gates/gates.service';
 import { StageRunsService } from '../stage-runs/stage-runs.service';
 import { StagesService } from '../stages/stages.service';
@@ -82,6 +89,35 @@ export class ClassificationService {
         stageRunStatus: pair.run.status,
       };
     });
+  }
+
+  async getNonFinishers(stageId: string): Promise<StageOutcomeEntry[]> {
+    const stage = await this.stagesService.findOne(stageId);
+    if (!stage) {
+      throw new NotFoundException(`Stage ${stageId} not found`);
+    }
+    const runs = await this.stageRunsService.findByStage(stageId);
+    const vehicles = await this.vehiclesService.findAll();
+    const vehicleById = new Map<string, Vehicle>(vehicles.map((vehicle) => [vehicle.id, vehicle]));
+    const toEntry = (vehicleId: string, outcome: 'DNF' | 'DNS'): StageOutcomeEntry => {
+      const vehicle = vehicleById.get(vehicleId);
+      return {
+        vehicleId,
+        startNumber: vehicle?.startNumber ?? '?',
+        driverName: vehicle?.driverName ?? 'Unknown',
+        coDriverName: vehicle?.coDriverName,
+        outcome,
+      };
+    };
+
+    const dnf = runs.filter((run) => run.status === StageRunStatus.CANCELLED).map((run) => toEntry(run.vehicleId, 'DNF'));
+    if (stage.status !== StageStatus.CLOSED) {
+      // Before the stage closes, "no run yet" just means "hasn't started" — not DNS.
+      return dnf;
+    }
+    const startedVehicleIds = new Set(runs.map((run) => run.vehicleId));
+    const dns = vehicles.filter((vehicle) => !startedVehicleIds.has(vehicle.id)).map((vehicle) => toEntry(vehicle.id, 'DNS'));
+    return [...dnf, ...dns];
   }
 
   private async rank(entries: RankableEntry[]): Promise<ClassificationEntry[]> {

@@ -21,7 +21,7 @@ async function post(path, body) {
 }
 
 async function main() {
-  console.log(await put('/stages/WP1', { name: 'Wilderness Pass 1', stageNumber: 1, status: 'READY' }));
+  console.log(await put('/stages/WP1', { name: 'Wilderness Pass 1', stageNumber: 1, status: 'NOT_STARTED' }));
   console.log(await put('/gates/START_WP1', { name: 'Start WP1', role: 'stage_start', stageId: 'WP1', enabled: true }));
   console.log(await put('/gates/SPLIT1_WP1', { name: 'Split 1 WP1', role: 'stage_split', stageId: 'WP1', splitIndex: 1, enabled: true }));
   console.log(await put('/gates/FINISH_WP1', { name: 'Finish WP1', role: 'stage_finish', stageId: 'WP1', enabled: true }));

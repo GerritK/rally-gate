@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
   API_BASE,
+  closeStage,
+  fetchNonFinishers,
   fetchOverallClassification,
   fetchRecentEvents,
   fetchSplitClassification,
@@ -16,6 +18,7 @@ import {
   type OverallClassificationEntry,
   type SplitClassificationEntry,
   type Stage,
+  type StageOutcomeEntry,
   type StageRun,
   type StageSplit,
 } from './api';
@@ -30,6 +33,8 @@ const splitsByRun = ref<Record<string, StageSplit[]>>({});
 const splitGates = ref<Gate[]>([]);
 const selectedSplitIndex = ref<number | null>(null);
 const splitClassification = ref<SplitClassificationEntry[]>([]);
+const nonFinishers = ref<StageOutcomeEntry[]>([]);
+const closingStage = ref(false);
 let detectionsSource: EventSource;
 let stageRunsSource: EventSource;
 let stageRunSplitsSource: EventSource;
@@ -85,11 +90,32 @@ async function refreshSplitClassification() {
   }
 }
 
+async function refreshNonFinishers() {
+  nonFinishers.value = selectedStageId.value ? await fetchNonFinishers(selectedStageId.value) : [];
+}
+
 async function onStageSelected() {
   await refreshClassifications();
   splitGates.value = selectedStageId.value ? await fetchSplitGatesForStage(selectedStageId.value) : [];
   selectedSplitIndex.value = splitGates.value.length > 0 ? splitGates.value[0].splitIndex! : null;
   await refreshSplitClassification();
+  await refreshNonFinishers();
+}
+
+const selectedStage = computed(() => stages.value.find((stage) => stage.id === selectedStageId.value));
+
+async function onCloseStage() {
+  if (!selectedStageId.value || closingStage.value) return;
+  closingStage.value = true;
+  try {
+    const updated = await closeStage(selectedStageId.value);
+    const idx = stages.value.findIndex((stage) => stage.id === updated.id);
+    if (idx !== -1) stages.value[idx] = updated;
+    await refreshClassifications();
+    await refreshNonFinishers();
+  } finally {
+    closingStage.value = false;
+  }
 }
 
 watch(selectedStageId, onStageSelected);
@@ -148,6 +174,14 @@ onUnmounted(() => {
           </option>
         </select>
       </label>
+      <button
+        v-if="selectedStage && selectedStage.status !== 'CLOSED'"
+        :disabled="closingStage"
+        @click="onCloseStage"
+      >
+        Close Stage (mark DNF/DNS)
+      </button>
+      <span v-else-if="selectedStage">Stage closed.</span>
       <table>
         <thead>
           <tr>
@@ -167,6 +201,24 @@ onUnmounted(() => {
             <td>{{ entry.coDriverName ?? '-' }}</td>
             <td>{{ formatDuration(entry.durationMs) }}</td>
             <td>{{ formatGap(entry.gapMs) }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <table v-if="nonFinishers.length > 0">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Driver</th>
+            <th>Co-Driver</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="entry in nonFinishers" :key="entry.vehicleId">
+            <td>{{ entry.startNumber }}</td>
+            <td>{{ entry.driverName }}</td>
+            <td>{{ entry.coDriverName ?? '-' }}</td>
+            <td>{{ entry.outcome }}</td>
           </tr>
         </tbody>
       </table>
