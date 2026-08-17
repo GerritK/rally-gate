@@ -105,6 +105,17 @@ anything — "plug in a gate, it appears":
   auto-create a `Gate` row (unassigned, no active `GateAssignment` yet — sits
   in the list waiting for a marshal to configure it) instead of requiring one
   to pre-exist.
+- `gateId` (`Gate.id`) has no format enforced by the server — plain string
+  primary key, no global uniqueness required by force. But it should be
+  chosen so it *won't collide* if this gate is ever borrowed/loaned to
+  another club or used at a joint event: prefix it with a short club code
+  (e.g. `CLUB_START_WP1` rather than `START_WP1`), since one database = one
+  event (`deployment-modes.md`) means nothing stops two clubs' gates from
+  ending up on the same network, and a collision there would silently merge
+  two physically different gates into one `Gate` row. `deploy/install-gate-pi.sh`'s
+  `GATE_ID` prompt nudges toward this. No central cross-club registry to
+  actually enforce it — same "not ruled out, just very low priority" status as the
+  cross-event known-gates registry idea in `deployment-modes.md`.
 - `Gate.lastHeartbeatAt` (nullable `datetime`) is stamped on every heartbeat.
   "Online/offline" is `now - lastHeartbeatAt > threshold`, computed
   client-side in the dashboard (30s threshold), same pattern as the
@@ -122,6 +133,38 @@ anything — "plug in a gate, it appears":
   id/name/online/last-heartbeat/capabilities/active-assignment) and
   "Gate Assignments" section (create/activate/deactivate/delete) replace the
   old raw `PUT /gates/:id` role pre-configuration.
+
+## MQTT broker discovery (planned, not built)
+
+Heartbeat/discovery above assumes a gate already knows where the broker is
+(`MQTT_HOST`/`MQTT_PORT`, currently typed in by hand — an interactive prompt
+in `deploy/install-gate-pi.sh`, or plain env vars). That's one more thing a
+marshal can get wrong or that breaks silently if `rally-server`'s IP changes
+(DHCP re-lease, moved to a different machine) — a layer *before* heartbeat-based
+discovery even applies, since a gate can't publish a heartbeat to a broker it
+doesn't know the address of.
+
+- `rally-server` advertises itself via mDNS/Bonjour (e.g. a service type like
+  `_rally-mqtt._tcp.local`, TXT record carrying the MQTT port) when
+  `BrokerService` starts listening.
+- `gate-agent` tries resolving that service first at startup, before falling
+  back to the manual `MQTT_HOST` env var. Manual entry stays as the fallback,
+  not something autodiscovery replaces — mDNS/multicast is unreliable on some
+  consumer/travel router hardware (blocked or not forwarded), so a rally site
+  with flaky APs still needs the escape hatch.
+- Fits the "closed rally WiFi" model for free: mDNS is LAN-only by nature (it
+  doesn't route off the local network), so it can't leak the broker's
+  existence to anything outside the event's own WiFi the way a
+  cloud-registry-based discovery scheme would.
+- New dependency on both ends (something like `bonjour-service` in Node) —
+  Raspberry Pi OS also ships `avahi-daemon`, which is an alternative
+  implementation path (shell out / system mDNS) worth weighing against a
+  pure-JS library once this gets built.
+- Directly relevant to the "Gate config web interface" roadmap item
+  (`development-roadmap.md`) — that item's config page already needs an
+  "MQTT host" field; autodiscovery would just make that field default to the
+  resolved address instead of requiring manual entry, with manual override
+  still available in the same UI.
 
 ## Gate assignment: plan vs. live
 

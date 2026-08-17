@@ -4,7 +4,10 @@
 # decoder and any GPIO sensors — see apps/gate-agent/Dockerfile for why.
 #
 # Usage: curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-gate-pi.sh | bash
-# Prompts can be skipped by pre-setting the env var (e.g. GATE_ID=START_WP1 ... | bash).
+# Prompts can be skipped by pre-setting the env vars, e.g.:
+#   GATE_ID=CLUB_START_WP1 MQTT_HOST=192.168.1.10 bash -c "$(curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-gate-pi.sh)"
+# GATE_ID should be globally unique — prefix it with your club's short code
+# (see "Gate discovery & heartbeat" in docs/architecture.md).
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/GerritK/rally-gate.git}"
@@ -22,7 +25,11 @@ ask() {
 echo "== rally-gate gate-agent setup =="
 echo
 
-ask GATE_ID "Gate ID (e.g. START_WP1)"
+echo "No two gates need a globally unique ID by force, but pick one that"
+echo "won't collide if this gate is ever borrowed/loaned to another club or"
+echo "used at a joint event. Prefix it with your club's short code, e.g."
+echo "CLUB_START_WP1 rather than just START_WP1."
+ask GATE_ID "Gate ID (e.g. CLUB_START_WP1)"
 while [ -z "$GATE_ID" ]; do ask GATE_ID "Gate ID is required"; done
 
 ask MQTT_HOST "rally-server IP address"
