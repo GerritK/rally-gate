@@ -28,6 +28,22 @@ event bus but never publishes back out — `broker.service.ts:19-27`). Two
 ideas (clock sync accuracy, gate health visibility) converge on adding a
 second, server-to-gate direction:
 
+0. **Event-based, not a hard-coded call chain.** "Starting a stage" must stay
+   consistent with how the rest of `rally-server` is wired: `EventsService`
+   never calls the live feed or the rule engine directly — it emits
+   `detection.created`/`stage-run.updated`/`stage-run.split` on
+   `EventEmitter2` and `LiveController` just listens. Starting a stage should
+   follow the same shape: `StagesService` (or wherever "start" ends up living)
+   emits one internal `stage.started` event, and separate, independent
+   listeners react to it — one flips the stage's active `GateAssignment` rows
+   (see "Gate assignment: plan vs. live" below), another (in `BrokerService`
+   or a new gate-sync provider) publishes the per-gate MQTT `sync` message
+   below. Neither listener needs to know the other exists. This keeps the
+   trigger swappable later (today: a marshal's button click via an eventual
+   `POST /stages/:id/start`; later: possibly the first `stage_start`
+   detection itself) without touching the gate-assignment or MQTT-publish
+   code, and keeps `StagesService` from growing a direct dependency on
+   `BrokerService`.
 1. Starting a stage (a real action, not the current generic `PUT /stages/:id`
    upsert) makes `rally-server` look up which gates belong to it (active
    `GateAssignment` rows for that `stageId` — see "Gate assignment: plan vs.
@@ -71,41 +87,41 @@ first car actually launching — accepted tradeoff, not revisited unless real
 usage shows otherwise. Not designed in detail yet (message schema, how long
 `rally-server` waits for acks, what happens if a gate never reports ready).
 
-## Gate discovery & heartbeat (planned, not built)
+## Gate discovery & heartbeat
 
-Today a `Gate` row must already exist (via `PUT /gates/:id` or
-`config/sample-gates.yaml`, which nothing actually loads yet) before its
-`GATE_ID` means anything — you have to know the exact ID in advance.
-Heartbeat-driven discovery flips that to "plug in a gate, it appears":
+Gates no longer need a pre-existing `Gate` row before their `GATE_ID` means
+anything — "plug in a gate, it appears":
 
-- Gates periodically publish `rally/gates/<gateId>/heartbeat` — gate-
-  initiated and continuous, unlike the stage-scoped `sync`/`ready` messages
-  above, since a gate should be visible from boot, before any stage exists.
-  No new broker wiring needed: `BrokerService`'s `aedes.on('publish', ...)`
-  (`broker.service.ts:19`) already sees every topic regardless of
-  subscription.
-- A heartbeat from an unknown `gateId` makes `GatesService` auto-create a
-  `Gate` row (unassigned, no active `GateAssignment` yet — sits in the list
-  waiting for a marshal to configure it) instead of requiring one to
-  pre-exist.
-- Add `lastHeartbeatAt` to `Gate` — one nullable column, no new table.
+- `gate-agent` publishes `rally/gates/<gateId>/heartbeat` every
+  `HEARTBEAT_INTERVAL_MS` (default 15s) — gate-initiated and continuous,
+  unlike the stage-scoped `sync`/`ready` messages below, since a gate should
+  be visible from boot, before any stage exists. No new broker wiring
+  needed: `BrokerService`'s `aedes.on('publish', ...)` (`broker.service.ts:19`)
+  already sees every topic regardless of subscription; `GatesService`
+  subscribes via its own `@OnEvent('mqtt.message')` handler
+  (`gates.service.ts`), matching the same pattern `EventsService` uses for
+  detections.
+- A heartbeat from an unknown `gateId` makes `GatesService.recordHeartbeat`
+  auto-create a `Gate` row (unassigned, no active `GateAssignment` yet — sits
+  in the list waiting for a marshal to configure it) instead of requiring one
+  to pre-exist.
+- `Gate.lastHeartbeatAt` (nullable `datetime`) is stamped on every heartbeat.
   "Online/offline" is `now - lastHeartbeatAt > threshold`, computed
-  client-side, same pattern as the expected-stage-time overdue idea
-  (`development-roadmap.md`).
-- Heartbeat payload can also self-report what the gate is capable of (which
-  `DecoderAdapter`/sensors it's running — `decoder-adapters.md`), stored as a
-  read-only field on `Gate` (e.g. `capabilities`). Purely descriptive: helps
-  whoever's building the event plan see "gate 7 has OpenStint + through-beam"
+  client-side in the dashboard (30s threshold), same pattern as the
+  expected-stage-time overdue idea (`development-roadmap.md`).
+- The heartbeat payload's `capabilities` field self-reports what the gate is
+  running (`{ capabilities: process.env.ADAPTER ?? 'simulated' }` today,
+  since real `DecoderAdapter` selection — `decoder-adapters.md` — isn't wired
+  up yet), stored as a read-only string field on `Gate`. Purely descriptive:
+  helps whoever's building the event plan see what a gate reports running
   before deciding what role to assign it. Not app config — the adapter is
   actually selected on the Pi via the `ADAPTER` env var
   (`decoder-adapters.md:76-79`); the server field just mirrors that fact so
-  it doesn't need a second, unsynced copy of it. Deferred along with the rest
-  of heartbeat — no mechanism yet for a gate to report anything about itself.
-- New "gate list" page in the web dashboard — today's `App.vue` is a
-  read-only live/results view with no setup UI at all. Table of gates
-  (name/capabilities/enabled/last-heartbeat/online), plus a per-stage
-  assignment screen for creating/activating `GateAssignment` rows (see
-  below), replacing today's raw `PUT /gates/:id` pre-configuration.
+  it doesn't need a second, unsynced copy of it.
+- The web dashboard's "Gates" section (table of
+  id/name/online/last-heartbeat/capabilities/active-assignment) and
+  "Gate Assignments" section (create/activate/deactivate/delete) replace the
+  old raw `PUT /gates/:id` role pre-configuration.
 
 ## Gate assignment: plan vs. live
 
@@ -117,26 +133,30 @@ time for the same hardware — which a single `stageId`/`role` pointer on
 `Gate` can't hold.
 
 - `GateAssignment` (`gateId`, `stageId`, `role`, `splitIndex`, `active`) is
-  the plan: one row per (gate, stage), created during event setup, long
-  before any of them go live.
-- Exactly one assignment per gate is `active` at a time. Starting a stage
-  flips it in a transaction (deactivate the gate's other assignments,
-  activate the one for the stage being started) — same moment `PUT
-  /gates/:id` used to flip `Gate.stageId`/`role` directly, just relocated to
-  a flag on the right plan row instead of a copy.
-- `EventsService.applyRules` (`events.service.ts:79-98`) queries
-  `GateAssignment` where `gateId = X AND active = true` instead of reading
+  the plan: one row per (gate, stage), created via `POST /gate-assignments`
+  during event setup, long before any of them go live.
+- Exactly one assignment per gate is `active` at a time.
+  `GateAssignmentsService.activate` flips it in a transaction (deactivate the
+  gate's other assignments, activate the one being requested) — same moment
+  `PUT /gates/:id` used to flip `Gate.stageId`/`role` directly, just
+  relocated to a flag on the right plan row instead of a copy. Activation is
+  a manual marshal action today (`POST /gate-assignments/:id/activate` from
+  the dashboard) — there's no "start stage" server action yet to trigger it
+  automatically. When that lands (see "Gate control channel" below), it
+  should be a `stage.started` event listener, not a direct call from
+  `StagesService` — same event-based shape as the rest of the pipeline.
+- `EventsService.applyRules` (`events.service.ts`) queries `GateAssignment`
+  where `gateId = X AND active = true` instead of reading
   `gate.stageId`/`gate.role`. `Gate` itself carries no live assignment
-  fields — just hardware identity (`id`, `name`, `enabled`,
-  `lastHeartbeatAt`, `capabilities`). One source of truth instead of two
+  fields — just hardware identity (`id`, `name`, `lastHeartbeatAt`,
+  `capabilities`). One source of truth instead of two
   copies that can drift (edit the plan, forget to flip the live pointer).
 - Reassigning a gate across stages doesn't corrupt history since
   `StageRun`/`StageSplit` snapshot `stageId` at creation instead of
   live-joining back to `Gate`/`GateAssignment`.
-- An audit trail of *inactive* assignments (what a gate used to be, not what
-  it's planned to be) falls out of this for free if `GateAssignment` rows are
-  soft-deactivated rather than deleted — not needed yet, but no extra schema
-  work if it turns out to matter later.
+- Deactivating (rather than deleting) an assignment leaves it in the table as
+  an audit trail of what a gate used to be — `GET /gate-assignments` returns
+  inactive rows too.
 
 ## Current scope vs. full vision
 

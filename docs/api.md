@@ -5,7 +5,8 @@ REST (all on `rally-server`, default port 57430; embedded MQTT broker on
 
 | Endpoint | Methods | Notes |
 |---|---|---|
-| `/gates` | GET, and `/:id` GET/PUT | PUT upserts a gate by id (name, role, stageId, splitIndex, enabled) |
+| `/gates` | GET, and `/:id` GET/PUT | PUT upserts a gate by id (name only — hardware identity, no role) |
+| `/gate-assignments` | GET, POST, `/:id/activate`\|`/deactivate` POST, `/:id` DELETE | the (gate, stage, role, splitIndex) plan; `active` picks which one the rule engine uses |
 | `/vehicles` | GET, POST, `/:id` GET | transponder assignment is `Vehicle.transponderId` |
 | `/stages` | GET, and `/:id` GET/PUT | sorted by `stageNumber` |
 | `/stage-runs` | GET | derived state, read-only via API |

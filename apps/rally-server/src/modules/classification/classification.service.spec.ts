@@ -6,7 +6,8 @@ function makeService(stage: { status: StageStatus }, runs: any[], vehicles: any[
   const stageRunsService = { findByStage: jest.fn().mockResolvedValue(runs) } as any;
   const vehiclesService = { findAll: jest.fn().mockResolvedValue(vehicles) } as any;
   const gatesService = {} as any;
-  return new ClassificationService(stageRunsService, stagesService, vehiclesService, gatesService);
+  const gateAssignmentsService = {} as any;
+  return new ClassificationService(stageRunsService, stagesService, vehiclesService, gatesService, gateAssignmentsService);
 }
 
 describe('ClassificationService.getNonFinishers', () => {

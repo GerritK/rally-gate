@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { StageRunStatus } from '@rally-gate/shared';
 import { In, Repository } from 'typeorm';
-import { Gate } from '../gates/gate.entity';
 import { StageRun } from './stage-run.entity';
 import { StageSplit } from './stage-split.entity';
 
@@ -93,21 +92,27 @@ export class StageRunsService {
     return this.stageRuns.save(run);
   }
 
-  async recordSplit(vehicleId: string, stageId: string, gate: Gate, at: Date): Promise<StageSplit | null> {
+  async recordSplit(
+    vehicleId: string,
+    stageId: string,
+    gateId: string,
+    splitIndex: number,
+    at: Date,
+  ): Promise<StageSplit | null> {
     const run = await this.findActive(vehicleId, stageId);
     if (!run) {
       this.logger.warn(`No active stage run for vehicle ${vehicleId} on ${stageId}, ignoring split event`);
       return null;
     }
-    const existing = await this.stageSplits.findOneBy({ stageRunId: run.id, gateId: gate.id });
+    const existing = await this.stageSplits.findOneBy({ stageRunId: run.id, gateId });
     if (existing) {
-      this.logger.warn(`Split for gate ${gate.id} already recorded for run ${run.id}, ignoring duplicate`);
+      this.logger.warn(`Split for gate ${gateId} already recorded for run ${run.id}, ignoring duplicate`);
       return existing;
     }
     const split = this.stageSplits.create({
       stageRunId: run.id,
-      gateId: gate.id,
-      splitIndex: gate.splitIndex ?? 0,
+      gateId,
+      splitIndex,
       timestamp: at,
       elapsedMs: at.getTime() - run.startTime.getTime(),
     });
