@@ -84,3 +84,10 @@ Gate hardware (or SimulatedAdapter)
 **`packages/shared`** holds types used by all three apps (gate roles, `DetectionEvent` shape, MQTT topic helpers, stage/classification types) — build it first after any change (`npm run build:shared`), since the other workspaces import its compiled output, not its TS source.
 
 **Rule engine is intentionally simple and hardcoded**, not a YAML DSL — `EventsService.applyRules` directly branches on `GateRole`. One active `StageRun` per vehicle+stage; duplicate starts/out-of-order finishes/splits are logged and ignored rather than erroring (`stage-runs.service.ts`).
+
+## Field deployment scripts
+
+`deploy/install-server-pi.sh` and `deploy/install-gate-pi.sh` are one-shot `curl | bash` installers for real Raspberry Pi hardware (not run from this dev repo/working directory). They hardcode assumptions about the codebase that don't get checked by any build or test — update them by hand whenever the corresponding thing changes:
+
+- `install-server-pi.sh`: assumes `deploy/docker-compose.yml` exists and `docker compose up -d --build` works; prints port `57430`.
+- `install-gate-pi.sh`: assumes npm workspace names `@rally-gate/shared`/`@rally-gate/gate-agent` (must match their `package.json` `name` fields), a Node 22.x install, build output at `apps/gate-agent/dist/main.js`, and env vars `GATE_ID`/`MQTT_HOST`/`MQTT_PORT` (must match what `apps/gate-agent/src/main.ts` reads, default port `57431`).
