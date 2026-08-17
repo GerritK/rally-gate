@@ -13,27 +13,32 @@
 
 ## Next
 
-- Optional DNF/DNS stage-run outcome (`StageRunStatus.CANCELLED` is already reserved for this — needs a way to mark a run as such, e.g. an admin action or a timeout rule).
-- Parc Fermé / time control / service park gate roles and their state transitions.
-- Manual correction of stage runs (admin override).
-- Gate/gate-node health reporting.
-- Expected stage time: optional `Stage.expectedDurationMs` set by the
-  marshal, dashboard flags any `STARTED` run as overdue once
-  `now - startTime` exceeds it — helps catch a missed/failed detection
-  rather than just a slow car. Client-side only (SSE data already has
-  `startTime`), no new backend push needed.
-- **Gate config web interface** (bigger item, own service): local HTTP server
-  on the gate Pi to set `GATE_ID`, Wi-Fi/network, and MQTT host without
-  re-running the install script over SSH. Needs an **AP/hotspot mode**
-  fallback (hostapd + dnsmasq, or a lib like balena's wifi-connect) so a
-  marshal can reach it before the Pi has any network configured — Pi boots as
-  its own AP when no known Wi-Fi is set, serves the config page, switches to
-  station mode once Wi-Fi is saved. Also falls back to AP mode if it *has* a
-  saved Wi-Fi that fails to connect (wrong password, gate out of range,
-  router changed) — not just on first boot with nothing configured. Not
-  designed yet.
-- Standalone packaging (`apps/rally-server/packaging/standalone`, Node SEA/pkg + optional tray icon).
-- Real `OpenStintAdapter` once the RF hardware validation (two ordered gates) confirms reliable reads.
+Priority order (1 = next):
+
+1. Optional DNF/DNS stage-run outcome (`StageRunStatus.CANCELLED` is already reserved for this — needs a way to mark a run as such, e.g. an admin action or a timeout rule).
+2. Manual correction of stage runs (admin override) — safety net for missed/bad detections (RFID, beam, missed transponder reads all funnel into this).
+3. Gate/gate-node health reporting, plus expected stage time: optional
+   `Stage.expectedDurationMs` set by the marshal, dashboard flags any
+   `STARTED` run as overdue once `now - startTime` exceeds it. Client-side
+   only (SSE data already has `startTime`), no new backend push needed.
+   Bundled with health reporting since both are "tell the marshal something's
+   wrong" signals. Health reporting's actual mechanism is now sketched under
+   "Gate control channel" in `architecture.md` — a `stage-started` broadcast
+   + per-gate `ready` ack, which also doubles as the clock-sync trigger
+   (see `decoder-adapters.md` DS3231 note).
+4. Standalone packaging (`apps/rally-server/packaging/standalone`, Node SEA/pkg + optional tray icon) — needed to hand `rally-server` to a marshal without a dev machine.
+5. Real `OpenStintAdapter` once the RF hardware validation (two ordered gates) confirms reliable reads — critical path, but gated on external hardware validation so it runs in parallel with the above rather than blocking them.
+6. **Gate config web interface** (bigger item, own service): local HTTP server
+   on the gate Pi to set `GATE_ID`, Wi-Fi/network, and MQTT host without
+   re-running the install script over SSH. Needs an **AP/hotspot mode**
+   fallback (hostapd + dnsmasq, or a lib like balena's wifi-connect) so a
+   marshal can reach it before the Pi has any network configured — Pi boots as
+   its own AP when no known Wi-Fi is set, serves the config page, switches to
+   station mode once Wi-Fi is saved. Also falls back to AP mode if it *has* a
+   saved Wi-Fi that fails to connect (wrong password, gate out of range,
+   router changed) — not just on first boot with nothing configured. Not
+   designed yet.
+7. Parc Fermé / time control / service park gate roles and their state transitions.
 
 ## Deliberately deferred
 
