@@ -1,0 +1,27 @@
+/**
+ * Apply to any element showing a stage/split time. Two things matter for
+ * timing specifically, not just "use a monospace font":
+ * - tabular-nums stops columns reflowing as digits change on live updates.
+ * - the slashed zero (font-feature-settings 'zero') reads unambiguously
+ *   against O at a glance from across the stage, where a plain 0 can't.
+ */
+.rg-timing {
+  font-family:
+    'JetBrains Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'zero' 1;
+  letter-spacing: -0.01em;
+}
+
+/*
+ * Native <input type="time"> ships its own OS clock icon that doesn't match
+ * this app's MDI iconset. Hide it and pair with an
+ * append-inner-icon="mdi-clock-outline" + @click:append-inner="openTimePicker"
+ * on the v-text-field instead — same native picker popup underneath (that
+ * part can't be restyled further), just a consistent trigger icon.
+ */
+input[type='time']::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  width: 0;
+  margin: 0;
+}

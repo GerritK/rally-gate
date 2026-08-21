@@ -36,8 +36,19 @@ import {
   type StageSplit,
   type Vehicle,
 } from './api';
+import {
+  formatClockTime,
+  formatRelativeTime,
+  formatStageDuration,
+  openTimePicker,
+} from '@rally-gate/ui';
 
 const HEARTBEAT_ONLINE_THRESHOLD_MS = 30_000;
+
+// Ticks every second so relative "Xs ago" heartbeat displays (and the
+// online/offline chip) keep counting up without needing new gate data.
+const now = ref(Date.now());
+let nowTimer: ReturnType<typeof setInterval>;
 
 const detections = ref<DetectionEventRecord[]>([]);
 const stageRuns = ref<StageRun[]>([]);
@@ -104,18 +115,24 @@ function formatSplits(runId: string): string {
   const splits = splitsByRun.value[runId];
   if (!splits || splits.length === 0) return '-';
   return splits
-    .map((s) => `S${s.splitIndex}: ${(s.elapsedMs / 1000).toFixed(3)}s`)
+    .map((s) => `S${s.splitIndex}: ${formatStageDuration(s.elapsedMs)}`)
     .join(', ');
 }
 
 function formatDuration(ms?: number): string {
-  if (ms === undefined) return '-';
-  return `${(ms / 1000).toFixed(3)}s`;
+  return ms === undefined ? '-' : formatStageDuration(ms);
+}
+
+/** A STARTED run has no durationMs yet — tick it live off the `now` ref. */
+function runDurationDisplay(run: StageRun): string {
+  if (run.status === 'STARTED') {
+    return formatStageDuration(now.value - new Date(run.startTime).getTime());
+  }
+  return formatDuration(run.durationMs);
 }
 
 function formatGap(ms: number): string {
-  if (ms === 0) return '-';
-  return `+${(ms / 1000).toFixed(3)}s`;
+  return ms === 0 ? '-' : `+${formatStageDuration(ms)}`;
 }
 
 async function refreshClassifications() {
@@ -159,10 +176,28 @@ const selectedStage = computed(() =>
   stages.value.find((stage) => stage.id === selectedStageId.value),
 );
 
+const stageOptions = computed(() =>
+  stages.value.map((s) => ({ id: s.id, title: `${s.stageNumber}. ${s.name}` })),
+);
+
+const splitGateOptions = computed(() =>
+  splitGates.value.map((g) => ({
+    value: g.splitIndex,
+    title: `Split ${g.splitIndex} (${g.name})`,
+  })),
+);
+
+const vehicleOptions = computed(() =>
+  vehicles.value.map((v) => ({
+    id: v.id,
+    title: `#${v.startNumber} ${v.driverName}`,
+  })),
+);
+
 function isOnline(gate: Gate): boolean {
   if (!gate.lastHeartbeatAt) return false;
   return (
-    Date.now() - new Date(gate.lastHeartbeatAt).getTime() <
+    now.value - new Date(gate.lastHeartbeatAt).getTime() <
     HEARTBEAT_ONLINE_THRESHOLD_MS
   );
 }
@@ -176,26 +211,61 @@ function vehicleName(vehicleId: string): string {
   return vehicle ? `#${vehicle.startNumber} ${vehicle.driverName}` : vehicleId;
 }
 
-function toLocalInputValue(iso?: string): string {
+function runStatusColor(status: string): string {
+  switch (status) {
+    case 'FINISHED':
+      return 'success';
+    case 'STARTED':
+      return 'info';
+    case 'CANCELLED':
+      return 'error';
+    default:
+      return 'timing-idle';
+  }
+}
+
+function outcomeColor(outcome: string): string {
+  return outcome === 'DNF' ? 'error' : 'warning';
+}
+
+function toLocalTimeValue(iso?: string): string {
   if (!iso) return '';
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
-    d.getHours(),
-  )}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+/**
+ * A correction only ever nudges the time of day (the marshal fixing a
+ * missed/bad detection knows the exact second, not a different date) — the
+ * date always comes from context (the run's existing date, or today for a
+ * new run), never from the picker itself.
+ */
+function combineDateAndTime(
+  dateSource: string | Date,
+  timeValue: string,
+): string {
+  const d = new Date(dateSource);
+  const [h, m, s] = timeValue.split(':').map(Number);
+  d.setHours(h, m, s ?? 0, 0);
+  return d.toISOString();
 }
 
 async function onCorrectStart(run: StageRun, value: string) {
   if (!value) return;
   upsertStageRun(
-    await correctStageRun(run.id, { startTime: new Date(value).toISOString() }),
+    await correctStageRun(run.id, {
+      startTime: combineDateAndTime(run.startTime, value),
+    }),
   );
 }
 
 async function onCorrectFinish(run: StageRun, value: string) {
   upsertStageRun(
     await correctStageRun(run.id, {
-      finishTime: value ? new Date(value).toISOString() : null,
+      finishTime: value
+        ? combineDateAndTime(run.finishTime ?? run.startTime, value)
+        : null,
     }),
   );
 }
@@ -217,7 +287,7 @@ async function onCreateRun() {
     const created = await createStageRun({
       vehicleId: newRun.value.vehicleId,
       stageId: newRun.value.stageId,
-      startTime: new Date(newRun.value.startTime).toISOString(),
+      startTime: combineDateAndTime(new Date(), newRun.value.startTime),
     });
     upsertStageRun(created);
     splitsByRun.value[created.id] = [];
@@ -303,387 +373,543 @@ onMounted(async () => {
     upsertSplit(JSON.parse(e.data));
     refreshSplitClassification();
   };
+
+  nowTimer = setInterval(() => {
+    now.value = Date.now();
+  }, 1000);
 });
 
 onUnmounted(() => {
   detectionsSource?.close();
   stageRunsSource?.close();
   stageRunSplitsSource?.close();
+  clearInterval(nowTimer);
 });
 </script>
 
 <template>
-  <main>
-    <h1>Rally Gate — Live Timing</h1>
-
-    <section>
-      <h2>Stage Classification</h2>
-      <label>
-        Stage:
-        <select v-model="selectedStageId">
-          <option v-for="stage in stages" :key="stage.id" :value="stage.id">
-            {{ stage.stageNumber }}. {{ stage.name }}
-          </option>
-        </select>
-      </label>
-      <button
-        v-if="selectedStage && selectedStage.status !== 'CLOSED'"
-        :disabled="closingStage"
-        @click="onCloseStage"
-      >
-        Close Stage (mark DNF/DNS)
-      </button>
-      <span v-else-if="selectedStage">Stage closed.</span>
-      <table>
-        <thead>
-          <tr>
-            <th>Pos</th>
-            <th>#</th>
-            <th>Driver</th>
-            <th>Co-Driver</th>
-            <th>Time</th>
-            <th>Gap</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="entry in stageClassification" :key="entry.vehicleId">
-            <td>{{ entry.position }}</td>
-            <td>{{ entry.startNumber }}</td>
-            <td>{{ entry.driverName }}</td>
-            <td>{{ entry.coDriverName ?? '-' }}</td>
-            <td>{{ formatDuration(entry.durationMs) }}</td>
-            <td>{{ formatGap(entry.gapMs) }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <table v-if="nonFinishers.length > 0">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Driver</th>
-            <th>Co-Driver</th>
-            <th>Outcome</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="entry in nonFinishers" :key="entry.vehicleId">
-            <td>{{ entry.startNumber }}</td>
-            <td>{{ entry.driverName }}</td>
-            <td>{{ entry.coDriverName ?? '-' }}</td>
-            <td>{{ entry.outcome }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
-
-    <section>
-      <h2>Split Classification</h2>
-      <label v-if="splitGates.length > 0">
-        Split:
-        <select v-model="selectedSplitIndex">
-          <option
-            v-for="gate in splitGates"
-            :key="gate.gateId"
-            :value="gate.splitIndex"
-          >
-            Split {{ gate.splitIndex }} ({{ gate.name }})
-          </option>
-        </select>
-      </label>
-      <p v-else>No split gates configured for this stage.</p>
-      <table v-if="splitGates.length > 0">
-        <thead>
-          <tr>
-            <th>Pos</th>
-            <th>#</th>
-            <th>Driver</th>
-            <th>Co-Driver</th>
-            <th>Time</th>
-            <th>Gap</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="entry in splitClassification" :key="entry.vehicleId">
-            <td>{{ entry.position }}</td>
-            <td>{{ entry.startNumber }}</td>
-            <td>{{ entry.driverName }}</td>
-            <td>{{ entry.coDriverName ?? '-' }}</td>
-            <td>{{ formatDuration(entry.elapsedMs) }}</td>
-            <td>{{ formatGap(entry.gapMs) }}</td>
-            <td>{{ entry.stageRunStatus }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
-
-    <section>
-      <h2>Overall Classification</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Pos</th>
-            <th>#</th>
-            <th>Driver</th>
-            <th>Co-Driver</th>
-            <th>Total Time</th>
-            <th>Gap</th>
-            <th>Stages</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="entry in overallClassification" :key="entry.vehicleId">
-            <td>{{ entry.position }}</td>
-            <td>{{ entry.startNumber }}</td>
-            <td>{{ entry.driverName }}</td>
-            <td>{{ entry.coDriverName ?? '-' }}</td>
-            <td>{{ formatDuration(entry.durationMs) }}</td>
-            <td>{{ formatGap(entry.gapMs) }}</td>
-            <td>{{ entry.stagesCompleted }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
-
-    <section>
-      <h2>Stage Runs</h2>
-      <p>
-        Corrections apply immediately — use for missed or bad gate detections.
-      </p>
-      <table>
-        <thead>
-          <tr>
-            <th>Vehicle</th>
-            <th>Stage</th>
-            <th>Start</th>
-            <th>Splits</th>
-            <th>Finish</th>
-            <th>Duration</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="run in stageRuns" :key="run.id">
-            <td>{{ vehicleName(run.vehicleId) }}</td>
-            <td>{{ stageName(run.stageId) }}</td>
-            <td>
-              <input
-                v-if="editingRunId === run.id"
-                type="datetime-local"
-                step="1"
-                :value="toLocalInputValue(run.startTime)"
-                @change="
-                  onCorrectStart(run, ($event.target as HTMLInputElement).value)
-                "
+  <v-app>
+    <v-app-bar title="Rally Gate — Live Timing" color="primary" />
+    <v-main>
+      <v-container fluid class="py-6">
+        <v-card class="mb-6">
+          <v-card-title>Stage Classification</v-card-title>
+          <v-card-text>
+            <div class="d-flex flex-wrap align-center ga-4 mb-4">
+              <v-select
+                v-model="selectedStageId"
+                :items="stageOptions"
+                item-title="title"
+                item-value="id"
+                label="Stage"
+                density="comfortable"
+                hide-details
+                style="max-width: 320px"
               />
-              <template v-else>{{
-                new Date(run.startTime).toLocaleTimeString()
-              }}</template>
-            </td>
-            <td>{{ formatSplits(run.id) }}</td>
-            <td>
-              <input
-                v-if="editingRunId === run.id"
-                type="datetime-local"
-                step="1"
-                :value="toLocalInputValue(run.finishTime)"
-                @change="
-                  onCorrectFinish(
-                    run,
-                    ($event.target as HTMLInputElement).value,
-                  )
-                "
+              <v-btn
+                v-if="selectedStage && selectedStage.status !== 'CLOSED'"
+                :loading="closingStage"
+                :disabled="closingStage"
+                color="error"
+                variant="outlined"
+                prepend-icon="mdi-flag-checkered"
+                @click="onCloseStage"
+              >
+                Close Stage (mark DNF/DNS)
+              </v-btn>
+              <v-chip v-else-if="selectedStage" color="timing-idle">
+                Stage closed
+              </v-chip>
+            </div>
+
+            <v-table density="comfortable">
+              <thead>
+                <tr>
+                  <th>Pos</th>
+                  <th>#</th>
+                  <th>Driver</th>
+                  <th>Co-Driver</th>
+                  <th>Time</th>
+                  <th>Gap</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="entry in stageClassification" :key="entry.vehicleId">
+                  <td>{{ entry.position }}</td>
+                  <td>{{ entry.startNumber }}</td>
+                  <td>{{ entry.driverName }}</td>
+                  <td>{{ entry.coDriverName ?? '-' }}</td>
+                  <td class="rg-timing">
+                    {{ formatDuration(entry.durationMs) }}
+                  </td>
+                  <td class="rg-timing">{{ formatGap(entry.gapMs) }}</td>
+                </tr>
+              </tbody>
+            </v-table>
+
+            <v-table
+              v-if="nonFinishers.length > 0"
+              density="comfortable"
+              class="mt-4"
+            >
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Driver</th>
+                  <th>Co-Driver</th>
+                  <th>Outcome</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="entry in nonFinishers" :key="entry.vehicleId">
+                  <td>{{ entry.startNumber }}</td>
+                  <td>{{ entry.driverName }}</td>
+                  <td>{{ entry.coDriverName ?? '-' }}</td>
+                  <td>
+                    <v-chip size="small" :color="outcomeColor(entry.outcome)">
+                      {{ entry.outcome }}
+                    </v-chip>
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+          </v-card-text>
+        </v-card>
+
+        <v-card class="mb-6">
+          <v-card-title>Split Classification</v-card-title>
+          <v-card-text>
+            <v-select
+              v-if="splitGates.length > 0"
+              v-model="selectedSplitIndex"
+              :items="splitGateOptions"
+              item-title="title"
+              item-value="value"
+              label="Split"
+              density="comfortable"
+              hide-details
+              style="max-width: 320px"
+              class="mb-4"
+            />
+            <v-alert v-else type="info" variant="tonal" class="mb-4">
+              No split gates configured for this stage.
+            </v-alert>
+            <v-table v-if="splitGates.length > 0" density="comfortable">
+              <thead>
+                <tr>
+                  <th>Pos</th>
+                  <th>#</th>
+                  <th>Driver</th>
+                  <th>Co-Driver</th>
+                  <th>Time</th>
+                  <th>Gap</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="entry in splitClassification" :key="entry.vehicleId">
+                  <td>{{ entry.position }}</td>
+                  <td>{{ entry.startNumber }}</td>
+                  <td>{{ entry.driverName }}</td>
+                  <td>{{ entry.coDriverName ?? '-' }}</td>
+                  <td class="rg-timing">
+                    {{ formatDuration(entry.elapsedMs) }}
+                  </td>
+                  <td class="rg-timing">{{ formatGap(entry.gapMs) }}</td>
+                  <td>
+                    <v-chip
+                      size="small"
+                      :color="runStatusColor(entry.stageRunStatus)"
+                    >
+                      {{ entry.stageRunStatus }}
+                    </v-chip>
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+          </v-card-text>
+        </v-card>
+
+        <v-card class="mb-6">
+          <v-card-title>Overall Classification</v-card-title>
+          <v-card-text>
+            <v-table density="comfortable">
+              <thead>
+                <tr>
+                  <th>Pos</th>
+                  <th>#</th>
+                  <th>Driver</th>
+                  <th>Co-Driver</th>
+                  <th>Total Time</th>
+                  <th>Gap</th>
+                  <th>Stages</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="entry in overallClassification"
+                  :key="entry.vehicleId"
+                >
+                  <td>{{ entry.position }}</td>
+                  <td>{{ entry.startNumber }}</td>
+                  <td>{{ entry.driverName }}</td>
+                  <td>{{ entry.coDriverName ?? '-' }}</td>
+                  <td class="rg-timing">
+                    {{ formatDuration(entry.durationMs) }}
+                  </td>
+                  <td class="rg-timing">{{ formatGap(entry.gapMs) }}</td>
+                  <td>{{ entry.stagesCompleted }}</td>
+                </tr>
+              </tbody>
+            </v-table>
+          </v-card-text>
+        </v-card>
+
+        <v-card class="mb-6">
+          <v-card-title>Stage Runs</v-card-title>
+          <v-card-text>
+            <v-alert type="info" variant="tonal" class="mb-4">
+              Corrections apply immediately — use for missed or bad gate
+              detections.
+            </v-alert>
+            <v-table density="comfortable">
+              <thead>
+                <tr>
+                  <th>Vehicle</th>
+                  <th>Stage</th>
+                  <th>Start</th>
+                  <th>Splits</th>
+                  <th>Finish</th>
+                  <th>Duration</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="run in stageRuns" :key="run.id">
+                  <td>{{ vehicleName(run.vehicleId) }}</td>
+                  <td>{{ stageName(run.stageId) }}</td>
+                  <td>
+                    <v-text-field
+                      v-if="editingRunId === run.id"
+                      type="time"
+                      step="1"
+                      density="compact"
+                      hide-details
+                      append-inner-icon="mdi-clock-outline"
+                      :model-value="toLocalTimeValue(run.startTime)"
+                      @click:append-inner="openTimePicker"
+                      @change="
+                        onCorrectStart(
+                          run,
+                          ($event.target as HTMLInputElement).value,
+                        )
+                      "
+                    />
+                    <span v-else class="rg-timing">
+                      {{ formatClockTime(run.startTime) }}
+                    </span>
+                  </td>
+                  <td class="rg-timing">{{ formatSplits(run.id) }}</td>
+                  <td>
+                    <v-text-field
+                      v-if="editingRunId === run.id"
+                      type="time"
+                      step="1"
+                      density="compact"
+                      hide-details
+                      append-inner-icon="mdi-clock-outline"
+                      :model-value="toLocalTimeValue(run.finishTime)"
+                      @click:append-inner="openTimePicker"
+                      @change="
+                        onCorrectFinish(
+                          run,
+                          ($event.target as HTMLInputElement).value,
+                        )
+                      "
+                    />
+                    <span v-else class="rg-timing">
+                      {{
+                        run.finishTime ? formatClockTime(run.finishTime) : '-'
+                      }}
+                    </span>
+                  </td>
+                  <td class="rg-timing">
+                    {{ runDurationDisplay(run) }}
+                  </td>
+                  <td>
+                    <v-chip size="small" :color="runStatusColor(run.status)">
+                      {{ run.status }}
+                    </v-chip>
+                  </td>
+                  <td>
+                    <v-btn
+                      size="small"
+                      variant="text"
+                      :prepend-icon="
+                        editingRunId === run.id ? 'mdi-check' : 'mdi-pencil'
+                      "
+                      @click="toggleEditRun(run.id)"
+                    >
+                      {{ editingRunId === run.id ? 'Done' : 'Correct' }}
+                    </v-btn>
+                    <v-btn
+                      size="small"
+                      variant="text"
+                      color="error"
+                      prepend-icon="mdi-delete"
+                      @click="onDeleteRun(run)"
+                    >
+                      Delete
+                    </v-btn>
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+            <form
+              class="d-flex flex-wrap align-center ga-3 mt-4"
+              @submit.prevent="onCreateRun"
+            >
+              <v-select
+                v-model="newRun.vehicleId"
+                :items="vehicleOptions"
+                item-title="title"
+                item-value="id"
+                label="Vehicle"
+                density="comfortable"
+                hide-details
+                style="min-width: 220px"
               />
-              <template v-else>{{
-                run.finishTime
-                  ? new Date(run.finishTime).toLocaleTimeString()
-                  : '-'
-              }}</template>
-            </td>
-            <td>{{ formatDuration(run.durationMs) }}</td>
-            <td>{{ run.status }}</td>
-            <td>
-              <button @click="toggleEditRun(run.id)">
-                {{ editingRunId === run.id ? 'Done' : 'Correct' }}
-              </button>
-              <button @click="onDeleteRun(run)">Delete</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <form @submit.prevent="onCreateRun">
-        <select v-model="newRun.vehicleId">
-          <option value="" disabled>Vehicle</option>
-          <option
-            v-for="vehicle in vehicles"
-            :key="vehicle.id"
-            :value="vehicle.id"
-          >
-            #{{ vehicle.startNumber }} {{ vehicle.driverName }}
-          </option>
-        </select>
-        <select v-model="newRun.stageId">
-          <option value="" disabled>Stage</option>
-          <option v-for="stage in stages" :key="stage.id" :value="stage.id">
-            {{ stage.name }}
-          </option>
-        </select>
-        <input v-model="newRun.startTime" type="datetime-local" step="1" />
-        <button type="submit">Add Missing Run</button>
-      </form>
-    </section>
+              <v-select
+                v-model="newRun.stageId"
+                :items="stageOptions"
+                item-title="title"
+                item-value="id"
+                label="Stage"
+                density="comfortable"
+                hide-details
+                style="min-width: 200px"
+              />
+              <v-text-field
+                v-model="newRun.startTime"
+                type="time"
+                step="1"
+                label="Start time (today)"
+                density="comfortable"
+                hide-details
+                append-inner-icon="mdi-clock-outline"
+                style="min-width: 220px"
+                @click:append-inner="openTimePicker"
+              />
+              <v-btn type="submit" color="primary" prepend-icon="mdi-plus">
+                Add Missing Run
+              </v-btn>
+            </form>
+          </v-card-text>
+        </v-card>
 
-    <section>
-      <h2>Gates</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Online</th>
-            <th>Last Heartbeat</th>
-            <th>Capabilities</th>
-            <th>Active Assignment</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="gate in gates" :key="gate.id">
-            <td>{{ gate.id }}</td>
-            <td>{{ gate.name }}</td>
-            <td>{{ isOnline(gate) ? 'online' : 'offline' }}</td>
-            <td>
-              {{
-                gate.lastHeartbeatAt
-                  ? new Date(gate.lastHeartbeatAt).toLocaleTimeString()
-                  : 'never'
-              }}
-            </td>
-            <td>{{ gate.capabilities ?? '-' }}</td>
-            <td>
-              <template
-                v-for="assignment in gateAssignments.filter(
-                  (a) => a.gateId === gate.id && a.active,
-                )"
-                :key="assignment.id"
-              >
-                {{ assignment.role }} @ {{ stageName(assignment.stageId) }}
-              </template>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <p v-if="gates.length === 0">
-        No gates yet — waiting for a gate-agent heartbeat.
-      </p>
-    </section>
+        <v-card class="mb-6">
+          <v-card-title>Gates</v-card-title>
+          <v-card-text>
+            <v-table density="comfortable">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Online</th>
+                  <th>Last Heartbeat</th>
+                  <th>Capabilities</th>
+                  <th>Active Assignment</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="gate in gates" :key="gate.id">
+                  <td>{{ gate.id }}</td>
+                  <td>{{ gate.name }}</td>
+                  <td>
+                    <v-chip
+                      size="small"
+                      :color="isOnline(gate) ? 'success' : 'timing-idle'"
+                    >
+                      {{ isOnline(gate) ? 'online' : 'offline' }}
+                    </v-chip>
+                  </td>
+                  <td
+                    :title="
+                      gate.lastHeartbeatAt
+                        ? formatClockTime(gate.lastHeartbeatAt)
+                        : undefined
+                    "
+                  >
+                    {{
+                      gate.lastHeartbeatAt
+                        ? formatRelativeTime(gate.lastHeartbeatAt, now)
+                        : 'never'
+                    }}
+                  </td>
+                  <td>{{ gate.capabilities ?? '-' }}</td>
+                  <td>
+                    <v-chip
+                      v-for="assignment in gateAssignments.filter(
+                        (a) => a.gateId === gate.id && a.active,
+                      )"
+                      :key="assignment.id"
+                      size="small"
+                      class="mr-1"
+                    >
+                      {{ assignment.role }} @
+                      {{ stageName(assignment.stageId) }}
+                    </v-chip>
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+            <v-alert v-if="gates.length === 0" type="info" variant="tonal">
+              No gates yet — waiting for a gate-agent heartbeat.
+            </v-alert>
+          </v-card-text>
+        </v-card>
 
-    <section>
-      <h2>Gate Assignments</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Gate</th>
-            <th>Stage</th>
-            <th>Role</th>
-            <th>Split #</th>
-            <th>Active</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="assignment in gateAssignments" :key="assignment.id">
-            <td>{{ assignment.gateId }}</td>
-            <td>{{ stageName(assignment.stageId) }}</td>
-            <td>{{ assignment.role }}</td>
-            <td>{{ assignment.splitIndex ?? '-' }}</td>
-            <td>{{ assignment.active ? 'yes' : 'no' }}</td>
-            <td>
-              <button
-                v-if="!assignment.active"
-                @click="onActivateAssignment(assignment)"
-              >
-                Activate
-              </button>
-              <button v-else @click="onDeactivateAssignment(assignment)">
-                Deactivate
-              </button>
-              <button @click="onDeleteAssignment(assignment)">Delete</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <form @submit.prevent="onCreateAssignment">
-        <select v-model="newAssignment.gateId">
-          <option value="" disabled>Gate</option>
-          <option v-for="gate in gates" :key="gate.id" :value="gate.id">
-            {{ gate.name }}
-          </option>
-        </select>
-        <select v-model="newAssignment.stageId">
-          <option value="" disabled>Stage</option>
-          <option v-for="stage in stages" :key="stage.id" :value="stage.id">
-            {{ stage.name }}
-          </option>
-        </select>
-        <select v-model="newAssignment.role">
-          <option v-for="role in GATE_ROLES" :key="role" :value="role">
-            {{ role }}
-          </option>
-        </select>
-        <input
-          v-if="newAssignment.role === 'stage_split'"
-          v-model.number="newAssignment.splitIndex"
-          type="number"
-          min="0"
-          placeholder="Split #"
-        />
-        <button type="submit">Add Assignment</button>
-      </form>
-    </section>
+        <v-card class="mb-6">
+          <v-card-title>Gate Assignments</v-card-title>
+          <v-card-text>
+            <v-table density="comfortable">
+              <thead>
+                <tr>
+                  <th>Gate</th>
+                  <th>Stage</th>
+                  <th>Role</th>
+                  <th>Split #</th>
+                  <th>Active</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="assignment in gateAssignments" :key="assignment.id">
+                  <td>{{ assignment.gateId }}</td>
+                  <td>{{ stageName(assignment.stageId) }}</td>
+                  <td>{{ assignment.role }}</td>
+                  <td>{{ assignment.splitIndex ?? '-' }}</td>
+                  <td>
+                    <v-chip
+                      size="small"
+                      :color="assignment.active ? 'success' : 'timing-idle'"
+                    >
+                      {{ assignment.active ? 'active' : 'inactive' }}
+                    </v-chip>
+                  </td>
+                  <td>
+                    <v-btn
+                      v-if="!assignment.active"
+                      size="small"
+                      variant="text"
+                      color="success"
+                      prepend-icon="mdi-play"
+                      @click="onActivateAssignment(assignment)"
+                    >
+                      Activate
+                    </v-btn>
+                    <v-btn
+                      v-else
+                      size="small"
+                      variant="text"
+                      prepend-icon="mdi-pause"
+                      @click="onDeactivateAssignment(assignment)"
+                    >
+                      Deactivate
+                    </v-btn>
+                    <v-btn
+                      size="small"
+                      variant="text"
+                      color="error"
+                      prepend-icon="mdi-delete"
+                      @click="onDeleteAssignment(assignment)"
+                    >
+                      Delete
+                    </v-btn>
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+            <form
+              class="d-flex flex-wrap align-center ga-3 mt-4"
+              @submit.prevent="onCreateAssignment"
+            >
+              <v-select
+                v-model="newAssignment.gateId"
+                :items="gates"
+                item-title="name"
+                item-value="id"
+                label="Gate"
+                density="comfortable"
+                hide-details
+                style="min-width: 200px"
+              />
+              <v-select
+                v-model="newAssignment.stageId"
+                :items="stageOptions"
+                item-title="title"
+                item-value="id"
+                label="Stage"
+                density="comfortable"
+                hide-details
+                style="min-width: 200px"
+              />
+              <v-select
+                v-model="newAssignment.role"
+                :items="[...GATE_ROLES]"
+                label="Role"
+                density="comfortable"
+                hide-details
+                style="min-width: 200px"
+              />
+              <v-text-field
+                v-if="newAssignment.role === 'stage_split'"
+                v-model.number="newAssignment.splitIndex"
+                type="number"
+                min="0"
+                label="Split #"
+                density="comfortable"
+                hide-details
+                style="max-width: 140px"
+              />
+              <v-btn type="submit" color="primary" prepend-icon="mdi-plus">
+                Add Assignment
+              </v-btn>
+            </form>
+          </v-card-text>
+        </v-card>
 
-    <section>
-      <h2>Live Detections</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Gate</th>
-            <th>Transponder</th>
-            <th>Vehicle</th>
-            <th>Gate Time</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="event in detections" :key="event.eventId">
-            <td>{{ event.gateId }}</td>
-            <td>{{ event.transponderId }}</td>
-            <td>{{ event.vehicleId ?? 'unknown' }}</td>
-            <td>{{ new Date(event.timestampGate).toLocaleTimeString() }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
-  </main>
+        <v-card>
+          <v-card-title>Live Detections</v-card-title>
+          <v-card-text>
+            <v-table density="comfortable">
+              <thead>
+                <tr>
+                  <th>Gate</th>
+                  <th>Transponder</th>
+                  <th>Vehicle</th>
+                  <th>Gate Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="event in detections" :key="event.eventId">
+                  <td>{{ event.gateId }}</td>
+                  <td>{{ event.transponderId }}</td>
+                  <td>
+                    {{
+                      event.vehicleId ? vehicleName(event.vehicleId) : 'unknown'
+                    }}
+                  </td>
+                  <td class="rg-timing">
+                    {{ formatClockTime(event.timestampGate) }}
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+          </v-card-text>
+        </v-card>
+      </v-container>
+    </v-main>
+  </v-app>
 </template>
-
-<style scoped>
-main {
-  max-width: 960px;
-  margin: 2rem auto;
-  font-family: system-ui, sans-serif;
-  padding: 0 1rem;
-}
-section {
-  margin-top: 2rem;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-th,
-td {
-  text-align: left;
-  padding: 0.4rem 0.6rem;
-  border-bottom: 1px solid #ccc;
-}
-</style>
