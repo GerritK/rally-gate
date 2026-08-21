@@ -72,8 +72,11 @@ describe('StageRunsService.correctRun', () => {
 
     const corrected = await service.correctRun('r1', { finishTime: null });
 
-    expect(corrected.finishTime).toBeUndefined();
-    expect(corrected.durationMs).toBeUndefined();
+    // Must be null, not undefined: TypeORM's save() silently skips
+    // undefined properties (leaves the DB column untouched), so only null
+    // actually clears finishTime — see the entity's doc comment.
+    expect(corrected.finishTime).toBeNull();
+    expect(corrected.durationMs).toBeNull();
     expect(corrected.status).toBe(StageRunStatus.STARTED);
   });
 
