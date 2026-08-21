@@ -4,12 +4,14 @@ import {
   OverallClassificationEntry,
   SplitClassificationEntry,
   StageOutcomeEntry,
-  StageRunStatus,
   StageStatus,
 } from '@rally-gate/shared';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { GatesService } from '../gates/gates.service';
-import { StageRunsService } from '../stage-runs/stage-runs.service';
+import {
+  deriveStageRunStatus,
+  StageRunsService,
+} from '../stage-runs/stage-runs.service';
 import { StagesService } from '../stages/stages.service';
 import { Vehicle } from '../vehicles/vehicle.entity';
 import { VehiclesService } from '../vehicles/vehicles.service';
@@ -108,6 +110,7 @@ export class ClassificationService {
       (a, b) => a.split.elapsedMs - b.split.elapsedMs,
     );
     const leaderMs = sorted[0]?.split.elapsedMs ?? 0;
+    const stageClosed = stage.status === StageStatus.CLOSED;
     return sorted.map((pair, index) => {
       const vehicle = vehicleById.get(pair.run.vehicleId);
       return {
@@ -119,7 +122,7 @@ export class ClassificationService {
         splitIndex,
         elapsedMs: pair.split.elapsedMs,
         gapMs: pair.split.elapsedMs - leaderMs,
-        stageRunStatus: pair.run.status,
+        stageRunStatus: deriveStageRunStatus(pair.run, stageClosed),
       };
     });
   }
@@ -148,13 +151,14 @@ export class ClassificationService {
       };
     };
 
-    const dnf = runs
-      .filter((run) => run.status === StageRunStatus.CANCELLED)
-      .map((run) => toEntry(run.vehicleId, 'DNF'));
     if (stage.status !== StageStatus.CLOSED) {
-      // Before the stage closes, "no run yet" just means "hasn't started" — not DNS.
-      return dnf;
+      // Before the stage closes, an unfinished run is still running, not DNF,
+      // and "no run yet" just means "hasn't started" — not DNS.
+      return [];
     }
+    const dnf = runs
+      .filter((run) => !run.finishTime)
+      .map((run) => toEntry(run.vehicleId, 'DNF'));
     const startedVehicleIds = new Set(runs.map((run) => run.vehicleId));
     const dns = vehicles
       .filter((vehicle) => !startedVehicleIds.has(vehicle.id))

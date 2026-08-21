@@ -4,9 +4,12 @@ import {
   activateGateAssignment,
   API_BASE,
   closeStage,
+  correctStageRun,
   createGateAssignment,
+  createStageRun,
   deactivateGateAssignment,
   deleteGateAssignment,
+  deleteStageRun,
   fetchGateAssignments,
   fetchGates,
   fetchNonFinishers,
@@ -18,6 +21,7 @@ import {
   fetchStageClassification,
   fetchStageRuns,
   fetchStages,
+  fetchVehicles,
   GATE_ROLES,
   type ClassificationEntry,
   type DetectionEventRecord,
@@ -30,6 +34,7 @@ import {
   type StageOutcomeEntry,
   type StageRun,
   type StageSplit,
+  type Vehicle,
 } from './api';
 
 const HEARTBEAT_ONLINE_THRESHOLD_MS = 30_000;
@@ -48,6 +53,7 @@ const nonFinishers = ref<StageOutcomeEntry[]>([]);
 const closingStage = ref(false);
 const gates = ref<Gate[]>([]);
 const gateAssignments = ref<GateAssignment[]>([]);
+const vehicles = ref<Vehicle[]>([]);
 const newAssignment = ref<{
   gateId: string;
   stageId: string;
@@ -58,6 +64,16 @@ const newAssignment = ref<{
   stageId: '',
   role: GATE_ROLES[0],
 });
+const newRun = ref<{ vehicleId: string; stageId: string; startTime: string }>({
+  vehicleId: '',
+  stageId: '',
+  startTime: '',
+});
+const editingRunId = ref<string | null>(null);
+
+function toggleEditRun(runId: string) {
+  editingRunId.value = editingRunId.value === runId ? null : runId;
+}
 let detectionsSource: EventSource;
 let stageRunsSource: EventSource;
 let stageRunSplitsSource: EventSource;
@@ -155,6 +171,62 @@ function stageName(stageId: string): string {
   return stages.value.find((stage) => stage.id === stageId)?.name ?? stageId;
 }
 
+function vehicleName(vehicleId: string): string {
+  const vehicle = vehicles.value.find((v) => v.id === vehicleId);
+  return vehicle ? `#${vehicle.startNumber} ${vehicle.driverName}` : vehicleId;
+}
+
+function toLocalInputValue(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours(),
+  )}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+async function onCorrectStart(run: StageRun, value: string) {
+  if (!value) return;
+  upsertStageRun(
+    await correctStageRun(run.id, { startTime: new Date(value).toISOString() }),
+  );
+}
+
+async function onCorrectFinish(run: StageRun, value: string) {
+  upsertStageRun(
+    await correctStageRun(run.id, {
+      finishTime: value ? new Date(value).toISOString() : null,
+    }),
+  );
+}
+
+async function onDeleteRun(run: StageRun) {
+  await deleteStageRun(run.id);
+  stageRuns.value = stageRuns.value.filter((r) => r.id !== run.id);
+  delete splitsByRun.value[run.id];
+}
+
+async function onCreateRun() {
+  if (
+    !newRun.value.vehicleId ||
+    !newRun.value.stageId ||
+    !newRun.value.startTime
+  )
+    return;
+  try {
+    const created = await createStageRun({
+      vehicleId: newRun.value.vehicleId,
+      stageId: newRun.value.stageId,
+      startTime: new Date(newRun.value.startTime).toISOString(),
+    });
+    upsertStageRun(created);
+    splitsByRun.value[created.id] = [];
+    newRun.value = { vehicleId: '', stageId: '', startTime: '' };
+  } catch (err) {
+    alert(err instanceof Error ? err.message : 'Failed to add run');
+  }
+}
+
 async function refreshGates() {
   gates.value = await fetchGates();
   gateAssignments.value = await fetchGateAssignments();
@@ -208,6 +280,7 @@ onMounted(async () => {
   }
   await onStageSelected();
   await refreshGates();
+  vehicles.value = await fetchVehicles();
 
   for (const run of stageRuns.value) {
     splitsByRun.value[run.id] = await fetchSplitsForRun(run.id);
@@ -374,6 +447,9 @@ onUnmounted(() => {
 
     <section>
       <h2>Stage Runs</h2>
+      <p>
+        Corrections apply immediately — use for missed or bad gate detections.
+      </p>
       <table>
         <thead>
           <tr>
@@ -384,26 +460,78 @@ onUnmounted(() => {
             <th>Finish</th>
             <th>Duration</th>
             <th>Status</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="run in stageRuns" :key="run.id">
-            <td>{{ run.vehicleId }}</td>
-            <td>{{ run.stageId }}</td>
-            <td>{{ new Date(run.startTime).toLocaleTimeString() }}</td>
+            <td>{{ vehicleName(run.vehicleId) }}</td>
+            <td>{{ stageName(run.stageId) }}</td>
+            <td>
+              <input
+                v-if="editingRunId === run.id"
+                type="datetime-local"
+                step="1"
+                :value="toLocalInputValue(run.startTime)"
+                @change="
+                  onCorrectStart(run, ($event.target as HTMLInputElement).value)
+                "
+              />
+              <template v-else>{{
+                new Date(run.startTime).toLocaleTimeString()
+              }}</template>
+            </td>
             <td>{{ formatSplits(run.id) }}</td>
             <td>
-              {{
+              <input
+                v-if="editingRunId === run.id"
+                type="datetime-local"
+                step="1"
+                :value="toLocalInputValue(run.finishTime)"
+                @change="
+                  onCorrectFinish(
+                    run,
+                    ($event.target as HTMLInputElement).value,
+                  )
+                "
+              />
+              <template v-else>{{
                 run.finishTime
                   ? new Date(run.finishTime).toLocaleTimeString()
                   : '-'
-              }}
+              }}</template>
             </td>
             <td>{{ formatDuration(run.durationMs) }}</td>
             <td>{{ run.status }}</td>
+            <td>
+              <button @click="toggleEditRun(run.id)">
+                {{ editingRunId === run.id ? 'Done' : 'Correct' }}
+              </button>
+              <button @click="onDeleteRun(run)">Delete</button>
+            </td>
           </tr>
         </tbody>
       </table>
+      <form @submit.prevent="onCreateRun">
+        <select v-model="newRun.vehicleId">
+          <option value="" disabled>Vehicle</option>
+          <option
+            v-for="vehicle in vehicles"
+            :key="vehicle.id"
+            :value="vehicle.id"
+          >
+            #{{ vehicle.startNumber }} {{ vehicle.driverName }}
+          </option>
+        </select>
+        <select v-model="newRun.stageId">
+          <option value="" disabled>Stage</option>
+          <option v-for="stage in stages" :key="stage.id" :value="stage.id">
+            {{ stage.name }}
+          </option>
+        </select>
+        <input v-model="newRun.startTime" type="datetime-local" step="1" />
+        <button type="submit">Add Missing Run</button>
+      </form>
     </section>
 
     <section>

@@ -1,4 +1,4 @@
-import { StageRunStatus, StageStatus } from '@rally-gate/shared';
+import { StageStatus } from '@rally-gate/shared';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { GatesService } from '../gates/gates.service';
 import { StageRunsService } from '../stage-runs/stage-runs.service';
@@ -47,23 +47,20 @@ describe('ClassificationService.getNonFinishers', () => {
     expect(await service.getNonFinishers('WP1')).toEqual([]);
   });
 
-  it('reports CANCELLED runs as DNF before the stage is closed, but no DNS yet', async () => {
-    const runs = [{ vehicleId: 'v1', status: StageRunStatus.CANCELLED }];
+  it('reports no one before the stage closes, even with an unfinished run — it is still running, not DNF', async () => {
+    const runs = [{ vehicleId: 'v1', finishTime: undefined }];
     const service = makeService(
       { status: StageStatus.NOT_STARTED },
       runs,
       vehicles,
     );
-    const result = await service.getNonFinishers('WP1');
-    expect(result).toEqual([
-      expect.objectContaining({ vehicleId: 'v1', outcome: 'DNF' }),
-    ]);
+    expect(await service.getNonFinishers('WP1')).toEqual([]);
   });
 
-  it('reports DNF (cancelled, unfinished run) and DNS (no run at all) once the stage is closed', async () => {
+  it('reports DNF (unfinished run) and DNS (no run at all) once the stage is closed', async () => {
     const runs = [
-      { vehicleId: 'v1', status: StageRunStatus.CANCELLED },
-      { vehicleId: 'v3', status: StageRunStatus.FINISHED },
+      { vehicleId: 'v1', finishTime: undefined },
+      { vehicleId: 'v3', finishTime: new Date() },
     ];
     const service = makeService({ status: StageStatus.CLOSED }, runs, vehicles);
     const result = await service.getNonFinishers('WP1');

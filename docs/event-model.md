@@ -25,13 +25,30 @@ aren't assumed to be perfectly synced), `rawPayload`, `processed`.
 
 ## StageRun
 
-One row per vehicle+stage attempt. Created on a `stage_start` detection,
-closed on the matching `stage_finish` detection. `durationMs` is
-`finishTime - startTime` in server time. See
-`apps/rally-server/src/modules/stage-runs/stage-runs.service.ts` for the
-current (intentionally simple) rule: one active run per vehicle+stage,
-duplicate start events are ignored, a finish event with no active run is
-ignored (logged, not stored) rather than erroring.
+One row per vehicle+stage attempt, enforced by a `@Unique(['vehicleId',
+'stageId'])` DB constraint on `StageRun` — a vehicle can only run a stage
+once. Created on a `stage_start` detection, closed on the matching
+`stage_finish` detection. `durationMs` is `finishTime - startTime` in server
+time. See `apps/rally-server/src/modules/stage-runs/stage-runs.service.ts`
+for the current (intentionally simple) rule: one active run per
+vehicle+stage, duplicate start events are ignored (the pre-insert check
+handles the common case; a race that slips past it and hits the DB
+constraint falls back to returning the existing row rather than erroring), a
+finish event with no active run is ignored (logged, not stored) rather than
+erroring. A marshal can also correct a run directly (missed or bad
+detection) via `PATCH /stage-runs/:id` (startTime/finishTime, `durationMs`
+recomputed server-side) or create one outright via `POST /stage-runs` when
+the start detection never arrived at all (409s if the vehicle already has a
+run on that stage) — see `stage-runs.service.ts`
+`correctRun`/`createManual`.
+
+`StageRun` has no `status` column — STARTED/FINISHED/CANCELLED is derived on
+read (`deriveStageRunStatus` in `stage-runs.service.ts`), never stored:
+FINISHED once `finishTime` is set, otherwise STARTED unless the run's stage
+has been closed, in which case it's CANCELLED (DNF). This means
+`Stage.close()` (`stages.service.ts`) no longer needs to sweep/write
+anything to `StageRun` rows — every still-unfinished run on a closed stage
+reports CANCELLED for free, with no risk of the two drifting out of sync.
 
 ## StageSplit
 

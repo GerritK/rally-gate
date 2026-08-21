@@ -5,7 +5,7 @@ export class Vehicle {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column({ unique: true })
   startNumber: string;
 
   @Column()
