@@ -221,13 +221,11 @@ export class StageRunsService {
       run.startTime = new Date(patch.startTime);
     }
     if (patch.finishTime !== undefined) {
-      run.finishTime = patch.finishTime
-        ? new Date(patch.finishTime)
-        : undefined;
+      run.finishTime = patch.finishTime ? new Date(patch.finishTime) : null;
     }
     run.durationMs = run.finishTime
       ? run.finishTime.getTime() - run.startTime.getTime()
-      : undefined;
+      : null;
     const saved = await this.stageRuns.save(run);
     const withStatus = await this.withStatus(saved);
     this.emitter.emit('stage-run.updated', withStatus);
@@ -237,9 +235,7 @@ export class StageRunsService {
   /** Admin override: record a run whose start (and maybe finish) detection never arrived. */
   async createManual(input: ManualStageRunInput): Promise<StageRunWithStatus> {
     const startTime = new Date(input.startTime);
-    const finishTime = input.finishTime
-      ? new Date(input.finishTime)
-      : undefined;
+    const finishTime = input.finishTime ? new Date(input.finishTime) : null;
     const run = this.stageRuns.create({
       vehicleId: input.vehicleId,
       stageId: input.stageId,
@@ -247,7 +243,7 @@ export class StageRunsService {
       finishTime,
       durationMs: finishTime
         ? finishTime.getTime() - startTime.getTime()
-        : undefined,
+        : null,
     });
     let saved: StageRun;
     try {

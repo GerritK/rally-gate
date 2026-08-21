@@ -24,9 +24,20 @@ export class StageRun {
   @Column({ type: 'datetime' })
   startTime: Date;
 
+  /**
+   * `| null`, not just optional: TypeORM's save() skips properties that are
+   * `undefined` (leaves the DB column untouched) but writes `null` fields
+   * as SQL NULL. Clearing a finish time needs the latter — see
+   * StageRunsService.correctRun.
+   */
   @Column({ type: 'datetime', nullable: true })
-  finishTime?: Date;
+  finishTime?: Date | null;
 
-  @Column({ nullable: true })
-  durationMs?: number;
+  /**
+   * Explicit `type: 'int'` needed: reflect-metadata reduces a `number |
+   * null` property type to generic `Object`, which better-sqlite3 rejects
+   * as a column type when TypeORM tries to infer it from the TS type.
+   */
+  @Column({ type: 'int', nullable: true })
+  durationMs?: number | null;
 }
