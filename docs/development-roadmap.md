@@ -30,13 +30,29 @@
   /gates/:id` role pre-configuration. Verified end-to-end: gate-agent
   heartbeat auto-registered a gate, an activated `stage_start` assignment
   turned a simulated detection into a `StageRun`.
+- Manual correction of stage runs (admin override): `PATCH /stage-runs/:id`
+  lets a marshal fix `startTime`/`finishTime` on an existing run (`durationMs`
+  recomputed server-side), `POST /stage-runs` creates one outright when a
+  start detection never arrived, `DELETE /stage-runs/:id` removes a phantom
+  row (e.g. a misread transponder). All three emit `stage-run.updated`
+  through the same event bus the gate pipeline uses, so the live dashboard
+  picks up corrections without a special case. Dashboard's Stage Runs table
+  has a per-row "Correct" toggle (off by default) that swaps start/finish to
+  editable inputs; a Delete button; and a form to add a missing run.
+  `StageRun.status` is not a stored/settable field — it's derived on read
+  from `finishTime` + whether the run's stage is closed (see `StageRun` in
+  `event-model.md`), so there's no status editor and `Stage.close()` no
+  longer writes a DNF sweep to `StageRun` rows at all. Verified via `curl`
+  against the running server (create → correct finish time → classification
+  reflects it → close stage flips the still-open run to CANCELLED/DNF for
+  free → delete → 404 on a missing id) and `vue-tsc`/`tsc` typechecks; no
+  dedicated e2e browser test.
 
 ## Next
 
 Priority order (1 = next):
 
-1. Manual correction of stage runs (admin override) — safety net for missed/bad detections (RFID, beam, missed transponder reads all funnel into this).
-2. Gate/gate-node health reporting, plus expected stage time: optional
+1. Gate/gate-node health reporting, plus expected stage time: optional
    `Stage.expectedDurationMs` set by the marshal, dashboard flags any
    `STARTED` run as overdue once `now - startTime` exceeds it. Client-side
    only (SSE data already has `startTime`), no new backend push needed.
@@ -45,15 +61,15 @@ Priority order (1 = next):
    "Gate control channel" in `architecture.md` — a `stage-started` broadcast
    + per-gate `ready` ack, which also doubles as the clock-sync trigger
    (see `decoder-adapters.md` DS3231 note).
-3. Standalone packaging (`apps/rally-server/packaging/standalone`, Node SEA/pkg + optional tray icon) — needed to hand `rally-server` to a marshal without a dev machine.
-4. Real `OpenStintAdapter` once the RF hardware validation (two ordered gates) confirms reliable reads — critical path, but gated on external hardware validation so it runs in parallel with the above rather than blocking them.
-5. mDNS/Bonjour broker autodiscovery so a gate can find `rally-server`'s MQTT
+2. Standalone packaging (`apps/rally-server/packaging/standalone`, Node SEA/pkg + optional tray icon) — needed to hand `rally-server` to a marshal without a dev machine.
+3. Real `OpenStintAdapter` once the RF hardware validation (two ordered gates) confirms reliable reads — critical path, but gated on external hardware validation so it runs in parallel with the above rather than blocking them.
+4. mDNS/Bonjour broker autodiscovery so a gate can find `rally-server`'s MQTT
    broker on the local network instead of `MQTT_HOST` being typed in by hand
    — see "MQTT broker discovery" in `architecture.md`. Smaller and
    independent of the gate config web interface item below (no AP/hotspot
    work needed), though it feeds into that item's "MQTT host" field once
    built. Manual entry stays as a fallback for APs that block multicast.
-6. **Gate config web interface** (bigger item, own service): local HTTP server
+5. **Gate config web interface** (bigger item, own service): local HTTP server
    on the gate Pi to set `GATE_ID`, Wi-Fi/network, and MQTT host without
    re-running the install script over SSH. Needs an **AP/hotspot mode**
    fallback (hostapd + dnsmasq, or a lib like balena's wifi-connect) so a
@@ -63,7 +79,7 @@ Priority order (1 = next):
    saved Wi-Fi that fails to connect (wrong password, gate out of range,
    router changed) — not just on first boot with nothing configured. Not
    designed yet.
-7. Parc Fermé / time control / service park gate roles and their state transitions.
+6. Parc Fermé / time control / service park gate roles and their state transitions.
 
 ## Deliberately deferred
 

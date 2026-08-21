@@ -1,7 +1,16 @@
-import { StageRunStatus } from '@rally-gate/shared';
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, Unique } from 'typeorm';
 
+/**
+ * No `status` column — STARTED/FINISHED/CANCELLED is derived from
+ * `finishTime` plus whether the stage has been closed, see
+ * `deriveStageRunStatus` in `stage-runs.service.ts`. Storing it separately
+ * would let it drift out of sync with the timestamps it's supposed to
+ * summarize.
+ *
+ * One row per (vehicleId, stageId) — a vehicle attempts a stage once.
+ */
 @Entity()
+@Unique(['vehicleId', 'stageId'])
 export class StageRun {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -20,7 +29,4 @@ export class StageRun {
 
   @Column({ nullable: true })
   durationMs?: number;
-
-  @Column({ type: 'varchar', default: StageRunStatus.STARTED })
-  status: StageRunStatus;
 }

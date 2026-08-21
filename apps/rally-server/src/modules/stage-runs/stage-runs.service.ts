@@ -1,13 +1,50 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { StageRunStatus } from '@rally-gate/shared';
-import { In, Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { StageRunStatus, StageStatus } from '@rally-gate/shared';
+import { In, IsNull, Not, Repository } from 'typeorm';
+import { isUniqueViolation } from '../../common/db-errors';
+import { StagesService } from '../stages/stages.service';
 import { StageRun } from './stage-run.entity';
 import { StageSplit } from './stage-split.entity';
 
 export interface StageRunSplitPair {
   run: StageRun;
   split: StageSplit;
+}
+
+export interface StageRunCorrection {
+  startTime?: string;
+  finishTime?: string | null;
+}
+
+export interface ManualStageRunInput {
+  vehicleId: string;
+  stageId: string;
+  startTime: string;
+  finishTime?: string;
+}
+
+export type StageRunWithStatus = StageRun & { status: StageRunStatus };
+
+/**
+ * STARTED/FINISHED/CANCELLED is derived, never stored: a run is FINISHED once
+ * it has a finishTime, otherwise it's STARTED unless its stage has been
+ * closed (marshal swept it as DNF), in which case it's CANCELLED.
+ */
+export function deriveStageRunStatus(
+  run: Pick<StageRun, 'finishTime'>,
+  stageClosed: boolean,
+): StageRunStatus {
+  if (run.finishTime) {
+    return StageRunStatus.FINISHED;
+  }
+  return stageClosed ? StageRunStatus.CANCELLED : StageRunStatus.STARTED;
 }
 
 @Injectable()
@@ -19,15 +56,38 @@ export class StageRunsService {
     private readonly stageRuns: Repository<StageRun>,
     @InjectRepository(StageSplit)
     private readonly stageSplits: Repository<StageSplit>,
+    private readonly stagesService: StagesService,
+    private readonly emitter: EventEmitter2,
   ) {}
 
-  findAll(): Promise<StageRun[]> {
-    return this.stageRuns.find({ order: { startTime: 'DESC' } });
+  private async isStageClosed(stageId: string): Promise<boolean> {
+    const stage = await this.stagesService.findOne(stageId);
+    return stage?.status === StageStatus.CLOSED;
+  }
+
+  private async withStatus(run: StageRun): Promise<StageRunWithStatus> {
+    return { ...run, status: await this.deriveStatus(run) };
+  }
+
+  private async deriveStatus(run: StageRun): Promise<StageRunStatus> {
+    return deriveStageRunStatus(run, await this.isStageClosed(run.stageId));
+  }
+
+  async findAll(): Promise<StageRunWithStatus[]> {
+    const runs = await this.stageRuns.find({ order: { startTime: 'DESC' } });
+    const stages = await this.stagesService.findAll();
+    const closedStageIds = new Set(
+      stages.filter((s) => s.status === StageStatus.CLOSED).map((s) => s.id),
+    );
+    return runs.map((run) => ({
+      ...run,
+      status: deriveStageRunStatus(run, closedStageIds.has(run.stageId)),
+    }));
   }
 
   findFinishedByStage(stageId: string): Promise<StageRun[]> {
     return this.stageRuns.find({
-      where: { stageId, status: StageRunStatus.FINISHED },
+      where: { stageId, finishTime: Not(IsNull()) },
       order: { durationMs: 'ASC' },
     });
   }
@@ -36,17 +96,11 @@ export class StageRunsService {
     return this.stageRuns.find({ where: { stageId } });
   }
 
-  async cancelActiveRuns(stageId: string): Promise<void> {
-    await this.stageRuns.update(
-      { stageId, status: StageRunStatus.STARTED },
-      { status: StageRunStatus.CANCELLED },
-    );
-  }
-
   findAllFinished(): Promise<StageRun[]> {
-    return this.stageRuns.find({ where: { status: StageRunStatus.FINISHED } });
+    return this.stageRuns.find({ where: { finishTime: Not(IsNull()) } });
   }
 
+  /** The vehicle's in-progress attempt on this stage, if any (not yet finished). */
   private findActive(
     vehicleId: string,
     stageId: string,
@@ -54,7 +108,7 @@ export class StageRunsService {
     return this.stageRuns.findOneBy({
       vehicleId,
       stageId,
-      status: StageRunStatus.STARTED,
+      finishTime: IsNull(),
     });
   }
 
@@ -65,7 +119,7 @@ export class StageRunsService {
     return this.stageRuns.findOneBy({
       vehicleId,
       stageId,
-      status: StageRunStatus.FINISHED,
+      finishTime: Not(IsNull()),
     });
   }
 
@@ -73,35 +127,41 @@ export class StageRunsService {
     vehicleId: string,
     stageId: string,
     startTime: Date,
-  ): Promise<StageRun> {
+  ): Promise<StageRunWithStatus> {
     const existing = await this.findActive(vehicleId, stageId);
     if (existing) {
       this.logger.warn(
         `Vehicle ${vehicleId} already has a running stage run on ${stageId}, ignoring duplicate start`,
       );
-      return existing;
+      return this.withStatus(existing);
     }
     const finished = await this.findFinished(vehicleId, stageId);
     if (finished) {
       this.logger.warn(
         `Vehicle ${vehicleId} already finished stage ${stageId}, ignoring restart`,
       );
-      return finished;
+      return this.withStatus(finished);
     }
-    const run = this.stageRuns.create({
-      vehicleId,
-      stageId,
-      startTime,
-      status: StageRunStatus.STARTED,
-    });
-    return this.stageRuns.save(run);
+    const run = this.stageRuns.create({ vehicleId, stageId, startTime });
+    try {
+      return this.withStatus(await this.stageRuns.save(run));
+    } catch (err) {
+      if (!isUniqueViolation(err)) {
+        throw err;
+      }
+      // Lost a race with another detection for the same vehicle+stage.
+      const raced =
+        (await this.findActive(vehicleId, stageId)) ??
+        (await this.findFinished(vehicleId, stageId));
+      return this.withStatus(raced!);
+    }
   }
 
   async finishRun(
     vehicleId: string,
     stageId: string,
     finishTime: Date,
-  ): Promise<StageRun | null> {
+  ): Promise<StageRunWithStatus | null> {
     const run = await this.findActive(vehicleId, stageId);
     if (!run) {
       this.logger.warn(
@@ -111,8 +171,7 @@ export class StageRunsService {
     }
     run.finishTime = finishTime;
     run.durationMs = finishTime.getTime() - run.startTime.getTime();
-    run.status = StageRunStatus.FINISHED;
-    return this.stageRuns.save(run);
+    return this.withStatus(await this.stageRuns.save(run));
   }
 
   async recordSplit(
@@ -149,6 +208,70 @@ export class StageRunsService {
     return this.stageSplits.save(split);
   }
 
+  /** Admin override: fix a run's timing when a gate detection was missed or wrong. */
+  async correctRun(
+    id: string,
+    patch: StageRunCorrection,
+  ): Promise<StageRunWithStatus> {
+    const run = await this.stageRuns.findOneBy({ id });
+    if (!run) {
+      throw new NotFoundException(`StageRun ${id} not found`);
+    }
+    if (patch.startTime !== undefined) {
+      run.startTime = new Date(patch.startTime);
+    }
+    if (patch.finishTime !== undefined) {
+      run.finishTime = patch.finishTime
+        ? new Date(patch.finishTime)
+        : undefined;
+    }
+    run.durationMs = run.finishTime
+      ? run.finishTime.getTime() - run.startTime.getTime()
+      : undefined;
+    const saved = await this.stageRuns.save(run);
+    const withStatus = await this.withStatus(saved);
+    this.emitter.emit('stage-run.updated', withStatus);
+    return withStatus;
+  }
+
+  /** Admin override: record a run whose start (and maybe finish) detection never arrived. */
+  async createManual(input: ManualStageRunInput): Promise<StageRunWithStatus> {
+    const startTime = new Date(input.startTime);
+    const finishTime = input.finishTime
+      ? new Date(input.finishTime)
+      : undefined;
+    const run = this.stageRuns.create({
+      vehicleId: input.vehicleId,
+      stageId: input.stageId,
+      startTime,
+      finishTime,
+      durationMs: finishTime
+        ? finishTime.getTime() - startTime.getTime()
+        : undefined,
+    });
+    let saved: StageRun;
+    try {
+      saved = await this.stageRuns.save(run);
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        throw new ConflictException(
+          `Vehicle ${input.vehicleId} already has a run on stage ${input.stageId}`,
+        );
+      }
+      throw err;
+    }
+    const withStatus = await this.withStatus(saved);
+    this.emitter.emit('stage-run.updated', withStatus);
+    return withStatus;
+  }
+
+  async remove(id: string): Promise<void> {
+    const result = await this.stageRuns.delete(id);
+    if (result.affected === 0) {
+      throw new NotFoundException(`StageRun ${id} not found`);
+    }
+  }
+
   findSplitsForRun(stageRunId: string): Promise<StageSplit[]> {
     return this.stageSplits.find({
       where: { stageRunId },
@@ -160,19 +283,20 @@ export class StageRunsService {
     stageId: string,
     splitIndex: number,
   ): Promise<StageRunSplitPair[]> {
-    const runs = await this.stageRuns.find({
-      where: { stageId },
-    });
+    const runs = await this.stageRuns.find({ where: { stageId } });
+    const stageClosed = await this.isStageClosed(stageId);
     const activeRuns = runs.filter(
-      (run) => run.status !== StageRunStatus.CANCELLED,
+      (run) =>
+        deriveStageRunStatus(run, stageClosed) !== StageRunStatus.CANCELLED,
     );
     if (activeRuns.length === 0) {
       return [];
     }
-    const runById = new Map(activeRuns.map((run) => [run.id, run]));
+    const runIds = activeRuns.map((run) => run.id);
     const splits = await this.stageSplits.find({
-      where: { stageRunId: In([...runById.keys()]), splitIndex },
+      where: { stageRunId: In(runIds), splitIndex },
     });
+    const runById = new Map(activeRuns.map((run) => [run.id, run]));
     return splits.map((split) => ({
       run: runById.get(split.stageRunId)!,
       split,
