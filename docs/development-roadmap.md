@@ -79,7 +79,7 @@ Priority order (1 = next):
    saved Wi-Fi that fails to connect (wrong password, gate out of range,
    router changed) — not just on first boot with nothing configured. Not
    designed yet.
-6. Parc Fermé / time control / service park gate roles and their state transitions.
+6. Parc Fermé / time control / service park gate roles and their state transitions. When this lands, checkpoint-to-checkpoint interval/target times should use their own formatter (MM:SS or accumulated minutes) — see the format conventions documented in `packages/ui/src/format.ts`, don't reuse `formatStageDuration`.
 
 ## Deliberately deferred
 

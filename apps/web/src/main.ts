@@ -1,5 +1,5 @@
 import { createApp } from 'vue';
-import './style.css';
+import { createRallyVuetify } from '@rally-gate/ui';
 import App from './App.vue';
 
-createApp(App).mount('#app');
+createApp(App).use(createRallyVuetify()).mount('#app');
