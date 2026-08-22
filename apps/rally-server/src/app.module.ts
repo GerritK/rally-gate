@@ -9,6 +9,8 @@ import { ClassificationModule } from './modules/classification/classification.mo
 import { EventsModule } from './modules/events/events.module';
 import { GatesModule } from './modules/gates/gates.module';
 import { LiveModule } from './modules/live/live.module';
+import { RallyInfoModule } from './modules/rally-info/rally-info.module';
+import { SettingsModule } from './modules/settings/settings.module';
 import { StageRunsModule } from './modules/stage-runs/stage-runs.module';
 import { StagesModule } from './modules/stages/stages.module';
 import { VehiclesModule } from './modules/vehicles/vehicles.module';
@@ -20,6 +22,8 @@ import { VehiclesModule } from './modules/vehicles/vehicles.module';
     BrokerModule,
     GatesModule,
     VehiclesModule,
+    RallyInfoModule,
+    SettingsModule,
     StagesModule,
     StageRunsModule,
     EventsModule,

@@ -3,7 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { OnEvent } from '@nestjs/event-emitter';
 import { DETECTION_TOPIC_PREFIX } from '@rally-gate/shared';
 import { Repository } from 'typeorm';
+import { SettingsService } from '../settings/settings.service';
 import { Gate } from './gate.entity';
+
+export const AUTO_DISCOVER_GATES_KEY = 'autoDiscoverGates';
 
 const HEARTBEAT_TOPIC_REGEX = new RegExp(
   `^${DETECTION_TOPIC_PREFIX}/([^/]+)/heartbeat$`,
@@ -14,6 +17,7 @@ export class GatesService {
   constructor(
     @InjectRepository(Gate)
     private readonly gates: Repository<Gate>,
+    private readonly settingsService: SettingsService,
   ) {}
 
   findAll(): Promise<Gate[]> {
@@ -27,6 +31,10 @@ export class GatesService {
   async upsert(gate: Gate): Promise<Gate> {
     await this.gates.save(gate);
     return this.findOne(gate.id) as Promise<Gate>;
+  }
+
+  async remove(id: string): Promise<void> {
+    await this.gates.delete(id);
   }
 
   @OnEvent('mqtt.message')
@@ -52,10 +60,27 @@ export class GatesService {
     await this.recordHeartbeat(gateId, capabilities);
   }
 
-  async recordHeartbeat(gateId: string, capabilities?: string): Promise<Gate> {
-    const gate =
-      (await this.gates.findOneBy({ id: gateId })) ??
-      this.gates.create({ id: gateId, name: gateId });
+  /**
+   * Ignores heartbeats from gates that were never manually added when
+   * auto-discovery is off, rather than silently registering them — that's
+   * the point of the setting (keep the roster to gates the marshal expects
+   * at this event).
+   */
+  async recordHeartbeat(
+    gateId: string,
+    capabilities?: string,
+  ): Promise<Gate | null> {
+    let gate = await this.gates.findOneBy({ id: gateId });
+    if (!gate) {
+      const autoDiscover = await this.settingsService.getBoolean(
+        AUTO_DISCOVER_GATES_KEY,
+        true,
+      );
+      if (!autoDiscover) {
+        return null;
+      }
+      gate = this.gates.create({ id: gateId, name: gateId });
+    }
     gate.lastHeartbeatAt = new Date();
     if (capabilities) {
       gate.capabilities = capabilities;

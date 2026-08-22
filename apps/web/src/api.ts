@@ -86,6 +86,12 @@ export interface Vehicle {
   coDriverName?: string;
 }
 
+export interface RallyInfo {
+  name: string;
+  date?: string;
+  location?: string;
+}
+
 export interface Gate {
   id: string;
   name: string;
@@ -142,6 +148,21 @@ export function fetchStages(): Promise<Stage[]> {
   return apiFetch('/stages');
 }
 
+export function fetchStage(id: string): Promise<Stage> {
+  return apiFetch(`/stages/${id}`);
+}
+
+export function upsertStage(
+  id: string,
+  input: { name: string; stageNumber: number; status: string },
+): Promise<Stage> {
+  return apiFetch(`/stages/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
 export function fetchSplitsForRun(stageRunId: string): Promise<StageSplit[]> {
   return apiFetch(`/stage-runs/${stageRunId}/splits`);
 }
@@ -168,6 +189,40 @@ export function fetchVehicles(): Promise<Vehicle[]> {
   return apiFetch('/vehicles');
 }
 
+export function createVehicle(input: {
+  startNumber: string;
+  driverName: string;
+  coDriverName?: string;
+}): Promise<Vehicle> {
+  return postJson('/vehicles', input);
+}
+
+export function fetchRallyInfo(): Promise<RallyInfo | null> {
+  return apiFetch('/rally-info');
+}
+
+export function saveRallyInfo(input: RallyInfo): Promise<RallyInfo> {
+  return apiFetch('/rally-info', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchSetting(key: string): Promise<string | null> {
+  return apiFetch<{ key: string; value: string } | null>(
+    `/settings/${key}`,
+  ).then((setting) => setting?.value ?? null);
+}
+
+export function saveSetting(key: string, value: string): Promise<void> {
+  return apiFetch(`/settings/${key}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value }),
+  }).then(() => undefined);
+}
+
 export function createStageRun(input: {
   vehicleId: string;
   stageId: string;
@@ -178,6 +233,18 @@ export function createStageRun(input: {
 
 export function fetchGates(): Promise<Gate[]> {
   return apiFetch('/gates');
+}
+
+export function upsertGate(id: string, input: { name: string }): Promise<Gate> {
+  return apiFetch(`/gates/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteGate(id: string): Promise<void> {
+  return apiFetch(`/gates/${id}`, { method: 'DELETE' });
 }
 
 export function fetchGateAssignments(): Promise<GateAssignment[]> {
