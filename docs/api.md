@@ -12,6 +12,7 @@ REST (all on `rally-server`, default port 57430; embedded MQTT broker on
 | `/stage-runs` | GET, POST, `/:id` PATCH\|DELETE | derived from gate detections; POST/PATCH/DELETE are the marshal's manual-correction override for missed/bad detections; `(vehicleId, stageId)` is DB-unique, POST 409s on a clash |
 | `/stage-runs/:id/splits` | GET | `StageSplit`s for a run, ordered by `splitIndex` |
 | `/events` | GET | recent `DetectionEventRecord`s |
+| `/events/pending` | GET, `/retry` POST | detections stored but never timed, because rule application threw. The raw passing is always saved before the rules run, so a failure costs the timing, not the evidence — `processed: false` marks it. The server re-runs these every 30s (idempotent: the rule engine ignores repeats); POST forces a sweep now and returns `{ recovered }`. A non-empty list means passings are missing from the results, so the dashboard surfaces the count |
 | `/classification/stages/:stageId` | GET | ranked per-stage results with gaps |
 | `/classification/overall` | GET | ranked overall results with gaps, lowest total wins. Counts **CLOSED stages only**; a crew that didn't complete one is charged a **notional time** (slowest real time on that stage + `notionalPenaltyMs`, default 2 min) so all totals cover the same stages — see "Notional times" in `event-model.md`. `stagesCompleted` is stages actually driven and is display-only, not the ranking key; a value below the maximum means notional time is inside that total |
 
