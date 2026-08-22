@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -45,6 +46,43 @@ export function deriveStageRunStatus(
     return StageRunStatus.FINISHED;
   }
   return stageClosed ? StageRunStatus.CANCELLED : StageRunStatus.STARTED;
+}
+
+/**
+ * A finish must be strictly after its start. Nothing downstream re-checks
+ * this: `ClassificationService.rank` sorts `durationMs` ascending, so a
+ * negative duration doesn't surface as an error — it takes first place. The
+ * two ways it happens are both routine rather than exotic: the finish gate's
+ * clock trailing the start gate's (the two are separate Pis, see CLAUDE.md
+ * "Timing correctness"), and a mistyped manual correction.
+ */
+export function isValidRunDuration(startTime: Date, finishTime: Date): boolean {
+  return finishTime.getTime() > startTime.getTime();
+}
+
+/** Throwing form of {@link isValidRunDuration}, for the admin HTTP paths. */
+function assertValidRunDuration(startTime: Date, finishTime: Date): void {
+  if (!isValidRunDuration(startTime, finishTime)) {
+    throw new BadRequestException(
+      `finishTime (${finishTime.toISOString()}) must be after startTime (${startTime.toISOString()})`,
+    );
+  }
+}
+
+/**
+ * Corrections arrive as raw strings from an unvalidated body (there's no
+ * ValidationPipe yet — see CLAUDE.md "Requests are untrusted"), and
+ * `new Date('nonsense')` is an Invalid Date whose getTime() is NaN rather
+ * than a throw. Unchecked, that NaN propagates into durationMs.
+ */
+function parseTime(value: string, field: string): Date {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException(
+      `${field} is not a valid date/time: ${value}`,
+    );
+  }
+  return parsed;
 }
 
 @Injectable()
@@ -169,6 +207,15 @@ export class StageRunsService {
       );
       return null;
     }
+    if (!isValidRunDuration(run.startTime, finishTime)) {
+      // Log and ignore, like the duplicate-start/out-of-order cases above —
+      // a bad detection shouldn't error out the MQTT pipeline. A burst of
+      // these means the finish gate's clock is behind the start gate's.
+      this.logger.warn(
+        `Finish ${finishTime.toISOString()} is not after start ${run.startTime.toISOString()} for vehicle ${vehicleId} on ${stageId} (check gate clock sync), ignoring finish event`,
+      );
+      return null;
+    }
     run.finishTime = finishTime;
     run.durationMs = finishTime.getTime() - run.startTime.getTime();
     return this.withStatus(await this.stageRuns.save(run));
@@ -218,10 +265,17 @@ export class StageRunsService {
       throw new NotFoundException(`StageRun ${id} not found`);
     }
     if (patch.startTime !== undefined) {
-      run.startTime = new Date(patch.startTime);
+      run.startTime = parseTime(patch.startTime, 'startTime');
     }
     if (patch.finishTime !== undefined) {
-      run.finishTime = patch.finishTime ? new Date(patch.finishTime) : null;
+      run.finishTime = patch.finishTime
+        ? parseTime(patch.finishTime, 'finishTime')
+        : null;
+    }
+    // Checked against the merged result, not the patch: correcting only one
+    // of the two still has to leave the pair ordered.
+    if (run.finishTime) {
+      assertValidRunDuration(run.startTime, run.finishTime);
     }
     run.durationMs = run.finishTime
       ? run.finishTime.getTime() - run.startTime.getTime()
@@ -234,8 +288,13 @@ export class StageRunsService {
 
   /** Admin override: record a run whose start (and maybe finish) detection never arrived. */
   async createManual(input: ManualStageRunInput): Promise<StageRunWithStatus> {
-    const startTime = new Date(input.startTime);
-    const finishTime = input.finishTime ? new Date(input.finishTime) : null;
+    const startTime = parseTime(input.startTime, 'startTime');
+    const finishTime = input.finishTime
+      ? parseTime(input.finishTime, 'finishTime')
+      : null;
+    if (finishTime) {
+      assertValidRunDuration(startTime, finishTime);
+    }
     const run = this.stageRuns.create({
       vehicleId: input.vehicleId,
       stageId: input.stageId,
