@@ -118,3 +118,20 @@ Priority order (1 = next):
   missed — revisit if/when they're actually needed, don't let
   `frontend-structure.md`'s Setup page grow a start-list or penalty UI
   speculatively.
+- Vehicle classes (4WD, 2WD, Rookie, Stock, ...) with per-class
+  classification, alongside the existing overall/stage/split ranking.
+  Two constraints noted up front so they're not lost by the time this gets
+  designed: classes are **freely defined by the organizer**, not a fixed
+  enum like `GateRole` — needs to be data (a `Class` entity/table), not a
+  hardcoded list. And a vehicle can belong to **multiple classes at once**
+  (e.g. a car is both "4WD" and "Rookie"), so it's a many-to-many
+  relationship, not a single `classId` on `Vehicle` — the same
+  `StageRun`/vehicle counts toward every class ranking it belongs to
+  simultaneously, not exclusively. The global/overall ranking
+  (`classification.service.ts`) stays as-is; per-class rankings are
+  additional filtered views over the same underlying runs, conceptually
+  like the existing split classification but filtered by class membership
+  instead of split gate. Touches `Vehicle`, a new join table,
+  `ClassificationService`/`ClassificationController`, and the Results
+  pages in `apps/web`. Not designed beyond this — no entity shape, no
+  routes, no UI decided yet.
