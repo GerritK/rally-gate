@@ -6,11 +6,17 @@ import {
   type OverallClassificationEntry,
 } from '../api/classification';
 import { fetchStages, type Stage } from '../api/stages';
-import { formatDuration, formatGap } from '../format';
+import { formatDuration, formatOverallGap } from '../format';
 
 const router = useRouter();
 const overallClassification = ref<OverallClassificationEntry[]>([]);
 const stages = ref<Stage[]>([]);
+
+/** The classification is sorted by stages completed first, so the leader
+ * always holds the highest count — every other gap is measured against it. */
+const leaderStagesCompleted = computed(
+  () => overallClassification.value[0]?.stagesCompleted ?? 0,
+);
 
 const stageOptions = computed(() =>
   stages.value.map((s) => ({ id: s.id, title: `${s.stageNumber}. ${s.name}` })),
@@ -62,7 +68,12 @@ onMounted(async () => {
             <td>{{ entry.driverName }}</td>
             <td>{{ entry.coDriverName ?? '-' }}</td>
             <td class="rg-timing">{{ formatDuration(entry.durationMs) }}</td>
-            <td class="rg-timing">{{ formatGap(entry.gapMs) }}</td>
+            <td
+              class="rg-timing"
+              :class="{ 'text-medium-emphasis': entry.gapMs === null }"
+            >
+              {{ formatOverallGap(entry, leaderStagesCompleted) }}
+            </td>
             <td>{{ entry.stagesCompleted }}</td>
           </tr>
         </tbody>

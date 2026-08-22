@@ -52,8 +52,23 @@ export function formatDuration(ms?: number): string {
   return ms === undefined ? '-' : formatStageDuration(ms);
 }
 
-export function formatGap(ms: number): string {
+export function formatGap(ms: number | null): string {
+  if (ms === null) return '-';
   return ms === 0 ? '-' : `+${formatStageDuration(ms)}`;
+}
+
+/**
+ * Overall gap. A crew on fewer stages than the leader has no meaningful time
+ * gap — their total is smaller precisely because they drove less — so the
+ * server sends `gapMs: null` and the deficit is shown in stages instead.
+ */
+export function formatOverallGap(
+  entry: { gapMs: number | null; stagesCompleted: number },
+  leaderStagesCompleted: number,
+): string {
+  if (entry.gapMs !== null) return formatGap(entry.gapMs);
+  const behind = leaderStagesCompleted - entry.stagesCompleted;
+  return `-${behind} stage${behind === 1 ? '' : 's'}`;
 }
 
 export function runStatusColor(status: string): string {

@@ -13,7 +13,7 @@ REST (all on `rally-server`, default port 57430; embedded MQTT broker on
 | `/stage-runs/:id/splits` | GET | `StageSplit`s for a run, ordered by `splitIndex` |
 | `/events` | GET | recent `DetectionEventRecord`s |
 | `/classification/stages/:stageId` | GET | ranked per-stage results with gaps |
-| `/classification/overall` | GET | ranked overall results with gaps |
+| `/classification/overall` | GET | ranked overall results with gaps. Ordered by `stagesCompleted` **descending first**, then total time ascending — completing more of the rally beats a quicker total over fewer stages, since a smaller total is otherwise just a symptom of having driven less. `gapMs` is `null` for any crew not on the leader's stage count (a time gap there would be negative and read as "ahead"); clients show the stage deficit instead |
 
 Live (Server-Sent Events, plain `EventSource` on the client — no Socket.IO):
 - `GET /live/detections` — a new `DetectionEventRecord` as it's ingested
