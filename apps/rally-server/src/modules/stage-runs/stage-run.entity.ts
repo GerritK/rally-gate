@@ -24,7 +24,7 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
  */
 @Index(['vehicleId', 'stageId'], {
   unique: true,
-  where: '"finishTime" IS NULL',
+  where: '"finishTime" IS NULL AND "voided" = false',
 })
 export class StageRun {
   @PrimaryGeneratedColumn('uuid')
@@ -45,6 +45,19 @@ export class StageRun {
    */
   @Column({ type: 'int', default: 1 })
   attempt: number;
+
+  /**
+   * Struck out by a marshal, typically after a red flag. A voided attempt
+   * counts for nothing (`latestAttempts` skips it) and stops blocking the
+   * vehicle from running the stage again, so the start gate is free to open
+   * a fresh attempt on its own.
+   *
+   * It also has to be part of the partial unique index above: a voided but
+   * unfinished run would otherwise keep occupying the one-open-attempt slot
+   * and silently block the re-run it was voided to permit.
+   */
+  @Column({ default: false })
+  voided: boolean;
 
   @Column()
   vehicleId: string;

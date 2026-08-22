@@ -103,13 +103,39 @@ and "latest" becomes whichever row the driver happened to return first — a
 wrong result with no error. `startTime` can't serve either, since the
 correction endpoints can edit it.
 
-A re-run is **not** started by a gate detection. The start gate stays live
-for the rest of the field while a finished car is recovered back past it, so
-treating any post-finish start as a new attempt would routinely manufacture a
-phantom run — and since results count the latest attempt, that phantom would
-silently replace a real time. A re-run is an explicit marshal action
-(`POST /stage-runs`); the finish gate then completes it on its own, because
-`findActive` picks up the new open run.
+### Voiding, and how a re-run actually starts
+
+A re-run is **not** started by a bare gate detection. The start gate stays
+live for the rest of the field while a finished car is recovered back past
+it, so treating any post-finish start as a new attempt would routinely
+manufacture a phantom run — and since results count the latest attempt, that
+phantom would silently replace a real time.
+
+Instead the marshal **voids** the attempt (`POST /stage-runs/:id/void`),
+which is what a red flag actually does to a run:
+
+- the row stays, with `voided: true` and status `VOIDED` — it is the record
+  of what was originally timed, which is what a protest turns on, so this is
+  deliberately not a delete;
+- `latestAttempts` skips it, so results fall back to the last surviving
+  attempt immediately, or to no result at all if every attempt is voided;
+- `findActive`/`findFinished` skip it too, so the vehicle now has neither an
+  open nor a completed attempt — and **the start gate opens the re-run by
+  itself** on the car's next pass, with the finish gate closing it.
+
+That last point is the reason for doing it this way rather than hand-entering
+a replacement run: both ends of the re-run stay gate-timed. The alternative,
+arming a whole stage for re-runs, was rejected because it re-opens the
+drive-back hole for every finished car in the field — including the crashed
+one being recovered, which is usually what caused the red flag.
+
+Voided runs must also be excluded from the partial unique index: a voided but
+unfinished run would otherwise keep occupying the one-open-attempt slot and
+block the very re-run it was voided to permit.
+
+There is no un-void. A void applied to the wrong car is corrected by voiding
+the right one and letting that car re-run; the mistaken row stays visible as
+`VOIDED` rather than being quietly reversed.
 
 Otherwise the rules stay intentionally simple: duplicate start events are
 ignored (the pre-insert check handles the common case; a race that reaches

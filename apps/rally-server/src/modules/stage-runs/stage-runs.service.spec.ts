@@ -38,6 +38,21 @@ describe('latestAttempts', () => {
     expect(latestAttempts([slowRerun, quickVoided])).toEqual([slowRerun]);
   });
 
+  it('ignores a voided attempt so results fall back to the surviving one', () => {
+    const original = run('v1', 'SS1', 1, 90_000);
+    const voidedRerun = { ...run('v1', 'SS1', 2, 120_000), voided: true };
+
+    expect(latestAttempts([original, voidedRerun])).toEqual([original]);
+  });
+
+  it('yields no result at all when every attempt is voided', () => {
+    // The correct reading of "that run didn't happen" — the vehicle should
+    // drop out of the stage's results rather than keep a struck-out time.
+    const only = { ...run('v1', 'SS1', 1, 90_000), voided: true };
+
+    expect(latestAttempts([only])).toEqual([]);
+  });
+
   it('keeps attempts on different stages and by different vehicles apart', () => {
     const a = run('v1', 'SS1', 1, 90_000);
     const b = run('v1', 'SS2', 1, 95_000);
@@ -64,6 +79,14 @@ describe('deriveStageRunStatus', () => {
     expect(deriveStageRunStatus({ finishTime: undefined }, true)).toBe(
       StageRunStatus.CANCELLED,
     );
+  });
+
+  it('is VOIDED ahead of FINISHED, even with a finish time recorded', () => {
+    // Order matters: a voided run usually *does* have a finishTime, and
+    // reporting FINISHED would present a struck-out time as a result.
+    const run = { finishTime: new Date(), voided: true };
+    expect(deriveStageRunStatus(run, false)).toBe(StageRunStatus.VOIDED);
+    expect(deriveStageRunStatus(run, true)).toBe(StageRunStatus.VOIDED);
   });
 });
 
