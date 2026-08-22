@@ -6,9 +6,9 @@ REST (all on `rally-server`, default port 57430; embedded MQTT broker on
 | Endpoint | Methods | Notes |
 |---|---|---|
 | `/gates` | GET, and `/:id` GET/PUT | PUT upserts a gate by id (name only — hardware identity, no role) |
-| `/gate-assignments` | GET, POST, `/:id/activate`\|`/deactivate` POST, `/:id` DELETE | the (gate, stage, role, splitIndex) plan; `active` picks which one the rule engine uses |
+| `/gate-assignments` | GET, POST, `/:id` DELETE | the (gate, stage, role, splitIndex) plan; `active` picks which one the rule engine uses |
 | `/vehicles` | GET, POST, `/:id` GET | transponder assignment is `Vehicle.transponderId`; `startNumber` is DB-unique, POST 409s on a clash |
-| `/stages` | GET, and `/:id` GET/PUT | sorted by `stageNumber` |
+| `/stages` | GET, and `/:id` GET/PUT, `/:id/activate`\|`/close` POST | sorted by `stageNumber`; `status` is `NOT_STARTED`\|`ACTIVE`\|`CLOSED`; activate flips all of the stage's `GateAssignment`s on and sets `ACTIVE` — 409s with `{ conflictingStageIds }` if another stage is already active on a shared gate (unless `?force=true`, which closes that other stage instead — DNFs anything still `STARTED` on it), or a plain 409 if the stage is already `CLOSED`; close flips the stage's gates back off and marks it `CLOSED` — terminal, no reactivating (no standalone deactivate either — see `architecture.md`) |
 | `/stage-runs` | GET, POST, `/:id` PATCH\|DELETE | derived from gate detections; POST/PATCH/DELETE are the marshal's manual-correction override for missed/bad detections; `(vehicleId, stageId)` is DB-unique, POST 409s on a clash |
 | `/stage-runs/:id/splits` | GET | `StageSplit`s for a run, ordered by `splitIndex` |
 | `/events` | GET | recent `DetectionEventRecord`s |

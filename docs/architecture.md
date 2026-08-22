@@ -186,16 +186,83 @@ time for the same hardware — which a single `stageId`/`role` pointer on
 - `GateAssignment` (`gateId`, `stageId`, `role`, `splitIndex`, `active`) is
   the plan: one row per (gate, stage), created via `POST /gate-assignments`
   during event setup, long before any of them go live.
-- Exactly one assignment per gate is `active` at a time.
-  `GateAssignmentsService.activate` flips it in a transaction (deactivate the
-  gate's other assignments, activate the one being requested) — same moment
-  `PUT /gates/:id` used to flip `Gate.stageId`/`role` directly, just
-  relocated to a flag on the right plan row instead of a copy. Activation is
-  a manual marshal action today (`POST /gate-assignments/:id/activate` from
-  the dashboard) — there's no "start stage" server action yet to trigger it
-  automatically. When that lands (see "Gate control channel" below), it
-  should be a `stage.started` event listener, not a direct call from
-  `StagesService` — same event-based shape as the rest of the pipeline.
+- Exactly one assignment per gate is `active` at a time, but activation is
+  triggered **per stage, not per assignment** — a marshal activates "SS2",
+  not each of SS2's gates individually. `POST /stages/:id/activate` (via
+  `StagesService.activate` → `GateAssignmentsService.activateForStage`)
+  flips every assignment for that `stageId` to `active` in one transaction,
+  same moment `PUT /gates/:id` used to flip `Gate.stageId`/`role` directly,
+  just relocated to a flag on the right plan rows instead of a copy. It's a
+  manual marshal action from the Live Timing page today (`/setup/stages/:stageId`
+  shows assignments read-only, deliberately — that page plans a stage's
+  gates, Live Timing runs them) — there's no automatic `stage.started`
+  trigger yet. When that lands (see "Gate control channel" below), it should
+  be an additional event listener alongside this, not a replacement — same
+  event-based shape as the rest of the pipeline.
+- `Stage.status` also gets a matching `ACTIVE` value (alongside
+  `NOT_STARTED`/`CLOSED`), set the moment `activate` succeeds. This is
+  deliberately **not** a replacement for `GateAssignment.active` — the two
+  answer different questions, and collapsing them would need a join across
+  a module boundary that doesn't otherwise exist:
+  - `GateAssignment.active` is what the hot path (`EventsService.applyRules`,
+    run per incoming detection) indexes by: "which of this *gate's* several
+    planned (stage, role) rows is live right now." A gate can be planned for
+    many stages at once, so this is inherently a per-gate fact.
+    `GatesModule` owns it and never needs to know about `Stage`.
+  - `Stage.status` is the per-stage lifecycle summary the dashboard reads —
+    `NOT_STARTED` → `ACTIVE` → `CLOSED`, one-way. Reintroducing a
+    computed-from-`GateAssignment` version of "is this stage active" would
+    force `GatesModule` to depend on `Stage`, while `StagesModule` already
+    depends on `GatesModule` for `GateAssignmentsService` — a cycle, for a
+    value `StagesService` can just set directly since it already touches
+    both.
+  - Because both exist, `StagesService` is responsible for keeping them in
+    sync at every transition — `activate` sets `ACTIVE` right after
+    `GateAssignmentsService` flips the rows, `close` sets `CLOSED` right
+    after it clears them. Critically, a forced activate that steals gates
+    from another active stage **closes** that other stage (`activate`
+    calls `this.close(bumpedStageId)` for each id `activateForStage` reports
+    back via `deactivatedStageIds`) rather than merely resetting its status.
+    Deactivating alone isn't enough: the bumped stage's gates are gone
+    either way, so anything still `STARTED` on it can never receive a real
+    finish detection again — `close` is what turns that into `CANCELLED`
+    (DNF) instead of leaving it stuck `STARTED` forever. Resetting to
+    `NOT_STARTED` was tried first and was wrong on both counts: it left
+    in-progress runs stranded, and it mislabeled a stage that had already
+    run cars as "not started."
+- Because gates are shared across stages by design (e.g. gate 7 above),
+  activating one stage can silently steal a gate that's mid-run for another.
+  `activateForStage` checks for this first: if any of the stage's gates are
+  currently `active` under a *different* `stageId`, it throws `409` with
+  `{ conflictingStageIds }` instead of proceeding. The dashboard surfaces
+  that as a warning dialog — cancel, or confirm and retry with `?force=true`,
+  which closes the conflicting stage (see above) before activating this one.
+  There's no lock preventing the conflict from recurring seconds later (two
+  marshals racing the same gate); this is a confirmation prompt, not
+  concurrency control.
+- There is deliberately no standalone "deactivate stage" action. Turning a
+  stage's gates off only ever happens via `StagesService.close`, which calls
+  `GateAssignmentsService.deactivateForStage` before flipping `Stage.status`
+  to `CLOSED` — one action, not two similar-looking ones a marshal could
+  confuse (an earlier version exposed both `POST /stages/:id/activate` and
+  `POST /stages/:id/deactivate`; the standalone deactivate was removed
+  because "gates off but stage still open" wasn't a state anything actually
+  needed, and gave a false impression that a paused stage could safely be
+  resumed later without re-checking for gate conflicts). Practical effect:
+  closing is the only way to stop a stage from recording detections. Without
+  deactivation happening somewhere, a closed stage could otherwise keep
+  silently recording detections against it, since `EventsService.applyRules`
+  only checks `GateAssignment.active`, never `Stage.status` (see "Current
+  scope vs. full vision" for that gap).
+- **Closing is terminal.** `StagesService.activate` (backing
+  `POST /stages/:id/activate`) refuses with `409` if `Stage.status` is
+  already `CLOSED` — there's no reopening a closed stage, matching the
+  frontend hiding the Activate button once closed. Deliberate: once a
+  stage's results are final, "just reactivate it" would let new detections
+  quietly mutate a stage marshals may already be reporting on. Fixing a
+  single missed/bad detection after close still goes through the stage-run
+  correction endpoints (`PATCH/POST/DELETE /stage-runs`), which don't depend
+  on the stage being active.
 - `EventsService.applyRules` (`events.service.ts`) queries `GateAssignment`
   where `gateId = X AND active = true` instead of reading
   `gate.stageId`/`gate.role`. `Gate` itself carries no live assignment

@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { API_BASE } from '../api/client';
+import { API_BASE, ApiError } from '../api/client';
 import { fetchRecentEvents, type DetectionEventRecord } from '../api/events';
-import { closeStage, fetchStages, type Stage } from '../api/stages';
+import {
+  activateStage,
+  closeStage,
+  fetchStages,
+  type Stage,
+} from '../api/stages';
 import {
   correctStageRun,
   createStageRun,
@@ -37,6 +42,9 @@ const vehicles = ref<Vehicle[]>([]);
 const splitsByRun = ref<Record<string, StageSplit[]>>({});
 const selectedStageId = ref<string>('');
 const closingStage = ref(false);
+const activatingStage = ref(false);
+const conflictDialog = ref(false);
+const conflictingStageNames = ref<string[]>([]);
 const editingRunId = ref<string | null>(null);
 const newRun = ref<{ vehicleId: string; stageId: string; startTime: string }>({
   vehicleId: '',
@@ -98,6 +106,11 @@ const stageOptions = computed(() =>
   stages.value.map((s) => ({ id: s.id, title: `${s.stageNumber}. ${s.name}` })),
 );
 
+function stageTitle(stageId: string): string {
+  const stage = stages.value.find((s) => s.id === stageId);
+  return stage ? `${stage.stageNumber}. ${stage.name}` : stageId;
+}
+
 const vehicleOptions = computed(() =>
   vehicles.value.map((v) => ({
     id: v.id,
@@ -151,13 +164,46 @@ async function onCreateRun() {
   }
 }
 
+/**
+ * Refetches every stage rather than patching just the one — a forced
+ * activate can bump another stage's status back down too (see
+ * `docs/architecture.md`), and rally stage counts are small enough that
+ * refetching all of them is simpler than tracking which ones changed.
+ */
+async function refreshStages() {
+  stages.value = await fetchStages();
+}
+
+async function onActivateStage(force = false) {
+  if (!selectedStageId.value || activatingStage.value) return;
+  activatingStage.value = true;
+  try {
+    await activateStage(selectedStageId.value, force);
+    await refreshStages();
+    conflictDialog.value = false;
+  } catch (err) {
+    const conflictingStageIds =
+      err instanceof ApiError && err.status === 409
+        ? (err.body as { conflictingStageIds?: string[] } | null)
+            ?.conflictingStageIds
+        : undefined;
+    if (conflictingStageIds) {
+      conflictingStageNames.value = conflictingStageIds.map(stageTitle);
+      conflictDialog.value = true;
+    } else {
+      alert(err instanceof Error ? err.message : 'Failed to activate stage');
+    }
+  } finally {
+    activatingStage.value = false;
+  }
+}
+
 async function onCloseStage() {
   if (!selectedStageId.value || closingStage.value) return;
   closingStage.value = true;
   try {
-    const updated = await closeStage(selectedStageId.value);
-    const idx = stages.value.findIndex((stage) => stage.id === updated.id);
-    if (idx !== -1) stages.value[idx] = updated;
+    await closeStage(selectedStageId.value);
+    await refreshStages();
   } finally {
     closingStage.value = false;
   }
@@ -218,8 +264,25 @@ onUnmounted(() => {
           hide-details
           style="max-width: 320px"
         />
+        <v-chip
+          v-if="selectedStage"
+          :color="selectedStage.status === 'ACTIVE' ? 'success' : 'timing-idle'"
+        >
+          {{ selectedStage.status }}
+        </v-chip>
         <v-btn
-          v-if="selectedStage && selectedStage.status !== 'CLOSED'"
+          v-if="selectedStage && selectedStage.status === 'NOT_STARTED'"
+          :loading="activatingStage"
+          :disabled="activatingStage"
+          color="success"
+          variant="outlined"
+          prepend-icon="mdi-play"
+          @click="onActivateStage()"
+        >
+          Activate Stage
+        </v-btn>
+        <v-btn
+          v-if="selectedStage && selectedStage.status === 'ACTIVE'"
           :loading="closingStage"
           :disabled="closingStage"
           color="error"
@@ -227,11 +290,8 @@ onUnmounted(() => {
           prepend-icon="mdi-flag-checkered"
           @click="onCloseStage"
         >
-          Close Stage (mark DNF/DNS)
+          Close Stage (deactivates gates, marks DNF/DNS)
         </v-btn>
-        <v-chip v-else-if="selectedStage" color="timing-idle">
-          Stage closed
-        </v-chip>
       </div>
 
       <v-alert type="info" variant="tonal" class="mb-4">
@@ -399,4 +459,29 @@ onUnmounted(() => {
       </v-table>
     </v-card-text>
   </v-card>
+
+  <v-dialog v-model="conflictDialog" max-width="480">
+    <v-card>
+      <v-card-title>Gates already active elsewhere</v-card-title>
+      <v-card-text>
+        This stage shares gates with the currently active
+        {{ conflictingStageNames.length > 1 ? 'stages' : 'stage' }}:
+        <strong>{{ conflictingStageNames.join(', ') }}</strong
+        >. Activating anyway will close
+        {{ conflictingStageNames.length > 1 ? 'those stages' : 'that stage' }}
+        — any of its cars still on course will be marked DNF.
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer />
+        <v-btn variant="text" @click="conflictDialog = false">Cancel</v-btn>
+        <v-btn
+          color="success"
+          :loading="activatingStage"
+          @click="onActivateStage(true)"
+        >
+          Activate anyway
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>

@@ -36,16 +36,6 @@ export class GateAssignmentsController {
     return this.gateAssignmentsService.create(body);
   }
 
-  @Post(':id/activate')
-  activate(@Param('id') id: string) {
-    return this.gateAssignmentsService.activate(id);
-  }
-
-  @Post(':id/deactivate')
-  deactivate(@Param('id') id: string) {
-    return this.gateAssignmentsService.deactivate(id);
-  }
-
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.gateAssignmentsService.remove(id);
