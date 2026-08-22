@@ -6,16 +6,16 @@ import {
   type OverallClassificationEntry,
 } from '../api/classification';
 import { fetchStages, type Stage } from '../api/stages';
-import { formatDuration, formatOverallGap } from '../format';
+import { formatDuration, formatGap } from '../format';
 
 const router = useRouter();
 const overallClassification = ref<OverallClassificationEntry[]>([]);
 const stages = ref<Stage[]>([]);
 
-/** The classification is sorted by stages completed first, so the leader
- * always holds the highest count — every other gap is measured against it. */
-const leaderStagesCompleted = computed(
-  () => overallClassification.value[0]?.stagesCompleted ?? 0,
+/** Stages counted toward the overall — every closed stage that anyone
+ * finished. A crew below this has notional time inside its total. */
+const stagesCounted = computed(() =>
+  Math.max(0, ...overallClassification.value.map((e) => e.stagesCompleted)),
 );
 
 const stageOptions = computed(() =>
@@ -68,13 +68,22 @@ onMounted(async () => {
             <td>{{ entry.driverName }}</td>
             <td>{{ entry.coDriverName ?? '-' }}</td>
             <td class="rg-timing">{{ formatDuration(entry.durationMs) }}</td>
-            <td
-              class="rg-timing"
-              :class="{ 'text-medium-emphasis': entry.gapMs === null }"
-            >
-              {{ formatOverallGap(entry, leaderStagesCompleted) }}
+            <td class="rg-timing">{{ formatGap(entry.gapMs) }}</td>
+            <td>
+              <v-tooltip
+                v-if="entry.stagesCompleted < stagesCounted"
+                :text="`Did not complete ${stagesCounted - entry.stagesCompleted} of ${stagesCounted} stages — a notional time is included in this total.`"
+                location="top"
+              >
+                <template #activator="{ props }">
+                  <span v-bind="props" class="text-warning">
+                    {{ entry.stagesCompleted }}
+                    <v-icon size="x-small" icon="mdi-asterisk" />
+                  </span>
+                </template>
+              </v-tooltip>
+              <span v-else>{{ entry.stagesCompleted }}</span>
             </td>
-            <td>{{ entry.stagesCompleted }}</td>
           </tr>
         </tbody>
       </v-table>
