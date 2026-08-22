@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { StageStatus } from '@rally-gate/shared';
 import { Not, Repository } from 'typeorm';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
+import { CreateStageDto, UpdateStageDto } from './dto';
 import { Stage } from './stage.entity';
 
 @Injectable()
@@ -25,7 +26,7 @@ export class StagesService {
     return this.stages.findOneBy({ id });
   }
 
-  async create(stage: Stage): Promise<Stage> {
+  async create(stage: CreateStageDto): Promise<Stage> {
     if (await this.findOne(stage.id)) {
       throw new ConflictException(`Stage ${stage.id} already exists`);
     }
@@ -40,7 +41,7 @@ export class StagesService {
    * terminal history; either way its name/number shouldn't shift underneath
    * runs already tied to it.
    */
-  async update(id: string, data: Omit<Stage, 'id'>): Promise<Stage> {
+  async update(id: string, data: UpdateStageDto): Promise<Stage> {
     const stage = await this.findOne(id);
     if (!stage) {
       throw new NotFoundException(`Stage ${id} not found`);

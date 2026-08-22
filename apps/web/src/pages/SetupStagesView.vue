@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { StageStatus } from '@rally-gate/shared';
 import {
   createStage,
   deleteStage,
@@ -43,7 +42,6 @@ async function onCreateStage() {
       id: newStage.value.id,
       name: newStage.value.name,
       stageNumber: newStage.value.stageNumber,
-      status: StageStatus.NOT_STARTED,
     });
     newStage.value.id = '';
     newStage.value.name = '';

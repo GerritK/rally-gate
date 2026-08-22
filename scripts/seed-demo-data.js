@@ -29,11 +29,12 @@ async function assign(gateId, stageId, role, splitIndex) {
 
 async function main() {
   console.log(
+    // No `status` — it's server-owned and starts NOT_STARTED; the API
+    // rejects unknown properties. Activation happens via /stages/WP1/activate.
     await post('/stages', {
       id: 'WP1',
       name: 'Wilderness Pass 1',
       stageNumber: 1,
-      status: 'NOT_STARTED',
     }),
   );
   await assign('START_WP1', 'WP1', 'stage_start');

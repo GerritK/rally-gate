@@ -45,7 +45,6 @@ async function onSaveStage() {
     stage.value = await upsertStage(stage.value.id, {
       name: stage.value.name,
       stageNumber: stage.value.stageNumber,
-      status: stage.value.status,
     });
   } finally {
     savingStage.value = false;

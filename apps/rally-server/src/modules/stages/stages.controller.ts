@@ -8,7 +8,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
-import { Stage } from './stage.entity';
+import { CreateStageDto, UpdateStageDto } from './dto';
 import { StagesService } from './stages.service';
 
 @Controller('stages')
@@ -26,13 +26,13 @@ export class StagesController {
   }
 
   @Post()
-  create(@Body() stage: Stage) {
+  create(@Body() stage: CreateStageDto) {
     return this.stagesService.create(stage);
   }
 
   /** Only NOT_STARTED stages can be edited — 409s for ACTIVE/CLOSED. */
   @Put(':id')
-  update(@Param('id') id: string, @Body() stage: Omit<Stage, 'id'>) {
+  update(@Param('id') id: string, @Body() stage: UpdateStageDto) {
     return this.stagesService.update(id, stage);
   }
 

@@ -7,7 +7,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
-import { Gate } from './gate.entity';
+import { UpsertGateDto } from './dto';
 import { GatesService } from './gates.service';
 
 @Controller('gates')
@@ -25,7 +25,7 @@ export class GatesController {
   }
 
   @Put(':id')
-  upsert(@Param('id') id: string, @Body() gate: Omit<Gate, 'id'>) {
+  upsert(@Param('id') id: string, @Body() gate: UpsertGateDto) {
     return this.gatesService.upsert({ ...gate, id });
   }
 

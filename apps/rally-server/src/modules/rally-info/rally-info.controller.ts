@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Put } from '@nestjs/common';
-import { RallyInfo } from './rally-info.entity';
+import { UpsertRallyInfoDto } from './dto';
 import { RallyInfoService } from './rally-info.service';
 
 @Controller('rally-info')
@@ -12,7 +12,7 @@ export class RallyInfoController {
   }
 
   @Put()
-  upsert(@Body() body: Omit<RallyInfo, 'id'>) {
+  upsert(@Body() body: UpsertRallyInfoDto) {
     return this.rallyInfoService.upsert(body);
   }
 }
