@@ -16,9 +16,14 @@ export class StagesController {
     return this.stagesService.findOne(id);
   }
 
+  @Post()
+  create(@Body() stage: Stage) {
+    return this.stagesService.create(stage);
+  }
+
   @Put(':id')
-  upsert(@Param('id') id: string, @Body() stage: Omit<Stage, 'id'>) {
-    return this.stagesService.upsert({ ...stage, id });
+  update(@Param('id') id: string, @Body() stage: Omit<Stage, 'id'>) {
+    return this.stagesService.update(id, stage);
   }
 
   @Post(':id/close')

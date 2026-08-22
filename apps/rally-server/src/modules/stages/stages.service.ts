@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { StageStatus } from '@rally-gate/shared';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { Stage } from './stage.entity';
 
@@ -25,9 +25,36 @@ export class StagesService {
     return this.stages.findOneBy({ id });
   }
 
-  async upsert(stage: Stage): Promise<Stage> {
+  async create(stage: Stage): Promise<Stage> {
+    if (await this.findOne(stage.id)) {
+      throw new ConflictException(`Stage ${stage.id} already exists`);
+    }
+    await this.assertStageNumberFree(stage.stageNumber);
     await this.stages.save(stage);
     return this.findOne(stage.id) as Promise<Stage>;
+  }
+
+  async update(id: string, data: Omit<Stage, 'id'>): Promise<Stage> {
+    if (!(await this.findOne(id))) {
+      throw new NotFoundException(`Stage ${id} not found`);
+    }
+    await this.assertStageNumberFree(data.stageNumber, id);
+    await this.stages.save({ ...data, id });
+    return this.findOne(id) as Promise<Stage>;
+  }
+
+  private async assertStageNumberFree(
+    stageNumber: number,
+    excludeId?: string,
+  ): Promise<void> {
+    const clash = await this.stages.findOneBy(
+      excludeId ? { stageNumber, id: Not(excludeId) } : { stageNumber },
+    );
+    if (clash) {
+      throw new ConflictException(
+        `Stage number ${stageNumber} is already used by stage ${clash.id}`,
+      );
+    }
   }
 
   /**

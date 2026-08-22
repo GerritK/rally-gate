@@ -1,13 +1,33 @@
 import { StageStatus } from '@rally-gate/shared';
+import { FindOperator } from 'typeorm';
 import { StagesService } from './stages.service';
 
-type StageRow = { id: string; status: StageStatus };
+type StageRow = {
+  id: string;
+  status: StageStatus;
+  stageNumber?: number;
+  name?: string;
+};
 
 function makeService(initialStages: StageRow[]) {
   const state: StageRow[] = initialStages.map((s) => ({ ...s }));
   const stages = {
-    findOneBy: jest.fn(({ id }: { id: string }) => {
-      const found = state.find((s) => s.id === id);
+    findOneBy: jest.fn((where: Partial<StageRow> & { id?: unknown }) => {
+      const found = state.find((s) => {
+        if ('id' in where && !(where.id instanceof FindOperator)) {
+          return s.id === where.id;
+        }
+        if (
+          where.stageNumber !== undefined &&
+          s.stageNumber !== where.stageNumber
+        ) {
+          return false;
+        }
+        if (where.id instanceof FindOperator) {
+          return s.id !== where.id.value;
+        }
+        return where.stageNumber !== undefined;
+      });
       return Promise.resolve(found ? { ...found } : null);
     }),
     save: jest.fn((s: StageRow) => {
@@ -30,6 +50,106 @@ function makeService(initialStages: StageRow[]) {
     state,
   };
 }
+
+describe('StagesService.create', () => {
+  it('rejects a duplicate id instead of overwriting the existing stage', async () => {
+    const { service } = makeService([
+      {
+        id: 'SS1',
+        status: StageStatus.ACTIVE,
+        stageNumber: 1,
+        name: 'Stage 1',
+      },
+    ]);
+
+    await expect(
+      service.create({
+        id: 'SS1',
+        name: 'Different name',
+        stageNumber: 2,
+        status: StageStatus.NOT_STARTED,
+      }),
+    ).rejects.toThrow(/already exists/i);
+  });
+
+  it('rejects a stage number already used by another stage', async () => {
+    const { service } = makeService([
+      {
+        id: 'SS1',
+        status: StageStatus.NOT_STARTED,
+        stageNumber: 1,
+        name: 'Stage 1',
+      },
+    ]);
+
+    await expect(
+      service.create({
+        id: 'SS2',
+        name: 'Stage 2',
+        stageNumber: 1,
+        status: StageStatus.NOT_STARTED,
+      }),
+    ).rejects.toThrow(/stage number 1/i);
+  });
+});
+
+describe('StagesService.update', () => {
+  it('404s instead of silently creating a new stage', async () => {
+    const { service } = makeService([]);
+
+    await expect(
+      service.update('SS1', {
+        name: 'Stage 1',
+        stageNumber: 1,
+        status: StageStatus.NOT_STARTED,
+      }),
+    ).rejects.toThrow(/not found/i);
+  });
+
+  it('rejects a stage number clash with a different stage', async () => {
+    const { service } = makeService([
+      {
+        id: 'SS1',
+        status: StageStatus.NOT_STARTED,
+        stageNumber: 1,
+        name: 'Stage 1',
+      },
+      {
+        id: 'SS2',
+        status: StageStatus.NOT_STARTED,
+        stageNumber: 2,
+        name: 'Stage 2',
+      },
+    ]);
+
+    await expect(
+      service.update('SS2', {
+        name: 'Stage 2',
+        stageNumber: 1,
+        status: StageStatus.NOT_STARTED,
+      }),
+    ).rejects.toThrow(/stage number 1/i);
+  });
+
+  it('allows saving a stage with its own unchanged stage number', async () => {
+    const { service } = makeService([
+      {
+        id: 'SS1',
+        status: StageStatus.NOT_STARTED,
+        stageNumber: 1,
+        name: 'Stage 1',
+      },
+    ]);
+
+    const result = await service.update('SS1', {
+      name: 'Renamed',
+      stageNumber: 1,
+      status: StageStatus.NOT_STARTED,
+    });
+
+    expect(result.name).toBe('Renamed');
+  });
+});
 
 describe('StagesService.close', () => {
   it('deactivates the stage gates before marking it closed', async () => {
