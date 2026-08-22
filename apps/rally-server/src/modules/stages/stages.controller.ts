@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import { Stage } from './stage.entity';
 import { StagesService } from './stages.service';
 
@@ -24,6 +33,12 @@ export class StagesController {
   @Put(':id')
   update(@Param('id') id: string, @Body() stage: Omit<Stage, 'id'>) {
     return this.stagesService.update(id, stage);
+  }
+
+  /** Only NOT_STARTED stages can be deleted — 409s for ACTIVE/CLOSED. */
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.stagesService.remove(id);
   }
 
   @Post(':id/close')
