@@ -20,6 +20,12 @@ import { VehiclesService } from '../vehicles/vehicles.service';
 interface RankableEntry {
   vehicleId: string;
   durationMs: number;
+  /**
+   * Overall ranking only. Left undefined for a single-stage classification,
+   * where every entry covers exactly one run and totals are directly
+   * comparable — `rank` then degenerates to a plain time sort.
+   */
+  stagesCompleted?: number;
 }
 
 @Injectable()
@@ -67,6 +73,7 @@ export class ClassificationService {
       Array.from(totals.entries()).map(([vehicleId, totalsEntry]) => ({
         vehicleId,
         durationMs: totalsEntry.durationMs,
+        stagesCompleted: totalsEntry.stagesCompleted,
       })),
     );
     return ranked.map((entry) => ({
@@ -167,15 +174,36 @@ export class ClassificationService {
     return [...dnf, ...dns];
   }
 
+  /**
+   * Ranks by stages completed descending, then total time ascending.
+   *
+   * The stage count has to come first, and cannot be a tiebreak: totals over
+   * different numbers of stages aren't comparable at all. Sorting on time
+   * alone puts a crew who retired after one stage above a crew who completed
+   * five, purely because they drove less — the smaller total is a symptom of
+   * doing less work, not of being quick.
+   *
+   * `gapMs` gets the same treatment. Against a leader on more stages, the
+   * arithmetic difference is negative and reads as "ahead", so it's reported
+   * as null and the client shows the stage deficit instead.
+   *
+   * Single-stage rankings pass no `stagesCompleted`, so every entry compares
+   * equal on it and this collapses to the plain time sort it was before.
+   */
   private async rank(entries: RankableEntry[]): Promise<ClassificationEntry[]> {
     const vehicles = await this.vehiclesService.findAll();
     const vehicleById = new Map<string, Vehicle>(
       vehicles.map((vehicle) => [vehicle.id, vehicle]),
     );
-    const sorted = [...entries].sort((a, b) => a.durationMs - b.durationMs);
-    const leaderMs = sorted[0]?.durationMs ?? 0;
+    const sorted = [...entries].sort(
+      (a, b) =>
+        (b.stagesCompleted ?? 0) - (a.stagesCompleted ?? 0) ||
+        a.durationMs - b.durationMs,
+    );
+    const leader = sorted[0];
     return sorted.map((entry, index) => {
       const vehicle = vehicleById.get(entry.vehicleId);
+      const comparable = entry.stagesCompleted === leader?.stagesCompleted;
       return {
         position: index + 1,
         vehicleId: entry.vehicleId,
@@ -183,7 +211,7 @@ export class ClassificationService {
         driverName: vehicle?.driverName ?? 'Unknown',
         coDriverName: vehicle?.coDriverName ?? undefined,
         durationMs: entry.durationMs,
-        gapMs: entry.durationMs - leaderMs,
+        gapMs: comparable ? entry.durationMs - (leader?.durationMs ?? 0) : null,
       };
     });
   }

@@ -5,10 +5,22 @@ export interface ClassificationEntry {
   driverName: string;
   coDriverName?: string;
   durationMs: number;
-  gapMs: number;
+  /**
+   * Time behind the leader, or `null` when the two totals don't cover the
+   * same work and a time gap would be meaningless — see
+   * `OverallClassificationEntry.stagesCompleted`. Always a number within a
+   * single stage's classification, where every entry is one run.
+   */
+  gapMs: number | null;
 }
 
 export interface OverallClassificationEntry extends ClassificationEntry {
+  /**
+   * Ranking is by `stagesCompleted` descending *first*, then total time
+   * ascending: finishing more of the rally always beats a quicker total over
+   * fewer stages. `gapMs` is null for anyone not on the leader's stage count,
+   * since their smaller total is a consequence of having driven less.
+   */
   stagesCompleted: number;
 }
 
