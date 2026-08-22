@@ -44,3 +44,35 @@ jobs:
       # the frontend has no test suite, so this is its only typecheck.
       - name: Build all workspaces
         run: npm run build
+
+  # The headless stack is the one path neither the tests nor a local dev loop
+  # can exercise. TypeORM connects before it validates entity metadata, so a
+  # Postgres-invalid column type cannot fail until Postgres is actually
+  # reachable — never under DB_TYPE=sqlite, and in Docker only as a
+  # restart loop. This is the automated form of the "run docker compose up and
+  # confirm it reaches listening" check in CLAUDE.md. It also covers the
+  # Dockerfiles themselves, which nothing else builds.
+  headless-stack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start the stack
+        run: docker compose -f deploy/docker-compose.yml up -d --build
+
+      - name: Wait for rally-server to answer
+        run: |
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:57430/ >/dev/null 2>&1; then
+              echo "rally-server is up against Postgres"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::rally-server never came up"
+          docker compose -f deploy/docker-compose.yml logs --no-color
+          exit 1
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f deploy/docker-compose.yml down -v

@@ -1,17 +1,24 @@
-version: "3.8"
-
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: rally
-      POSTGRES_PASSWORD: rally
+      # Override with DB_PASSWORD in the environment (or a .env beside this
+      # file) for anything beyond a closed rally network.
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-rally}
       POSTGRES_DB: rally_gate
-    ports:
-      - "5432:5432"
+    # Deliberately no `ports:`. Only rally-server talks to Postgres, and it
+    # does so over the compose network — publishing 5432 would expose the
+    # event database to the whole rally WiFi for no gain, and 5432 is outside
+    # this project's 57430-57439 range anyway.
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rally -d rally_gate"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   rally-server:
     build:
@@ -19,13 +26,17 @@ services:
       dockerfile: apps/rally-server/Dockerfile
     restart: unless-stopped
     depends_on:
-      - postgres
+      postgres:
+        # Wait for Postgres to actually accept connections, not merely to have
+        # been created. TypeORM connects *before* it validates entity metadata,
+        # so starting too early turns a clean failure into a restart loop.
+        condition: service_healthy
     environment:
       DB_TYPE: postgres
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USERNAME: rally
-      DB_PASSWORD: rally
+      DB_PASSWORD: ${DB_PASSWORD:-rally}
       DB_NAME: rally_gate
       PORT: 57430
       MQTT_PORT: 57431

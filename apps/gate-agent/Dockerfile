@@ -5,15 +5,22 @@
 FROM node:22-alpine AS build
 WORKDIR /repo
 
-COPY package.json ./
+# See apps/rally-server/Dockerfile for why every workspace manifest and the
+# lockfile are copied before the sources.
+COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/
+COPY packages/ui/package.json packages/ui/
 COPY apps/gate-agent/package.json apps/gate-agent/
-RUN npm install
+COPY apps/rally-server/package.json apps/rally-server/
+COPY apps/web/package.json apps/web/
+RUN npm ci
 
 COPY packages/shared packages/shared
 COPY apps/gate-agent apps/gate-agent
 RUN npm run build --workspace=@rally-gate/shared
 RUN npm run build --workspace=@rally-gate/gate-agent
+
+RUN npm prune --omit=dev
 
 FROM node:22-alpine
 WORKDIR /repo

@@ -1,15 +1,28 @@
 FROM node:22-alpine AS build
 WORKDIR /repo
 
-COPY package.json ./
+# The lockfile plus *every* workspace manifest, so `npm ci` sees exactly the
+# tree the lockfile describes — omitting one makes npm consider the lockfile
+# out of sync and refuse. Copied ahead of the sources so this layer caches
+# until a dependency actually changes.
+COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/
+COPY packages/ui/package.json packages/ui/
+COPY apps/gate-agent/package.json apps/gate-agent/
 COPY apps/rally-server/package.json apps/rally-server/
-RUN npm install
+COPY apps/web/package.json apps/web/
+# `npm ci` rather than `npm install`: installs strictly from the lockfile, so
+# two builds of the same commit resolve identical dependencies.
+RUN npm ci
 
 COPY packages/shared packages/shared
 COPY apps/rally-server apps/rally-server
 RUN npm run build --workspace=@rally-gate/shared
 RUN npm run build --workspace=@rally-gate/rally-server
+
+# The build needed nest-cli, typescript, webpack and jest; the runtime does
+# not. Pruning here keeps them out of the image copied below.
+RUN npm prune --omit=dev
 
 FROM node:22-alpine
 WORKDIR /repo
