@@ -16,6 +16,47 @@ interface DetectionEvent {
 }
 ```
 
+## Notional times
+
+Overall classification is a sum of stage times, so totals only mean anything
+if they cover the same stages. A crew that didn't complete one would otherwise
+have a *shorter* total and rank higher for having driven less.
+
+Rally's answer, which this follows, is to give them a time anyway: a
+**notional time**, defined here as **the slowest real time on that stage,
+within the ranking being computed, plus a configurable penalty**
+(`notionalPenaltyMs` setting, default 30s). Anchoring on the slowest time is
+what guarantees the notional is worse than every real time in that ranking, so
+skipping a stage never pays off on that stage.
+
+Rules:
+
+- **Only CLOSED stages count.** A stage still running has no result yet, so
+  nobody is charged for not having finished it. Same trigger
+  `getNonFinishers` uses, so DNF/DNS and the overall table agree on when a
+  stage is decided. Practical effect: the overall table moves when a stage
+  closes, not continuously during one.
+- **A crew must have completed at least one stage to be classified.**
+  Otherwise a registered car that never turned up collects notionals for the
+  whole rally and lands in the results on an entirely invented total.
+- **A closed stage nobody finished is dropped entirely.** With no real time to
+  anchor a notional, every crew would get the same invented figure — a
+  constant added to all totals, which moves no positions. Skipping it is
+  equivalent and avoids fabricating a number.
+- **Ranking is then plain lowest-total-wins.** No stages-completed ordering:
+  once notionals make totals comparable, a separate stage-count rule would
+  actively contradict the times. Note this means a crew quick enough on the
+  stages it *did* complete can still lead on fewer stages — the penalty is the
+  knob controlling how punishing a retirement is.
+- **Notional times are computed per ranking, never stored on a `StageRun`.**
+  The basis is the slowest time *within the ranking being computed*: overall
+  ranking uses the slowest overall, a class ranking uses the slowest in that
+  class. Because a vehicle can belong to several classes at once (see the
+  deferred vehicle-classes item in `development-roadmap.md`), the same missed
+  stage yields a *different* notional in each ranking it appears in — so it
+  cannot be a property of the run. `StageRun` stays purely factual: measured
+  times only.
+
 ## DetectionEventRecord (stored, `apps/rally-server`)
 
 Adds server-side fields once ingested: `vehicleId` (resolved from

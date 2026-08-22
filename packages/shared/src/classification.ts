@@ -5,21 +5,19 @@ export interface ClassificationEntry {
   driverName: string;
   coDriverName?: string;
   durationMs: number;
-  /**
-   * Time behind the leader, or `null` when the two totals don't cover the
-   * same work and a time gap would be meaningless — see
-   * `OverallClassificationEntry.stagesCompleted`. Always a number within a
-   * single stage's classification, where every entry is one run.
-   */
-  gapMs: number | null;
+  gapMs: number;
 }
 
 export interface OverallClassificationEntry extends ClassificationEntry {
   /**
-   * Ranking is by `stagesCompleted` descending *first*, then total time
-   * ascending: finishing more of the rally always beats a quicker total over
-   * fewer stages. `gapMs` is null for anyone not on the leader's stage count,
-   * since their smaller total is a consequence of having driven less.
+   * Stages this crew actually *drove*, which is display information, not the
+   * ranking key. `durationMs` covers every counted stage for everyone —
+   * missed ones contribute a notional time — so totals are directly
+   * comparable and ranking is plain lowest-total-wins.
+   *
+   * A crew showing fewer completed stages than the leader therefore has
+   * notional time inside its total. See "Notional times" in
+   * `docs/event-model.md`.
    */
   stagesCompleted: number;
 }

@@ -14,18 +14,23 @@ import {
   StageRunsService,
 } from '../stage-runs/stage-runs.service';
 import { StagesService } from '../stages/stages.service';
+import { SettingsService } from '../settings/settings.service';
 import { Vehicle } from '../vehicles/vehicle.entity';
 import { VehiclesService } from '../vehicles/vehicles.service';
+
+export const NOTIONAL_PENALTY_MS_KEY = 'notionalPenaltyMs';
+
+/**
+ * Added on top of the slowest real time to produce a notional. Only the
+ * margin is configurable — the *basis* is always the slowest time within the
+ * ranking being computed, which is what keeps a notional worse than every
+ * real time in that ranking and stops a retirement from paying off.
+ */
+export const DEFAULT_NOTIONAL_PENALTY_MS = 30_000;
 
 interface RankableEntry {
   vehicleId: string;
   durationMs: number;
-  /**
-   * Overall ranking only. Left undefined for a single-stage classification,
-   * where every entry covers exactly one run and totals are directly
-   * comparable — `rank` then degenerates to a plain time sort.
-   */
-  stagesCompleted?: number;
 }
 
 @Injectable()
@@ -36,6 +41,7 @@ export class ClassificationService {
     private readonly vehiclesService: VehiclesService,
     private readonly gatesService: GatesService,
     private readonly gateAssignmentsService: GateAssignmentsService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   async getStageClassification(
@@ -54,26 +60,89 @@ export class ClassificationService {
     );
   }
 
+  /**
+   * Overall standings, following rally's actual rule: every counted stage
+   * contributes a time for every classified crew, so totals are comparable
+   * and the lowest one wins. A crew that didn't complete a stage gets a
+   * **notional time** for it (see "Notional times" in `docs/event-model.md`)
+   * rather than simply a shorter total — otherwise retiring early would look
+   * like winning, since less driving means less accumulated time.
+   *
+   * Only **CLOSED** stages count. A stage still running has no result yet:
+   * penalising a crew for not having finished something nobody has finished
+   * would be wrong, and the crews who *have* finished it would otherwise be
+   * carrying a stage the others aren't. Same trigger `getNonFinishers` uses,
+   * so DNF/DNS and the overall table agree about when a stage is decided.
+   * Practical consequence: the overall table moves when a stage closes, not
+   * continuously during one — Live Timing is where in-progress runs show.
+   */
   async getOverallClassification(): Promise<OverallClassificationEntry[]> {
-    const runs = await this.stageRunsService.findAllFinished();
-    const totals = new Map<
-      string,
-      { durationMs: number; stagesCompleted: number }
-    >();
-    for (const run of runs) {
-      const totalsEntry = totals.get(run.vehicleId) ?? {
-        durationMs: 0,
-        stagesCompleted: 0,
-      };
-      totalsEntry.durationMs += run.durationMs ?? 0;
-      totalsEntry.stagesCompleted += 1;
-      totals.set(run.vehicleId, totalsEntry);
+    const stages = await this.stagesService.findAll();
+    const closedStageIds = new Set(
+      stages
+        .filter((stage) => stage.status === StageStatus.CLOSED)
+        .map((stage) => stage.id),
+    );
+    if (closedStageIds.size === 0) {
+      return [];
     }
-    const ranked = await this.rank(
-      Array.from(totals.entries()).map(([vehicleId, totalsEntry]) => ({
+
+    const finished = (await this.stageRunsService.findAllFinished()).filter(
+      (run) => closedStageIds.has(run.stageId),
+    );
+    // Classified = drove at least one closed stage. Without this a registered
+    // car that never turned up would collect notional times for the whole
+    // rally and appear in the results on an entirely invented total.
+    //
+    // This set is also the notional's *population*, and is the one thing a
+    // per-class ranking changes: a class ranking narrows it to that class's
+    // members and the slowest time is then the slowest within the class. A
+    // car in two classes gets a different notional in each ranking, which is
+    // why notional times are computed per view and never written onto the
+    // run — see the deferred vehicle-classes item in development-roadmap.md.
+    const classified = [...new Set(finished.map((run) => run.vehicleId))];
+    if (classified.length === 0) {
+      return [];
+    }
+
+    const notionalPenaltyMs = await this.settingsService.getNumber(
+      NOTIONAL_PENALTY_MS_KEY,
+      DEFAULT_NOTIONAL_PENALTY_MS,
+    );
+
+    const timesByStage = new Map<string, Map<string, number>>();
+    for (const run of finished) {
+      const stageTimes =
+        timesByStage.get(run.stageId) ?? new Map<string, number>();
+      stageTimes.set(run.vehicleId, run.durationMs ?? 0);
+      timesByStage.set(run.stageId, stageTimes);
+    }
+
+    const totals = new Map(
+      classified.map((vehicleId) => [
         vehicleId,
-        durationMs: totalsEntry.durationMs,
-        stagesCompleted: totalsEntry.stagesCompleted,
+        { durationMs: 0, stagesCompleted: 0 },
+      ]),
+    );
+    for (const stageTimes of timesByStage.values()) {
+      // A stage nobody finished never lands here, and rightly so: with no
+      // real time to anchor a notional, every crew would receive the same
+      // invented figure, shifting all totals equally and changing nothing.
+      const notionalMs = Math.max(...stageTimes.values()) + notionalPenaltyMs;
+      for (const vehicleId of classified) {
+        const total = totals.get(vehicleId)!;
+        const realMs = stageTimes.get(vehicleId);
+        total.durationMs += realMs ?? notionalMs;
+        if (realMs !== undefined) {
+          total.stagesCompleted += 1;
+        }
+      }
+    }
+
+    const ranked = await this.rank(
+      [...totals].map(([vehicleId, total]) => ({
+        vehicleId,
+        durationMs: total.durationMs,
       })),
     );
     return ranked.map((entry) => ({
@@ -175,35 +244,20 @@ export class ClassificationService {
   }
 
   /**
-   * Ranks by stages completed descending, then total time ascending.
-   *
-   * The stage count has to come first, and cannot be a tiebreak: totals over
-   * different numbers of stages aren't comparable at all. Sorting on time
-   * alone puts a crew who retired after one stage above a crew who completed
-   * five, purely because they drove less — the smaller total is a symptom of
-   * doing less work, not of being quick.
-   *
-   * `gapMs` gets the same treatment. Against a leader on more stages, the
-   * arithmetic difference is negative and reads as "ahead", so it's reported
-   * as null and the client shows the stage deficit instead.
-   *
-   * Single-stage rankings pass no `stagesCompleted`, so every entry compares
-   * equal on it and this collapses to the plain time sort it was before.
+   * Lowest total wins. Callers are responsible for handing in totals that
+   * cover the same work — a single stage's runs, or overall totals already
+   * padded with notional times — because a plain time sort is only correct
+   * once that holds. See `getOverallClassification`.
    */
   private async rank(entries: RankableEntry[]): Promise<ClassificationEntry[]> {
     const vehicles = await this.vehiclesService.findAll();
     const vehicleById = new Map<string, Vehicle>(
       vehicles.map((vehicle) => [vehicle.id, vehicle]),
     );
-    const sorted = [...entries].sort(
-      (a, b) =>
-        (b.stagesCompleted ?? 0) - (a.stagesCompleted ?? 0) ||
-        a.durationMs - b.durationMs,
-    );
-    const leader = sorted[0];
+    const sorted = [...entries].sort((a, b) => a.durationMs - b.durationMs);
+    const leaderMs = sorted[0]?.durationMs ?? 0;
     return sorted.map((entry, index) => {
       const vehicle = vehicleById.get(entry.vehicleId);
-      const comparable = entry.stagesCompleted === leader?.stagesCompleted;
       return {
         position: index + 1,
         vehicleId: entry.vehicleId,
@@ -211,7 +265,7 @@ export class ClassificationService {
         driverName: vehicle?.driverName ?? 'Unknown',
         coDriverName: vehicle?.coDriverName ?? undefined,
         durationMs: entry.durationMs,
-        gapMs: comparable ? entry.durationMs - (leader?.durationMs ?? 0) : null,
+        gapMs: entry.durationMs - leaderMs,
       };
     });
   }
