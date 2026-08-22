@@ -1,5 +1,51 @@
 import { StageRunStatus, StageStatus } from '@rally-gate/shared';
-import { deriveStageRunStatus, StageRunsService } from './stage-runs.service';
+import type { StageRun } from './stage-run.entity';
+import {
+  deriveStageRunStatus,
+  latestAttempts,
+  StageRunsService,
+} from './stage-runs.service';
+
+describe('latestAttempts', () => {
+  const run = (
+    vehicleId: string,
+    stageId: string,
+    attempt: number,
+    durationMs: number,
+  ) =>
+    ({
+      vehicleId,
+      stageId,
+      attempt,
+      durationMs,
+    }) as StageRun;
+
+  it('keeps only the most recent attempt per vehicle and stage', () => {
+    // A red-flagged stage gets re-run; the first attempt stays in the
+    // database as evidence but must not compete with the re-run.
+    const first = run('v1', 'SS1', 1, 90_000);
+    const rerun = run('v1', 'SS1', 2, 120_000);
+
+    expect(latestAttempts([first, rerun])).toEqual([rerun]);
+  });
+
+  it('picks the re-run even when it is the slower time', () => {
+    // "Latest", not "best" — a re-run replaces the original outright, so a
+    // crew cannot keep a quicker voided run by being slower second time.
+    const quickVoided = run('v1', 'SS1', 1, 60_000);
+    const slowRerun = run('v1', 'SS1', 2, 200_000);
+
+    expect(latestAttempts([slowRerun, quickVoided])).toEqual([slowRerun]);
+  });
+
+  it('keeps attempts on different stages and by different vehicles apart', () => {
+    const a = run('v1', 'SS1', 1, 90_000);
+    const b = run('v1', 'SS2', 1, 95_000);
+    const c = run('v2', 'SS1', 1, 88_000);
+
+    expect(latestAttempts([a, b, c])).toHaveLength(3);
+  });
+});
 
 describe('deriveStageRunStatus', () => {
   it('is FINISHED once a finishTime is set, regardless of stage closed', () => {
@@ -128,8 +174,9 @@ describe('StageRunsService.correctRun', () => {
 });
 
 describe('StageRunsService.createManual', () => {
-  it('throws ConflictException when the vehicle already has a run on the stage', async () => {
+  it('throws ConflictException when the vehicle already has an unfinished run', async () => {
     const stageRuns = {
+      findOne: jest.fn().mockResolvedValue(null), // nextAttempt lookup
       create: jest.fn().mockImplementation((r: unknown) => r),
       save: jest
         .fn()
@@ -154,7 +201,9 @@ describe('StageRunsService.createManual', () => {
         stageId: 's1',
         startTime: '2026-01-01T00:00:00.000Z',
       }),
-    ).rejects.toThrow('Vehicle v1 already has a run on stage s1');
+      // Only an unfinished run collides — completed attempts accumulate, so
+      // that a red-flagged stage can be re-run.
+    ).rejects.toThrow('already has an unfinished run on stage s1');
   });
 
   it('rejects a finish time at or before the start time', async () => {
@@ -211,7 +260,10 @@ describe('StageRunsService.finishRun', () => {
 });
 
 describe('StageRunsService.startRun', () => {
-  it('falls back to the existing row when it loses a race on the unique constraint', async () => {
+  it('falls back to the existing row when it loses a race on the unique index', async () => {
+    // Two detections for the same passing can both clear the findActive
+    // check; the partial unique index on unfinished runs is what stops the
+    // second one becoming a duplicate row.
     const existing = {
       id: 'r1',
       vehicleId: 'v1',
@@ -223,8 +275,8 @@ describe('StageRunsService.startRun', () => {
       findOneBy: jest
         .fn()
         .mockResolvedValueOnce(null) // findActive pre-check
-        .mockResolvedValueOnce(null) // findFinished pre-check
         .mockResolvedValueOnce(existing), // findActive after losing the race
+      findOne: jest.fn().mockResolvedValue(null), // findFinished pre-check
       create: jest.fn().mockImplementation((r: unknown) => r),
       save: jest.fn().mockRejectedValue(new Error('UNIQUE constraint failed')),
     };

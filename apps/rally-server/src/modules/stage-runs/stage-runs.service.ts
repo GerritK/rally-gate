@@ -49,6 +49,26 @@ export function deriveStageRunStatus(
 }
 
 /**
+ * Collapses a set of runs to the most recent attempt per vehicle+stage.
+ *
+ * A stage that gets red-flagged is re-run, and both attempts are kept — the
+ * earlier one is evidence, not garbage. Results only ever count the latest,
+ * so every query feeding classification passes through here rather than
+ * leaving each caller to remember.
+ */
+export function latestAttempts(runs: StageRun[]): StageRun[] {
+  const latest = new Map<string, StageRun>();
+  for (const run of runs) {
+    const key = `${run.vehicleId}:${run.stageId}`;
+    const seen = latest.get(key);
+    if (!seen || run.attempt > seen.attempt) {
+      latest.set(key, run);
+    }
+  }
+  return [...latest.values()];
+}
+
+/**
  * A finish must be strictly after its start. Nothing downstream re-checks
  * this: `ClassificationService.rank` sorts `durationMs` ascending, so a
  * negative duration doesn't surface as an error — it takes first place. The
@@ -123,19 +143,27 @@ export class StageRunsService {
     }));
   }
 
-  findFinishedByStage(stageId: string): Promise<StageRun[]> {
-    return this.stageRuns.find({
+  // The three finders below feed results, so each returns only the latest
+  // attempt per vehicle+stage. `findAll` deliberately does not — the
+  // dashboard shows every attempt, including superseded ones.
+
+  async findFinishedByStage(stageId: string): Promise<StageRun[]> {
+    const runs = await this.stageRuns.find({
       where: { stageId, finishTime: Not(IsNull()) },
-      order: { durationMs: 'ASC' },
     });
+    return latestAttempts(runs).sort(
+      (a, b) => (a.durationMs ?? 0) - (b.durationMs ?? 0),
+    );
   }
 
-  findByStage(stageId: string): Promise<StageRun[]> {
-    return this.stageRuns.find({ where: { stageId } });
+  async findByStage(stageId: string): Promise<StageRun[]> {
+    return latestAttempts(await this.stageRuns.find({ where: { stageId } }));
   }
 
-  findAllFinished(): Promise<StageRun[]> {
-    return this.stageRuns.find({ where: { finishTime: Not(IsNull()) } });
+  async findAllFinished(): Promise<StageRun[]> {
+    return latestAttempts(
+      await this.stageRuns.find({ where: { finishTime: Not(IsNull()) } }),
+    );
   }
 
   /** The vehicle's in-progress attempt on this stage, if any (not yet finished). */
@@ -150,15 +178,31 @@ export class StageRunsService {
     });
   }
 
+  /** The vehicle's most recent completed attempt on this stage, if any. */
   private findFinished(
     vehicleId: string,
     stageId: string,
   ): Promise<StageRun | null> {
-    return this.stageRuns.findOneBy({
-      vehicleId,
-      stageId,
-      finishTime: Not(IsNull()),
+    return this.stageRuns.findOne({
+      where: { vehicleId, stageId, finishTime: Not(IsNull()) },
+      order: { attempt: 'DESC' },
     });
+  }
+
+  /**
+   * Next attempt number for this vehicle on this stage. Taken from the
+   * highest existing attempt rather than a count, so deleting a phantom run
+   * can't hand a later attempt a number that's already in use.
+   */
+  private async nextAttempt(
+    vehicleId: string,
+    stageId: string,
+  ): Promise<number> {
+    const highest = await this.stageRuns.findOne({
+      where: { vehicleId, stageId },
+      order: { attempt: 'DESC' },
+    });
+    return (highest?.attempt ?? 0) + 1;
   }
 
   async startRun(
@@ -175,19 +219,34 @@ export class StageRunsService {
     }
     const finished = await this.findFinished(vehicleId, stageId);
     if (finished) {
+      // Re-runs are supported, but a gate detection must not be what starts
+      // one. The start gate stays live for the rest of the field while a
+      // finished car is recovered back past it, so treating any post-finish
+      // start as a new attempt would routinely manufacture a phantom run —
+      // and since results count the *latest* attempt, that phantom would
+      // silently replace a real time. A re-run is therefore an explicit
+      // marshal action (`POST /stage-runs`); the finish gate then completes
+      // it on its own, because `findActive` picks up the new open run.
       this.logger.warn(
-        `Vehicle ${vehicleId} already finished stage ${stageId}, ignoring restart`,
+        `Vehicle ${vehicleId} already finished stage ${stageId}, ignoring restart (create a re-run explicitly if the stage was red-flagged)`,
       );
       return this.withStatus(finished);
     }
-    const run = this.stageRuns.create({ vehicleId, stageId, startTime });
+    const run = this.stageRuns.create({
+      vehicleId,
+      stageId,
+      startTime,
+      attempt: await this.nextAttempt(vehicleId, stageId),
+    });
     try {
       return this.withStatus(await this.stageRuns.save(run));
     } catch (err) {
       if (!isUniqueViolation(err)) {
         throw err;
       }
-      // Lost a race with another detection for the same vehicle+stage.
+      // Lost a race with a concurrent detection for the same passing — the
+      // partial unique index on (vehicleId, stageId) where finishTime IS NULL
+      // is what catches it, since both callers can clear `findActive` first.
       const raced =
         (await this.findActive(vehicleId, stageId)) ??
         (await this.findFinished(vehicleId, stageId));
@@ -298,6 +357,7 @@ export class StageRunsService {
     const run = this.stageRuns.create({
       vehicleId: input.vehicleId,
       stageId: input.stageId,
+      attempt: await this.nextAttempt(input.vehicleId, input.stageId),
       startTime,
       finishTime,
       durationMs: finishTime
@@ -309,8 +369,10 @@ export class StageRunsService {
       saved = await this.stageRuns.save(run);
     } catch (err) {
       if (isUniqueViolation(err)) {
+        // Only an *unfinished* run collides now — completed attempts are
+        // allowed to accumulate, that's what makes a re-run possible.
         throw new ConflictException(
-          `Vehicle ${input.vehicleId} already has a run on stage ${input.stageId}`,
+          `Vehicle ${input.vehicleId} already has an unfinished run on stage ${input.stageId}; finish or delete it before starting another attempt`,
         );
       }
       throw err;

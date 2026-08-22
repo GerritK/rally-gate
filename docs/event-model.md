@@ -81,21 +81,44 @@ reading and the adjustment stay independently inspectable.
 
 ## StageRun
 
-One row per vehicle+stage attempt, enforced by a `@Unique(['vehicleId',
-'stageId'])` DB constraint on `StageRun` — a vehicle can only run a stage
-once. Created on a `stage_start` detection, closed on the matching
-`stage_finish` detection. `durationMs` is `finishTime - startTime` in server
-time. See `apps/rally-server/src/modules/stage-runs/stage-runs.service.ts`
-for the current (intentionally simple) rule: one active run per
-vehicle+stage, duplicate start events are ignored (the pre-insert check
-handles the common case; a race that slips past it and hits the DB
-constraint falls back to returning the existing row rather than erroring), a
-finish event with no active run is ignored (logged, not stored) rather than
-erroring. A marshal can also correct a run directly (missed or bad
-detection) via `PATCH /stage-runs/:id` (startTime/finishTime, `durationMs`
-recomputed server-side) or create one outright via `POST /stage-runs` when
-the start detection never arrived at all (409s if the vehicle already has a
-run on that stage) — see `stage-runs.service.ts`
+One row per *attempt*. A vehicle may have several attempts at a stage,
+because a red-flagged stage gets re-run and the original timing is kept as
+evidence rather than overwritten. `attempt` numbers them from 1, and only the
+highest counts toward results (`latestAttempts` in `stage-runs.service.ts`);
+every query that feeds classification goes through it. Created on a
+`stage_start` detection, closed on the matching `stage_finish` detection.
+`durationMs` is `finishTime - startTime`.
+
+**At most one *unfinished* attempt per vehicle+stage**, enforced by a partial
+unique index (`where "finishTime" IS NULL`). This replaced a plain unique on
+(vehicleId, stageId), which had been doing two jobs at once: forbidding
+re-runs, and backstopping the race where two detections for one passing both
+clear the pre-insert `findActive` check. Only the first job was meant to go —
+dropping the constraint outright would have silently reopened the race.
+
+`attempt` is an explicit counter rather than a creation timestamp on purpose:
+`@CreateDateColumn` normalises to sqlite `datetime`, which has only
+second precision, so two attempts recorded in the same second compare equal
+and "latest" becomes whichever row the driver happened to return first — a
+wrong result with no error. `startTime` can't serve either, since the
+correction endpoints can edit it.
+
+A re-run is **not** started by a gate detection. The start gate stays live
+for the rest of the field while a finished car is recovered back past it, so
+treating any post-finish start as a new attempt would routinely manufacture a
+phantom run — and since results count the latest attempt, that phantom would
+silently replace a real time. A re-run is an explicit marshal action
+(`POST /stage-runs`); the finish gate then completes it on its own, because
+`findActive` picks up the new open run.
+
+Otherwise the rules stay intentionally simple: duplicate start events are
+ignored (the pre-insert check handles the common case; a race that reaches
+the index falls back to returning the existing row rather than erroring), and
+a finish event with no active run is ignored (logged, not stored). A marshal
+can also correct a run directly via `PATCH /stage-runs/:id`
+(startTime/finishTime, `durationMs` recomputed server-side) or create one
+outright via `POST /stage-runs` when the start detection never arrived —
+that now 409s only if an *unfinished* run already exists.
 `correctRun`/`createManual`.
 
 `StageRun` has no `status` column — STARTED/FINISHED/CANCELLED is derived on
