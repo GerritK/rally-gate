@@ -118,7 +118,7 @@ export class ClassificationService {
         vehicleId: pair.run.vehicleId,
         startNumber: vehicle?.startNumber ?? '?',
         driverName: vehicle?.driverName ?? 'Unknown',
-        coDriverName: vehicle?.coDriverName,
+        coDriverName: vehicle?.coDriverName ?? undefined,
         splitIndex,
         elapsedMs: pair.split.elapsedMs,
         gapMs: pair.split.elapsedMs - leaderMs,
@@ -146,7 +146,7 @@ export class ClassificationService {
         vehicleId,
         startNumber: vehicle?.startNumber ?? '?',
         driverName: vehicle?.driverName ?? 'Unknown',
-        coDriverName: vehicle?.coDriverName,
+        coDriverName: vehicle?.coDriverName ?? undefined,
         outcome,
       };
     };
@@ -180,7 +180,7 @@ export class ClassificationService {
         vehicleId: entry.vehicleId,
         startNumber: vehicle?.startNumber ?? '?',
         driverName: vehicle?.driverName ?? 'Unknown',
-        coDriverName: vehicle?.coDriverName,
+        coDriverName: vehicle?.coDriverName ?? undefined,
         durationMs: entry.durationMs,
         gapMs: entry.durationMs - leaderMs,
       };

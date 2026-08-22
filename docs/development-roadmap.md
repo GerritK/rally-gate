@@ -60,6 +60,24 @@
   Verified end-to-end with a headless-browser pass through every route
   (RallyInfo save round-trip, stage create, gate assignment add, vehicle
   add) — no console errors.
+- Gate management on the Hardware page: add/rename/delete a gate manually
+  (`PUT`/`DELETE /gates/:id`) instead of only via auto-discovery from its
+  first heartbeat, plus a per-event auto-discovery on/off toggle backed by
+  a new generic `Settings` key-value module (`apps/rally-server/src/modules/settings/`,
+  kept separate from `RallyInfo` so future toggles don't need another
+  schema change) — when off, heartbeats from gates not already known are
+  ignored rather than auto-registered.
+- Vehicle status: `VehicleStatus` enum (`REGISTERED`, `CHECKED_IN`,
+  `SCRUTINEERED`, `WITHDRAWN`, `DISQUALIFIED`) added to `packages/shared`
+  and wired onto `Vehicle.status` (previously an untyped string nobody
+  ever set past the default). `PATCH /vehicles/:id` now does a general
+  partial update (status, driver/co-driver name, start number,
+  transponder — not just status), reusing the same unique-start-number
+  conflict handling as `create`. Vehicles page got inline per-field
+  editing plus a status `v-select`, and `apps/web` picked up
+  `@rally-gate/shared` as a real dependency for the first time (see the
+  Vite `optimizeDeps` note in `CLAUDE.md`'s `packages/shared` section —
+  hit and fixed the CJS/ESM pre-bundling gotcha while building this).
 
 ## Next
 
