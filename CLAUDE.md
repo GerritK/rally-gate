@@ -36,6 +36,7 @@ npm run dev:web              # Vue dashboard (Vite)
 `apps/rally-server` (run from that directory):
 ```bash
 npm run lint                 # eslint --fix, includes prettier/prettier rule — run before finishing any server change
+npm run lint:check           # same rules, no --fix (what CI runs; --fix in CI would repair the tree and report success)
 npm run format                # prettier --write only
 npm test                     # jest, all *.spec.ts under src/
 npx jest gates.service       # single test file (substring match on path)
@@ -46,7 +47,10 @@ npm run build                 # nest build
 `apps/gate-agent`, `apps/web`, `packages/shared`, `packages/ui` have no local `.prettierrc`/lint script — format them with the server's config:
 ```bash
 npx prettier --config apps/rally-server/.prettierrc --write "apps/gate-agent/src/**/*.ts" "apps/web/src/**/*.{ts,vue}" "packages/shared/src/**/*.ts" "packages/ui/src/**/*.{ts,css}"
+npm run format:check         # from the repo root — the check-only version of exactly that command, run by CI
 ```
+
+CI (`.github/workflows/ci.yml`) runs, in order: `build:shared` → `format:check` → `lint:check` → server tests → `npm run build`. That last step is what typechecks `apps/web` (via `vue-tsc`), which has no test suite of its own — so a frontend type error only ever surfaces there or in a local `npm run build`. Master being green matters more than usual here: `deploy/install-*.sh` are `curl | bash` off master, so a broken commit is one a marshal can pull onto a Pi mid-event.
 
 Headless deployment (Postgres instead of SQLite):
 ```bash
