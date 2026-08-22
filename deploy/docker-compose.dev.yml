@@ -1,5 +1,3 @@
-version: "3.8"
-
 # Adds a simulated gate-agent on top of docker-compose.yml, for demoing the
 # full pipeline without any physical gate hardware attached.
 #
