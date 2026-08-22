@@ -25,3 +25,17 @@ input[type='time']::-webkit-calendar-picker-indicator {
   width: 0;
   margin: 0;
 }
+
+/*
+ * Vuetify's $heading-font-family (theme.ts's `font-heading` variable) only
+ * feeds its .text-h1–.text-h6 typography-scale classes internally — it
+ * doesn't reach v-card-title/v-toolbar-title, which just inherit the body
+ * font otherwise. Every section/page heading in this app is one of those
+ * two components, so set it explicitly here rather than adding a utility
+ * class every call site would need to remember.
+ */
+.v-card-title,
+.v-toolbar-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+}
