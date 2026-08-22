@@ -15,6 +15,6 @@ export function upsertGate(id: string, input: { name: string }): Promise<Gate> {
   return putJson(`/gates/${id}`, input);
 }
 
-export function deleteGate(id: string): Promise<void> {
-  return deleteRequest(`/gates/${id}`);
+export function deleteGate(id: string, force = false): Promise<void> {
+  return deleteRequest(`/gates/${id}${force ? '?force=true' : ''}`);
 }

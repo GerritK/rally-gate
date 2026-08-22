@@ -161,6 +161,24 @@ describe('StagesService.update', () => {
 
     expect(result.name).toBe('Renamed');
   });
+
+  it.each([StageStatus.ACTIVE, StageStatus.CLOSED])(
+    'refuses to edit a %s stage',
+    async (status) => {
+      const { service, state } = makeService([
+        { id: 'SS1', status, stageNumber: 1, name: 'Stage 1' },
+      ]);
+
+      await expect(
+        service.update('SS1', {
+          name: 'Renamed',
+          stageNumber: 1,
+          status,
+        }),
+      ).rejects.toThrow(/NOT_STARTED/i);
+      expect(state[0].name).toBe('Stage 1');
+    },
+  );
 });
 
 describe('StagesService.remove', () => {

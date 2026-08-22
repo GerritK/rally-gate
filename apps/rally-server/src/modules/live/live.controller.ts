@@ -26,4 +26,11 @@ export class LiveController {
       map((data): MessageEvent => ({ data: data as object })),
     );
   }
+
+  @Sse('gates')
+  gates(): Observable<MessageEvent> {
+    return fromEvent(this.eventEmitter, 'gate.heartbeat').pipe(
+      map((data): MessageEvent => ({ data: data as object })),
+    );
+  }
 }

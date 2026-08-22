@@ -30,6 +30,7 @@ export class StagesController {
     return this.stagesService.create(stage);
   }
 
+  /** Only NOT_STARTED stages can be edited — 409s for ACTIVE/CLOSED. */
   @Put(':id')
   update(@Param('id') id: string, @Body() stage: Omit<Stage, 'id'>) {
     return this.stagesService.update(id, stage);

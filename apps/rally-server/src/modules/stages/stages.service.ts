@@ -34,9 +34,21 @@ export class StagesService {
     return this.findOne(stage.id) as Promise<Stage>;
   }
 
+  /**
+   * Editing is restricted to NOT_STARTED stages — once a stage is ACTIVE its
+   * gates are live and StageRuns already reference it, and once CLOSED it's
+   * terminal history; either way its name/number shouldn't shift underneath
+   * runs already tied to it.
+   */
   async update(id: string, data: Omit<Stage, 'id'>): Promise<Stage> {
-    if (!(await this.findOne(id))) {
+    const stage = await this.findOne(id);
+    if (!stage) {
       throw new NotFoundException(`Stage ${id} not found`);
+    }
+    if (stage.status !== StageStatus.NOT_STARTED) {
+      throw new ConflictException(
+        `Stage ${id} is ${stage.status} and can only be edited while NOT_STARTED`,
+      );
     }
     await this.assertStageNumberFree(data.stageNumber, id);
     await this.stages.save({ ...data, id });
