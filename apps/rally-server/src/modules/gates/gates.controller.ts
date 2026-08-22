@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Put } from '@nestjs/common';
 import { Gate } from './gate.entity';
 import { GatesService } from './gates.service';
 
@@ -19,5 +19,10 @@ export class GatesController {
   @Put(':id')
   upsert(@Param('id') id: string, @Body() gate: Omit<Gate, 'id'>) {
     return this.gatesService.upsert({ ...gate, id });
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.gatesService.remove(id);
   }
 }

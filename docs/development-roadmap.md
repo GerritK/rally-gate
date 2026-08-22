@@ -47,18 +47,25 @@
   reflects it → close stage flips the still-open run to CANCELLED/DNF for
   free → delete → 404 on a missing id) and `vue-tsc`/`tsc` typechecks; no
   dedicated e2e browser test.
+- Frontend restructuring: `apps/web` split from one `App.vue` into a
+  `vue-router` multi-page app behind a `v-navigation-drawer` (5 top-level
+  routes — Live Timing, Results, Setup, Hardware, Vehicles — plus nested
+  `/results/stages/:stageId` and `/setup/stages/:stageId`), per the plan in
+  `docs/frontend-structure.md`. Includes the new `RallyInfo` backend module
+  (singleton entity/service/controller, `GET`/`PUT /rally-info`) and the new
+  Vehicles registration UI (`POST /vehicles` had no caller before). Gate
+  assignment CRUD moved from a flat cross-stage table to nested under its
+  stage's setup page (`/setup/stages/:stageId`, filtered client-side from
+  `GET /gate-assignments`); Hardware is now a read-only gate-centric roster.
+  Verified end-to-end with a headless-browser pass through every route
+  (RallyInfo save round-trip, stage create, gate assignment add, vehicle
+  add) — no console errors.
 
 ## Next
 
 Priority order (1 = next):
 
-1. **Frontend restructuring** — split `apps/web`'s single `App.vue` into a
-   proper multi-page app (`vue-router`, Vuetify nav). Fully planned in
-   `docs/frontend-structure.md`: route list, nav grouping, and a small new
-   backend piece (`RallyInfo` singleton — rally name/date/location, since
-   no `Event` entity holds a label for "this event" today). Read that doc
-   before starting, it has the reasoning for each split, not just the list.
-2. Gate/gate-node health reporting, plus expected stage time: optional
+1. Gate/gate-node health reporting, plus expected stage time: optional
    `Stage.expectedDurationMs` set by the marshal, dashboard flags any
    `STARTED` run as overdue once `now - startTime` exceeds it. Client-side
    only (SSE data already has `startTime`), no new backend push needed.

@@ -1,19 +1,19 @@
-# Frontend Structure (planned, not yet built)
+# Frontend Structure
 
-Plan for restructuring `apps/web` from one single-page dashboard into a
-proper multi-page app. Audience is the marshal/organizer team only — no
-public/spectator view (see `deployment-modes.md` "Future: online/spectator
-mode", still deliberately deferred). Written down mid-planning so this can
-be picked up in a later session without re-deriving the reasoning.
+Built — see [development-roadmap.md](development-roadmap.md) "Done" for the
+verification summary. This doc records the reasoning behind the route/nav
+split so it doesn't need re-deriving later. Audience is the marshal/organizer
+team only — no public/spectator view (see `deployment-modes.md` "Future:
+online/spectator mode", still deliberately deferred).
 
 ## Why
 
 `App.vue` today stacks every section vertically on one page (Stage/Split/Overall
 Classification, Stage Runs + corrections, Gates, Gate Assignments, Live
 Detections). It grew there incrementally across the Vuetify migration. This
-plan splits it into `vue-router` pages under one Vuetify nav (`v-navigation-drawer`
-or top tabs — not decided yet), grouped by the question each page answers
-rather than by "what happened to be built in what order."
+plan splits it into `vue-router` pages under one Vuetify nav, grouped by the
+question each page answers rather than by "what happened to be built in what
+order."
 
 ## Route list
 
@@ -51,6 +51,23 @@ rather than by "what happened to be built in what order."
   ongoing relevance. `/setup` links out to both instead of duplicating them.
 - **No results-export/printable view yet** — `/results` can grow a
   print-friendly variant later without restructuring.
+- **Nav is `v-navigation-drawer`, not top tabs.** 5 items today is thin
+  justification for a drawer on its own, but more nav-worthy sections are
+  expected (see roadmap), and a drawer doesn't need reworking when that
+  list grows the way a tab bar would.
+- **No new store (Pinia etc.) as part of this split.** Today one
+  `<script setup>` shares refs (`stages`, `gates`, `vehicles`, ...) across
+  every section for free; once those live in separate route components,
+  each page fetches what it needs in its own `onMounted`, same pattern as
+  today, just per-page instead of per-app. Rally data volumes are tiny (see
+  the gate-assignments filtering note below), so refetching per page isn't
+  a real cost. Only reach for a shared store if duplicate fetches become an
+  actual, visible problem.
+- **Don't pre-build a `components/` hierarchy while splitting.** One `.vue`
+  file per route, moving markup as-is. Extract a shared component only once
+  something is actually duplicated across two pages (e.g. a gate status
+  chip, if Hardware and Live end up rendering one identically) — not
+  speculatively as part of the split.
 
 ## New backend piece: RallyInfo (scoped, small)
 
@@ -88,14 +105,22 @@ of that decision:
   volume (a rally has a handful of stages/gates); add the query param only
   if that ever actually matters.
 
-## Next steps (pick up here)
+## Build notes
 
-1. Build RallyInfo backend piece (entity/service/controller/module, wire
-   into `app.module.ts`).
-2. Add `vue-router` to `apps/web` (not installed yet).
-3. Decide nav pattern (Vuetify `v-navigation-drawer` sidebar vs. top tabs)
-   before splitting `App.vue`.
-4. Split `App.vue` into the pages above, moving sections rather than
-   rewriting them where possible.
-5. Build the two genuinely new pieces: Vehicles registration form, Setup
-   landing page + Stage creation form.
+All of the above is built. A few things that came up during the split,
+worth knowing if this area changes again:
+
+- `apps/web/src/format.ts` holds the pure formatting/lookup helpers
+  (`formatDuration`, `stageName`, `isOnline`, etc.) shared across pages —
+  extracted once splitting `App.vue` actually required sharing them, not
+  ahead of time.
+- Each page fetches its own reference data (`stages`, `gates`, `vehicles`)
+  in its own `onMounted`, same pattern `App.vue` used — no shared store.
+  Revisit only if duplicate fetches become an actual, visible problem.
+- `/results/overall` and `/results/stages/:stageId` cross-link to each
+  other (a stage-jump select on Overall, an "Overall Classification" link
+  on the stage page) since the doc's route split otherwise left no way to
+  navigate between them from the UI.
+- Stage creation needed the caller-supplied `id` field flagged in the
+  original plan (`SetupStagesView.vue`) — `PUT /stages/:id` takes it, no
+  auto-generated id.
