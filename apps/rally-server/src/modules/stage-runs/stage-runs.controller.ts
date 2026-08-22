@@ -44,6 +44,15 @@ export class StageRunsController {
     return this.stageRunsService.voidRun(id);
   }
 
+  /**
+   * Reverses a void. 409s if a later surviving attempt would still supersede
+   * this one (void that one first), or if it would leave two attempts open.
+   */
+  @Post(':id/unvoid')
+  unvoid(@Param('id') id: string) {
+    return this.stageRunsService.unvoidRun(id);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.stageRunsService.remove(id);

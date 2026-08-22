@@ -62,6 +62,15 @@ export function voidStageRun(id: string): Promise<StageRun> {
   return postRequest(`/stage-runs/${id}/void`);
 }
 
+/**
+ * Reverses a void. Throws `ApiError` 409 if a later surviving attempt would
+ * still supersede this one (void that one first), or if it would leave two
+ * attempts open at once.
+ */
+export function unvoidStageRun(id: string): Promise<StageRun> {
+  return postRequest(`/stage-runs/${id}/unvoid`);
+}
+
 export function fetchSplitsForRun(stageRunId: string): Promise<StageSplit[]> {
   return apiFetch(`/stage-runs/${stageRunId}/splits`);
 }

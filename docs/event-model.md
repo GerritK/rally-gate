@@ -133,9 +133,24 @@ Voided runs must also be excluded from the partial unique index: a voided but
 unfinished run would otherwise keep occupying the one-open-attempt slot and
 block the very re-run it was voided to permit.
 
-There is no un-void. A void applied to the wrong car is corrected by voiding
-the right one and letting that car re-run; the mistaken row stays visible as
-`VOIDED` rather than being quietly reversed.
+`POST /stage-runs/:id/unvoid` reverses a void — for a red flag called on the
+wrong car, or called and then withdrawn. It **refuses rather than cascades**,
+in two cases:
+
+- **a later surviving attempt already supersedes it.** Restoring would change
+  nothing, since `latestAttempts` takes the highest — and a control that
+  silently does nothing is worse than one that refuses. Voiding attempt 2
+  automatically would be worse still: it would strike out a run the car
+  actually drove, as a side effect of a button labelled "unvoid". The error
+  names the attempt to void first, so the marshal makes that call explicitly
+  and it shows up in the record as a deliberate act.
+- **it would leave two attempts open at once.** Reachable by voiding two
+  unfinished attempts and restoring them in order. The partial unique index
+  would reject it anyway, but as a driver error rather than something a
+  marshal can act on.
+
+Restoring an earlier attempt after a re-run is therefore two explicit steps —
+void attempt 2, then unvoid attempt 1 — and both are visible afterwards.
 
 Otherwise the rules stay intentionally simple: duplicate start events are
 ignored (the pre-insert check handles the common case; a race that reaches
