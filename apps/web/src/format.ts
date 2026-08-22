@@ -64,6 +64,11 @@ export function runStatusColor(status: string): string {
       return 'info';
     case 'CANCELLED':
       return 'error';
+    case 'VOIDED':
+      // Neutral, not red: a voided run isn't a failure by the crew, it's a
+      // struck-out attempt. Red stays reserved for penalties/DNF/abort per
+      // the theme conventions in packages/ui.
+      return 'timing-idle';
     default:
       return 'timing-idle';
   }

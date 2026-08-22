@@ -24,6 +24,7 @@ import {
   deleteStageRun,
   fetchSplitsForRun,
   fetchStageRuns,
+  voidStageRun,
   type StageRun,
   type StageSplit,
 } from '../api/stage-runs';
@@ -217,6 +218,23 @@ async function onCorrectFinish(run: StageRun, value: string) {
         : null,
     }),
   );
+}
+
+/**
+ * Red flag. Keeps the attempt on record but drops it from the results and
+ * frees the car, so the start gate opens the re-run itself next time it goes
+ * through — no restart time to type in.
+ */
+async function onVoidRun(run: StageRun) {
+  if (
+    !confirm(
+      `Void ${vehicleName(vehicles.value, run.vehicleId)}'s attempt ${run.attempt}?\n\n` +
+        `It stays on record but stops counting, and the car can run this stage again — ` +
+        `the start gate will time the new attempt automatically.`,
+    )
+  )
+    return;
+  upsertStageRun(await voidStageRun(run.id));
 }
 
 async function onDeleteRun(run: StageRun) {
@@ -514,9 +532,21 @@ onUnmounted(() => {
               {{ runDurationDisplay(run) }}
             </td>
             <td>
-              <v-chip size="small" :color="runStatusColor(run.status)">
+              <v-chip
+                size="small"
+                :color="runStatusColor(run.status)"
+                :prepend-icon="
+                  run.status === 'VOIDED' ? 'mdi-cancel' : undefined
+                "
+              >
                 {{ run.status }}
               </v-chip>
+              <span
+                v-if="run.attempt > 1"
+                class="text-caption text-medium-emphasis ml-1"
+              >
+                attempt {{ run.attempt }}
+              </span>
             </td>
             <td>
               <v-btn
@@ -528,6 +558,15 @@ onUnmounted(() => {
                 @click="toggleEditRun(run.id)"
               >
                 {{ editingRunId === run.id ? 'Done' : 'Correct' }}
+              </v-btn>
+              <v-btn
+                v-if="!run.voided"
+                size="small"
+                variant="text"
+                prepend-icon="mdi-cancel"
+                @click="onVoidRun(run)"
+              >
+                Void
               </v-btn>
               <v-btn
                 size="small"

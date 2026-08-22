@@ -34,6 +34,16 @@ export class StageRunsController {
     return this.stageRunsService.correctRun(id, body);
   }
 
+  /**
+   * Strikes out an attempt (red flag). Keeps the row as evidence, drops it
+   * from results, and frees the vehicle so the start gate can open a re-run
+   * on its next pass — see "StageRun" in `docs/event-model.md`.
+   */
+  @Post(':id/void')
+  void(@Param('id') id: string) {
+    return this.stageRunsService.voidRun(id);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.stageRunsService.remove(id);

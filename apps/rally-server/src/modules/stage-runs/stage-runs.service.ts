@@ -39,9 +39,14 @@ export type StageRunWithStatus = StageRun & { status: StageRunStatus };
  * closed (marshal swept it as DNF), in which case it's CANCELLED.
  */
 export function deriveStageRunStatus(
-  run: Pick<StageRun, 'finishTime'>,
+  run: Pick<StageRun, 'finishTime'> & Partial<Pick<StageRun, 'voided'>>,
   stageClosed: boolean,
 ): StageRunStatus {
+  // Checked first: a voided run may well have a finishTime, and reporting it
+  // as FINISHED would present a struck-out time as a result.
+  if (run.voided) {
+    return StageRunStatus.VOIDED;
+  }
   if (run.finishTime) {
     return StageRunStatus.FINISHED;
   }
@@ -59,6 +64,12 @@ export function deriveStageRunStatus(
 export function latestAttempts(runs: StageRun[]): StageRun[] {
   const latest = new Map<string, StageRun>();
   for (const run of runs) {
+    // A voided attempt counts for nothing, so results fall back to the last
+    // surviving attempt — or to no result at all if every attempt is voided,
+    // which is the correct reading of "that run didn't happen".
+    if (run.voided) {
+      continue;
+    }
     const key = `${run.vehicleId}:${run.stageId}`;
     const seen = latest.get(key);
     if (!seen || run.attempt > seen.attempt) {
@@ -166,7 +177,12 @@ export class StageRunsService {
     );
   }
 
-  /** The vehicle's in-progress attempt on this stage, if any (not yet finished). */
+  /**
+   * The vehicle's in-progress attempt on this stage, if any. Voided runs are
+   * excluded throughout: voiding is what releases a vehicle to run again, so
+   * a voided row must stop counting as either "already running" or "already
+   * finished" everywhere the rule engine checks.
+   */
   private findActive(
     vehicleId: string,
     stageId: string,
@@ -175,6 +191,7 @@ export class StageRunsService {
       vehicleId,
       stageId,
       finishTime: IsNull(),
+      voided: false,
     });
   }
 
@@ -184,7 +201,7 @@ export class StageRunsService {
     stageId: string,
   ): Promise<StageRun | null> {
     return this.stageRuns.findOne({
-      where: { vehicleId, stageId, finishTime: Not(IsNull()) },
+      where: { vehicleId, stageId, finishTime: Not(IsNull()), voided: false },
       order: { attempt: 'DESC' },
     });
   }
@@ -378,6 +395,27 @@ export class StageRunsService {
       throw err;
     }
     const withStatus = await this.withStatus(saved);
+    this.emitter.emit('stage-run.updated', withStatus);
+    return withStatus;
+  }
+
+  /**
+   * Strikes out an attempt — the red-flag action. The row stays: it is the
+   * record of what was originally timed, which is exactly what a protest
+   * would turn on, so this is deliberately not a delete.
+   *
+   * Once voided the vehicle has no active and no finished attempt on the
+   * stage, so the *start gate* opens the re-run by itself on the car's next
+   * pass. That is the point of doing it this way rather than hand-entering a
+   * replacement run: both ends of the re-run stay gate-timed.
+   */
+  async voidRun(id: string): Promise<StageRunWithStatus> {
+    const run = await this.stageRuns.findOneBy({ id });
+    if (!run) {
+      throw new NotFoundException(`StageRun ${id} not found`);
+    }
+    run.voided = true;
+    const withStatus = await this.withStatus(await this.stageRuns.save(run));
     this.emitter.emit('stage-run.updated', withStatus);
     return withStatus;
   }
