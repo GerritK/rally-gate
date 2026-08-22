@@ -33,4 +33,17 @@ export class LiveController {
       map((data): MessageEvent => ({ data: data as object })),
     );
   }
+
+  /**
+   * The backlog of detections that failed rule application, pushed whenever
+   * it changes — a failure or a recovery. Carries the whole list rather than
+   * a delta, so a client that reconnects mid-event is correct again on the
+   * next change without needing replay.
+   */
+  @Sse('pending-detections')
+  pendingDetections(): Observable<MessageEvent> {
+    return fromEvent(this.eventEmitter, 'detection.pending-changed').pipe(
+      map((data): MessageEvent => ({ data: data as object })),
+    );
+  }
 }

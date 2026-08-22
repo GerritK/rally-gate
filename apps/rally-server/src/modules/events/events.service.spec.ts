@@ -98,6 +98,23 @@ describe('EventsService detection failures', () => {
     expect(saved.some((r) => r.processed)).toBe(false);
   });
 
+  it('publishes the backlog on failure instead of only logging it', async () => {
+    // The failure has to reach the live feed under the name LiveController
+    // subscribes to. An emit nothing listens for is indistinguishable from
+    // no emit at all, which is how this was missed the first time.
+    const { service, emitter } = makeService({
+      startRun: jest.fn().mockRejectedValue(new Error('SQLITE_BUSY')),
+    });
+
+    await service.handleMqttMessage(detection());
+
+    // Empty because the repository is mocked; what matters is that the event
+    // fires under the name LiveController subscribes to, carrying the list.
+    expect(emitter.emit).toHaveBeenCalledWith('detection.pending-changed', {
+      pending: [],
+    });
+  });
+
   it('marks a detection processed once its rules apply', async () => {
     const { service, saved } = makeService({});
 
@@ -106,19 +123,24 @@ describe('EventsService detection failures', () => {
     expect(saved.at(-1)).toMatchObject({ processed: true });
   });
 
-  it.each([
+  const nothingToApply: [string, { gate?: null; vehicle?: null }][] = [
     ['an unknown gate', { gate: null }],
     ['an unregistered transponder', { vehicle: null }],
-  ])('marks %s processed rather than leaving it pending', async (_l, opts) => {
-    // Nothing to apply and retrying would never change that, so these must
-    // not accumulate in the pending list — it is meant to hold real
-    // failures, not stray passings from a car that isn't in this event.
-    const { service, saved } = makeService(opts);
+  ];
 
-    await service.handleMqttMessage(detection());
+  it.each(nothingToApply)(
+    'marks %s processed rather than leaving it pending',
+    async (_l, opts) => {
+      // Nothing to apply and retrying would never change that, so these must
+      // not accumulate in the pending list — it is meant to hold real
+      // failures, not stray passings from a car that isn't in this event.
+      const { service, saved } = makeService(opts);
 
-    expect(saved.at(-1)).toMatchObject({ processed: true });
-  });
+      await service.handleMqttMessage(detection());
+
+      expect(saved.at(-1)).toMatchObject({ processed: true });
+    },
+  );
 });
 
 describe('EventsService.reprocessPending', () => {

@@ -20,6 +20,8 @@ Live (Server-Sent Events, plain `EventSource` on the client — no Socket.IO):
 - `GET /live/detections` — a new `DetectionEventRecord` as it's ingested
 - `GET /live/stage-runs` — a `StageRun` whenever it's created or updated
 - `GET /live/stage-run-splits` — a `StageSplit` whenever one is recorded
+- `GET /live/gates` — a `Gate` on each heartbeat
+- `GET /live/pending-detections` — `{ pending: DetectionEventRecord[] }` whenever the failed-detection backlog changes (a failure or a recovery). Carries the whole list, not a delta, so a reconnecting client is correct again on the next change
 
 Not built yet: `/penalties`, `/results`, `/config`, `/gate-nodes`, auth of
 any kind. See the original project doc's "API" section for the full
