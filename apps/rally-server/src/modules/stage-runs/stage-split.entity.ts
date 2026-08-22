@@ -15,7 +15,7 @@ export class StageSplit {
   @Column()
   splitIndex: number;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: Date })
   timestamp: Date;
 
   @Column()

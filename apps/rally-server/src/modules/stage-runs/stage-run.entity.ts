@@ -21,7 +21,13 @@ export class StageRun {
   @Column()
   stageId: string;
 
-  @Column({ type: 'datetime' })
+  /**
+   * `type: Date` (the constructor), not `'datetime'`: `'datetime'` is
+   * sqlite-only and fails Postgres metadata validation at startup, while
+   * `Date` normalizes to `datetime` on sqlite and `timestamp` on Postgres.
+   * Same reason `'timestamp'` is wrong here — it's the Postgres-only mirror.
+   */
+  @Column({ type: Date })
   startTime: Date;
 
   /**
@@ -30,7 +36,7 @@ export class StageRun {
    * as SQL NULL. Clearing a finish time needs the latter — see
    * StageRunsService.correctRun.
    */
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: Date, nullable: true })
   finishTime?: Date | null;
 
   /**
