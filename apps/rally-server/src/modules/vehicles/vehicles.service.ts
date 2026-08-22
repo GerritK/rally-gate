@@ -1,4 +1,8 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { isUniqueViolation } from '../../common/db-errors';
@@ -30,6 +34,27 @@ export class VehiclesService {
       if (isUniqueViolation(err)) {
         throw new ConflictException(
           `Start number ${data.startNumber} is already in use`,
+        );
+      }
+      throw err;
+    }
+  }
+
+  async update(
+    id: string,
+    patch: Partial<Omit<Vehicle, 'id'>>,
+  ): Promise<Vehicle> {
+    const vehicle = await this.findOne(id);
+    if (!vehicle) {
+      throw new NotFoundException(`Vehicle ${id} not found`);
+    }
+    Object.assign(vehicle, patch);
+    try {
+      return await this.vehicles.save(vehicle);
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        throw new ConflictException(
+          `Start number ${vehicle.startNumber} is already in use`,
         );
       }
       throw err;

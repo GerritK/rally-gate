@@ -1,3 +1,7 @@
+import { VehicleStatus } from '@rally-gate/shared';
+
+export { VehicleStatus };
+
 export const API_BASE =
   import.meta.env.VITE_API_URL ?? 'http://localhost:57430';
 
@@ -83,7 +87,9 @@ export interface Vehicle {
   id: string;
   startNumber: string;
   driverName: string;
-  coDriverName?: string;
+  coDriverName?: string | null;
+  transponderId?: string | null;
+  status: VehicleStatus;
 }
 
 export interface RallyInfo {
@@ -193,8 +199,20 @@ export function createVehicle(input: {
   startNumber: string;
   driverName: string;
   coDriverName?: string;
+  transponderId?: string;
 }): Promise<Vehicle> {
   return postJson('/vehicles', input);
+}
+
+export function updateVehicle(
+  id: string,
+  patch: Partial<Omit<Vehicle, 'id'>>,
+): Promise<Vehicle> {
+  return apiFetch(`/vehicles/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
 }
 
 export function fetchRallyInfo(): Promise<RallyInfo | null> {

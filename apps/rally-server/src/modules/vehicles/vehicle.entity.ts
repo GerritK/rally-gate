@@ -1,3 +1,4 @@
+import { VehicleStatus } from '@rally-gate/shared';
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity()
@@ -11,12 +12,12 @@ export class Vehicle {
   @Column()
   driverName: string;
 
-  @Column({ nullable: true })
-  coDriverName?: string;
+  @Column({ type: 'varchar', nullable: true })
+  coDriverName?: string | null;
 
-  @Column({ nullable: true })
-  transponderId?: string;
+  @Column({ type: 'varchar', nullable: true })
+  transponderId?: string | null;
 
-  @Column({ default: 'REGISTERED' })
-  status: string;
+  @Column({ type: 'varchar', default: VehicleStatus.REGISTERED })
+  status: VehicleStatus;
 }
