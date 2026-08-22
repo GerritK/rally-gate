@@ -8,7 +8,7 @@ export class Gate {
   @Column({ default: '' })
   name: string;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: Date, nullable: true })
   lastHeartbeatAt?: Date;
 
   @Column({ nullable: true })

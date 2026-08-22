@@ -14,10 +14,10 @@ export class DetectionEventRecord {
   @Column({ nullable: true })
   vehicleId?: string;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: Date })
   timestampGate: Date;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: Date })
   timestampServer: Date;
 
   @Column({ type: 'text' })
