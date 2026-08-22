@@ -46,10 +46,6 @@ import {
 const now = ref(Date.now());
 let nowTimer: ReturnType<typeof setInterval>;
 
-/** Polled rather than pushed: a detection *failing* isn't an event the live
- * feed carries, and the count only changes on failure or on a retry sweep. */
-const PENDING_POLL_MS = 10_000;
-let pendingTimer: ReturnType<typeof setInterval>;
 const pendingDetections = ref<DetectionEventRecord[]>([]);
 const retryingPending = ref(false);
 
@@ -91,6 +87,7 @@ let detectionsSource: EventSource;
 let stageRunsSource: EventSource;
 let stageRunSplitsSource: EventSource;
 let gatesSource: EventSource;
+let pendingSource: EventSource;
 
 const FLASH_DURATION_MS = 600;
 
@@ -331,12 +328,20 @@ onMounted(async () => {
     upsertSplit(JSON.parse(e.data));
   };
 
+  pendingSource = new EventSource(`${API_BASE}/live/pending-detections`);
+  // `onopen` fires on the first connect *and* on every automatic reconnect,
+  // which is exactly when this client may have missed a change — so it
+  // doubles as the initial load and the resync, with no timer either way.
+  pendingSource.onopen = () => void refreshPending();
+  pendingSource.onmessage = (e) => {
+    pendingDetections.value = (
+      JSON.parse(e.data) as { pending: DetectionEventRecord[] }
+    ).pending;
+  };
+
   nowTimer = setInterval(() => {
     now.value = Date.now();
   }, 1000);
-
-  await refreshPending();
-  pendingTimer = setInterval(() => void refreshPending(), PENDING_POLL_MS);
 });
 
 onUnmounted(() => {
@@ -344,8 +349,8 @@ onUnmounted(() => {
   stageRunsSource?.close();
   stageRunSplitsSource?.close();
   gatesSource?.close();
+  pendingSource?.close();
   clearInterval(nowTimer);
-  clearInterval(pendingTimer);
 });
 </script>
 

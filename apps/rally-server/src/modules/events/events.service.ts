@@ -104,8 +104,32 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     }
     if (recovered > 0) {
       this.logger.log(`Recovered ${recovered} detection(s)`);
+      await this.emitPendingChanged();
     }
     return recovered;
+  }
+
+  /**
+   * Publishes the current backlog to the live feed, so the dashboard learns
+   * about a failure the moment it happens instead of asking on a timer. Same
+   * shape as every other cross-cutting signal here — emit, and let
+   * `LiveController` be the thing that listens.
+   *
+   * Never throws: this runs from the catch path of an ingest that is already
+   * going wrong, and failing to refresh a banner must not compound that.
+   */
+  private async emitPendingChanged(): Promise<void> {
+    try {
+      this.emitter.emit('detection.pending-changed', {
+        pending: await this.findPending(),
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Could not publish the pending-detection backlog: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
   }
 
   @OnEvent('mqtt.message')
@@ -209,7 +233,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         `Rule application failed for detection ${record.eventId} from gate ${record.gateId}; it is stored but not timed, and will be retried`,
         err instanceof Error ? err.stack : String(err),
       );
-      this.emitter.emit('detection.failed', record);
+      await this.emitPendingChanged();
       return false;
     }
   }
