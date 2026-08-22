@@ -56,6 +56,22 @@ Planned adapters (not implemented yet):
   the exact `decoder_timestamp` format/units under `-t` aren't specified in
   the protocol doc — confirm against real decoder output when
   `OpenStintAdapter` actually gets built.
+
+  **Amendment (the "no NTP at all" premise is being revised).** The `-t`
+  decision above rests on gate Pis running no time daemon, so nothing can
+  jump their clock mid-event. Planned time sync (chrony against
+  `rally-server`, optionally disciplined by GPS/PPS — see "Hardware notes"
+  and `development-roadmap.md` item 0) breaks that premise, and the risk
+  OpenStint warns about becomes live again. `-t` stays the right call, but it
+  now carries a **configuration requirement rather than an assumption**: any
+  time daemon on a gate must be allowed to *step* the clock only at boot, and
+  must *slew* from then on (chrony's `makestep <threshold> <limit>` with a
+  small update limit does exactly this). A bounded slew is harmless here —
+  correcting even 100ppm over a minutes-long stage moves the clock by
+  milliseconds — whereas a step mid-stage puts a discontinuity straight into
+  a `StageRun`. GPS/PPS makes this easier rather than harder: a continuously
+  disciplined clock stays locked with tiny slews and has no reason to step
+  after the initial fix.
 - `RCHourglassAdapter` — considered as an alternative decoder, not currently pursued.
 - `ManualEntryAdapter` — for a marshal manually keying in a passage.
 - `ThroughBeamAdapter` — cheap IR break-beam sensor on GPIO, no transponder
@@ -118,6 +134,56 @@ instead of one column. Expected to be a small change, not a big redesign.
   Pi (see `apps/gate-agent/Dockerfile` for why it's not containerized). The
   RTC covers surviving power cycles; correcting for setup-time miscalibration
   between gates is a separate planned mechanism — see "Gate control channel"
-  in `architecture.md`.
+  and "Clock offset" in `architecture.md`.
+- **GPS module with PPS** — optional per-gate upgrade, not a requirement.
+  Worth understanding what it does and doesn't buy before spending on it.
+
+  A GPS module gives two separate things, and only one is useful for timing:
+  - **NMEA sentences** (UART/USB, ~1Hz) carrying time of day, delivered with
+    tens to hundreds of ms of serial/USB jitter. On their own these are
+    *worse* than the LAN — they tell you which second it is, not when it
+    started.
+  - **PPS** — a hardware pulse on a GPIO whose rising edge tracks the top of
+    each UTC second to within tens of nanoseconds. This is the entire value.
+
+  Consequence: **a USB GPS dongle is the wrong hardware.** USB latency
+  destroys the pulse edge, and most dongles don't expose PPS at all. It needs
+  a UART/GPIO module or HAT, wired to a GPIO, with `dtoverlay=pps-gpio` and
+  chrony using the PPS refclock. GPS does not replace chrony — it becomes a
+  *source* for it, so the chrony work is a prerequisite either way, not an
+  alternative.
+
+  **Accuracy is not the reason to do this.** chrony over the rally LAN
+  already lands within a few ms, against winning margins measured in tenths
+  of a second — comfortably 20-100x more accuracy than needed. GPS/PPS is
+  ~1µs, which is overkill by any measure.
+
+  **The reason to do it is topology: it takes the network out of the timing
+  path.** A stage can be kilometres of forest track, and the start and finish
+  gates may not see the same AP. With PPS, a gate's timestamps are correct
+  whether or not it can reach `rally-server` at that instant, so delivery
+  becomes eventually-consistent rather than timing-critical. That composes
+  with the QoS 1 persistent session in `apps/gate-agent/src/main.ts` (and the
+  disk-backed outgoing store marked as a `ponytail:` ceiling there): a gate
+  could be out of contact for an entire stage, buffer its detections, and
+  sync on return with the times still exact. It also bounds the cold-start
+  hole that "Clock offset" in `architecture.md` exists to catch, without
+  depending on the server being reachable at boot.
+
+  Caveats worth weighing before buying:
+  - **Sky view is the real risk** — dense forest, valleys, under bridges, all
+    places rally stages actually go. A gate that loses fix falls back to its
+    crystal, so none of the existing fallbacks stop being necessary.
+  - Complements the DS3231 rather than replacing it: GPS sets the time
+    correctly, the RTC holds it through a fix loss or reboot. The RTC alone
+    can't set the time right in the first place.
+  - Must obey the step-at-boot-only rule in the `-t` amendment above.
+  - ~EUR 15-30 plus antenna placement, per gate.
+
+  **Requires no `rally-server` changes at all.** Because gates stamp their
+  own time and the server measures and optionally corrects it, a GPS-equipped
+  gate simply reports `Gate.clockOffsetMs` near zero permanently — so the
+  Hardware page's clock column doubles as a GPS health indicator for free
+  (green = good fix, amber = the antenna has lost sky).
 - **Through-beam (IR break-beam) sensor** — candidate GPIO input for
   `ThroughBeamAdapter` above. ([example](https://de.aliexpress.com/item/1005006052871002.html))
