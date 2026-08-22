@@ -97,6 +97,34 @@ describe('StageRunsService.correctRun', () => {
       'StageRun missing not found',
     );
   });
+
+  it('rejects a finish time at or before the start time', async () => {
+    const { service, stageRuns } = makeService({ ...baseRun });
+
+    await expect(
+      service.correctRun('r1', { finishTime: '2025-12-31T23:59:00.000Z' }),
+    ).rejects.toThrow('must be after startTime');
+    expect(stageRuns.save).not.toHaveBeenCalled();
+  });
+
+  it('rejects a start time moved past an existing finish time', async () => {
+    // Only startTime is patched here — the pair still has to end up ordered,
+    // so the check runs against the merged run, not just the patch.
+    const { service } = makeService({ ...baseRun });
+
+    await expect(
+      service.correctRun('r1', { startTime: '2026-01-01T00:02:00.000Z' }),
+    ).rejects.toThrow('must be after startTime');
+  });
+
+  it('rejects an unparseable date instead of storing NaN', async () => {
+    const { service, stageRuns } = makeService({ ...baseRun });
+
+    await expect(
+      service.correctRun('r1', { finishTime: 'yesterday-ish' }),
+    ).rejects.toThrow('finishTime is not a valid date/time');
+    expect(stageRuns.save).not.toHaveBeenCalled();
+  });
 });
 
 describe('StageRunsService.createManual', () => {
@@ -127,6 +155,58 @@ describe('StageRunsService.createManual', () => {
         startTime: '2026-01-01T00:00:00.000Z',
       }),
     ).rejects.toThrow('Vehicle v1 already has a run on stage s1');
+  });
+
+  it('rejects a finish time at or before the start time', async () => {
+    const { service, stageRuns } = makeService(null);
+
+    await expect(
+      service.createManual({
+        vehicleId: 'v1',
+        stageId: 's1',
+        startTime: '2026-01-01T00:01:00.000Z',
+        finishTime: '2026-01-01T00:00:00.000Z',
+      }),
+    ).rejects.toThrow('must be after startTime');
+    expect(stageRuns.save).not.toHaveBeenCalled();
+  });
+});
+
+describe('StageRunsService.finishRun', () => {
+  const activeRun = {
+    id: 'r1',
+    vehicleId: 'v1',
+    stageId: 's1',
+    startTime: new Date('2026-01-01T00:00:00.000Z'),
+    finishTime: null,
+  };
+
+  it('records a finish after the start normally', async () => {
+    const { service } = makeService({ ...activeRun });
+
+    const finished = await service.finishRun(
+      'v1',
+      's1',
+      new Date('2026-01-01T00:01:00.000Z'),
+    );
+
+    expect(finished?.durationMs).toBe(60_000);
+  });
+
+  it('ignores a finish before the start rather than storing a negative duration', async () => {
+    // The classic clock-skew case: the finish gate's Pi is behind the start
+    // gate's. Ranking sorts durationMs ascending, so persisting this would
+    // silently put the car first.
+    const { service, stageRuns } = makeService({ ...activeRun });
+
+    const finished = await service.finishRun(
+      'v1',
+      's1',
+      new Date('2025-12-31T23:59:00.000Z'),
+    );
+
+    expect(finished).toBeNull();
+    expect(stageRuns.save).not.toHaveBeenCalled();
   });
 });
 
