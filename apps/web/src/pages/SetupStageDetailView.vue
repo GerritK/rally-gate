@@ -26,6 +26,8 @@ const assignmentsForStage = computed(() =>
   gateAssignments.value.filter((a) => a.stageId === props.stageId),
 );
 
+const stageEditable = computed(() => stage.value?.status === 'NOT_STARTED');
+
 async function refreshAssignments() {
   gateAssignments.value = await fetchGateAssignments();
 }
@@ -82,17 +84,14 @@ onMounted(load);
   <v-card v-if="stage" class="mb-6">
     <v-card-title>Stage Details</v-card-title>
     <v-card-text>
+      <v-alert v-if="!stageEditable" type="info" variant="tonal" class="mb-4">
+        This stage is {{ stage.status }} and can only be edited while
+        NOT_STARTED.
+      </v-alert>
       <form
         class="d-flex flex-wrap align-center ga-3"
         @submit.prevent="onSaveStage"
       >
-        <v-text-field
-          v-model="stage.name"
-          label="Name"
-          density="comfortable"
-          hide-details
-          style="min-width: 220px"
-        />
         <v-text-field
           v-model.number="stage.stageNumber"
           type="number"
@@ -100,7 +99,16 @@ onMounted(load);
           label="Stage #"
           density="comfortable"
           hide-details
+          :disabled="!stageEditable"
           style="max-width: 140px"
+        />
+        <v-text-field
+          v-model="stage.name"
+          label="Name"
+          density="comfortable"
+          hide-details
+          :disabled="!stageEditable"
+          style="min-width: 220px"
         />
         <v-chip :color="stage.status === 'ACTIVE' ? 'success' : 'timing-idle'">
           {{ stage.status }}
@@ -109,6 +117,7 @@ onMounted(load);
           type="submit"
           color="primary"
           :loading="savingStage"
+          :disabled="!stageEditable"
           prepend-icon="mdi-content-save"
         >
           Save
@@ -120,9 +129,14 @@ onMounted(load);
   <v-card>
     <v-card-title>Gate Assignments</v-card-title>
     <v-card-text>
-      <v-alert type="info" variant="tonal" class="mb-4">
-        Activate this stage's gates from Live Timing, not here — closing the
-        stage there deactivates them again.
+      <v-alert
+        v-if="stage && !stageEditable"
+        type="info"
+        variant="tonal"
+        class="mb-4"
+      >
+        This stage is {{ stage.status }} — gate assignments can only be added or
+        removed while NOT_STARTED.
       </v-alert>
       <v-table density="comfortable">
         <thead>
@@ -149,6 +163,7 @@ onMounted(load);
             </td>
             <td>
               <v-btn
+                v-if="stageEditable"
                 size="small"
                 variant="text"
                 color="error"
@@ -162,6 +177,7 @@ onMounted(load);
         </tbody>
       </v-table>
       <form
+        v-if="stageEditable"
         class="d-flex flex-wrap align-center ga-3 mt-4"
         @submit.prevent="onCreateAssignment"
       >

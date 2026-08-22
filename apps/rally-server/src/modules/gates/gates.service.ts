@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { OnEvent } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { DETECTION_TOPIC_PREFIX } from '@rally-gate/shared';
 import { Repository } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
+import { GateAssignmentsService } from './gate-assignments.service';
 import { Gate } from './gate.entity';
 
 export const AUTO_DISCOVER_GATES_KEY = 'autoDiscoverGates';
@@ -18,6 +19,8 @@ export class GatesService {
     @InjectRepository(Gate)
     private readonly gates: Repository<Gate>,
     private readonly settingsService: SettingsService,
+    private readonly emitter: EventEmitter2,
+    private readonly gateAssignmentsService: GateAssignmentsService,
   ) {}
 
   findAll(): Promise<Gate[]> {
@@ -33,7 +36,14 @@ export class GatesService {
     return this.findOne(gate.id) as Promise<Gate>;
   }
 
-  async remove(id: string): Promise<void> {
+  /**
+   * Deleting a gate cascades to its gate assignments — see
+   * `GateAssignmentsService.removeAllForGate` for the actual rules (hard
+   * refusal if any referenced stage is ACTIVE/CLOSED, otherwise requires
+   * `force` to confirm the cascade).
+   */
+  async remove(id: string, force = false): Promise<void> {
+    await this.gateAssignmentsService.removeAllForGate(id, force);
     await this.gates.delete(id);
   }
 
@@ -85,6 +95,8 @@ export class GatesService {
     if (capabilities) {
       gate.capabilities = capabilities;
     }
-    return this.gates.save(gate);
+    const saved = await this.gates.save(gate);
+    this.emitter.emit('gate.heartbeat', saved);
+    return saved;
   }
 }

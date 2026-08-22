@@ -3,6 +3,11 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { API_BASE, ApiError } from '../api/client';
 import { fetchRecentEvents, type DetectionEventRecord } from '../api/events';
 import {
+  fetchGateAssignments,
+  type GateAssignment,
+} from '../api/gate-assignments';
+import { fetchGates, type Gate } from '../api/gates';
+import {
   activateStage,
   closeStage,
   fetchStages,
@@ -26,6 +31,7 @@ import {
 import {
   combineDateAndTime,
   formatDuration,
+  isOnline,
   runStatusColor,
   stageName,
   toLocalTimeValue,
@@ -39,22 +45,44 @@ const detections = ref<DetectionEventRecord[]>([]);
 const stageRuns = ref<StageRun[]>([]);
 const stages = ref<Stage[]>([]);
 const vehicles = ref<Vehicle[]>([]);
+const gates = ref<Gate[]>([]);
+const gateAssignments = ref<GateAssignment[]>([]);
 const splitsByRun = ref<Record<string, StageSplit[]>>({});
+const flashingGateIds = ref<Record<string, boolean>>({});
 const selectedStageId = ref<string>('');
 const closingStage = ref(false);
 const activatingStage = ref(false);
 const conflictDialog = ref(false);
 const conflictingStageNames = ref<string[]>([]);
 const editingRunId = ref<string | null>(null);
-const newRun = ref<{ vehicleId: string; stageId: string; startTime: string }>({
+const newRun = ref<{ vehicleId: string; startTime: string }>({
   vehicleId: '',
-  stageId: '',
   startTime: '',
 });
 
 let detectionsSource: EventSource;
 let stageRunsSource: EventSource;
 let stageRunSplitsSource: EventSource;
+let gatesSource: EventSource;
+
+const FLASH_DURATION_MS = 600;
+
+function flashGate(gateId: string) {
+  flashingGateIds.value[gateId] = true;
+  setTimeout(() => {
+    flashingGateIds.value[gateId] = false;
+  }, FLASH_DURATION_MS);
+}
+
+function upsertGateStatus(gate: Gate) {
+  const idx = gates.value.findIndex((g) => g.id === gate.id);
+  if (idx === -1) {
+    gates.value.push(gate);
+  } else {
+    gates.value[idx] = gate;
+  }
+  flashGate(gate.id);
+}
 
 function toggleEditRun(runId: string) {
   editingRunId.value = editingRunId.value === runId ? null : runId;
@@ -106,6 +134,36 @@ const stageOptions = computed(() =>
   stages.value.map((s) => ({ id: s.id, title: `${s.stageNumber}. ${s.name}` })),
 );
 
+const selectedStageGateIds = computed(
+  () =>
+    new Set(
+      gateAssignments.value
+        .filter((a) => a.active && a.stageId === selectedStageId.value)
+        .map((a) => a.gateId),
+    ),
+);
+
+/** All gates assigned to the selected stage, active or not — lets a marshal
+ * check gate status before activating, not just once it's live. */
+const selectedStageGates = computed(() => {
+  const gateIds = new Set(
+    gateAssignments.value
+      .filter((a) => a.stageId === selectedStageId.value)
+      .map((a) => a.gateId),
+  );
+  return gates.value.filter((g) => gateIds.has(g.id));
+});
+
+const filteredStageRuns = computed(() =>
+  stageRuns.value.filter((run) => run.stageId === selectedStageId.value),
+);
+
+const filteredDetections = computed(() =>
+  detections.value.filter((event) =>
+    selectedStageGateIds.value.has(event.gateId),
+  ),
+);
+
 function stageTitle(stageId: string): string {
   const stage = stages.value.find((s) => s.id === stageId);
   return stage ? `${stage.stageNumber}. ${stage.name}` : stageId;
@@ -146,19 +204,19 @@ async function onDeleteRun(run: StageRun) {
 async function onCreateRun() {
   if (
     !newRun.value.vehicleId ||
-    !newRun.value.stageId ||
+    !selectedStageId.value ||
     !newRun.value.startTime
   )
     return;
   try {
     const created = await createStageRun({
       vehicleId: newRun.value.vehicleId,
-      stageId: newRun.value.stageId,
+      stageId: selectedStageId.value,
       startTime: combineDateAndTime(new Date(), newRun.value.startTime),
     });
     upsertStageRun(created);
     splitsByRun.value[created.id] = [];
-    newRun.value = { vehicleId: '', stageId: '', startTime: '' };
+    newRun.value = { vehicleId: '', startTime: '' };
   } catch (err) {
     alert(err instanceof Error ? err.message : 'Failed to add run');
   }
@@ -172,6 +230,7 @@ async function onCreateRun() {
  */
 async function refreshStages() {
   stages.value = await fetchStages();
+  gateAssignments.value = await fetchGateAssignments();
 }
 
 async function onActivateStage(force = false) {
@@ -214,6 +273,8 @@ onMounted(async () => {
   stageRuns.value = await fetchStageRuns();
   stages.value = await fetchStages();
   vehicles.value = await fetchVehicles();
+  gateAssignments.value = await fetchGateAssignments();
+  gates.value = await fetchGates();
   const openStage = stages.value.find((s) => s.status !== 'CLOSED');
   selectedStageId.value = (openStage ?? stages.value[0])?.id ?? '';
 
@@ -223,7 +284,14 @@ onMounted(async () => {
 
   detectionsSource = new EventSource(`${API_BASE}/live/detections`);
   detectionsSource.onmessage = (e) => {
-    detections.value.unshift(JSON.parse(e.data));
+    const event: DetectionEventRecord = JSON.parse(e.data);
+    detections.value.unshift(event);
+    flashGate(event.gateId);
+  };
+
+  gatesSource = new EventSource(`${API_BASE}/live/gates`);
+  gatesSource.onmessage = (e) => {
+    upsertGateStatus(JSON.parse(e.data));
   };
 
   stageRunsSource = new EventSource(`${API_BASE}/live/stage-runs`);
@@ -245,11 +313,28 @@ onUnmounted(() => {
   detectionsSource?.close();
   stageRunsSource?.close();
   stageRunSplitsSource?.close();
+  gatesSource?.close();
   clearInterval(nowTimer);
 });
 </script>
 
 <template>
+  <div class="d-flex flex-wrap justify-center ga-2 mb-6">
+    <v-chip
+      v-for="gate in selectedStageGates"
+      :key="gate.id"
+      :class="{ 'gate-flash': flashingGateIds[gate.id] }"
+      :color="isOnline(gate, now) ? 'success' : 'error'"
+      prepend-icon="mdi-access-point"
+      size="small"
+    >
+      {{ gate.name }}
+    </v-chip>
+    <span v-if="selectedStageGates.length === 0" class="text-medium-emphasis">
+      No gates assigned to this stage yet.
+    </span>
+  </div>
+
   <v-card class="mb-6">
     <v-card-title>Stage Runs</v-card-title>
     <v-card-text>
@@ -311,7 +396,7 @@ onUnmounted(() => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="run in stageRuns" :key="run.id">
+          <tr v-for="run in filteredStageRuns" :key="run.id">
             <td>{{ vehicleName(vehicles, run.vehicleId) }}</td>
             <td>{{ stageName(stages, run.stageId) }}</td>
             <td>
@@ -400,16 +485,6 @@ onUnmounted(() => {
           hide-details
           style="min-width: 220px"
         />
-        <v-select
-          v-model="newRun.stageId"
-          :items="stageOptions"
-          item-title="title"
-          item-value="id"
-          label="Stage"
-          density="comfortable"
-          hide-details
-          style="min-width: 200px"
-        />
         <v-text-field
           v-model="newRun.startTime"
           type="time"
@@ -421,8 +496,14 @@ onUnmounted(() => {
           style="min-width: 220px"
           @click:append-inner="openTimePicker"
         />
-        <v-btn type="submit" color="primary" prepend-icon="mdi-plus">
-          Add Missing Run
+        <v-btn
+          type="submit"
+          color="primary"
+          prepend-icon="mdi-plus"
+          :disabled="!selectedStageId"
+        >
+          Add Missing Run to
+          {{ selectedStageId ? stageTitle(selectedStageId) : 'stage' }}
         </v-btn>
       </form>
     </v-card-text>
@@ -441,7 +522,7 @@ onUnmounted(() => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="event in detections" :key="event.eventId">
+          <tr v-for="event in filteredDetections" :key="event.eventId">
             <td>{{ event.gateId }}</td>
             <td>{{ event.transponderId }}</td>
             <td>
@@ -485,3 +566,18 @@ onUnmounted(() => {
     </v-card>
   </v-dialog>
 </template>
+
+<style scoped>
+.gate-flash {
+  animation: gate-flash-pulse 0.6s ease-out;
+}
+
+@keyframes gate-flash-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--v-theme-primary), 0.7);
+  }
+  100% {
+    box-shadow: 0 0 0 8px rgba(var(--v-theme-primary), 0);
+  }
+}
+</style>

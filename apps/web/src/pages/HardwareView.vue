@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { ApiError } from '../api/client';
 import {
   fetchGateAssignments,
   type GateAssignment,
@@ -8,7 +9,7 @@ import { deleteGate, fetchGates, upsertGate, type Gate } from '../api/gates';
 import { fetchSetting, saveSetting } from '../api/settings';
 import { fetchStages, type Stage } from '../api/stages';
 import { formatClockTime, formatRelativeTime } from '@rally-gate/ui';
-import { isOnline, stageName } from '../format';
+import { isOnline } from '../format';
 
 const AUTO_DISCOVER_KEY = 'autoDiscoverGates';
 
@@ -22,9 +23,26 @@ const autoDiscover = ref(true);
 const newGate = ref({ id: '', name: '' });
 const creatingGate = ref(false);
 const editingGateId = ref<string | null>(null);
+const deleteConflictGate = ref<Gate | null>(null);
+const deleteConflictMessage = ref('');
+
+/** Gates referenced by an ACTIVE/CLOSED stage's assignment — those
+ * assignments can't be removed, so the gate can't be deleted at all. */
+const lockedGateIds = computed(() => {
+  const lockedStageIds = new Set(
+    stages.value.filter((s) => s.status !== 'NOT_STARTED').map((s) => s.id),
+  );
+  return new Set(
+    gateAssignments.value
+      .filter((a) => lockedStageIds.has(a.stageId))
+      .map((a) => a.gateId),
+  );
+});
 
 async function refreshGates() {
   gates.value = await fetchGates();
+  gateAssignments.value = await fetchGateAssignments();
+  stages.value = await fetchStages();
 }
 
 function toggleEditGate(gateId: string) {
@@ -37,9 +55,27 @@ async function onRenameGate(gate: Gate, name: string) {
   await refreshGates();
 }
 
-async function onDeleteGate(gate: Gate) {
-  await deleteGate(gate.id);
-  gates.value = gates.value.filter((g) => g.id !== gate.id);
+async function onDeleteGate(gate: Gate, force = false) {
+  try {
+    await deleteGate(gate.id, force);
+    gates.value = gates.value.filter((g) => g.id !== gate.id);
+    deleteConflictGate.value = null;
+  } catch (err) {
+    const assignmentCount =
+      err instanceof ApiError && err.status === 409
+        ? (err.body as { assignmentCount?: number } | null)?.assignmentCount
+        : undefined;
+    if (assignmentCount) {
+      deleteConflictGate.value = gate;
+      deleteConflictMessage.value = err.message;
+    } else {
+      alert(err instanceof Error ? err.message : 'Failed to delete gate');
+    }
+  }
+}
+
+function onConfirmDeleteGate() {
+  if (deleteConflictGate.value) onDeleteGate(deleteConflictGate.value, true);
 }
 
 async function onToggleAutoDiscover(value: boolean | null) {
@@ -65,8 +101,6 @@ async function onCreateGate() {
 
 onMounted(async () => {
   await refreshGates();
-  gateAssignments.value = await fetchGateAssignments();
-  stages.value = await fetchStages();
   autoDiscover.value = (await fetchSetting(AUTO_DISCOVER_KEY)) !== 'false';
   nowTimer = setInterval(() => {
     now.value = Date.now();
@@ -99,7 +133,6 @@ onUnmounted(() => {
             <th>Online</th>
             <th>Last Heartbeat</th>
             <th>Capabilities</th>
-            <th>Active Assignment</th>
             <th></th>
           </tr>
         </thead>
@@ -121,7 +154,7 @@ onUnmounted(() => {
             <td>
               <v-chip
                 size="small"
-                :color="isOnline(gate, now) ? 'success' : 'timing-idle'"
+                :color="isOnline(gate, now) ? 'success' : 'error'"
               >
                 {{ isOnline(gate, now) ? 'online' : 'offline' }}
               </v-chip>
@@ -141,19 +174,6 @@ onUnmounted(() => {
             </td>
             <td>{{ gate.capabilities ?? '-' }}</td>
             <td>
-              <v-chip
-                v-for="assignment in gateAssignments.filter(
-                  (a) => a.gateId === gate.id && a.active,
-                )"
-                :key="assignment.id"
-                size="small"
-                class="mr-1"
-              >
-                {{ assignment.role }} @
-                {{ stageName(stages, assignment.stageId) }}
-              </v-chip>
-            </td>
-            <td>
               <v-btn
                 size="small"
                 variant="text"
@@ -164,15 +184,25 @@ onUnmounted(() => {
               >
                 {{ editingGateId === gate.id ? 'Done' : 'Rename' }}
               </v-btn>
-              <v-btn
-                size="small"
-                variant="text"
-                color="error"
-                prepend-icon="mdi-delete"
-                @click="onDeleteGate(gate)"
+              <v-tooltip
+                :disabled="!lockedGateIds.has(gate.id)"
+                text="Referenced by an active/closed stage — can't be deleted"
               >
-                Delete
-              </v-btn>
+                <template #activator="{ props: tooltipProps }">
+                  <span v-bind="tooltipProps">
+                    <v-btn
+                      size="small"
+                      variant="text"
+                      color="error"
+                      prepend-icon="mdi-delete"
+                      :disabled="lockedGateIds.has(gate.id)"
+                      @click="onDeleteGate(gate)"
+                    >
+                      Delete
+                    </v-btn>
+                  </span>
+                </template>
+              </v-tooltip>
             </td>
           </tr>
         </tbody>
@@ -213,4 +243,20 @@ onUnmounted(() => {
       </form>
     </v-card-text>
   </v-card>
+
+  <v-dialog :model-value="!!deleteConflictGate" max-width="480">
+    <v-card>
+      <v-card-title>Delete gate and its assignments?</v-card-title>
+      <v-card-text>{{ deleteConflictMessage }}</v-card-text>
+      <v-card-actions>
+        <v-spacer />
+        <v-btn variant="text" @click="deleteConflictGate = null">
+          Cancel
+        </v-btn>
+        <v-btn color="error" @click="onConfirmDeleteGate">
+          Delete gate and assignments
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
