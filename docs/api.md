@@ -13,7 +13,7 @@ REST (all on `rally-server`, default port 57430; embedded MQTT broker on
 | `/stage-runs/:id/splits` | GET | `StageSplit`s for a run, ordered by `splitIndex` |
 | `/events` | GET | recent `DetectionEventRecord`s |
 | `/classification/stages/:stageId` | GET | ranked per-stage results with gaps |
-| `/classification/overall` | GET | ranked overall results with gaps, lowest total wins. Counts **CLOSED stages only**; a crew that didn't complete one is charged a **notional time** (slowest real time on that stage + `notionalPenaltyMs`, default 30s) so all totals cover the same stages — see "Notional times" in `event-model.md`. `stagesCompleted` is stages actually driven and is display-only, not the ranking key; a value below the maximum means notional time is inside that total |
+| `/classification/overall` | GET | ranked overall results with gaps, lowest total wins. Counts **CLOSED stages only**; a crew that didn't complete one is charged a **notional time** (slowest real time on that stage + `notionalPenaltyMs`, default 2 min) so all totals cover the same stages — see "Notional times" in `event-model.md`. `stagesCompleted` is stages actually driven and is display-only, not the ranking key; a value below the maximum means notional time is inside that total |
 
 Live (Server-Sent Events, plain `EventSource` on the client — no Socket.IO):
 - `GET /live/detections` — a new `DetectionEventRecord` as it's ingested

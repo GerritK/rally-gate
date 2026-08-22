@@ -5,10 +5,17 @@ import { SettingsService } from '../settings/settings.service';
 import { StageRunsService } from '../stage-runs/stage-runs.service';
 import { StagesService } from '../stages/stages.service';
 import { VehiclesService } from '../vehicles/vehicles.service';
-import {
-  ClassificationService,
-  DEFAULT_NOTIONAL_PENALTY_MS,
-} from './classification.service';
+import { ClassificationService } from './classification.service';
+
+/**
+ * Deliberately not `DEFAULT_NOTIONAL_PENALTY_MS`. These cases demonstrate how
+ * the penalty behaves, so they pin their own value — otherwise retuning the
+ * product default would silently change what they claim to prove.
+ *
+ * 30s against ~100s stages is a *small* penalty, which is the point: it keeps
+ * the "quick crew can still lead on fewer stages" case under test.
+ */
+const SMALL_PENALTY_MS = 30_000;
 
 function makeService(
   stage: { status: StageStatus },
@@ -40,7 +47,7 @@ function makeOverallService(
   stages: { id: string; status: StageStatus }[],
   finishedRuns: unknown[],
   vehicles: unknown[],
-  notionalPenaltyMs = DEFAULT_NOTIONAL_PENALTY_MS,
+  notionalPenaltyMs = SMALL_PENALTY_MS,
 ) {
   const stageRunsService = {
     findAllFinished: jest.fn().mockResolvedValue(finishedRuns),
