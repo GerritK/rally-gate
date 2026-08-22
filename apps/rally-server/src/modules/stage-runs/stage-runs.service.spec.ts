@@ -278,15 +278,39 @@ describe('StageRunsService.unvoidRun', () => {
     expect(stageRuns.save).not.toHaveBeenCalled();
   });
 
-  it('allows restoring a finished attempt alongside an earlier survivor', async () => {
-    // Two finished attempts are fine — the highest simply wins.
+  it('warns before displacing the attempt that currently counts', async () => {
+    // Void 1 and 2, restore 1, then restore 2: nothing supersedes 2, so the
+    // earlier checks stay quiet while the result silently moves back to 2.
+    // Coherent to want, but not something to do without saying so.
+    const { service, stageRuns } = makeUnvoidService([
+      { id: 'r0', attempt: 0, voided: false, finishTime: new Date() },
+    ]);
+
+    await expect(service.unvoidRun('r1')).rejects.toThrow(
+      'Attempt 0 currently counts',
+    );
+    expect(stageRuns.save).not.toHaveBeenCalled();
+  });
+
+  it('displaces the counting attempt once confirmed with force', async () => {
     const { service } = makeUnvoidService([
       { id: 'r0', attempt: 0, voided: false, finishTime: new Date() },
     ]);
 
-    await expect(service.unvoidRun('r1')).resolves.toMatchObject({
+    await expect(service.unvoidRun('r1', true)).resolves.toMatchObject({
       voided: false,
     });
+  });
+
+  it('does not let force past the refusals that have nothing to confirm', async () => {
+    // Forcing a no-op is meaningless, so the supersede case stays final.
+    const { service } = makeUnvoidService([
+      { id: 'r2', attempt: 2, voided: false, finishTime: new Date() },
+    ]);
+
+    await expect(service.unvoidRun('r1', true)).rejects.toThrow(
+      'Attempt 2 supersedes this one',
+    );
   });
 });
 

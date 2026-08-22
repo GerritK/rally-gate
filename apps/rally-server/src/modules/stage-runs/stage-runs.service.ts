@@ -436,8 +436,15 @@ export class StageRunsService {
    *   forbids. Reachable by voiding two unfinished attempts and unvoiding
    *   them in order, so the check can't be left to the index alone — it
    *   would surface as a driver error rather than an explanation.
+   *
+   * And it warns, once, when restoring would *displace* the attempt that
+   * currently counts — void 1 and 2, restore 1, then restore 2, and the
+   * result silently moves back to 2. That is a coherent thing to want, so
+   * `force` confirms it rather than forbidding it, the same shape as the
+   * gate conflict in `activateForStage`. Unlike the two refusals above it is
+   * forceable, because there is something real to confirm.
    */
-  async unvoidRun(id: string): Promise<StageRunWithStatus> {
+  async unvoidRun(id: string, force = false): Promise<StageRunWithStatus> {
     const run = await this.stageRuns.findOneBy({ id });
     if (!run) {
       throw new NotFoundException(`StageRun ${id} not found`);
@@ -462,6 +469,21 @@ export class StageRunsService {
       throw new ConflictException(
         `Another attempt on this stage is still open; only one attempt can be in progress at a time`,
       );
+    }
+
+    // Past the check above, every surviving sibling is numbered below this
+    // one, so restoring it takes over as the counting attempt. The highest
+    // of them is the one being displaced.
+    const displaced = siblings.reduce<StageRun | null>(
+      (highest, other) =>
+        !highest || other.attempt > highest.attempt ? other : highest,
+      null,
+    );
+    if (displaced && !force) {
+      throw new ConflictException({
+        message: `Attempt ${displaced.attempt} currently counts for this stage; restoring attempt ${run.attempt} replaces it as the counting run`,
+        displacedAttempt: displaced.attempt,
+      });
     }
 
     run.voided = false;

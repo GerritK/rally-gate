@@ -149,8 +149,20 @@ in two cases:
   would reject it anyway, but as a driver error rather than something a
   marshal can act on.
 
+Neither of those is forceable — there is nothing to confirm about a no-op or
+an impossible state.
+
+A third case *is* forceable. Restoring an attempt when a lower-numbered one
+is currently counting **displaces** it: void 1 and 2, restore 1, then restore
+2, and the result moves back to attempt 2. Both refusals above stay quiet
+there — nothing supersedes attempt 2, and nothing is open — so it used to
+happen silently. It now 409s with `{ displacedAttempt }` and proceeds on
+`?force=true`, the same warn-then-confirm shape as the gate conflict in
+`activateForStage`. Coherent to want, but not something to do without saying
+so, since it changes the result.
+
 Restoring an earlier attempt after a re-run is therefore two explicit steps —
-void attempt 2, then unvoid attempt 1 — and both are visible afterwards.
+void attempt 2, then unvoid attempt 1 — and both remain visible afterwards.
 
 Otherwise the rules stay intentionally simple: duplicate start events are
 ignored (the pre-insert check handles the common case; a race that reaches
