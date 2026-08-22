@@ -109,10 +109,29 @@
   Verified with a full route sweep in a real browser after the split, no
   console errors.
 
+- Gate clock offset measurement + correction: heartbeats carry `sentAt`,
+  `Gate.clockOffsetMs` holds the measured `arrivedAt - sentAt`, and
+  `EventsService` corrects a detection's effective time at ingest when the
+  offset clears `clockCorrectionThresholdMs` (default 1000ms), storing the
+  amount applied on `DetectionEventRecord.clockCorrectionMs` and leaving
+  `timestampGate` raw. Hardware page shows per-gate offset, amber past 250ms
+  and red once corrected. Deadband exists because the one-way measurement
+  can't separate clock offset from transit latency — see "Clock offset" in
+  `architecture.md`. Verified end-to-end with a gate deliberately skewed 5s
+  behind: the run recorded 3000ms (the true elapsed time) where an
+  uncorrected server reported 8002ms.
+
 ## Next
 
 Priority order (1 = next):
 
+0. **chrony/NTP on gates** — the actual clock sync, versus the offset
+   correction above, which is only a monitor plus a gross-failure safety net
+   and can't resolve below network latency. Gates run chrony against
+   `rally-server`, which serves NTP from its local clock (`local stratum 10`)
+   so it works with no internet. Needs `deploy/install-gate-pi.sh` work and a
+   server-side NTP service, and can only be validated on real Pi hardware —
+   which is why it wasn't bundled with the measurement work.
 1. Gate/gate-node health reporting, plus expected stage time: optional
    `Stage.expectedDurationMs` set by the marshal, dashboard flags any
    `STARTED` run as overdue once `now - startTime` exceeds it. Client-side

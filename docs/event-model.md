@@ -21,7 +21,14 @@ interface DetectionEvent {
 Adds server-side fields once ingested: `vehicleId` (resolved from
 `transponderId`, if a matching vehicle exists), `timestampServer` (server's
 own clock — kept separate from `timestampGate` since gate/server clocks
-aren't assumed to be perfectly synced), `rawPayload`, `processed`.
+aren't assumed to be perfectly synced), `clockCorrectionMs`, `rawPayload`,
+`processed`.
+
+`timestampGate` is never rewritten. When the gate's measured clock offset is
+large enough to correct (see "Clock offset" in `architecture.md`), the
+correction is recorded separately in `clockCorrectionMs` and the time the
+rule engine actually used is `timestampGate + clockCorrectionMs` — so the raw
+reading and the adjustment stay independently inspectable.
 
 ## StageRun
 

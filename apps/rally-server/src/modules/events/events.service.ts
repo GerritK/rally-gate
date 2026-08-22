@@ -78,13 +78,23 @@ export class EventsService {
       );
     }
 
+    // Gate clocks are independent of each other and of the server's, so a
+    // duration built from two gates' raw timestamps carries their
+    // disagreement. Correct onto server time here, at ingest, and keep both
+    // halves — see "Clock offset" in docs/architecture.md.
+    const clockCorrectionMs = gate
+      ? await this.gatesService.clockCorrectionMsFor(gate)
+      : 0;
+    const timestampGate = new Date(detection.timestampGate);
+
     const record = this.events.create({
       eventId: detection.eventId,
       gateId: detection.gateId,
       transponderId: detection.transponderId,
       vehicleId: vehicle?.id,
-      timestampGate: new Date(detection.timestampGate),
+      timestampGate,
       timestampServer: new Date(),
+      clockCorrectionMs,
       rawPayload: JSON.stringify(detection),
       processed: false,
     });
@@ -92,7 +102,11 @@ export class EventsService {
     this.emitter.emit('detection.created', record);
 
     if (gate && vehicle) {
-      await this.applyRules(gate, vehicle.id, record.timestampGate);
+      await this.applyRules(
+        gate,
+        vehicle.id,
+        new Date(timestampGate.getTime() + clockCorrectionMs),
+      );
     }
 
     record.processed = true;

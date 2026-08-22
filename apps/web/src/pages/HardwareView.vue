@@ -9,9 +9,18 @@ import { deleteGate, fetchGates, upsertGate, type Gate } from '../api/gates';
 import { fetchSetting, saveSetting } from '../api/settings';
 import { fetchStages, type Stage } from '../api/stages';
 import { formatClockTime, formatRelativeTime } from '@rally-gate/ui';
-import { isOnline } from '../format';
+import {
+  clockOffsetColor,
+  clockOffsetHint,
+  formatClockOffset,
+  isOnline,
+} from '../format';
 
 const AUTO_DISCOVER_KEY = 'autoDiscoverGates';
+const CLOCK_CORRECTION_THRESHOLD_KEY = 'clockCorrectionThresholdMs';
+/** Mirrors DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS; only used until the real
+ * value arrives from settings, so the two can't drift in practice. */
+const CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS = 1_000;
 
 const now = ref(Date.now());
 let nowTimer: ReturnType<typeof setInterval>;
@@ -20,6 +29,7 @@ const gates = ref<Gate[]>([]);
 const gateAssignments = ref<GateAssignment[]>([]);
 const stages = ref<Stage[]>([]);
 const autoDiscover = ref(true);
+const clockCorrectionThresholdMs = ref(CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS);
 const newGate = ref({ id: '', name: '' });
 const creatingGate = ref(false);
 const editingGateId = ref<string | null>(null);
@@ -102,6 +112,9 @@ async function onCreateGate() {
 onMounted(async () => {
   await refreshGates();
   autoDiscover.value = (await fetchSetting(AUTO_DISCOVER_KEY)) !== 'false';
+  clockCorrectionThresholdMs.value =
+    Number(await fetchSetting(CLOCK_CORRECTION_THRESHOLD_KEY)) ||
+    CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS;
   nowTimer = setInterval(() => {
     now.value = Date.now();
   }, 1000);
@@ -132,6 +145,7 @@ onUnmounted(() => {
             <th>Name</th>
             <th>Online</th>
             <th>Last Heartbeat</th>
+            <th>Clock</th>
             <th>Capabilities</th>
             <th></th>
           </tr>
@@ -171,6 +185,39 @@ onUnmounted(() => {
                   ? formatRelativeTime(gate.lastHeartbeatAt, now)
                   : 'never'
               }}
+            </td>
+            <td>
+              <v-tooltip
+                :text="
+                  clockOffsetHint(
+                    gate.clockOffsetMs,
+                    clockCorrectionThresholdMs,
+                  )
+                "
+                location="top"
+              >
+                <template #activator="{ props }">
+                  <v-chip
+                    v-bind="props"
+                    size="small"
+                    class="rg-timing"
+                    :color="
+                      clockOffsetColor(
+                        gate.clockOffsetMs,
+                        clockCorrectionThresholdMs,
+                      )
+                    "
+                    :prepend-icon="
+                      gate.clockOffsetMs != null &&
+                      Math.abs(gate.clockOffsetMs) >= clockCorrectionThresholdMs
+                        ? 'mdi-clock-alert-outline'
+                        : 'mdi-clock-check-outline'
+                    "
+                  >
+                    {{ formatClockOffset(gate.clockOffsetMs) }}
+                  </v-chip>
+                </template>
+              </v-tooltip>
             </td>
             <td>{{ gate.capabilities ?? '-' }}</td>
             <td>

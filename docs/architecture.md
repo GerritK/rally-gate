@@ -142,6 +142,63 @@ anything — "plug in a gate, it appears":
   "Gate Assignments" section (create/activate/deactivate/delete) replace the
   old raw `PUT /gates/:id` role pre-configuration.
 
+## Clock offset
+
+A stage time is `finishGate.timestampGate - startGate.timestampGate` — two
+timestamps from two physically separate Pis. **What matters is not that
+either clock is correct, but that the two agree**; if every clock in the
+system is wrong by the same amount, durations are still exact and only the
+displayed time of day is off. That reframing is what the design follows.
+
+Left alone, they don't agree. A bare Pi crystal (±50ppm) drifts ~1.5s over an
+8-hour event, so two can diverge by ~3s; a Pi with no RTC and no internet
+boots from `fake-hwclock` with the time of its last shutdown, hours or days
+out. Winning margins are tenths of a second. Nothing about this failure is
+visible — it just silently changes who won.
+
+Two mechanisms, with different jobs:
+
+1. **Real sync belongs to NTP, not to this codebase.** Gates should run
+   chrony against `rally-server`, which serves NTP from its own local clock
+   (`local stratum 10`) so it works on a closed network with no internet.
+   That gets sub-millisecond agreement. **Not built yet** — see
+   `development-roadmap.md`.
+2. **Measured offset, for visibility and gross failures.** The heartbeat
+   `gate-agent` already publishes every 15s carries `sentAt` (its own clock
+   at publish time). `GatesService.recordHeartbeat` stores
+   `arrivedAt - sentAt` as `Gate.clockOffsetMs` — positive means the gate is
+   behind. The Hardware page shows it per gate, amber past 250ms and red once
+   it's being corrected, which is how anyone finds out chrony *isn't*
+   working. Without this the failure stays silent.
+
+**Why a deadband rather than always correcting.** The measurement is one-way,
+so it is really `offset + transit latency` and cannot separate the two. Below
+roughly the network's latency, "correcting" would inject jitter into clocks
+that may be perfectly fine — a well-synced pair would come out slightly
+*worse*. So `GatesService.clockCorrectionMsFor` applies the offset only past
+a threshold (`clockCorrectionThresholdMs` setting, default 1000ms), where the
+gate's clock is unambiguously wrong rather than merely noisy. The correction
+is self-effacing: once chrony is deployed, offsets sit under the threshold
+and it never fires.
+
+Correction is applied **at ingest, on the server** (`EventsService`), not on
+the gate:
+
+- the gate's clock never moves, so there is no mid-stage clock jump — the
+  same hazard the per-gate `sync` topic above is designed around;
+- `timestampGate` stays raw evidence and the applied correction is stored
+  alongside it as `DetectionEventRecord.clockCorrectionMs`, so effective time
+  is always `timestampGate + clockCorrectionMs` and any run can be recomputed
+  or undone later;
+- it works for a gate with no RTC and no NTP at all, including the window
+  before chrony's first sync — the case that otherwise produces a stage time
+  measured in days.
+
+Upgrade path: once the server-to-gate `sync` channel above exists, a
+round-trip probe (NTP's own arithmetic) separates offset from latency
+properly and the deadband stops being needed. Only the estimate changes —
+where it's stored and how it's applied stay as they are.
+
 ## MQTT broker discovery (planned, not built)
 
 Heartbeat/discovery above assumes a gate already knows where the broker is
