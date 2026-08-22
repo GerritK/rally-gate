@@ -196,6 +196,100 @@ describe('StageRunsService.correctRun', () => {
   });
 });
 
+describe('StageRunsService.unvoidRun', () => {
+  const voidedRun = {
+    id: 'r1',
+    vehicleId: 'v1',
+    stageId: 's1',
+    attempt: 1,
+    voided: true,
+    startTime: new Date('2026-01-01T00:00:00.000Z'),
+    finishTime: new Date('2026-01-01T00:01:30.000Z'),
+  };
+
+  function makeUnvoidService(siblings: Record<string, unknown>[]) {
+    const stageRuns = {
+      findOneBy: jest.fn().mockResolvedValue({ ...voidedRun }),
+      // The service filters itself out, so return it alongside the siblings
+      // exactly as the repository would.
+      find: jest.fn().mockResolvedValue(siblings),
+      save: jest.fn().mockImplementation((r) => Promise.resolve(r)),
+    };
+    const stagesService = {
+      findOne: jest.fn().mockResolvedValue({ status: StageStatus.NOT_STARTED }),
+    };
+    return {
+      service: new StageRunsService(
+        stageRuns as never,
+        {} as never,
+        stagesService as never,
+        { emit: jest.fn() } as never,
+      ),
+      stageRuns,
+    };
+  }
+
+  it('restores a void when nothing else survives on that stage', async () => {
+    const { service } = makeUnvoidService([]);
+
+    const restored = await service.unvoidRun('r1');
+
+    expect(restored.voided).toBe(false);
+    expect(restored.status).toBe(StageRunStatus.FINISHED);
+  });
+
+  it('refuses when a later attempt would still supersede it', async () => {
+    // Cascading a void onto attempt 2 would strike out a run the car really
+    // drove, as a side effect of a control labelled "unvoid" — so the
+    // marshal is asked to say so explicitly instead.
+    const { service, stageRuns } = makeUnvoidService([
+      { id: 'r2', attempt: 2, voided: false, finishTime: new Date() },
+    ]);
+
+    await expect(service.unvoidRun('r1')).rejects.toThrow(
+      'Attempt 2 supersedes this one',
+    );
+    expect(stageRuns.save).not.toHaveBeenCalled();
+  });
+
+  it('refuses when it would leave two attempts open at once', async () => {
+    // Reachable by voiding two unfinished attempts and restoring them in
+    // order. The partial unique index would reject it too, but as a driver
+    // error rather than something a marshal can act on.
+    const stageRuns = {
+      findOneBy: jest
+        .fn()
+        .mockResolvedValue({ ...voidedRun, finishTime: null }),
+      find: jest
+        .fn()
+        .mockResolvedValue([{ id: 'r0', attempt: 0, voided: false }]),
+      save: jest.fn(),
+    };
+    const service = new StageRunsService(
+      stageRuns as never,
+      {} as never,
+      { findOne: jest.fn() } as never,
+      { emit: jest.fn() } as never,
+    );
+
+    await expect(service.unvoidRun('r1')).rejects.toThrow(
+      'still open; only one attempt can be in progress',
+    );
+    expect(stageRuns.save).not.toHaveBeenCalled();
+  });
+
+  it('allows restoring a finished attempt alongside an earlier survivor', async () => {
+    // Two finished attempts are fine — the highest simply wins.
+    const { service } = makeUnvoidService([
+      { id: 'r0', attempt: 0, voided: false, finishTime: new Date() },
+    ]);
+
+    await expect(service.unvoidRun('r1')).resolves.toMatchObject({
+      voided: false,
+    });
+  });
+});
+
 describe('StageRunsService.createManual', () => {
   it('throws ConflictException when the vehicle already has an unfinished run', async () => {
     const stageRuns = {

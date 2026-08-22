@@ -24,6 +24,7 @@ import {
   deleteStageRun,
   fetchSplitsForRun,
   fetchStageRuns,
+  unvoidStageRun,
   voidStageRun,
   type StageRun,
   type StageSplit,
@@ -235,6 +236,19 @@ async function onVoidRun(run: StageRun) {
   )
     return;
   upsertStageRun(await voidStageRun(run.id));
+}
+
+/**
+ * Reverses a void. The server refuses when a later attempt would still
+ * supersede this one — surfaced as-is, since its message names the attempt
+ * to void first.
+ */
+async function onUnvoidRun(run: StageRun) {
+  try {
+    upsertStageRun(await unvoidStageRun(run.id));
+  } catch (err) {
+    alert(err instanceof Error ? err.message : 'Failed to restore run');
+  }
 }
 
 async function onDeleteRun(run: StageRun) {
@@ -567,6 +581,15 @@ onUnmounted(() => {
                 @click="onVoidRun(run)"
               >
                 Void
+              </v-btn>
+              <v-btn
+                v-else
+                size="small"
+                variant="text"
+                prepend-icon="mdi-restore"
+                @click="onUnvoidRun(run)"
+              >
+                Restore
               </v-btn>
               <v-btn
                 size="small"

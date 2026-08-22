@@ -420,6 +420,56 @@ export class StageRunsService {
     return withStatus;
   }
 
+  /**
+   * Reverses a void — for a red flag called on the wrong car, or called and
+   * then withdrawn.
+   *
+   * Deliberately refuses rather than cascading. Voiding the later attempts
+   * automatically would strike out a run the car actually drove, as a side
+   * effect of a button labelled "unvoid"; the marshal should say so
+   * explicitly. Two states are rejected:
+   *
+   * - a later surviving attempt already supersedes this one, so unvoiding
+   *   would restore nothing — `latestAttempts` takes the highest, and a
+   *   control that silently does nothing is worse than one that refuses;
+   * - it would leave two open attempts, which the partial unique index
+   *   forbids. Reachable by voiding two unfinished attempts and unvoiding
+   *   them in order, so the check can't be left to the index alone — it
+   *   would surface as a driver error rather than an explanation.
+   */
+  async unvoidRun(id: string): Promise<StageRunWithStatus> {
+    const run = await this.stageRuns.findOneBy({ id });
+    if (!run) {
+      throw new NotFoundException(`StageRun ${id} not found`);
+    }
+    const siblings = (
+      await this.stageRuns.find({
+        where: {
+          vehicleId: run.vehicleId,
+          stageId: run.stageId,
+          voided: false,
+        },
+      })
+    ).filter((other) => other.id !== run.id);
+
+    const superseding = siblings.find((other) => other.attempt > run.attempt);
+    if (superseding) {
+      throw new ConflictException(
+        `Attempt ${superseding.attempt} supersedes this one, so restoring it would change nothing — void attempt ${superseding.attempt} first if this attempt should count`,
+      );
+    }
+    if (!run.finishTime && siblings.some((other) => !other.finishTime)) {
+      throw new ConflictException(
+        `Another attempt on this stage is still open; only one attempt can be in progress at a time`,
+      );
+    }
+
+    run.voided = false;
+    const withStatus = await this.withStatus(await this.stageRuns.save(run));
+    this.emitter.emit('stage-run.updated', withStatus);
+    return withStatus;
+  }
+
   async remove(id: string): Promise<void> {
     const result = await this.stageRuns.delete(id);
     if (result.affected === 0) {
