@@ -1,5 +1,5 @@
 import { StageStatus } from '@rally-gate/shared';
-import { apiFetch, postRequest, putJson } from './client';
+import { apiFetch, postJson, postRequest, putJson } from './client';
 
 export interface Stage {
   id: string;
@@ -16,6 +16,12 @@ export function fetchStage(id: string): Promise<Stage> {
   return apiFetch(`/stages/${id}`);
 }
 
+/** Creates a new stage. Rejects (409) if `id` or `stageNumber` is already taken. */
+export function createStage(stage: Stage): Promise<Stage> {
+  return postJson('/stages', stage);
+}
+
+/** Updates an existing stage. 404s if `id` doesn't exist, 409s if `stageNumber` clashes with another stage. */
 export function upsertStage(
   id: string,
   input: { name: string; stageNumber: number; status: StageStatus },
