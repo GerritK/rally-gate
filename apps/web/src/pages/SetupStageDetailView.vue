@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import {
-  activateGateAssignment,
   createGateAssignment,
-  deactivateGateAssignment,
   deleteGateAssignment,
   fetchGateAssignments,
   GATE_ROLES,
@@ -62,16 +60,6 @@ async function onCreateAssignment() {
   await refreshAssignments();
 }
 
-async function onActivateAssignment(assignment: GateAssignment) {
-  await activateGateAssignment(assignment.id);
-  await refreshAssignments();
-}
-
-async function onDeactivateAssignment(assignment: GateAssignment) {
-  await deactivateGateAssignment(assignment.id);
-  await refreshAssignments();
-}
-
 async function onDeleteAssignment(assignment: GateAssignment) {
   await deleteGateAssignment(assignment.id);
   await refreshAssignments();
@@ -114,7 +102,7 @@ onMounted(load);
           hide-details
           style="max-width: 140px"
         />
-        <v-chip :color="stage.status === 'CLOSED' ? 'timing-idle' : 'success'">
+        <v-chip :color="stage.status === 'ACTIVE' ? 'success' : 'timing-idle'">
           {{ stage.status }}
         </v-chip>
         <v-btn
@@ -132,6 +120,10 @@ onMounted(load);
   <v-card>
     <v-card-title>Gate Assignments</v-card-title>
     <v-card-text>
+      <v-alert type="info" variant="tonal" class="mb-4">
+        Activate this stage's gates from Live Timing, not here — closing the
+        stage there deactivates them again.
+      </v-alert>
       <v-table density="comfortable">
         <thead>
           <tr>
@@ -156,25 +148,6 @@ onMounted(load);
               </v-chip>
             </td>
             <td>
-              <v-btn
-                v-if="!assignment.active"
-                size="small"
-                variant="text"
-                color="success"
-                prepend-icon="mdi-play"
-                @click="onActivateAssignment(assignment)"
-              >
-                Activate
-              </v-btn>
-              <v-btn
-                v-else
-                size="small"
-                variant="text"
-                prepend-icon="mdi-pause"
-                @click="onDeactivateAssignment(assignment)"
-              >
-                Deactivate
-              </v-btn>
               <v-btn
                 size="small"
                 variant="text"

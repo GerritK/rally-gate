@@ -20,12 +20,12 @@ order."
 | Route | Section | Contents | Status |
 |---|---|---|---|
 | `/` | — | redirect to `/live` | new |
-| `/live` | **Live Timing** | Live Detections feed, Stage Runs table (Correct/Delete/Add Missing Run inline, as today), Close Stage action | reorganized |
+| `/live` | **Live Timing** | Live Detections feed, Stage Runs table (Correct/Delete/Add Missing Run inline, as today), Activate Stage action (with cross-stage gate-conflict warning), Close Stage action (also deactivates the stage's gates) | reorganized |
 | `/results/overall` | **Results** | Overall Classification | reorganized |
 | `/results/stages/:stageId` | **Results** | Stage Classification, Split Classification, DNF/DNS — stage picked via route param (bookmarkable), not a client-side dropdown like today | reorganized |
 | `/setup` | **Setup** | Rally name/details (edit) + a link tile to Stages. A checklist landing page, not a duplicate of those pages | **new** |
 | `/setup/stages` | **Setup** | Stage list, create new stage | reorganized + new create form |
-| `/setup/stages/:stageId` | **Setup** | Edit stage name/number, plus that stage's gate assignments (assign a gate as start/finish/split, activate/deactivate/delete) | reorganized (replaces the old flat "Gate Assignments" table) |
+| `/setup/stages/:stageId` | **Setup** | Edit stage name/number, plus that stage's gate assignments (assign a gate as start/finish/split, delete) — active/inactive shown read-only, activation itself happens from Live Timing | reorganized (replaces the old flat "Gate Assignments" table) |
 | `/hardware` | **Hardware** | Gate roster: identity, online/offline, heartbeat, capabilities, current active assignment (gate-centric cross-stage view) | reorganized |
 | `/vehicles` | **Vehicles** | Registered vehicles/drivers list + add/edit form | **new UI** (backend `POST /vehicles` already exists, nothing calls it today) |
 
@@ -44,6 +44,22 @@ order."
   view moves to Hardware instead (gate-centric: each gate row shows its
   current active assignment), so that question is still answerable, just
   from the other entity's page.
+- **Stage activation lives on Live Timing, not Setup, and is per-stage, not
+  per-assignment.** Originally each `GateAssignment` had its own
+  activate/deactivate buttons in `/setup/stages/:stageId` (see
+  `architecture.md` "Gate assignment: plan vs. live"). In practice a marshal
+  thinks in stages ("SS2 is running now"), not in individual gates, and
+  flipping assignments one at a time made it easy to leave a stage
+  half-activated. `POST /stages/:id/activate` now activates every assignment
+  for a stage in one call, and it lives in Live Timing because activation is
+  an operational, mid-event action — same reasoning as Close Stage sitting
+  there already — not a setup-time one. Setup still shows each assignment's
+  active/inactive state, just without the controls. There's no standalone
+  "deactivate" button anywhere: gates only turn off via Close Stage, which
+  deactivates them as part of closing (see `architecture.md`) — a separate
+  deactivate action was tried and removed for looking too similar to Close
+  without the DNF/DNS side effect, one extra way to end up in an ambiguous
+  half-live state.
 - **Hardware and Vehicles are their own top-level nav items, not nested
   under Setup**, even though they're part of pre-event prep. Both get used
   operationally too (checking gate health mid-event, registering a late

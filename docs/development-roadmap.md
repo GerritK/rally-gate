@@ -19,17 +19,22 @@
   (`id`/`name`/`lastHeartbeatAt`/`capabilities`) — no more
   `role`/`stageId`/`splitIndex`. `GateAssignment` (`gate-assignment.entity.ts`)
   is the (gate, stage, role, splitIndex) plan, with exactly one row `active`
-  per gate at a time; `GET/POST /gate-assignments` and
-  `POST /gate-assignments/:id/activate|deactivate` manage it.
+  per gate at a time; `GET/POST /gate-assignments` manage the plan rows.
   `EventsService.applyRules` looks up the gate's active assignment instead of
   reading `gate.role`/`gate.stageId`. Activation is a manual marshal action
   for now (there's no "start stage" server action yet to auto-flip it — see
   "Gate control channel" below). Dashboard has new Gates and Gate Assignments
-  sections (list, online/offline from heartbeat age, create
-  assignment, activate/deactivate/delete) replacing the old raw `PUT
-  /gates/:id` role pre-configuration. Verified end-to-end: gate-agent
-  heartbeat auto-registered a gate, an activated `stage_start` assignment
-  turned a simulated detection into a `StageRun`.
+  sections (list, online/offline from heartbeat age, create/delete
+  assignment) replacing the old raw `PUT /gates/:id` role pre-configuration.
+  Verified end-to-end: gate-agent heartbeat auto-registered a gate, an
+  activated `stage_start` assignment turned a simulated detection into a
+  `StageRun`. **Superseded:** activation was per-assignment
+  (`POST /gate-assignments/:id/activate|deactivate`) at the time this was
+  written; it's now per-stage (`POST /stages/:id/activate`, with a
+  cross-stage gate-conflict warning) and there's no standalone deactivate —
+  `POST /stages/:id/close` deactivates the stage's gates as part of closing
+  — see `architecture.md` "Gate assignment: plan vs. live" and
+  `frontend-structure.md`.
 - Manual correction of stage runs (admin override): `PATCH /stage-runs/:id`
   lets a marshal fix `startTime`/`finishTime` on an existing run (`durationMs`
   recomputed server-side), `POST /stage-runs` creates one outright when a

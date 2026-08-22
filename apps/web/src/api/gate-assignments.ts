@@ -1,5 +1,5 @@
 import { GateRole } from '@rally-gate/shared';
-import { apiFetch, deleteRequest, postJson, postRequest } from './client';
+import { apiFetch, deleteRequest, postJson } from './client';
 
 export const GATE_ROLES = Object.values(GateRole);
 
@@ -23,14 +23,6 @@ export function createGateAssignment(assignment: {
   splitIndex?: number;
 }): Promise<GateAssignment> {
   return postJson('/gate-assignments', assignment);
-}
-
-export function activateGateAssignment(id: string): Promise<GateAssignment> {
-  return postRequest(`/gate-assignments/${id}/activate`);
-}
-
-export function deactivateGateAssignment(id: string): Promise<GateAssignment> {
-  return postRequest(`/gate-assignments/${id}/deactivate`);
 }
 
 export function deleteGateAssignment(id: string): Promise<void> {
