@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { API_BASE, ApiError } from '../api/client';
-import { fetchRecentEvents, type DetectionEventRecord } from '../api/events';
+import {
+  fetchPendingEvents,
+  fetchRecentEvents,
+  retryPendingEvents,
+  type DetectionEventRecord,
+} from '../api/events';
 import {
   fetchGateAssignments,
   type GateAssignment,
@@ -40,6 +45,28 @@ import {
 
 const now = ref(Date.now());
 let nowTimer: ReturnType<typeof setInterval>;
+
+/** Polled rather than pushed: a detection *failing* isn't an event the live
+ * feed carries, and the count only changes on failure or on a retry sweep. */
+const PENDING_POLL_MS = 10_000;
+let pendingTimer: ReturnType<typeof setInterval>;
+const pendingDetections = ref<DetectionEventRecord[]>([]);
+const retryingPending = ref(false);
+
+async function refreshPending() {
+  pendingDetections.value = await fetchPendingEvents();
+}
+
+async function onRetryPending() {
+  if (retryingPending.value) return;
+  retryingPending.value = true;
+  try {
+    await retryPendingEvents();
+    await refreshPending();
+  } finally {
+    retryingPending.value = false;
+  }
+}
 
 const detections = ref<DetectionEventRecord[]>([]);
 const stageRuns = ref<StageRun[]>([]);
@@ -307,6 +334,9 @@ onMounted(async () => {
   nowTimer = setInterval(() => {
     now.value = Date.now();
   }, 1000);
+
+  await refreshPending();
+  pendingTimer = setInterval(() => void refreshPending(), PENDING_POLL_MS);
 });
 
 onUnmounted(() => {
@@ -315,10 +345,46 @@ onUnmounted(() => {
   stageRunSplitsSource?.close();
   gatesSource?.close();
   clearInterval(nowTimer);
+  clearInterval(pendingTimer);
 });
 </script>
 
 <template>
+  <v-alert
+    v-if="pendingDetections.length > 0"
+    type="error"
+    variant="tonal"
+    class="mb-6"
+    icon="mdi-alert-circle-outline"
+  >
+    <div class="d-flex flex-wrap align-center ga-4">
+      <div>
+        <strong>
+          {{ pendingDetections.length }} detection{{
+            pendingDetections.length === 1 ? '' : 's'
+          }}
+          recorded but not timed.
+        </strong>
+        These passings are stored, but the run they belong to was not updated —
+        so a start or finish is missing from the results. The server keeps
+        retrying; if the count doesn't clear, fix the run by hand below.
+        <div class="text-caption mt-1">
+          Gates affected:
+          {{ [...new Set(pendingDetections.map((d) => d.gateId))].join(', ') }}
+        </div>
+      </div>
+      <v-spacer />
+      <v-btn
+        :loading="retryingPending"
+        variant="outlined"
+        prepend-icon="mdi-refresh"
+        @click="onRetryPending"
+      >
+        Retry now
+      </v-btn>
+    </div>
+  </v-alert>
+
   <div class="d-flex flex-wrap justify-center ga-2 mb-6">
     <v-chip
       v-for="gate in selectedStageGates"
