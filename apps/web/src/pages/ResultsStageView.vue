@@ -6,13 +6,12 @@ import {
   fetchSplitClassification,
   fetchSplitGatesForStage,
   fetchStageClassification,
-  fetchStages,
   type ClassificationEntry,
   type SplitClassificationEntry,
   type SplitGateInfo,
-  type Stage,
   type StageOutcomeEntry,
-} from '../api';
+} from '../api/classification';
+import { fetchStages, type Stage } from '../api/stages';
 import {
   formatDuration,
   formatGap,

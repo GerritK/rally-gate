@@ -6,14 +6,11 @@ import {
   deactivateGateAssignment,
   deleteGateAssignment,
   fetchGateAssignments,
-  fetchGates,
-  fetchStage,
   GATE_ROLES,
-  upsertStage,
-  type Gate,
   type GateAssignment,
-  type Stage,
-} from '../api';
+} from '../api/gate-assignments';
+import { fetchGates, type Gate } from '../api/gates';
+import { fetchStage, upsertStage, type Stage } from '../api/stages';
 
 const props = defineProps<{ stageId: string }>();
 

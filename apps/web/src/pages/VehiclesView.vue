@@ -6,7 +6,7 @@ import {
   updateVehicle,
   VehicleStatus,
   type Vehicle,
-} from '../api';
+} from '../api/vehicles';
 
 const STATUS_OPTIONS = Object.values(VehicleStatus);
 

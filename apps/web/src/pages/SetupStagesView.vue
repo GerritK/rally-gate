@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { fetchStages, upsertStage, type Stage } from '../api';
+import { StageStatus } from '@rally-gate/shared';
+import { fetchStages, upsertStage, type Stage } from '../api/stages';
 
 const stages = ref<Stage[]>([]);
 const newStage = ref({ id: '', name: '', stageNumber: 1 });
@@ -17,7 +18,7 @@ async function onCreateStage() {
     await upsertStage(newStage.value.id, {
       name: newStage.value.name,
       stageNumber: newStage.value.stageNumber,
-      status: 'NOT_STARTED',
+      status: StageStatus.NOT_STARTED,
     });
     newStage.value = { id: '', name: '', stageNumber: stages.value.length + 2 };
     await refresh();

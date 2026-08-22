@@ -31,3 +31,9 @@ export interface StageOutcomeEntry {
   coDriverName?: string;
   outcome: 'DNF' | 'DNS';
 }
+
+export interface SplitGateInfo {
+  gateId: string;
+  name: string;
+  splitIndex: number;
+}

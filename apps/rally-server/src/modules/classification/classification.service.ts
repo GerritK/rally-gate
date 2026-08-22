@@ -3,6 +3,7 @@ import {
   ClassificationEntry,
   OverallClassificationEntry,
   SplitClassificationEntry,
+  SplitGateInfo,
   StageOutcomeEntry,
   StageStatus,
 } from '@rally-gate/shared';
@@ -74,7 +75,7 @@ export class ClassificationService {
     }));
   }
 
-  async getSplitGates(stageId: string) {
+  async getSplitGates(stageId: string): Promise<SplitGateInfo[]> {
     const stage = await this.stagesService.findOne(stageId);
     if (!stage) {
       throw new NotFoundException(`Stage ${stageId} not found`);

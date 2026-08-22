@@ -3,10 +3,9 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   fetchOverallClassification,
-  fetchStages,
   type OverallClassificationEntry,
-  type Stage,
-} from '../api';
+} from '../api/classification';
+import { fetchStages, type Stage } from '../api/stages';
 import { formatDuration, formatGap } from '../format';
 
 const router = useRouter();

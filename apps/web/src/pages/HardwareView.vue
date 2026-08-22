@@ -1,17 +1,12 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
 import {
-  deleteGate,
   fetchGateAssignments,
-  fetchGates,
-  fetchSetting,
-  fetchStages,
-  saveSetting,
-  upsertGate,
-  type Gate,
   type GateAssignment,
-  type Stage,
-} from '../api';
+} from '../api/gate-assignments';
+import { deleteGate, fetchGates, upsertGate, type Gate } from '../api/gates';
+import { fetchSetting, saveSetting } from '../api/settings';
+import { fetchStages, type Stage } from '../api/stages';
 import { formatClockTime, formatRelativeTime } from '@rally-gate/ui';
 import { isOnline, stageName } from '../format';
 
