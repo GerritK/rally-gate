@@ -134,10 +134,10 @@ Priority order (1 = next):
    which is why it wasn't bundled with the measurement work.
 
    **Must be configured to step the clock only at boot and slew thereafter**
-   (`makestep` with a small update limit). Running any time daemon on a gate
-   invalidates the "no NTP at all" premise the OpenStint `-t` decision rests
-   on — a mid-stage step writes a discontinuity straight into a `StageRun`.
-   See the amendment under `OpenStintAdapter` in `decoder-adapters.md`.
+   (`makestep` with a small update limit) — a mid-stage step writes a
+   discontinuity straight into a `StageRun`. This applies to every gate
+   timestamp regardless of which decoder or flags are in use; see "Gate
+   system clock policy" in `decoder-adapters.md`.
 
    Optional follow-on: **GPS/PPS as a chrony refclock per gate**. Not for
    accuracy — LAN chrony already exceeds what tenths-of-a-second margins

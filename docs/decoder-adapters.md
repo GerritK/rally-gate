@@ -43,35 +43,79 @@ Planned adapters (not implemented yet):
   overkill for this project's precision needs (DS3231 drift is a few
   ppm/~1 min/year, trivial against a rally stage's timescale).
 
-  **Decision: run the decoder with `-t` (system clock instead of monotonic),
-  and have `OpenStintAdapter` use `decoder_timestamp` directly as
-  `timestampGate`.** OpenStint's own docs warn `-t` only after weighing
-  risk — but the specific risk they name is *live NTP corrections* (jumps,
-  backwards time, slewing) hitting the clock mid-event. Gate Pis are
-  deliberately offline at the rally site (no NTP running at all — see the
-  RTC note), so that risk category doesn't apply here. Using `-t` timestamps
-  the passing at the moment OpenStint actually decodes it, inside that
-  process — more accurate than gate-agent stamping its own receipt time,
-  which adds ZeroMQ IPC transport + Node event-loop jitter on top. Caveat:
-  the exact `decoder_timestamp` format/units under `-t` aren't specified in
-  the protocol doc — confirm against real decoder output when
-  `OpenStintAdapter` actually gets built.
+  **Provisional decision: run the decoder with `-t` (system clock instead of
+  monotonic) and have `OpenStintAdapter` use `decoder_timestamp` directly as
+  `timestampGate` — pending one check listed below.** Provisional because the
+  reasoning this originally rested on turned out not to hold, and what
+  replaces it is a question that can't be answered without reading OpenStint's
+  source or running the hardware.
 
-  **Amendment (the "no NTP at all" premise is being revised).** The `-t`
-  decision above rests on gate Pis running no time daemon, so nothing can
-  jump their clock mid-event. Planned time sync (chrony against
-  `rally-server`, optionally disciplined by GPS/PPS — see "Hardware notes"
-  and `development-roadmap.md` item 0) breaks that premise, and the risk
-  OpenStint warns about becomes live again. `-t` stays the right call, but it
-  now carries a **configuration requirement rather than an assumption**: any
-  time daemon on a gate must be allowed to *step* the clock only at boot, and
-  must *slew* from then on (chrony's `makestep <threshold> <limit>` with a
-  small update limit does exactly this). A bounded slew is harmless here —
-  correcting even 100ppm over a minutes-long stage moves the clock by
-  milliseconds — whereas a step mid-stage puts a discontinuity straight into
-  a `StageRun`. GPS/PPS makes this easier rather than harder: a continuously
-  disciplined clock stays locked with tiny slews and has no reason to step
-  after the initial fix.
+  *Superseded reasoning, kept so it isn't re-derived:* the original argument
+  was that OpenStint's warning about `-t` concerns live NTP corrections
+  (jumps, backwards time, slewing), and that gate Pis run no NTP, so the risk
+  didn't apply. Both halves are now wrong. Gates will run chrony
+  (`development-roadmap.md` item 0), so there *is* a time daemon. More
+  importantly the comparison was never symmetric in the way it implied:
+
+  | | who stamps | which clock |
+  |---|---|---|
+  | with `-t` | decoder, at decode time | `CLOCK_REALTIME` |
+  | without `-t` | adapter, at ZeroMQ receipt | `CLOCK_REALTIME` (`new Date()`) |
+
+  Both paths end up reading the same system clock on the same host, so a
+  clock step corrupts `timestampGate` identically either way. Dropping `-t`
+  buys no protection from it. Clock-step safety is a property of the gate's
+  time-daemon configuration, not of this flag — see "Gate system clock
+  policy" below.
+
+  **What actually decides it: does `-t` change only the reported field, or
+  OpenStint's internal behaviour too?** If the decoder also uses that clock
+  internally — correlating hits within a detection window, deduplicating,
+  computing `pass_duration` — then a backwards step under `-t` could corrupt
+  *detection itself*, not just a timestamp: a missed passing rather than a
+  wrong time on one you still caught. That asymmetry would explain why the
+  warning exists at all, given the reported-field exposure is identical. Not
+  yet checked against their source. **Check this before building the
+  adapter**; it decides the whole question.
+
+  - If `-t` only affects the reported field: take it. Free accuracy, simplest
+    code — it stamps the passing inside the decoder at decode time, where
+    gate-agent's own receipt time would add ZeroMQ transport plus Node
+    event-loop jitter (order 1-20ms, occasionally worse under load).
+  - If `-t` reaches into decoder logic: drop it and use the calibrated
+    monotonic option below, which recovers almost all of the accuracy without
+    exposing the decoder to a stepped clock.
+
+  **Calibrated monotonic (the option to reach for if `-t` is unsafe).** Keep
+  the decoder on monotonic, and calibrate its epoch onto wall clock in the
+  adapter: track `wallNow - decoder_timestamp` across messages, keep the
+  *minimum* observed (the least-jittered sample), then compute
+  `timestampGate = calibratedEpoch + decoder_timestamp`. Transport and
+  event-loop jitter then land only on the calibration, not on every
+  detection. This is the same min-filtered offset estimation as
+  `GatesService.measureClockOffsetMs` (`architecture.md` "Clock offset"), one
+  level further down the stack. Two things fall out free: a monotonic reset
+  identifies a decoder restart, and a jump in the calibrated offset
+  identifies a stepped wall clock — it self-detects the hazard this whole
+  discussion is about. Costs perhaps 15 lines.
+
+  **Cross-check regardless of which option wins.** The adapter has both
+  numbers in hand, so compare the decoder's timestamp against its own receipt
+  time and flag divergence beyond a bound. Three lines, same shape as the
+  clock-correction deadband, and it turns a silent decoder/host clock
+  divergence into something visible.
+
+  **Keep this in proportion.** `-t` is worth somewhere between 1 and 20ms of
+  jitter. The cross-gate skew that "Clock offset" in `architecture.md`
+  addresses was worth *seconds*. This is a refinement on a path gated behind
+  RF hardware validation that hasn't happened — worth having the reasoning
+  written down correctly, not worth much more until real decoder output
+  exists to test against.
+
+  Caveat that still stands: the exact `decoder_timestamp` format/units under
+  `-t` aren't specified in the protocol doc — confirm against real decoder
+  output when `OpenStintAdapter` actually gets built.
+
 - `RCHourglassAdapter` — considered as an alternative decoder, not currently pursued.
 - `ManualEntryAdapter` — for a marshal manually keying in a passage.
 - `ThroughBeamAdapter` — cheap IR break-beam sensor on GPIO, no transponder
@@ -124,10 +168,32 @@ needed for OpenStint's own `OPN`/`AMB` transponder-type split, see
 space a detection is in, so matching just needs to check the right list
 instead of one column. Expected to be a small change, not a big redesign.
 
+## Gate system clock policy
+
+Applies to every gate timestamp, independent of `-t`, of which decoder is
+running, and of whether the gate has an RTC or GPS. Any time daemon on a gate
+must be allowed to **step the clock only at boot, and slew from then on**
+(chrony's `makestep <threshold> <limit>` with a small update limit).
+
+A bounded slew is harmless — even 100ppm over a minutes-long stage moves the
+clock by milliseconds — whereas a step mid-stage writes a discontinuity
+straight into a `StageRun`: a car that started before the step and finished
+after it gets the step added to its time, with nothing in the data to show
+why. GPS/PPS makes this easier rather than harder, since a continuously
+disciplined clock stays locked with tiny slews and has no reason to step
+after the initial fix.
+
+This is the constraint an earlier version of the `OpenStintAdapter` note
+mistook for a property of the `-t` flag. It isn't — both `-t` and
+adapter-side stamping read the same `CLOCK_REALTIME`, so the policy is what
+protects the timestamp either way.
+
 ## Hardware notes
 
 - **DS3231 RTC module** — planned for gate-agent Pis. They run at rally
-  sites with no internet/NTP, so without a hardware clock the system time
+  sites with no internet (local NTP against `rally-server` is planned, see
+  `development-roadmap.md` item 0, but that only helps once the gate is on
+  the network and synced), so without a hardware clock the system time
   resets or drifts on every power cycle; splits depend on comparing
   timestamps across independently-running gates, so clock accuracy here is
   load-bearing. I2C, wired directly since gate-agent runs bare-metal on the
@@ -177,7 +243,8 @@ instead of one column. Expected to be a small change, not a big redesign.
   - Complements the DS3231 rather than replacing it: GPS sets the time
     correctly, the RTC holds it through a fix loss or reboot. The RTC alone
     can't set the time right in the first place.
-  - Must obey the step-at-boot-only rule in the `-t` amendment above.
+  - Must obey "Gate system clock policy" above — step only at boot, slew
+    thereafter.
   - ~EUR 15-30 plus antenna placement, per gate.
 
   **Requires no `rally-server` changes at all.** Because gates stamp their
