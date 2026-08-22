@@ -1,14 +1,38 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { StageStatus } from '@rally-gate/shared';
-import { createStage, fetchStages, type Stage } from '../api/stages';
+import {
+  createStage,
+  deleteStage,
+  fetchStages,
+  type Stage,
+} from '../api/stages';
 
 const stages = ref<Stage[]>([]);
 const newStage = ref({ id: '', name: '', stageNumber: 1 });
 const creating = ref(false);
+const deletingId = ref<string | null>(null);
+
+function nextStageNumber(): number {
+  return Math.max(0, ...stages.value.map((s) => s.stageNumber)) + 1;
+}
 
 async function refresh() {
   stages.value = await fetchStages();
+  newStage.value.stageNumber = nextStageNumber();
+}
+
+async function onDeleteStage(stage: Stage) {
+  if (!confirm(`Delete stage ${stage.id}?`)) return;
+  deletingId.value = stage.id;
+  try {
+    await deleteStage(stage.id);
+    await refresh();
+  } catch (err) {
+    alert(err instanceof Error ? err.message : 'Failed to delete stage');
+  } finally {
+    deletingId.value = null;
+  }
 }
 
 async function onCreateStage() {
@@ -21,7 +45,8 @@ async function onCreateStage() {
       stageNumber: newStage.value.stageNumber,
       status: StageStatus.NOT_STARTED,
     });
-    newStage.value = { id: '', name: '', stageNumber: stages.value.length + 2 };
+    newStage.value.id = '';
+    newStage.value.name = '';
     await refresh();
   } catch (err) {
     alert(err instanceof Error ? err.message : 'Failed to create stage');
@@ -73,6 +98,17 @@ onMounted(refresh);
               >
                 Edit / Gates
               </v-btn>
+              <v-btn
+                v-if="stage.status === 'NOT_STARTED'"
+                size="small"
+                variant="text"
+                color="error"
+                prepend-icon="mdi-delete"
+                :loading="deletingId === stage.id"
+                @click="onDeleteStage(stage)"
+              >
+                Delete
+              </v-btn>
             </td>
           </tr>
         </tbody>
@@ -81,6 +117,15 @@ onMounted(refresh);
         class="d-flex flex-wrap align-center ga-3 mt-4"
         @submit.prevent="onCreateStage"
       >
+        <v-text-field
+          v-model.number="newStage.stageNumber"
+          type="number"
+          min="1"
+          label="Stage #"
+          density="comfortable"
+          hide-details
+          style="max-width: 140px"
+        />
         <v-text-field
           v-model="newStage.id"
           label="ID (e.g. SS2)"
@@ -94,15 +139,6 @@ onMounted(refresh);
           density="comfortable"
           hide-details
           style="min-width: 220px"
-        />
-        <v-text-field
-          v-model.number="newStage.stageNumber"
-          type="number"
-          min="1"
-          label="Stage #"
-          density="comfortable"
-          hide-details
-          style="max-width: 140px"
         />
         <v-btn
           type="submit"

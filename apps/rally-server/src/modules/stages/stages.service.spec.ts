@@ -36,10 +36,16 @@ function makeService(initialStages: StageRow[]) {
       else state[idx] = { ...s };
       return Promise.resolve({ ...s });
     }),
+    delete: jest.fn((id: string) => {
+      const idx = state.findIndex((row) => row.id === id);
+      if (idx !== -1) state.splice(idx, 1);
+      return Promise.resolve(undefined);
+    }),
   };
   const gateAssignmentsService = {
     deactivateForStage: jest.fn().mockResolvedValue(undefined),
     activateForStage: jest.fn().mockResolvedValue({ deactivatedStageIds: [] }),
+    removeForStage: jest.fn().mockResolvedValue(undefined),
   };
   return {
     service: new StagesService(
@@ -148,6 +154,35 @@ describe('StagesService.update', () => {
     });
 
     expect(result.name).toBe('Renamed');
+  });
+});
+
+describe('StagesService.remove', () => {
+  it('deletes a NOT_STARTED stage and its gate assignments', async () => {
+    const { service, gateAssignmentsService, state } = makeService([
+      { id: 'SS1', status: StageStatus.NOT_STARTED },
+    ]);
+
+    await service.remove('SS1');
+
+    expect(gateAssignmentsService.removeForStage).toHaveBeenCalledWith('SS1');
+    expect(state).toHaveLength(0);
+  });
+
+  it('refuses to delete a stage that has already started', async () => {
+    const { service, gateAssignmentsService, state } = makeService([
+      { id: 'SS1', status: StageStatus.ACTIVE },
+    ]);
+
+    await expect(service.remove('SS1')).rejects.toThrow(/NOT_STARTED/i);
+    expect(gateAssignmentsService.removeForStage).not.toHaveBeenCalled();
+    expect(state).toHaveLength(1);
+  });
+
+  it('404s for a missing stage', async () => {
+    const { service } = makeService([]);
+
+    await expect(service.remove('GHOST')).rejects.toThrow(/not found/i);
   });
 });
 

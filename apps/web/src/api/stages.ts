@@ -1,5 +1,11 @@
 import { StageStatus } from '@rally-gate/shared';
-import { apiFetch, postJson, postRequest, putJson } from './client';
+import {
+  apiFetch,
+  deleteRequest,
+  postJson,
+  postRequest,
+  putJson,
+} from './client';
 
 export interface Stage {
   id: string;
@@ -27,6 +33,11 @@ export function upsertStage(
   input: { name: string; stageNumber: number; status: StageStatus },
 ): Promise<Stage> {
   return putJson(`/stages/${id}`, input);
+}
+
+/** Deletes the stage and its gate assignments. 409s unless the stage is still NOT_STARTED. */
+export function deleteStage(stageId: string): Promise<void> {
+  return deleteRequest(`/stages/${stageId}`);
 }
 
 /** Closes the stage — also deactivates its gates in one step (see `docs/architecture.md`). */

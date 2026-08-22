@@ -43,6 +43,25 @@ export class StagesService {
     return this.findOne(id) as Promise<Stage>;
   }
 
+  /**
+   * Deletion is restricted to NOT_STARTED stages — an ACTIVE/CLOSED stage may
+   * already have StageRuns pointing at its id (no FK/cascade exists), so
+   * deleting it would orphan history instead of a plan that was never used.
+   */
+  async remove(id: string): Promise<void> {
+    const stage = await this.findOne(id);
+    if (!stage) {
+      throw new NotFoundException(`Stage ${id} not found`);
+    }
+    if (stage.status !== StageStatus.NOT_STARTED) {
+      throw new ConflictException(
+        `Stage ${id} is ${stage.status} and can only be deleted while NOT_STARTED`,
+      );
+    }
+    await this.gateAssignmentsService.removeForStage(id);
+    await this.stages.delete(id);
+  }
+
   private async assertStageNumberFree(
     stageNumber: number,
     excludeId?: string,

@@ -88,6 +88,10 @@ export class GateAssignmentsService {
     await this.assignments.update({ stageId }, { active: false });
   }
 
+  async removeForStage(stageId: string): Promise<void> {
+    await this.assignments.delete({ stageId });
+  }
+
   async remove(id: string): Promise<void> {
     await this.assignments.delete(id);
   }
