@@ -12,24 +12,30 @@ type StageRow = {
 function makeService(initialStages: StageRow[]) {
   const state: StageRow[] = initialStages.map((s) => ({ ...s }));
   const stages = {
-    findOneBy: jest.fn((where: Partial<StageRow> & { id?: unknown }) => {
-      const found = state.find((s) => {
-        if ('id' in where && !(where.id instanceof FindOperator)) {
-          return s.id === where.id;
-        }
-        if (
-          where.stageNumber !== undefined &&
-          s.stageNumber !== where.stageNumber
-        ) {
-          return false;
-        }
-        if (where.id instanceof FindOperator) {
-          return s.id !== where.id.value;
-        }
-        return where.stageNumber !== undefined;
-      });
-      return Promise.resolve(found ? { ...found } : null);
-    }),
+    findOneBy: jest.fn(
+      (
+        where: Omit<Partial<StageRow>, 'id'> & {
+          id?: string | FindOperator<string>;
+        },
+      ) => {
+        const found = state.find((s) => {
+          if ('id' in where && !(where.id instanceof FindOperator)) {
+            return s.id === where.id;
+          }
+          if (
+            where.stageNumber !== undefined &&
+            s.stageNumber !== where.stageNumber
+          ) {
+            return false;
+          }
+          if (where.id instanceof FindOperator) {
+            return s.id !== where.id.value;
+          }
+          return where.stageNumber !== undefined;
+        });
+        return Promise.resolve(found ? { ...found } : null);
+      },
+    ),
     save: jest.fn((s: StageRow) => {
       const idx = state.findIndex((row) => row.id === s.id);
       if (idx === -1) state.push({ ...s });
