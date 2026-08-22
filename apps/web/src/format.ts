@@ -1,5 +1,7 @@
 import { formatStageDuration } from '@rally-gate/ui';
-import type { Gate, Stage, Vehicle } from './api';
+import type { Gate } from './api/gates';
+import type { Stage } from './api/stages';
+import type { Vehicle } from './api/vehicles';
 
 export const HEARTBEAT_ONLINE_THRESHOLD_MS = 30_000;
 

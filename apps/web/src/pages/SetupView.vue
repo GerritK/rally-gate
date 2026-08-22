@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { fetchRallyInfo, saveRallyInfo, type RallyInfo } from '../api';
+import {
+  fetchRallyInfo,
+  saveRallyInfo,
+  type RallyInfo,
+} from '../api/rally-info';
 
 const rallyInfo = ref<RallyInfo>({ name: '', date: '', location: '' });
 const saving = ref(false);

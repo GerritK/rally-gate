@@ -1,22 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { API_BASE } from '../api/client';
+import { fetchRecentEvents, type DetectionEventRecord } from '../api/events';
+import { closeStage, fetchStages, type Stage } from '../api/stages';
 import {
-  API_BASE,
-  closeStage,
   correctStageRun,
   createStageRun,
   deleteStageRun,
-  fetchRecentEvents,
   fetchSplitsForRun,
   fetchStageRuns,
-  fetchStages,
-  fetchVehicles,
-  type DetectionEventRecord,
-  type Stage,
   type StageRun,
   type StageSplit,
-  type Vehicle,
-} from '../api';
+} from '../api/stage-runs';
+import { fetchVehicles, type Vehicle } from '../api/vehicles';
 import {
   formatClockTime,
   formatStageDuration,

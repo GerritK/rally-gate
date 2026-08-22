@@ -78,6 +78,31 @@
   `@rally-gate/shared` as a real dependency for the first time (see the
   Vite `optimizeDeps` note in `CLAUDE.md`'s `packages/shared` section —
   hit and fixed the CJS/ESM pre-bundling gotcha while building this).
+- Split `apps/web/src/api.ts` (one 324-line file, every entity's types and
+  fetch calls flat in one place) into `apps/web/src/api/` — one module per
+  entity/topic (`vehicles.ts`, `stages.ts`, `stage-runs.ts`, `gates.ts`,
+  `gate-assignments.ts`, `classification.ts`, `rally-info.ts`,
+  `settings.ts`, `events.ts`) plus a `client.ts` holding the actual fetch
+  wrapper (`apiFetch`/`postJson`/`putJson`/`patchJson`/`postRequest`/
+  `deleteRequest`) every topic module calls into — the "centralized service,
+  split by topic" shape. Along the way, deduplicated types that were
+  hand-redeclared in `api.ts` despite already existing in
+  `packages/shared` (`ClassificationEntry` and its siblings — the server's
+  own `classification.service.ts` already imported these from `shared`,
+  the frontend just wasn't); added `SplitGateInfo` to
+  `packages/shared/src/classification.ts` since it was the one classification
+  response shape that had never been named anywhere, and typed it on the
+  server's `getSplitGates` return too. `Stage.status`/`StageRun.status`/
+  `GateAssignment.role`/`GATE_ROLES` now reuse `StageStatus`/
+  `StageRunStatus`/`GateRole` from `shared` instead of plain `string`.
+  Full entity DTOs (`Stage`, `StageRun`, `Gate`, `GateAssignment`,
+  `RallyInfo`) stay defined in their `apps/web/src/api/*.ts` module, not
+  promoted to `packages/shared` — the server doesn't formally declare
+  response DTOs for these today (controllers just return entities/inferred
+  shapes), so a shared type would still drift from the real response
+  without also introducing that layer server-side; out of scope here.
+  Verified with a full route sweep in a real browser after the split, no
+  console errors.
 
 ## Next
 
