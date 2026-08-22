@@ -22,10 +22,18 @@ client.on('connect', () => {
     timestampGate: new Date().toISOString(),
     source: 'simulated-cli',
   };
-  client.publish(detectionTopicFor(gateId), JSON.stringify(event), {}, () => {
-    console.log(
-      `Published detection: gate=${gateId} transponder=${transponderId}`,
-    );
-    client.end();
-  });
+  // QoS 1 so the callback fires on PUBACK rather than on local write —
+  // otherwise this one-shot CLI can `client.end()` before the broker has the
+  // detection, and report success for a publish that never landed.
+  client.publish(
+    detectionTopicFor(gateId),
+    JSON.stringify(event),
+    { qos: 1 },
+    () => {
+      console.log(
+        `Published detection: gate=${gateId} transponder=${transponderId}`,
+      );
+      client.end();
+    },
+  );
 });

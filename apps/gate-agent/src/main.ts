@@ -21,9 +21,27 @@ const HEARTBEAT_INTERVAL_MS = Number(
 );
 const CAPABILITIES = process.env.ADAPTER ?? 'simulated';
 
-const client = mqtt.connect(`mqtt://${MQTT_HOST}:${MQTT_PORT}`);
+/**
+ * `clientId`/`clean` are load-bearing, not boilerplate. Detections are
+ * published at QoS 1 (see `publishDetection`), and mqtt.js only replays
+ * in-flight QoS>0 messages across a reconnect when the session is persistent
+ * — with the default `clean: true` it discards its outgoing store instead,
+ * so a drop mid-publish loses the detection silently.
+ *
+ * Using GATE_ID as the client id also makes a duplicated GATE_ID visible:
+ * MQTT kicks the older connection when a second client claims the same id,
+ * so the gates flap instead of quietly merging into one `Gate` row (see
+ * "Gate discovery & heartbeat" in docs/architecture.md).
+ */
+const client = mqtt.connect(`mqtt://${MQTT_HOST}:${MQTT_PORT}`, {
+  clientId: GATE_ID,
+  clean: false,
+});
 
 function publishHeartbeat() {
+  // Deliberately QoS 0: a heartbeat is a liveness ping that repeats every
+  // HEARTBEAT_INTERVAL_MS, so a missed one is self-healing and queueing it
+  // for redelivery would only report staleness as freshness.
   client.publish(
     heartbeatTopicFor(GATE_ID),
     JSON.stringify({ capabilities: CAPABILITIES }),
@@ -51,7 +69,15 @@ function publishDetection(transponderId: string, timestamp: Date) {
     timestampGate: timestamp.toISOString(),
     source: 'simulated',
   };
-  client.publish(detectionTopicFor(GATE_ID), JSON.stringify(event));
+  // QoS 1: a lost detection is a driver with no time, and at-least-once is
+  // safe because the server pipeline is idempotent — DetectionEventRecord is
+  // keyed on the gate-generated `eventId`, and startRun/finishRun/recordSplit
+  // all ignore repeats (stage-runs.service.ts).
+  //
+  // ponytail: in-memory retry only — a systemd restart still drops whatever
+  // wasn't acked yet. Add a disk-backed mqtt.js outgoingStore if gates turn
+  // out to lose detections across crashes in the field.
+  client.publish(detectionTopicFor(GATE_ID), JSON.stringify(event), { qos: 1 });
   console.log(
     `[gate-agent:${GATE_ID}] published detection for transponder ${transponderId}`,
   );
