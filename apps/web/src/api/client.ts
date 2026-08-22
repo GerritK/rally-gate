@@ -2,12 +2,16 @@ export const API_BASE =
   import.meta.env.VITE_API_URL ?? 'http://localhost:57430';
 
 export class ApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-    public body: unknown,
-  ) {
+  // Declared and assigned explicitly rather than as constructor parameter
+  // properties: those emit runtime code from a type-position annotation,
+  // which `erasableSyntaxOnly` (on in tsconfig.app.json) rejects.
+  status: number;
+  body: unknown;
+
+  constructor(message: string, status: number, body: unknown) {
     super(message);
+    this.status = status;
+    this.body = body;
   }
 }
 

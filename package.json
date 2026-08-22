@@ -13,6 +13,7 @@
     "dev:web": "npm run dev --workspace=@rally-gate/web",
     "simulate": "npm run simulate --workspace=@rally-gate/gate-agent --",
     "seed-demo-data": "node scripts/seed-demo-data.js",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "format:check": "prettier --config apps/rally-server/.prettierrc --check \"apps/gate-agent/src/**/*.ts\" \"apps/web/src/**/*.{ts,vue}\" \"packages/shared/src/**/*.ts\" \"packages/ui/src/**/*.{ts,css}\""
   }
 }

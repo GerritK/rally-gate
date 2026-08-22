@@ -1,0 +1,46 @@
+name: CI
+
+# The install path for this project is `curl | bash` straight off master
+# (deploy/install-*.sh), so master being green is load-bearing rather than
+# cosmetic — a broken commit is one a marshal can pull onto a Pi at an event.
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 22 to match what actually gets deployed: node:22-alpine in both
+      # Dockerfiles, and setup_22.x in deploy/install-gate-pi.sh.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The other three workspaces import shared's *compiled* output, not its
+      # source, so nothing below can typecheck until this has run.
+      - name: Build shared
+        run: npm run build:shared
+
+      # Check-only variants throughout: the repo's own `lint` script passes
+      # --fix, which in CI would quietly repair the tree and report success
+      # while the committed code stays unformatted.
+      - name: Formatting
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint:check --workspace=@rally-gate/rally-server
+
+      - name: Tests
+        run: npm test --workspace=@rally-gate/rally-server
+
+      # Builds every workspace, which is what runs vue-tsc over apps/web —
+      # the frontend has no test suite, so this is its only typecheck.
+      - name: Build all workspaces
+        run: npm run build

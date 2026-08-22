@@ -71,13 +71,16 @@ async function onDeleteGate(gate: Gate, force = false) {
     gates.value = gates.value.filter((g) => g.id !== gate.id);
     deleteConflictGate.value = null;
   } catch (err) {
-    const assignmentCount =
-      err instanceof ApiError && err.status === 409
-        ? (err.body as { assignmentCount?: number } | null)?.assignmentCount
-        : undefined;
-    if (assignmentCount) {
+    // Narrowed into a local so the type survives into the branch below —
+    // `err instanceof ApiError` inside the ternary doesn't carry past it,
+    // which is why `err.message` was an error on `unknown`.
+    const conflict = err instanceof ApiError && err.status === 409 ? err : null;
+    const assignmentCount = (
+      conflict?.body as { assignmentCount?: number } | null
+    )?.assignmentCount;
+    if (conflict && assignmentCount) {
       deleteConflictGate.value = gate;
-      deleteConflictMessage.value = err.message;
+      deleteConflictMessage.value = conflict.message;
     } else {
       alert(err instanceof Error ? err.message : 'Failed to delete gate');
     }
