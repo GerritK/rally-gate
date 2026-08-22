@@ -25,8 +25,20 @@ export const NOTIONAL_PENALTY_MS_KEY = 'notionalPenaltyMs';
  * margin is configurable — the *basis* is always the slowest time within the
  * ranking being computed, which is what keeps a notional worse than every
  * real time in that ranking and stops a retirement from paying off.
+ *
+ * Sized to be roughly a stage duration, and deliberately not a token few
+ * seconds. A notional only guarantees that skipping a stage doesn't pay off
+ * *on that stage*; whether a crew who drove more finishes ahead of one who
+ * drove less depends on the penalty exceeding the advantage the shorter crew
+ * built elsewhere. With a small penalty a quick crew can retire and still
+ * lead the rally, which is legitimate rally arithmetic but rarely what an
+ * organiser means. Erring large is the safer default: too small produces a
+ * result that looks wrong, too large merely buries a retirement.
+ *
+ * Tune per event via the `notionalPenaltyMs` setting — the right value scales
+ * with stage length, which this can't know.
  */
-export const DEFAULT_NOTIONAL_PENALTY_MS = 30_000;
+export const DEFAULT_NOTIONAL_PENALTY_MS = 120_000;
 
 interface RankableEntry {
   vehicleId: string;

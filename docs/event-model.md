@@ -25,9 +25,17 @@ have a *shorter* total and rank higher for having driven less.
 Rally's answer, which this follows, is to give them a time anyway: a
 **notional time**, defined here as **the slowest real time on that stage,
 within the ranking being computed, plus a configurable penalty**
-(`notionalPenaltyMs` setting, default 30s). Anchoring on the slowest time is
+(`notionalPenaltyMs` setting, default 2 min). Anchoring on the slowest time is
 what guarantees the notional is worse than every real time in that ranking, so
 skipping a stage never pays off on that stage.
+
+Note what that guarantee does *not* cover: it says nothing about whether a
+crew who drove more stages finishes ahead of one who drove fewer. That holds
+only if the penalty outweighs the advantage the shorter crew built on the
+stages it did finish — with a small penalty a quick crew can retire and still
+lead, which is legitimate rally arithmetic but rarely what an organiser
+intends. The penalty is the knob for this, and it wants to scale with stage
+length; roughly one stage duration is a reasonable starting point.
 
 Rules:
 

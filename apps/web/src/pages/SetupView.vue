@@ -10,7 +10,7 @@ import { fetchSetting, saveSetting } from '../api/settings';
 const NOTIONAL_PENALTY_KEY = 'notionalPenaltyMs';
 /** Mirrors DEFAULT_NOTIONAL_PENALTY_MS server-side; only used until the
  * stored value loads, so the two can't drift in practice. */
-const NOTIONAL_PENALTY_FALLBACK_S = 30;
+const NOTIONAL_PENALTY_FALLBACK_S = 120;
 
 const rallyInfo = ref<RallyInfo>({ name: '', date: '', location: '' });
 const saving = ref(false);
@@ -96,8 +96,11 @@ onMounted(async () => {
         <strong>notional time</strong> for it: the slowest time anyone set on
         that stage, plus this penalty. Without it, retiring early would look
         like winning — a shorter total is otherwise just the result of driving
-        less. Raise it to make a retirement more costly; a penalty smaller than
-        the spread between crews still lets a quick car lead on fewer stages.
+        less. <br /><br />
+        Rule of thumb: set it to roughly <strong>one stage duration</strong>.
+        The penalty only has to be big enough to outweigh the advantage a crew
+        built on the stages it <em>did</em> finish — set it too low and a quick
+        car can retire and still lead the rally.
       </v-alert>
       <form
         class="d-flex flex-wrap align-center ga-3"
