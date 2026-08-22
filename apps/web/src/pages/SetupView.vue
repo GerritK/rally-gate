@@ -66,17 +66,5 @@ onMounted(async () => {
         <v-card-text>Create stages and assign gates to them.</v-card-text>
       </v-card>
     </v-col>
-    <v-col cols="12" sm="4">
-      <v-card to="/hardware" prepend-icon="mdi-router-wireless">
-        <v-card-title>Gates</v-card-title>
-        <v-card-text>Check gate identity and heartbeat status.</v-card-text>
-      </v-card>
-    </v-col>
-    <v-col cols="12" sm="4">
-      <v-card to="/vehicles" prepend-icon="mdi-car">
-        <v-card-title>Drivers</v-card-title>
-        <v-card-text>Register vehicles and drivers.</v-card-text>
-      </v-card>
-    </v-col>
   </v-row>
 </template>

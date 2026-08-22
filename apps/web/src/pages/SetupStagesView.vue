@@ -32,6 +32,10 @@ onMounted(refresh);
 </script>
 
 <template>
+  <v-btn variant="text" prepend-icon="mdi-arrow-left" to="/setup" class="mb-4">
+    Back to Setup
+  </v-btn>
+
   <v-card>
     <v-card-title>Stages</v-card-title>
     <v-card-text>

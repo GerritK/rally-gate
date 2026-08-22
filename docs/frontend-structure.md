@@ -23,7 +23,7 @@ order."
 | `/live` | **Live Timing** | Live Detections feed, Stage Runs table (Correct/Delete/Add Missing Run inline, as today), Close Stage action | reorganized |
 | `/results/overall` | **Results** | Overall Classification | reorganized |
 | `/results/stages/:stageId` | **Results** | Stage Classification, Split Classification, DNF/DNS — stage picked via route param (bookmarkable), not a client-side dropdown like today | reorganized |
-| `/setup` | **Setup** | Rally name/details (edit) + link tiles to Stages, Gates (→ Hardware), Drivers (→ Vehicles). A checklist landing page, not a duplicate of those pages | **new** |
+| `/setup` | **Setup** | Rally name/details (edit) + a link tile to Stages. A checklist landing page, not a duplicate of those pages | **new** |
 | `/setup/stages` | **Setup** | Stage list, create new stage | reorganized + new create form |
 | `/setup/stages/:stageId` | **Setup** | Edit stage name/number, plus that stage's gate assignments (assign a gate as start/finish/split, activate/deactivate/delete) | reorganized (replaces the old flat "Gate Assignments" table) |
 | `/hardware` | **Hardware** | Gate roster: identity, online/offline, heartbeat, capabilities, current active assignment (gate-centric cross-stage view) | reorganized |
@@ -48,7 +48,12 @@ order."
   under Setup**, even though they're part of pre-event prep. Both get used
   operationally too (checking gate health mid-event, registering a late
   entry mid-event), so burying them under "Setup" would misrepresent their
-  ongoing relevance. `/setup` links out to both instead of duplicating them.
+  ongoing relevance. `/setup` does **not** also link to them — they're
+  always one click away in the nav drawer, so a shortcut tile to the same
+  page would just be a second path to the same place. (It originally did
+  link to both; dropped after it started to feel redundant in practice —
+  see "Build notes".) Stages is different and still gets a tile: it has no
+  top-level nav item of its own, so `/setup` is the only way to reach it.
 - **No results-export/printable view yet** — `/results` can grow a
   print-friendly variant later without restructuring.
 - **Nav is `v-navigation-drawer`, not top tabs.** 5 items today is thin
@@ -124,3 +129,7 @@ worth knowing if this area changes again:
 - Stage creation needed the caller-supplied `id` field flagged in the
   original plan (`SetupStagesView.vue`) — `PUT /stages/:id` takes it, no
   auto-generated id.
+- `/setup`'s Gates/Drivers shortcut tiles (to Hardware/Vehicles) were
+  removed after they started to feel redundant with the nav drawer, which
+  already reaches both permanently. Only the Stages tile survives, since
+  Stages has no nav-drawer entry of its own.
