@@ -7,11 +7,8 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
+import { CorrectStageRunDto, CreateStageRunDto } from './dto';
 import { StageRunsService } from './stage-runs.service';
-import type {
-  ManualStageRunInput,
-  StageRunCorrection,
-} from './stage-runs.service';
 
 @Controller('stage-runs')
 export class StageRunsController {
@@ -28,12 +25,12 @@ export class StageRunsController {
   }
 
   @Post()
-  create(@Body() body: ManualStageRunInput) {
+  create(@Body() body: CreateStageRunDto) {
     return this.stageRunsService.createManual(body);
   }
 
   @Patch(':id')
-  correct(@Param('id') id: string, @Body() body: StageRunCorrection) {
+  correct(@Param('id') id: string, @Body() body: CorrectStageRunDto) {
     return this.stageRunsService.correctRun(id, body);
   }
 

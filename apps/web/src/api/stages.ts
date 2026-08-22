@@ -22,15 +22,30 @@ export function fetchStage(id: string): Promise<Stage> {
   return apiFetch(`/stages/${id}`);
 }
 
-/** Creates a new stage. Rejects (409) if `id` or `stageNumber` is already taken. */
-export function createStage(stage: Stage): Promise<Stage> {
-  return postJson('/stages', stage);
+/**
+ * Creates a new stage. Rejects (409) if `id` or `stageNumber` is already
+ * taken, (400) if `id` isn't URL-safe.
+ *
+ * No `status`: it's server-owned and always starts NOT_STARTED. Sending it is
+ * a 400 — lifecycle moves only through `activateStage`/`closeStage`, so that
+ * gate assignments stay in step with it (see `docs/architecture.md`).
+ */
+export function createStage(input: {
+  id: string;
+  name: string;
+  stageNumber: number;
+}): Promise<Stage> {
+  return postJson('/stages', input);
 }
 
-/** Updates an existing stage. 404s if `id` doesn't exist, 409s if `stageNumber` clashes with another stage. */
+/**
+ * Updates an existing stage. 404s if `id` doesn't exist, 409s if
+ * `stageNumber` clashes with another stage or the stage isn't NOT_STARTED.
+ * `status` is not settable here — see `createStage`.
+ */
 export function upsertStage(
   id: string,
-  input: { name: string; stageNumber: number; status: StageStatus },
+  input: { name: string; stageNumber: number },
 ): Promise<Stage> {
   return putJson(`/stages/${id}`, input);
 }

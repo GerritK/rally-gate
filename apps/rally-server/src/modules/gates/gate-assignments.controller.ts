@@ -7,7 +7,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { GateRole } from '@rally-gate/shared';
+import { CreateGateAssignmentDto } from './dto';
 import { GateAssignmentsService } from './gate-assignments.service';
 
 @Controller('gate-assignments')
@@ -24,15 +24,7 @@ export class GateAssignmentsController {
   }
 
   @Post()
-  create(
-    @Body()
-    body: {
-      gateId: string;
-      stageId: string;
-      role: GateRole;
-      splitIndex?: number;
-    },
-  ) {
+  create(@Body() body: CreateGateAssignmentDto) {
     return this.gateAssignmentsService.create(body);
   }
 

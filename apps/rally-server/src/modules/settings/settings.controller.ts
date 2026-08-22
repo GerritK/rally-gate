@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Put } from '@nestjs/common';
+import { SetSettingDto } from './dto';
 import { SettingsService } from './settings.service';
 
 @Controller('settings')
@@ -12,7 +13,7 @@ export class SettingsController {
   }
 
   @Put(':key')
-  set(@Param('key') key: string, @Body() body: { value: string }) {
+  set(@Param('key') key: string, @Body() body: SetSettingDto) {
     return this.settingsService.set(key, body.value);
   }
 }

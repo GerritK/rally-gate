@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
-import { Vehicle } from './vehicle.entity';
+import { CreateVehicleDto, UpdateVehicleDto } from './dto';
 import { VehiclesService } from './vehicles.service';
 
 @Controller('vehicles')
@@ -17,12 +17,12 @@ export class VehiclesController {
   }
 
   @Post()
-  create(@Body() body: Partial<Vehicle>) {
+  create(@Body() body: CreateVehicleDto) {
     return this.vehiclesService.create(body);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: Partial<Omit<Vehicle, 'id'>>) {
+  update(@Param('id') id: string, @Body() body: UpdateVehicleDto) {
     return this.vehiclesService.update(id, body);
   }
 }
