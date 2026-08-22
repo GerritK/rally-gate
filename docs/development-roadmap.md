@@ -52,7 +52,13 @@
 
 Priority order (1 = next):
 
-1. Gate/gate-node health reporting, plus expected stage time: optional
+1. **Frontend restructuring** — split `apps/web`'s single `App.vue` into a
+   proper multi-page app (`vue-router`, Vuetify nav). Fully planned in
+   `docs/frontend-structure.md`: route list, nav grouping, and a small new
+   backend piece (`RallyInfo` singleton — rally name/date/location, since
+   no `Event` entity holds a label for "this event" today). Read that doc
+   before starting, it has the reasoning for each split, not just the list.
+2. Gate/gate-node health reporting, plus expected stage time: optional
    `Stage.expectedDurationMs` set by the marshal, dashboard flags any
    `STARTED` run as overdue once `now - startTime` exceeds it. Client-side
    only (SSE data already has `startTime`), no new backend push needed.
@@ -60,16 +66,17 @@ Priority order (1 = next):
    wrong" signals. Health reporting's actual mechanism is now sketched under
    "Gate control channel" in `architecture.md` — a `stage-started` broadcast
    + per-gate `ready` ack, which also doubles as the clock-sync trigger
-   (see `decoder-adapters.md` DS3231 note).
-2. Standalone packaging (`apps/rally-server/packaging/standalone`, Node SEA/pkg + optional tray icon) — needed to hand `rally-server` to a marshal without a dev machine.
-3. Real `OpenStintAdapter` once the RF hardware validation (two ordered gates) confirms reliable reads — critical path, but gated on external hardware validation so it runs in parallel with the above rather than blocking them.
-4. mDNS/Bonjour broker autodiscovery so a gate can find `rally-server`'s MQTT
+   (see `decoder-adapters.md` DS3231 note). Natural fit once the Hardware
+   page from the frontend restructuring exists.
+3. Standalone packaging (`apps/rally-server/packaging/standalone`, Node SEA/pkg + optional tray icon) — needed to hand `rally-server` to a marshal without a dev machine.
+4. Real `OpenStintAdapter` once the RF hardware validation (two ordered gates) confirms reliable reads — critical path, but gated on external hardware validation so it runs in parallel with the above rather than blocking them.
+5. mDNS/Bonjour broker autodiscovery so a gate can find `rally-server`'s MQTT
    broker on the local network instead of `MQTT_HOST` being typed in by hand
    — see "MQTT broker discovery" in `architecture.md`. Smaller and
    independent of the gate config web interface item below (no AP/hotspot
    work needed), though it feeds into that item's "MQTT host" field once
    built. Manual entry stays as a fallback for APs that block multicast.
-5. **Gate config web interface** (bigger item, own service): local HTTP server
+6. **Gate config web interface** (bigger item, own service): local HTTP server
    on the gate Pi to set `GATE_ID`, Wi-Fi/network, and MQTT host without
    re-running the install script over SSH. Needs an **AP/hotspot mode**
    fallback (hostapd + dnsmasq, or a lib like balena's wifi-connect) so a
@@ -79,7 +86,7 @@ Priority order (1 = next):
    saved Wi-Fi that fails to connect (wrong password, gate out of range,
    router changed) — not just on first boot with nothing configured. Not
    designed yet.
-6. Parc Fermé / time control / service park gate roles and their state transitions. When this lands, checkpoint-to-checkpoint interval/target times should use their own formatter (MM:SS or accumulated minutes) — see the format conventions documented in `packages/ui/src/format.ts`, don't reuse `formatStageDuration`.
+7. Parc Fermé / time control / service park gate roles and their state transitions. When this lands, checkpoint-to-checkpoint interval/target times should use their own formatter (MM:SS or accumulated minutes) — see the format conventions documented in `packages/ui/src/format.ts`, don't reuse `formatStageDuration`.
 
 ## Deliberately deferred
 
@@ -93,3 +100,14 @@ Priority order (1 = next):
   outsiders is the security boundary for now (see `deployment-modes.md`
   "Future: online/spectator mode").
 - Online/spectator sync mode (see `deployment-modes.md`).
+- Planned/scheduled start times (a start list — "car #12 is due at 09:15:00"
+  — as opposed to the actual recorded start `StageRun` already has), the
+  `pre_start`/`time_control` gate roles' actual behavior, and penalties
+  (time penalties, exclusions). All four came up while scoping
+  `frontend-structure.md` and are genuinely undesigned — `pre_start`/
+  `time_control` exist only as unused `GateRole` enum values, penalties
+  only as a field-list sketch in the original idea doc, and start times
+  aren't represented anywhere at all. Explicitly deferred rather than
+  missed — revisit if/when they're actually needed, don't let
+  `frontend-structure.md`'s Setup page grow a start-list or penalty UI
+  speculatively.

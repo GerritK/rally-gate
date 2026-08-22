@@ -11,6 +11,7 @@ Rally Gate: open, modular timing/event management system for RC rally events. Fu
 - `docs/decoder-adapters.md` — `DecoderAdapter` interface, planned adapters, hardware notes
 - `docs/deployment-modes.md` — standalone vs headless, one-database-per-event model
 - `docs/api.md` — REST/SSE endpoint summary
+- `docs/frontend-structure.md` — planned multi-page restructuring of `apps/web` (routes, nav, new RallyInfo backend piece) — not built yet, read before starting on it
 - `docs/development-roadmap.md` — what's done, what's next, what's deliberately deferred (check this before starting new work)
 
 ## Commands
