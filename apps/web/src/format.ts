@@ -5,6 +5,49 @@ import type { Vehicle } from './api/vehicles';
 
 export const HEARTBEAT_ONLINE_THRESHOLD_MS = 30_000;
 
+/**
+ * Where a clock offset stops looking like ordinary network transit and
+ * starts looking like a real problem worth showing amber. Purely a display
+ * threshold — the server has its own, higher one for deciding when to
+ * actually correct, which this page reads from settings rather than
+ * duplicating.
+ */
+export const CLOCK_OFFSET_WARN_THRESHOLD_MS = 250;
+
+export function formatClockOffset(offsetMs?: number | null): string {
+  if (offsetMs === null || offsetMs === undefined) return 'not measured';
+  const sign = offsetMs < 0 ? '-' : '+';
+  const abs = Math.abs(offsetMs);
+  return abs < 1000
+    ? `${sign}${abs} ms`
+    : `${sign}${(abs / 1000).toFixed(2)} s`;
+}
+
+export function clockOffsetColor(
+  offsetMs: number | null | undefined,
+  correctionThresholdMs: number,
+): string {
+  if (offsetMs === null || offsetMs === undefined) return 'timing-idle';
+  const abs = Math.abs(offsetMs);
+  if (abs >= correctionThresholdMs) return 'error';
+  return abs >= CLOCK_OFFSET_WARN_THRESHOLD_MS ? 'warning' : 'success';
+}
+
+/** Explains what the server is doing about this gate's offset, if anything. */
+export function clockOffsetHint(
+  offsetMs: number | null | undefined,
+  correctionThresholdMs: number,
+): string {
+  if (offsetMs === null || offsetMs === undefined) {
+    return 'This gate has not reported its clock yet.';
+  }
+  const behind = offsetMs > 0 ? 'behind' : 'ahead of';
+  if (Math.abs(offsetMs) >= correctionThresholdMs) {
+    return `Clock is ${formatClockOffset(offsetMs)} ${behind} the server — detections from this gate are being corrected. Check its time sync.`;
+  }
+  return `Clock is within tolerance (${formatClockOffset(offsetMs)}); no correction applied.`;
+}
+
 export function formatDuration(ms?: number): string {
   return ms === undefined ? '-' : formatStageDuration(ms);
 }

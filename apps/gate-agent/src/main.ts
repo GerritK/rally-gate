@@ -2,6 +2,7 @@ import {
   detectionTopicFor,
   heartbeatTopicFor,
   DetectionEvent,
+  GateHeartbeat,
 } from '@rally-gate/shared';
 import mqtt from 'mqtt';
 import { ulid } from 'ulid';
@@ -42,10 +43,14 @@ function publishHeartbeat() {
   // Deliberately QoS 0: a heartbeat is a liveness ping that repeats every
   // HEARTBEAT_INTERVAL_MS, so a missed one is self-healing and queueing it
   // for redelivery would only report staleness as freshness.
-  client.publish(
-    heartbeatTopicFor(GATE_ID),
-    JSON.stringify({ capabilities: CAPABILITIES }),
-  );
+  const heartbeat: GateHeartbeat = {
+    capabilities: CAPABILITIES,
+    // Stamped here rather than anywhere upstream: the server subtracts this
+    // from arrival time to estimate this gate's clock offset, so it has to be
+    // read as late as possible before the packet goes out.
+    sentAt: new Date().toISOString(),
+  };
+  client.publish(heartbeatTopicFor(GATE_ID), JSON.stringify(heartbeat));
 }
 
 client.on('connect', () => {
