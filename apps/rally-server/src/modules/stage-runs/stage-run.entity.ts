@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryGeneratedColumn, Unique } from 'typeorm';
+import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 /**
  * No `status` column — STARTED/FINISHED/CANCELLED is derived from
@@ -7,13 +7,44 @@ import { Column, Entity, PrimaryGeneratedColumn, Unique } from 'typeorm';
  * would let it drift out of sync with the timestamps it's supposed to
  * summarize.
  *
- * One row per (vehicleId, stageId) — a vehicle attempts a stage once.
+ * **Several rows per (vehicleId, stageId) are allowed** — a red-flagged stage
+ * gets re-run, and the earlier attempt is kept as evidence rather than
+ * overwritten. Only the most recent attempt counts toward results
+ * (`latestAttempts` in `stage-runs.service.ts`).
  */
 @Entity()
-@Unique(['vehicleId', 'stageId'])
+/**
+ * Partial unique index: at most one *unfinished* attempt per vehicle+stage.
+ *
+ * This replaces a plain unique on (vehicleId, stageId), which was doing two
+ * jobs at once — forbidding re-runs, and backstopping the race where two
+ * detections for the same passing are processed concurrently and both get
+ * past the `findActive` check. Only the first job was meant to go; dropping
+ * the constraint outright would have quietly reopened the race.
+ */
+@Index(['vehicleId', 'stageId'], {
+  unique: true,
+  where: '"finishTime" IS NULL',
+})
 export class StageRun {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  /**
+   * 1 for a vehicle's first go at this stage, incrementing for each re-run.
+   * Highest attempt wins — see `latestAttempts` in `stage-runs.service.ts`.
+   *
+   * An explicit counter rather than a creation timestamp, for two reasons. A
+   * `@CreateDateColumn` normalises to sqlite `datetime`, which has only
+   * second precision, so two attempts recorded in the same second compare
+   * *equal* and the "latest" becomes whichever row the driver returned
+   * first — a silently wrong result rather than an error. And `startTime`
+   * can't serve either, since the correction endpoints can edit it, and
+   * which run supersedes which must not change because a marshal fixed a
+   * timestamp.
+   */
+  @Column({ type: 'int', default: 1 })
+  attempt: number;
 
   @Column()
   vehicleId: string;
