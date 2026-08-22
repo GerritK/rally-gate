@@ -132,6 +132,21 @@ Priority order (1 = next):
    so it works with no internet. Needs `deploy/install-gate-pi.sh` work and a
    server-side NTP service, and can only be validated on real Pi hardware —
    which is why it wasn't bundled with the measurement work.
+
+   **Must be configured to step the clock only at boot and slew thereafter**
+   (`makestep` with a small update limit). Running any time daemon on a gate
+   invalidates the "no NTP at all" premise the OpenStint `-t` decision rests
+   on — a mid-stage step writes a discontinuity straight into a `StageRun`.
+   See the amendment under `OpenStintAdapter` in `decoder-adapters.md`.
+
+   Optional follow-on: **GPS/PPS as a chrony refclock per gate**. Not for
+   accuracy — LAN chrony already exceeds what tenths-of-a-second margins
+   need — but because it removes the network from the timing path entirely,
+   which matters if stages get long enough that a gate can't reliably reach
+   the broker. Needs a UART/GPIO module, *not* a USB dongle; needs sky view.
+   Requires no `rally-server` changes, and the Hardware page's clock column
+   becomes its health indicator for free. Full trade-offs in
+   `decoder-adapters.md` "Hardware notes".
 1. Gate/gate-node health reporting, plus expected stage time: optional
    `Stage.expectedDurationMs` set by the marshal, dashboard flags any
    `STARTED` run as overdue once `now - startTime` exceeds it. Client-side
