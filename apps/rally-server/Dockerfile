@@ -16,9 +16,15 @@ COPY apps/web/package.json apps/web/
 RUN npm ci
 
 COPY packages/shared packages/shared
+COPY packages/ui packages/ui
 COPY apps/rally-server apps/rally-server
+COPY apps/web apps/web
 RUN npm run build --workspace=@rally-gate/shared
 RUN npm run build --workspace=@rally-gate/rally-server
+# The dashboard is served by rally-server itself in headless mode, so it has
+# to be built here — packages/ui ships as source and is compiled by web's own
+# Vite, which is why it is copied too.
+RUN npm run build --workspace=@rally-gate/web
 
 # The build needed nest-cli, typescript, webpack and jest; the runtime does
 # not. Pruning here keeps them out of the image copied below.
@@ -31,6 +37,9 @@ ENV NODE_ENV=production
 COPY --from=build /repo/node_modules node_modules
 COPY --from=build /repo/packages/shared packages/shared
 COPY --from=build /repo/apps/rally-server apps/rally-server
+# Static output only — main.ts resolves it as ../../web/dist relative to its
+# own compiled location, so the layout has to match the repo's.
+COPY --from=build /repo/apps/web/dist apps/web/dist
 
 EXPOSE 57430 57431
 CMD ["node", "apps/rally-server/dist/main.js"]

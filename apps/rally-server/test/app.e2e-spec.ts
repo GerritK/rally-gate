@@ -16,9 +16,11 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
-  it('/ (GET)', () => {
+  it('/api (GET)', () => {
+    // Under /api since the dashboard is served from the same origin at `/`
+    // — see setGlobalPrefix in main.ts.
     return request(app.getHttpServer())
-      .get('/')
+      .get('/api')
       .expect(200)
       .expect('Hello World!');
   });

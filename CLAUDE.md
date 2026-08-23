@@ -62,6 +62,8 @@ docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml up 
 
 This project's own services use dedicated ports **57430–57439**, never framework defaults (not 3000/5173/1883), to avoid clashing with other things running on a marshal's laptop. `rally-server` REST/SSE API is 57430, the embedded MQTT broker is 57431.
 
+**Every API route is under `/api`** (`setGlobalPrefix` in `main.ts`), because `rally-server` also serves the built `apps/web` on that same port and the two collide otherwise — `/vehicles` is both a REST resource and a dashboard page. Any non-`/api` GET that isn't a real file returns `index.html`, so vue-router history-mode deep links resolve. That fallback is registered *before* `listen()`: Nest installs its own catch-all 404 while initialising, so middleware added afterwards never runs. Static serving is skipped entirely when `apps/web/dist` is absent, which is the normal dev loop (Vite on 57432 → API on 57430).
+
 ## Architecture
 
 ```

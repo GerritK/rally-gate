@@ -20,6 +20,21 @@ Switching modes is a config change (`DB_TYPE`, `DB_HOST`, etc. — see
 The MQTT broker (Aedes) is embedded in-process in both modes — there is no
 separate Mosquitto/NATS container to run or configure.
 
+## Serving the dashboard
+
+In headless mode `rally-server` serves the built `apps/web` itself, on the
+same port as the API (57430). One service, one port, and the frontend calls a
+relative `/api/...` so nothing needs to know the server's address at build
+time — the old `VITE_API_URL` default pointed every browser at its *own*
+localhost, which only worked when the dashboard happened to run on the same
+machine as the server.
+
+That is also why the API sits under `/api`: `/vehicles` is both a REST
+resource and a page in the dashboard, so serving both from one origin needs
+them separated. `main.ts` skips static serving entirely when
+`apps/web/dist` is absent, which is the normal dev loop — there Vite serves
+the dashboard on 57432 and talks to the API on 57430.
+
 ## Event model: one database = one event (planned)
 
 A rally ("event") doesn't need its own `Event` table. `DB_PATH` (SQLite) /

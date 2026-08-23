@@ -1,6 +1,10 @@
 // Seeds a minimal demo event: two gates (start/finish), one stage, one vehicle.
 // Usage: node scripts/seed-demo-data.js [apiBaseUrl]
-const API_BASE = process.argv[2] ?? 'http://localhost:57430';
+// All API routes live under /api — rally-server serves the dashboard from the
+// same port, so the prefix is what keeps `/vehicles` the page and
+// `/api/vehicles` the resource. Pass a bare origin and the prefix is added.
+const argBase = process.argv[2] ?? 'http://localhost:57430';
+const API_BASE = argBase.endsWith('/api') ? argBase : `${argBase}/api`;
 
 async function put(path, body) {
   const res = await fetch(`${API_BASE}${path}`, {
