@@ -23,9 +23,10 @@ order."
 | `/live` | **Live Timing** | Live Detections feed, Stage Runs table (Correct/Delete/Add Missing Run inline, as today), Activate Stage action (with cross-stage gate-conflict warning), Close Stage action (also deactivates the stage's gates) | reorganized |
 | `/results/overall` | **Results** | Overall Classification | reorganized |
 | `/results/stages/:stageId` | **Results** | Stage Classification, Split Classification, DNF/DNS — stage picked via route param (bookmarkable), not a client-side dropdown like today | reorganized |
-| `/setup` | **Setup** | Rally name/details (edit) + a link tile to Stages. A checklist landing page, not a duplicate of those pages | **new** |
+| `/setup` | **Setup** | Rally name/details (edit) + link tiles to Stages and Scoring. A checklist landing page, not a duplicate of those pages | **new** |
 | `/setup/stages` | **Setup** | Stage list, create new stage | reorganized + new create form |
 | `/setup/stages/:stageId` | **Setup** | Edit stage name/number, plus that stage's gate assignments (assign a gate as start/finish/split, delete) — active/inactive shown read-only, activation itself happens from Live Timing | reorganized (replaces the old flat "Gate Assignments" table) |
+| `/setup/scoring` | **Setup** | Rules for scoring a stage a crew didn't finish — the notional time penalty today. Its own route rather than a card on `/setup`, both to keep that page a checklist of tiles and because the deferred vehicle-classes and penalties work lands here rather than growing the landing page | **new** |
 | `/hardware` | **Hardware** | Gate roster: identity, online/offline, heartbeat, capabilities, current active assignment (gate-centric cross-stage view) | reorganized |
 | `/vehicles` | **Vehicles** | Registered vehicles/drivers list + add/edit form | **new UI** (backend `POST /vehicles` already exists, nothing calls it today) |
 
