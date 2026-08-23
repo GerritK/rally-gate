@@ -24,6 +24,13 @@ export const CLOCK_CORRECTION_THRESHOLD_KEY = 'clockCorrectionThresholdMs';
 export const DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS = 1_000;
 
 /**
+ * `capabilities` is self-reported by the gate over an unauthenticated broker
+ * and stored verbatim, so it needs a bound — the ValidationPipe guards HTTP
+ * only. Generous next to the real values ("simulated", "openstint").
+ */
+const MAX_CAPABILITIES_LENGTH = 64;
+
+/**
  * `arrivedAt - sentAt`, or null when the gate sent no usable `sentAt` (an
  * older gate-agent, or a garbled value) — null means "leave the previous
  * measurement alone", which is not the same as an offset of zero.
@@ -155,8 +162,11 @@ export class GatesService {
       gate = this.gates.create({ id: gateId, name: gateId });
     }
     gate.lastHeartbeatAt = arrivedAt;
-    if (heartbeat.capabilities) {
-      gate.capabilities = heartbeat.capabilities;
+    if (typeof heartbeat.capabilities === 'string' && heartbeat.capabilities) {
+      gate.capabilities = heartbeat.capabilities.slice(
+        0,
+        MAX_CAPABILITIES_LENGTH,
+      );
     }
     const offsetMs = measureClockOffsetMs(heartbeat.sentAt, arrivedAt);
     if (offsetMs !== null) {

@@ -6,6 +6,7 @@ import {
   SplitGateInfo,
   StageOutcomeEntry,
   StageStatus,
+  VehicleStatus,
 } from '@rally-gate/shared';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { GatesService } from '../gates/gates.service';
@@ -250,7 +251,15 @@ export class ClassificationService {
       .map((run) => toEntry(run.vehicleId, 'DNF'));
     const startedVehicleIds = new Set(runs.map((run) => run.vehicleId));
     const dns = vehicles
-      .filter((vehicle) => !startedVehicleIds.has(vehicle.id))
+      .filter(
+        (vehicle) =>
+          !startedVehicleIds.has(vehicle.id) &&
+          // A withdrawn or excluded car isn't a "did not start" — it wasn't
+          // entered in the stage at all, so listing it alongside crews who
+          // were due out and failed to appear misrepresents both.
+          vehicle.status !== VehicleStatus.WITHDRAWN &&
+          vehicle.status !== VehicleStatus.DISQUALIFIED,
+      )
       .map((vehicle) => toEntry(vehicle.id, 'DNS'));
     return [...dnf, ...dns];
   }
