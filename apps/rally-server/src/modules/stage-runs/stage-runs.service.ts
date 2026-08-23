@@ -473,6 +473,13 @@ export class StageRunsService {
   }
 
   async remove(id: string): Promise<void> {
+    // Splits first, then the run. There are no foreign keys, so nothing
+    // cascades on its own and a run's splits would otherwise stay behind
+    // forever, referencing an id that no longer exists. Doing it in this
+    // order is safe without a transaction: if the run turns out not to
+    // exist, the split delete matched nothing anyway — and it quietly clears
+    // any orphans an earlier delete left behind.
+    await this.stageSplits.delete({ stageRunId: id });
     const result = await this.stageRuns.delete(id);
     if (result.affected === 0) {
       throw new NotFoundException(`StageRun ${id} not found`);
@@ -490,7 +497,11 @@ export class StageRunsService {
     stageId: string,
     splitIndex: number,
   ): Promise<StageRunSplitPair[]> {
-    const runs = await this.stageRuns.find({ where: { stageId } });
+    // Through findByStage, not a direct query: that is what applies
+    // `latestAttempts`, so a voided attempt's splits stop appearing on the
+    // live split leaderboard. Querying the repository here instead is
+    // precisely how they kept showing up.
+    const runs = await this.findByStage(stageId);
     const stageClosed = await this.isStageClosed(stageId);
     const activeRuns = runs.filter(
       (run) =>
@@ -504,9 +515,14 @@ export class StageRunsService {
       where: { stageRunId: In(runIds), splitIndex },
     });
     const runById = new Map(activeRuns.map((run) => [run.id, run]));
-    return splits.map((split) => ({
-      run: runById.get(split.stageRunId)!,
-      split,
-    }));
+    // Filtered rather than asserted non-null. The query above already limits
+    // splits to these runs, but pairing on that assumption with a `!` means a
+    // split whose run was excluded — voided, cancelled — would surface as a
+    // pair with no run, and `getSplitClassification` reads `pair.run` without
+    // checking. Dropping unmatched splits keeps that impossible.
+    return splits.flatMap((split) => {
+      const run = runById.get(split.stageRunId);
+      return run ? [{ run, split }] : [];
+    });
   }
 }

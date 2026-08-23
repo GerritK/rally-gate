@@ -2,6 +2,17 @@ import { NotFoundException } from '@nestjs/common';
 import { VehicleStatus } from '@rally-gate/shared';
 import { VehiclesService } from './vehicles.service';
 
+/**
+ * Shaped like what the sqlite driver actually throws — the code is what
+ * `isUniqueViolation` matches on. `db-errors.spec.ts` pins that against a
+ * real constraint violation; this is only a stand-in for the service tests.
+ */
+function uniqueViolation(): Error {
+  return Object.assign(new Error('UNIQUE constraint failed'), {
+    code: 'SQLITE_CONSTRAINT_UNIQUE',
+  });
+}
+
 function makeService(saveImpl: (v: unknown) => Promise<unknown>) {
   const vehicles = {
     create: jest.fn().mockImplementation((v: unknown) => v),
@@ -12,13 +23,7 @@ function makeService(saveImpl: (v: unknown) => Promise<unknown>) {
 
 describe('VehiclesService.create', () => {
   it('throws ConflictException when the start number is already taken', async () => {
-    const service = makeService(() =>
-      Promise.reject(
-        new Error(
-          'SQLITE_CONSTRAINT: UNIQUE constraint failed: vehicle.startNumber',
-        ),
-      ),
-    );
+    const service = makeService(() => Promise.reject(uniqueViolation()));
 
     await expect(
       service.create({ startNumber: '12', driverName: 'Demo' }),
@@ -87,12 +92,7 @@ describe('VehiclesService.update', () => {
   it('throws ConflictException when the new start number is already taken', async () => {
     const service = makeServiceForUpdate(
       { id: 'v1', startNumber: '12', driverName: 'Demo' },
-      () =>
-        Promise.reject(
-          new Error(
-            'SQLITE_CONSTRAINT: UNIQUE constraint failed: vehicle.startNumber',
-          ),
-        ),
+      () => Promise.reject(uniqueViolation()),
     );
 
     await expect(service.update('v1', { startNumber: '99' })).rejects.toThrow(

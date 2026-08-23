@@ -11,6 +11,7 @@ import {
   DetectionEvent,
   DETECTION_TOPIC_PREFIX,
   GateRole,
+  StageStatus,
 } from '@rally-gate/shared';
 import { Repository } from 'typeorm';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
@@ -18,6 +19,7 @@ import { Gate } from '../gates/gate.entity';
 import { GatesService } from '../gates/gates.service';
 import { VehiclesService } from '../vehicles/vehicles.service';
 import { StageRunsService } from '../stage-runs/stage-runs.service';
+import { StagesService } from '../stages/stages.service';
 import { DetectionEventRecord } from './detection-event.entity';
 
 const DETECTION_TOPIC_REGEX = new RegExp(
@@ -44,6 +46,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     private readonly gateAssignmentsService: GateAssignmentsService,
     private readonly vehiclesService: VehiclesService,
     private readonly stageRunsService: StageRunsService,
+    private readonly stagesService: StagesService,
     private readonly emitter: EventEmitter2,
   ) {}
 
@@ -250,6 +253,20 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     const stageId = assignment.stageId;
+
+    // `GateAssignment.active` is the hot-path check, but it and `Stage.status`
+    // are two records kept in step by `StagesService` rather than one fact —
+    // and `activate` updates them in separate steps, so a crash between the
+    // two leaves a gate live on a stage that isn't. Checking the stage as
+    // well means a detection in that window is stored without being timed,
+    // instead of quietly attaching a run to a stage nobody is running.
+    const stage = await this.stagesService.findOne(stageId);
+    if (stage?.status !== StageStatus.ACTIVE) {
+      this.logger.warn(
+        `Gate ${gate.id} is assigned to stage ${stageId}, which is ${stage?.status ?? 'missing'} rather than ACTIVE — storing the detection without timing it`,
+      );
+      return;
+    }
     if (assignment.role === GateRole.STAGE_START) {
       const run = await this.stageRunsService.startRun(vehicleId, stageId, at);
       this.emitter.emit('stage-run.updated', run);
