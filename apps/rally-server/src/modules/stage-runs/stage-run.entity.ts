@@ -38,14 +38,20 @@ export class StageRun {
    * 1 for a vehicle's first go at this stage, incrementing for each re-run.
    * Highest attempt wins — see `latestAttempts` in `stage-runs.service.ts`.
    *
-   * An explicit counter rather than a creation timestamp, for two reasons. A
-   * `@CreateDateColumn` normalises to sqlite `datetime`, which has only
-   * second precision, so two attempts recorded in the same second compare
-   * *equal* and the "latest" becomes whichever row the driver returned
-   * first — a silently wrong result rather than an error. And `startTime`
-   * can't serve either, since the correction endpoints can edit it, and
-   * which run supersedes which must not change because a marshal fixed a
-   * timestamp.
+   * An explicit counter rather than a creation timestamp, for two reasons.
+   * `@CreateDateColumn` writes only second precision on sqlite — verified:
+   * it stores `2026-08-23 00:07:54` where an application-set `Date` on the
+   * same `datetime` type stores `10:00:00.123` — so two attempts recorded in
+   * the same second compared *equal* and "latest" became whichever row the
+   * driver happened to return first. Note this is a property of
+   * `@CreateDateColumn`, **not** of `datetime` columns generally:
+   * `startTime`/`finishTime` keep their milliseconds, which is what makes
+   * tenth-of-a-second stage times possible at all (see
+   * `src/config/timestamp-precision.spec.ts`).
+   *
+   * `startTime` can't serve either, since the correction endpoints can edit
+   * it, and which run supersedes which must not change because a marshal
+   * fixed a timestamp.
    */
   @Column({ type: 'int', default: 1 })
   attempt: number;

@@ -110,11 +110,21 @@ covered, where two detections for one passing are processed concurrently and
 both clear the pre-insert `findActive` check.
 
 `attempt` is an explicit counter rather than a creation timestamp on purpose:
-`@CreateDateColumn` normalises to sqlite `datetime`, which has only
-second precision, so two attempts recorded in the same second compare equal
-and "latest" becomes whichever row the driver happened to return first — a
-wrong result with no error. `startTime` can't serve either, since the
-correction endpoints can edit it.
+`@CreateDateColumn` writes only second precision on sqlite, so two attempts
+recorded in the same second compared equal and "latest" became whichever row
+the driver happened to return first — a wrong result with no error.
+`startTime` can't serve either, since the correction endpoints can edit it.
+
+**This is specific to `@CreateDateColumn`, not to `datetime` columns.**
+Stage times keep their milliseconds: on the same column type, an
+application-set `Date` stores `2026-08-23 10:00:00.123` where
+`@CreateDateColumn` stores `2026-08-23 00:07:54`. Tenth-of-a-second margins
+are therefore safe, and `src/config/timestamp-precision.spec.ts` pins that —
+it round-trips `startTime`/`finishTime`, a split and a detection through real
+sqlite and recomputes the duration from what comes back, since a truncating
+driver would leave the stored `durationMs` correct while the timestamps
+behind it quietly lost precision. Postgres uses `timestamp`, which carries
+microseconds, so sqlite is the tighter of the two.
 
 ### Voiding, and how a re-run actually starts
 
