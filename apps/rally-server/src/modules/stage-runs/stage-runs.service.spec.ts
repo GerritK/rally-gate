@@ -238,79 +238,32 @@ describe('StageRunsService.unvoidRun', () => {
     expect(restored.status).toBe(StageRunStatus.FINISHED);
   });
 
-  it('refuses when a later attempt would still supersede it', async () => {
-    // Cascading a void onto attempt 2 would strike out a run the car really
-    // drove, as a side effect of a control labelled "unvoid" — so the
-    // marshal is asked to say so explicitly instead.
+  // One rule covers every shape of "something else already counts", because
+  // there is one invariant: at most one non-voided attempt per vehicle+stage.
+  it.each([
+    ['a higher attempt survives', { id: 'r2', attempt: 2 }],
+    ['a lower attempt survives', { id: 'r0', attempt: 0 }],
+  ])('refuses when %s', async (_label, survivor) => {
+    const { service, stageRuns } = makeUnvoidService([
+      { ...survivor, voided: false, finishTime: new Date() },
+    ]);
+
+    await expect(service.unvoidRun('r1')).rejects.toThrow(
+      `Attempt ${survivor.attempt} already counts`,
+    );
+    expect(stageRuns.save).not.toHaveBeenCalled();
+  });
+
+  it('refuses rather than cascading a void onto the surviving run', async () => {
+    // The whole point: striking out a run the car actually drove is the
+    // marshal's call to make explicitly, not a side effect of "restore".
     const { service, stageRuns } = makeUnvoidService([
       { id: 'r2', attempt: 2, voided: false, finishTime: new Date() },
     ]);
 
-    await expect(service.unvoidRun('r1')).rejects.toThrow(
-      'Attempt 2 supersedes this one',
-    );
+    await expect(service.unvoidRun('r1')).rejects.toThrow();
+    // Nothing was written at all — the survivor is untouched.
     expect(stageRuns.save).not.toHaveBeenCalled();
-  });
-
-  it('refuses when it would leave two attempts open at once', async () => {
-    // Reachable by voiding two unfinished attempts and restoring them in
-    // order. The partial unique index would reject it too, but as a driver
-    // error rather than something a marshal can act on.
-    const stageRuns = {
-      findOneBy: jest
-        .fn()
-        .mockResolvedValue({ ...voidedRun, finishTime: null }),
-      find: jest
-        .fn()
-        .mockResolvedValue([{ id: 'r0', attempt: 0, voided: false }]),
-      save: jest.fn(),
-    };
-    const service = new StageRunsService(
-      stageRuns as never,
-      {} as never,
-      { findOne: jest.fn() } as never,
-      { emit: jest.fn() } as never,
-    );
-
-    await expect(service.unvoidRun('r1')).rejects.toThrow(
-      'still open; only one attempt can be in progress',
-    );
-    expect(stageRuns.save).not.toHaveBeenCalled();
-  });
-
-  it('warns before displacing the attempt that currently counts', async () => {
-    // Void 1 and 2, restore 1, then restore 2: nothing supersedes 2, so the
-    // earlier checks stay quiet while the result silently moves back to 2.
-    // Coherent to want, but not something to do without saying so.
-    const { service, stageRuns } = makeUnvoidService([
-      { id: 'r0', attempt: 0, voided: false, finishTime: new Date() },
-    ]);
-
-    await expect(service.unvoidRun('r1')).rejects.toThrow(
-      'Attempt 0 currently counts',
-    );
-    expect(stageRuns.save).not.toHaveBeenCalled();
-  });
-
-  it('displaces the counting attempt once confirmed with force', async () => {
-    const { service } = makeUnvoidService([
-      { id: 'r0', attempt: 0, voided: false, finishTime: new Date() },
-    ]);
-
-    await expect(service.unvoidRun('r1', true)).resolves.toMatchObject({
-      voided: false,
-    });
-  });
-
-  it('does not let force past the refusals that have nothing to confirm', async () => {
-    // Forcing a no-op is meaningless, so the supersede case stays final.
-    const { service } = makeUnvoidService([
-      { id: 'r2', attempt: 2, voided: false, finishTime: new Date() },
-    ]);
-
-    await expect(service.unvoidRun('r1', true)).rejects.toThrow(
-      'Attempt 2 supersedes this one',
-    );
   });
 });
 
@@ -342,9 +295,9 @@ describe('StageRunsService.createManual', () => {
         stageId: 's1',
         startTime: '2026-01-01T00:00:00.000Z',
       }),
-      // Only an unfinished run collides — completed attempts accumulate, so
-      // that a red-flagged stage can be re-run.
-    ).rejects.toThrow('already has an unfinished run on stage s1');
+      // A vehicle has at most one non-voided attempt per stage, so recording
+      // a re-run by hand means voiding the previous attempt first.
+    ).rejects.toThrow('already has an attempt on stage s1 that counts');
   });
 
   it('rejects a finish time at or before the start time', async () => {

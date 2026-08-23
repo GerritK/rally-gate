@@ -6,7 +6,6 @@ import {
   Param,
   Patch,
   Post,
-  Query,
 } from '@nestjs/common';
 import { CorrectStageRunDto, CreateStageRunDto } from './dto';
 import { StageRunsService } from './stage-runs.service';
@@ -46,15 +45,13 @@ export class StageRunsController {
   }
 
   /**
-   * Reverses a void. Refuses outright if a later surviving attempt would
-   * still supersede this one (void that one first), or if it would leave two
-   * attempts open. 409s with `{ displacedAttempt }` — retryable with
-   * `?force=true` — when restoring would take over as the counting attempt
-   * from another surviving one.
+   * Reverses a void. 409s with `{ blockingAttempt }` if another attempt
+   * already counts for that stage — a vehicle has at most one non-voided
+   * attempt, so that one has to be voided first.
    */
   @Post(':id/unvoid')
-  unvoid(@Param('id') id: string, @Query('force') force?: string) {
-    return this.stageRunsService.unvoidRun(id, force === 'true');
+  unvoid(@Param('id') id: string) {
+    return this.stageRunsService.unvoidRun(id);
   }
 
   @Delete(':id')

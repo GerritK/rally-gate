@@ -64,14 +64,18 @@ export function deriveStageRunStatus(
 export function latestAttempts(runs: StageRun[]): StageRun[] {
   const latest = new Map<string, StageRun>();
   for (const run of runs) {
-    // A voided attempt counts for nothing, so results fall back to the last
-    // surviving attempt — or to no result at all if every attempt is voided,
-    // which is the correct reading of "that run didn't happen".
+    // Voided means "doesn't count" — the only reason an attempt doesn't, by
+    // the invariant the entity's unique index enforces. Every attempt voided
+    // therefore means no result at all, the correct reading of "that run
+    // didn't happen".
     if (run.voided) {
       continue;
     }
     const key = `${run.vehicleId}:${run.stageId}`;
     const seen = latest.get(key);
+    // The index guarantees at most one survivor per key, so this only ever
+    // picks between duplicates that shouldn't exist. Kept as a defensive
+    // tiebreak rather than trusting the schema blindly with a result.
     if (!seen || run.attempt > seen.attempt) {
       latest.set(key, run);
     }
@@ -386,10 +390,11 @@ export class StageRunsService {
       saved = await this.stageRuns.save(run);
     } catch (err) {
       if (isUniqueViolation(err)) {
-        // Only an *unfinished* run collides now — completed attempts are
-        // allowed to accumulate, that's what makes a re-run possible.
+        // A vehicle has at most one non-voided attempt per stage. Recording
+        // a re-run by hand therefore means voiding the previous attempt
+        // first — the same act that frees the car for a gate-timed re-run.
         throw new ConflictException(
-          `Vehicle ${input.vehicleId} already has an unfinished run on stage ${input.stageId}; finish or delete it before starting another attempt`,
+          `Vehicle ${input.vehicleId} already has an attempt on stage ${input.stageId} that counts; void it first to record another`,
         );
       }
       throw err;
@@ -429,27 +434,22 @@ export class StageRunsService {
    * effect of a button labelled "unvoid"; the marshal should say so
    * explicitly. Two states are rejected:
    *
-   * - a later surviving attempt already supersedes this one, so unvoiding
-   *   would restore nothing — `latestAttempts` takes the highest, and a
-   *   control that silently does nothing is worse than one that refuses;
-   * - it would leave two open attempts, which the partial unique index
-   *   forbids. Reachable by voiding two unfinished attempts and unvoiding
-   *   them in order, so the check can't be left to the index alone — it
-   *   would surface as a driver error rather than an explanation.
+   * One rule, because there is one invariant: a vehicle has at most one
+   * non-voided attempt per stage. So restoring is allowed exactly when
+   * nothing else survives, and refused otherwise — naming the attempt to
+   * void first.
    *
-   * And it warns, once, when restoring would *displace* the attempt that
-   * currently counts — void 1 and 2, restore 1, then restore 2, and the
-   * result silently moves back to 2. That is a coherent thing to want, so
-   * `force` confirms it rather than forbidding it, the same shape as the
-   * gate conflict in `activateForStage`. Unlike the two refusals above it is
-   * forceable, because there is something real to confirm.
+   * Deliberately not a cascade. Voiding the survivor automatically would
+   * strike out a run the car actually drove as a side effect of a control
+   * labelled "restore"; the marshal should say so, and have it recorded as a
+   * deliberate act. Two explicit steps, both visible afterwards.
    */
-  async unvoidRun(id: string, force = false): Promise<StageRunWithStatus> {
+  async unvoidRun(id: string): Promise<StageRunWithStatus> {
     const run = await this.stageRuns.findOneBy({ id });
     if (!run) {
       throw new NotFoundException(`StageRun ${id} not found`);
     }
-    const siblings = (
+    const survivor = (
       await this.stageRuns.find({
         where: {
           vehicleId: run.vehicleId,
@@ -457,32 +457,12 @@ export class StageRunsService {
           voided: false,
         },
       })
-    ).filter((other) => other.id !== run.id);
+    ).find((other) => other.id !== run.id);
 
-    const superseding = siblings.find((other) => other.attempt > run.attempt);
-    if (superseding) {
-      throw new ConflictException(
-        `Attempt ${superseding.attempt} supersedes this one, so restoring it would change nothing — void attempt ${superseding.attempt} first if this attempt should count`,
-      );
-    }
-    if (!run.finishTime && siblings.some((other) => !other.finishTime)) {
-      throw new ConflictException(
-        `Another attempt on this stage is still open; only one attempt can be in progress at a time`,
-      );
-    }
-
-    // Past the check above, every surviving sibling is numbered below this
-    // one, so restoring it takes over as the counting attempt. The highest
-    // of them is the one being displaced.
-    const displaced = siblings.reduce<StageRun | null>(
-      (highest, other) =>
-        !highest || other.attempt > highest.attempt ? other : highest,
-      null,
-    );
-    if (displaced && !force) {
+    if (survivor) {
       throw new ConflictException({
-        message: `Attempt ${displaced.attempt} currently counts for this stage; restoring attempt ${run.attempt} replaces it as the counting run`,
-        displacedAttempt: displaced.attempt,
+        message: `Attempt ${survivor.attempt} already counts for this stage; void it first if attempt ${run.attempt} should count instead`,
+        blockingAttempt: survivor.attempt,
       });
     }
 

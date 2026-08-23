@@ -14,17 +14,21 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
  */
 @Entity()
 /**
- * Partial unique index: at most one *unfinished* attempt per vehicle+stage.
+ * Partial unique index: **at most one non-voided attempt per vehicle+stage**.
  *
- * This replaces a plain unique on (vehicleId, stageId), which was doing two
- * jobs at once — forbidding re-runs, and backstopping the race where two
- * detections for the same passing are processed concurrently and both get
- * past the `findActive` check. Only the first job was meant to go; dropping
- * the constraint outright would have quietly reopened the race.
+ * This is the invariant the whole re-run model rests on — *not voided means
+ * it counts*. Without it an attempt could fail to count for two different
+ * reasons, voided or superseded by a higher attempt, and only the first would
+ * be visible: a superseded run would show FINISHED with a duration while
+ * being absent from the results.
+ *
+ * It also still backstops the race the original plain unique constraint
+ * covered, where two detections for the same passing are processed
+ * concurrently and both clear the `findActive` check.
  */
 @Index(['vehicleId', 'stageId'], {
   unique: true,
-  where: '"finishTime" IS NULL AND "voided" = false',
+  where: '"voided" = false',
 })
 export class StageRun {
   @PrimaryGeneratedColumn('uuid')
@@ -48,13 +52,12 @@ export class StageRun {
 
   /**
    * Struck out by a marshal, typically after a red flag. A voided attempt
-   * counts for nothing (`latestAttempts` skips it) and stops blocking the
-   * vehicle from running the stage again, so the start gate is free to open
-   * a fresh attempt on its own.
+   * counts for nothing and stops blocking the vehicle from running the stage
+   * again, so the start gate is free to open a fresh attempt on its own.
    *
-   * It also has to be part of the partial unique index above: a voided but
-   * unfinished run would otherwise keep occupying the one-open-attempt slot
-   * and silently block the re-run it was voided to permit.
+   * This is the *only* reason an attempt doesn't count — see the index
+   * above. Voiding the previous attempt is therefore what makes room for a
+   * re-run, rather than something done afterwards for tidiness.
    */
   @Column({ default: false })
   voided: boolean;

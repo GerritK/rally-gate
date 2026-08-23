@@ -63,18 +63,13 @@ export function voidStageRun(id: string): Promise<StageRun> {
 }
 
 /**
- * Reverses a void.
- *
- * Throws `ApiError` 409 outright if a later surviving attempt would still
- * supersede this one (void that one first), or if it would leave two
- * attempts open at once — neither is forceable.
- *
- * Also 409s with `body.displacedAttempt` when restoring would take over as
- * the counting attempt from another surviving one. That case *is* coherent,
- * so pass `force: true` to confirm it.
+ * Reverses a void. Throws `ApiError` 409 with `body.blockingAttempt` if
+ * another attempt already counts for that stage — a vehicle has at most one
+ * non-voided attempt, so that one must be voided first. Deliberately not a
+ * cascade: discarding the other run is the marshal's call to make explicitly.
  */
-export function unvoidStageRun(id: string, force = false): Promise<StageRun> {
-  return postRequest(`/stage-runs/${id}/unvoid${force ? '?force=true' : ''}`);
+export function unvoidStageRun(id: string): Promise<StageRun> {
+  return postRequest(`/stage-runs/${id}/unvoid`);
 }
 
 export function fetchSplitsForRun(stageRunId: string): Promise<StageSplit[]> {

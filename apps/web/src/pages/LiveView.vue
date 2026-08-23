@@ -239,33 +239,16 @@ async function onVoidRun(run: StageRun) {
 }
 
 /**
- * Reverses a void.
- *
- * Two of the server's refusals are final and surfaced as-is — their messages
- * already name the fix. The third, "this would displace the attempt that
- * currently counts", is a real choice, so it comes back with
- * `displacedAttempt` and is re-sent with `force` once confirmed.
+ * Reverses a void. The server refuses if another attempt already counts, and
+ * its message names the one to void first — surfaced as-is rather than
+ * offering to cascade, since discarding that run is a decision the marshal
+ * should make deliberately.
  */
 async function onUnvoidRun(run: StageRun) {
   try {
     upsertStageRun(await unvoidStageRun(run.id));
   } catch (err) {
-    // Narrowed into a local so the type survives into the branches below.
-    const conflict = err instanceof ApiError && err.status === 409 ? err : null;
-    const displacedAttempt = (
-      conflict?.body as { displacedAttempt?: number } | null
-    )?.displacedAttempt;
-    if (!conflict || displacedAttempt === undefined) {
-      alert(err instanceof Error ? err.message : 'Failed to restore run');
-      return;
-    }
-    if (
-      !confirm(
-        `${conflict.message}.\n\nAttempt ${displacedAttempt} stays on record but stops counting. Continue?`,
-      )
-    )
-      return;
-    upsertStageRun(await unvoidStageRun(run.id, true));
+    alert(err instanceof Error ? err.message : 'Failed to restore run');
   }
 }
 
