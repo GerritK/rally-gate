@@ -89,12 +89,25 @@ every query that feeds classification goes through it. Created on a
 `stage_start` detection, closed on the matching `stage_finish` detection.
 `durationMs` is `finishTime - startTime`.
 
-**At most one *unfinished* attempt per vehicle+stage**, enforced by a partial
-unique index (`where "finishTime" IS NULL`). This replaced a plain unique on
-(vehicleId, stageId), which had been doing two jobs at once: forbidding
-re-runs, and backstopping the race where two detections for one passing both
-clear the pre-insert `findActive` check. Only the first job was meant to go —
-dropping the constraint outright would have silently reopened the race.
+**At most one non-voided attempt per vehicle+stage**, enforced by a partial
+unique index (`where "voided" = false`). This is the invariant the whole
+model rests on: **not voided means it counts**.
+
+It has to be that and not something weaker. If several attempts could survive
+at once, an attempt could fail to count for two different reasons — voided,
+or superseded by a higher attempt — and only the first would be visible: a
+superseded run would show `FINISHED` with a duration while being absent from
+the results. One survivor per vehicle+stage removes the second reason
+entirely, so status always tells the truth without needing to know about
+sibling rows.
+
+Practical consequence: **voiding the previous attempt is what makes room for
+a re-run**, rather than tidying up afterwards. `POST /stage-runs` refuses
+while a surviving attempt exists, for the same reason.
+
+The index also still backstops the race the original plain unique constraint
+covered, where two detections for one passing are processed concurrently and
+both clear the pre-insert `findActive` check.
 
 `attempt` is an explicit counter rather than a creation timestamp on purpose:
 `@CreateDateColumn` normalises to sqlite `datetime`, which has only
@@ -134,32 +147,14 @@ unfinished run would otherwise keep occupying the one-open-attempt slot and
 block the very re-run it was voided to permit.
 
 `POST /stage-runs/:id/unvoid` reverses a void — for a red flag called on the
-wrong car, or called and then withdrawn. It **refuses rather than cascades**,
-in two cases:
+wrong car, or called and then withdrawn. One rule, because there is one
+invariant: it succeeds when nothing else survives on that stage, and 409s
+with `{ blockingAttempt }` otherwise, naming the attempt to void first.
 
-- **a later surviving attempt already supersedes it.** Restoring would change
-  nothing, since `latestAttempts` takes the highest — and a control that
-  silently does nothing is worse than one that refuses. Voiding attempt 2
-  automatically would be worse still: it would strike out a run the car
-  actually drove, as a side effect of a button labelled "unvoid". The error
-  names the attempt to void first, so the marshal makes that call explicitly
-  and it shows up in the record as a deliberate act.
-- **it would leave two attempts open at once.** Reachable by voiding two
-  unfinished attempts and restoring them in order. The partial unique index
-  would reject it anyway, but as a driver error rather than something a
-  marshal can act on.
-
-Neither of those is forceable — there is nothing to confirm about a no-op or
-an impossible state.
-
-A third case *is* forceable. Restoring an attempt when a lower-numbered one
-is currently counting **displaces** it: void 1 and 2, restore 1, then restore
-2, and the result moves back to attempt 2. Both refusals above stay quiet
-there — nothing supersedes attempt 2, and nothing is open — so it used to
-happen silently. It now 409s with `{ displacedAttempt }` and proceeds on
-`?force=true`, the same warn-then-confirm shape as the gate conflict in
-`activateForStage`. Coherent to want, but not something to do without saying
-so, since it changes the result.
+It **refuses rather than cascades**. Voiding the survivor automatically would
+strike out a run the car actually drove, as a side effect of a control
+labelled "restore". The marshal should make that call explicitly so it lands
+in the record as a deliberate act.
 
 Restoring an earlier attempt after a re-run is therefore two explicit steps —
 void attempt 2, then unvoid attempt 1 — and both remain visible afterwards.
