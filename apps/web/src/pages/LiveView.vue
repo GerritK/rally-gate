@@ -55,6 +55,32 @@ async function refreshPending() {
   pendingDetections.value = await fetchPendingEvents();
 }
 
+async function refreshDetections() {
+  detections.value = await fetchRecentEvents();
+}
+
+async function refreshGates() {
+  gates.value = await fetchGates();
+}
+
+async function refreshSplits() {
+  const splits = await Promise.all(
+    stageRuns.value.map(async (run) => [
+      run.id,
+      await fetchSplitsForRun(run.id),
+    ]),
+  );
+  splitsByRun.value = Object.fromEntries(splits) as Record<
+    string,
+    StageSplit[]
+  >;
+}
+
+async function refreshStageRunsAndSplits() {
+  stageRuns.value = await fetchStageRuns();
+  await refreshSplits();
+}
+
 async function onRetryPending() {
   if (retryingPending.value) return;
   retryingPending.value = true;
@@ -326,20 +352,22 @@ async function onCloseStage() {
 }
 
 onMounted(async () => {
-  detections.value = await fetchRecentEvents();
-  stageRuns.value = await fetchStageRuns();
+  // Stage/vehicle/assignment lists aren't pushed over SSE at all, so they are
+  // loaded once here and refreshed explicitly when an action changes them.
   stages.value = await fetchStages();
   vehicles.value = await fetchVehicles();
   gateAssignments.value = await fetchGateAssignments();
-  gates.value = await fetchGates();
   const openStage = stages.value.find((s) => s.status !== 'CLOSED');
   selectedStageId.value = (openStage ?? stages.value[0])?.id ?? '';
 
-  for (const run of stageRuns.value) {
-    splitsByRun.value[run.id] = await fetchSplitsForRun(run.id);
-  }
-
+  // Every stream below resyncs through `onopen`, which fires on the first
+  // connect *and* on each automatic reconnect — exactly when this client may
+  // have missed events. That makes it both the initial load and the recovery,
+  // so a dropped connection no longer leaves the page quietly stale until
+  // someone reloads it. Each stream refetches only what it feeds, so a
+  // simultaneous reconnect doesn't refetch everything five times over.
   detectionsSource = new EventSource(`${API_BASE}/live/detections`);
+  detectionsSource.onopen = () => void refreshDetections();
   detectionsSource.onmessage = (e) => {
     const event: DetectionEventRecord = JSON.parse(e.data);
     detections.value.unshift(event);
@@ -347,24 +375,26 @@ onMounted(async () => {
   };
 
   gatesSource = new EventSource(`${API_BASE}/live/gates`);
+  gatesSource.onopen = () => void refreshGates();
   gatesSource.onmessage = (e) => {
     upsertGateStatus(JSON.parse(e.data));
   };
 
   stageRunsSource = new EventSource(`${API_BASE}/live/stage-runs`);
+  // Runs carry their splits, so this refresh covers both — a run created
+  // while disconnected would otherwise appear with no split times.
+  stageRunsSource.onopen = () => void refreshStageRunsAndSplits();
   stageRunsSource.onmessage = (e) => {
     upsertStageRun(JSON.parse(e.data));
   };
 
   stageRunSplitsSource = new EventSource(`${API_BASE}/live/stage-run-splits`);
+  stageRunSplitsSource.onopen = () => void refreshSplits();
   stageRunSplitsSource.onmessage = (e) => {
     upsertSplit(JSON.parse(e.data));
   };
 
   pendingSource = new EventSource(`${API_BASE}/live/pending-detections`);
-  // `onopen` fires on the first connect *and* on every automatic reconnect,
-  // which is exactly when this client may have missed a change — so it
-  // doubles as the initial load and the resync, with no timer either way.
   pendingSource.onopen = () => void refreshPending();
   pendingSource.onmessage = (e) => {
     pendingDetections.value = (

@@ -34,6 +34,58 @@ const DETECTION_TOPIC_REGEX = new RegExp(
  */
 export const REPROCESS_INTERVAL_MS = 30_000;
 
+/**
+ * Long enough for any real transponder or gate id, short enough that a
+ * malformed publisher can't fill the event database one detection at a time.
+ */
+const MAX_ID_LENGTH = 128;
+
+/**
+ * Validates a detection off the wire.
+ *
+ * MQTT is the one ingress the global `ValidationPipe` does not cover — it
+ * only guards HTTP — and the broker is unauthenticated, so anything on the
+ * rally network can publish to a gate topic. Untyped JSON reaching the rule
+ * engine has real consequences: an unparseable `timestampGate` becomes an
+ * Invalid Date, which silently poisons a run's duration rather than throwing,
+ * and a missing `eventId` fails the insert on a NOT NULL primary key and
+ * lands in the pending list forever.
+ *
+ * Returns null for anything malformed; the caller drops it with a warning,
+ * matching how an unparseable payload is already handled.
+ */
+function parseDetection(payload: unknown): DetectionEvent | null {
+  const { eventId, gateId, transponderId, timestampGate, source } = (payload ??
+    {}) as Record<string, unknown>;
+
+  const isUsableId = (value: unknown): value is string =>
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= MAX_ID_LENGTH;
+
+  if (
+    !isUsableId(eventId) ||
+    !isUsableId(gateId) ||
+    !isUsableId(transponderId)
+  ) {
+    return null;
+  }
+  if (
+    typeof timestampGate !== 'string' ||
+    Number.isNaN(new Date(timestampGate).getTime())
+  ) {
+    return null;
+  }
+
+  return {
+    eventId,
+    gateId,
+    transponderId,
+    timestampGate,
+    source: typeof source === 'string' ? source.slice(0, MAX_ID_LENGTH) : '',
+  };
+}
+
 @Injectable()
 export class EventsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(EventsService.name);
@@ -147,11 +199,18 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     if (!match) {
       return;
     }
-    let detection: DetectionEvent;
+    let parsed: unknown;
     try {
-      detection = JSON.parse(payload.toString()) as DetectionEvent;
+      parsed = JSON.parse(payload.toString());
     } catch {
       this.logger.warn(`Ignoring malformed detection payload on ${topic}`);
+      return;
+    }
+    const detection = parseDetection(parsed);
+    if (!detection) {
+      this.logger.warn(
+        `Ignoring detection on ${topic} with missing or invalid fields — expected non-empty eventId, gateId, transponderId and a parseable timestampGate`,
+      );
       return;
     }
     await this.processDetection(detection);

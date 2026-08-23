@@ -168,6 +168,37 @@ describe('EventsService detection failures', () => {
   );
 });
 
+describe('EventsService detection payload validation', () => {
+  // MQTT is the one ingress the global ValidationPipe does not cover, and the
+  // broker is unauthenticated — anything on the rally network can publish to
+  // a gate topic.
+  it.each([
+    ['a missing eventId', { eventId: undefined }],
+    ['an empty gateId', { gateId: '' }],
+    ['a non-string transponderId', { transponderId: 1234567 }],
+    ['an unparseable timestampGate', { timestampGate: 'yesterday-ish' }],
+    ['an absurdly long gateId', { gateId: 'g'.repeat(500) }],
+  ])('drops a detection with %s', async (_label, overrides) => {
+    const { service, saved, startRun } = makeService({});
+
+    await service.handleMqttMessage(detection(overrides));
+
+    // Dropped outright rather than stored: an invalid timestamp becomes an
+    // Invalid Date that poisons a duration silently, and a missing eventId
+    // fails the insert and would sit in the pending list forever.
+    expect(saved).toHaveLength(0);
+    expect(startRun).not.toHaveBeenCalled();
+  });
+
+  it('accepts a well-formed detection', async () => {
+    const { service, saved } = makeService({});
+
+    await service.handleMqttMessage(detection());
+
+    expect(saved).not.toHaveLength(0);
+  });
+});
+
 describe('EventsService.reprocessPending', () => {
   const pendingRecord = {
     eventId: 'e1',
