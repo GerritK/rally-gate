@@ -32,6 +32,28 @@ order."
 
 5 top-level nav items: Live Timing, Results, Setup, Hardware, Vehicles.
 
+### Sub-page navigation: a back button, not breadcrumbs
+
+Every page below a top-level nav item opens with a text `v-btn` linking to its
+parent, and nothing uses `v-breadcrumbs`:
+
+```vue
+<v-btn variant="text" prepend-icon="mdi-arrow-left" to="/setup" class="mb-4">
+  Back to Setup
+</v-btn>
+```
+
+`/setup/stages` → Setup, `/setup/stages/:stageId` → Stages,
+`/setup/scoring` → Setup. `/results/stages/:stageId` uses the same shape with
+its own icon and label ("Overall Classification", `mdi-podium`), since that is
+a sideways move between two results views rather than a step up.
+
+Deliberate rather than incidental: the hierarchy is only two levels deep, so
+breadcrumbs add a trail nobody needs, and a full-size button is a much easier
+target than breadcrumb text on a tablet in a service park. Consistency is the
+larger part — a page that navigates differently from its siblings reads as a
+different kind of page.
+
 ## Key decisions and why
 
 - **Split Classification lives in Results, not Live Timing**, even though it
