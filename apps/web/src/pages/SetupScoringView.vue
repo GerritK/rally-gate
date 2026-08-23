@@ -35,13 +35,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <v-breadcrumbs
-    :items="[
-      { title: 'Setup', to: '/setup' },
-      { title: 'Scoring', disabled: true },
-    ]"
-    class="px-0"
-  />
+  <v-btn variant="text" prepend-icon="mdi-arrow-left" to="/setup" class="mb-4">
+    Back to Setup
+  </v-btn>
 
   <v-card>
     <v-card-title>Notional times</v-card-title>
