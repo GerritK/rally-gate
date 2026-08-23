@@ -1,7 +1,8 @@
-import { GateRole } from '@rally-gate/shared';
+import { GateRole, StageStatus } from '@rally-gate/shared';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { GatesService } from '../gates/gates.service';
 import { StageRunsService } from '../stage-runs/stage-runs.service';
+import { StagesService } from '../stages/stages.service';
 import { VehiclesService } from '../vehicles/vehicles.service';
 import { DetectionEventRecord } from './detection-event.entity';
 import { EventsService } from './events.service';
@@ -14,6 +15,7 @@ function makeService(opts: {
   vehicle?: unknown;
   pending?: unknown[];
   startRun?: jest.Mock;
+  stageStatus?: StageStatus;
 }) {
   const saved: DetectionEventRecord[] = [];
   const events = {
@@ -42,6 +44,12 @@ function makeService(opts: {
   } as unknown as GateAssignmentsService;
   const startRun = opts.startRun ?? jest.fn().mockResolvedValue({ id: 'r1' });
   const stageRunsService = { startRun } as unknown as StageRunsService;
+  const stagesService = {
+    findOne: jest.fn().mockResolvedValue({
+      id: 'SS1',
+      status: opts.stageStatus ?? StageStatus.ACTIVE,
+    }),
+  } as unknown as StagesService;
   const emitter = { emit: jest.fn() };
 
   const service = new EventsService(
@@ -50,6 +58,7 @@ function makeService(opts: {
     gateAssignmentsService,
     vehiclesService,
     stageRunsService,
+    stagesService,
     emitter as never,
   );
   return { service, events, saved, startRun, emitter };
@@ -114,6 +123,22 @@ describe('EventsService detection failures', () => {
       pending: [],
     });
   });
+
+  it.each([StageStatus.NOT_STARTED, StageStatus.CLOSED])(
+    'stores without timing when the assigned stage is %s',
+    async (stageStatus) => {
+      // GateAssignment.active and Stage.status are two records kept in step
+      // by StagesService, and activate updates them in separate steps — so a
+      // gate can be live on a stage that isn't. The detection is still kept;
+      // it just must not attach a run to a stage nobody is running.
+      const { service, saved, startRun } = makeService({ stageStatus });
+
+      await service.handleMqttMessage(detection());
+
+      expect(startRun).not.toHaveBeenCalled();
+      expect(saved.at(-1)).toMatchObject({ eventId: 'e1', processed: true });
+    },
+  );
 
   it('marks a detection processed once its rules apply', async () => {
     const { service, saved } = makeService({});

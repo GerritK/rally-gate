@@ -6,6 +6,17 @@ import {
   StageRunsService,
 } from './stage-runs.service';
 
+/**
+ * Shaped like what the sqlite driver actually throws — the code is what
+ * `isUniqueViolation` matches on. `db-errors.spec.ts` pins that against a
+ * real constraint violation; this is only a stand-in for the service tests.
+ */
+function uniqueViolation(): Error {
+  return Object.assign(new Error('UNIQUE constraint failed'), {
+    code: 'SQLITE_CONSTRAINT_UNIQUE',
+  });
+}
+
 describe('latestAttempts', () => {
   const run = (
     vehicleId: string,
@@ -110,6 +121,51 @@ function makeService(
   );
   return { service, stageRuns, emitter };
 }
+
+describe('StageRunsService.findSplitsForStageAtIndex', () => {
+  it('drops a voided attempt so its splits leave the live leaderboard', async () => {
+    // Regression: this queried the repository directly instead of going
+    // through findByStage, so it never applied latestAttempts and a voided
+    // attempt's split times kept showing on the split classification.
+    const surviving = {
+      id: 'r2',
+      vehicleId: 'v1',
+      stageId: 's1',
+      attempt: 2,
+      voided: false,
+      finishTime: new Date(),
+    };
+    const voided = {
+      id: 'r1',
+      vehicleId: 'v1',
+      stageId: 's1',
+      attempt: 1,
+      voided: true,
+      finishTime: new Date(),
+    };
+    const stageRuns = {
+      find: jest.fn().mockResolvedValue([voided, surviving]),
+    };
+    const stageSplits = {
+      find: jest.fn().mockResolvedValue([
+        { id: 's-voided', stageRunId: 'r1', splitIndex: 1, elapsedMs: 1_000 },
+        { id: 's-live', stageRunId: 'r2', splitIndex: 1, elapsedMs: 2_000 },
+      ]),
+    };
+    const service = new StageRunsService(
+      stageRuns as never,
+      stageSplits as never,
+      {
+        findOne: jest.fn().mockResolvedValue({ status: StageStatus.ACTIVE }),
+      } as never,
+      { emit: jest.fn() } as never,
+    );
+
+    const pairs = await service.findSplitsForStageAtIndex('s1', 1);
+
+    expect(pairs.map((p) => p.split.id)).toEqual(['s-live']);
+  });
+});
 
 describe('StageRunsService.correctRun', () => {
   const baseRun = {
@@ -272,13 +328,7 @@ describe('StageRunsService.createManual', () => {
     const stageRuns = {
       findOne: jest.fn().mockResolvedValue(null), // nextAttempt lookup
       create: jest.fn().mockImplementation((r: unknown) => r),
-      save: jest
-        .fn()
-        .mockRejectedValue(
-          new Error(
-            'UNIQUE constraint failed: stage_run.vehicleId, stage_run.stageId',
-          ),
-        ),
+      save: jest.fn().mockRejectedValue(uniqueViolation()),
     };
     const stagesService = { findOne: jest.fn() };
     const emitter = { emit: jest.fn() };
@@ -372,7 +422,7 @@ describe('StageRunsService.startRun', () => {
         .mockResolvedValueOnce(existing), // findActive after losing the race
       findOne: jest.fn().mockResolvedValue(null), // findFinished pre-check
       create: jest.fn().mockImplementation((r: unknown) => r),
-      save: jest.fn().mockRejectedValue(new Error('UNIQUE constraint failed')),
+      save: jest.fn().mockRejectedValue(uniqueViolation()),
     };
     const stagesService = {
       findOne: jest.fn().mockResolvedValue({ status: StageStatus.NOT_STARTED }),

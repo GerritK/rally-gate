@@ -16,7 +16,7 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private readonly events: EventEmitter2) {}
 
-  onModuleInit() {
+  async onModuleInit() {
     const port = Number(process.env.MQTT_PORT ?? 57431);
     this.aedes = new Aedes();
     this.server = createServer(this.aedes.handle);
@@ -34,9 +34,35 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
       });
     });
 
-    this.server.listen(port, () => {
-      this.logger.log(`Embedded MQTT broker listening on port ${port}`);
+    // Awaited, so a bind failure rejects out of onModuleInit and Nest aborts
+    // startup with it. Without this the 'error' event has no listener: node
+    // rethrows it as an uncaught exception *after* Nest has already logged
+    // "successfully started" and mapped every route, so a port clash reads as
+    // a random stack trace from a healthy-looking server. It matters most
+    // where it's least debuggable — a marshal double-clicking the packaged
+    // exe when a copy is already running.
+    await new Promise<void>((resolve, reject) => {
+      this.server.once('error', reject);
+      this.server.listen(port, () => {
+        this.logger.log(`Embedded MQTT broker listening on port ${port}`);
+        resolve();
+      });
+    }).catch((err: NodeJS.ErrnoException) => {
+      const hint =
+        err.code === 'EADDRINUSE'
+          ? ' — another rally-server is probably already running'
+          : '';
+      this.logger.error(
+        `Embedded MQTT broker cannot listen on port ${port}: ${err.message}${hint}. Gates cannot deliver detections, so startup is aborted rather than continuing without timing.`,
+      );
+      throw err;
     });
+
+    // Past startup, keep a listener attached so a later socket error is
+    // logged rather than becoming an uncaught exception mid-event.
+    this.server.on('error', (err) =>
+      this.logger.error(`Embedded MQTT broker error: ${err.message}`),
+    );
   }
 
   onModuleDestroy() {
