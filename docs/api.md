@@ -1,5 +1,12 @@
 # API
 
+**Every path below is prefixed with `/api`** (`app.setGlobalPrefix('api')` in
+`main.ts`). `rally-server` serves the built dashboard from the same port, so
+the prefix is what keeps `/vehicles` the *page* and `/api/vehicles` the
+*resource* — without it the two collide, and a new endpoint could silently
+shadow a page later. Anything outside `/api` that isn't a real file returns
+`index.html`, so vue-router's history-mode deep links resolve.
+
 REST (all on `rally-server`, default port 57430; embedded MQTT broker on
 57431):
 
