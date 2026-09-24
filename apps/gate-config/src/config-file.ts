@@ -22,31 +22,41 @@ export const FIELDS = {
     // Matches what the server accepts as a Gate primary key, and stays within
     // what a host name can be derived from (see install-gate-pi.sh).
     pattern: /^[A-Za-z0-9_-]{1,64}$/,
-    hint: 'Letters, digits, underscore and hyphen. Identity on the server — changing it makes the old one a separate gate.',
+    message: 'Use letters, digits, underscore and hyphen only (max 64).',
+    hint: 'Identity on the server — changing it makes the old one a separate gate.',
   },
   MQTT_HOST: {
     label: 'rally-server address',
     // Host name or IP. Deliberately not a strict hostname grammar: `.local`
     // names, bare IPv4 and IPv6 literals all have to pass.
     pattern: /^[A-Za-z0-9._:-]{1,253}$/,
+    message: 'Use a host name or IP address.',
     hint: 'Default rally-server.local is discovered over mDNS; an address here overrides it.',
   },
-  MQTT_PORT: { label: 'MQTT port', port: true, hint: 'Default 57431.' },
+  MQTT_PORT: {
+    label: 'MQTT port',
+    range: [1, 65535] as const,
+    message: 'Must be a port between 1 and 65535.',
+    hint: 'Default 57431.',
+  },
   ADAPTER: {
     label: 'Decoder',
-    oneOf: ['simulated'],
+    oneOf: ['simulated'] as const,
+    message: 'Pick one of the listed decoders.',
     hint: 'Only the simulator exists today.',
   },
   TRANSPONDERS: {
     label: 'Simulated transponders',
-    pattern: /^[0-9]+(,[0-9]*[0-9])*$/,
-    hint: 'Comma-separated, simulator only.',
+    pattern: /^[0-9]+(,[0-9]+)*$/,
+    message: 'Comma-separated digits, e.g. 1234567,7654321.',
+    hint: 'Simulator only.',
   },
   SIMULATE_INTERVAL_MS: {
     label: 'Simulated interval (ms)',
     // Lower bound because the simulator drives the real publish path: a 1ms
     // interval is a flood at the broker, not a test.
     range: [250, 3_600_000] as const,
+    message: 'Must be between 250 and 3600000 ms.',
     hint: 'Leave empty to publish no simulated detections.',
   },
   HEARTBEAT_INTERVAL_MS: {
@@ -54,11 +64,57 @@ export const FIELDS = {
     // Upper bound tied to the dashboard's 30s offline threshold: anything
     // slower makes a healthy gate read as offline.
     range: [1_000, 30_000] as const,
-    hint: 'Default 15000. Above 30000 the server shows this gate as offline.',
+    message: 'Must be between 1000 and 30000 ms.',
+    hint: 'Default 15000. Slower than 30000 and the server reads this gate as offline.',
   },
 } as const;
 
+/**
+ * The browser-safe description of each field, which the page turns into input
+ * rules.
+ *
+ * Sent so client-side validation is *derived* from this one definition rather
+ * than hand-written a second time in the Vue component, where the two would
+ * drift and a marshal would meet a rule the server does not have — or worse,
+ * not meet one it does. `config-file.spec.ts` asserts the two paths agree.
+ *
+ * Client-side rules stay a convenience: `validate` below is the boundary and
+ * runs on every save regardless of what the browser did. Exposing a pattern
+ * costs nothing; it is a grammar, not a secret.
+ */
+/** What the browser receives. Named so the wire contract is explicit rather
+ *  than inferred from `as const` specs, whose literal types are an
+ *  implementation detail of the server's own checks. */
+export interface FieldDescriptor {
+  label: string;
+  hint: string;
+  message: string;
+  oneOf?: string[];
+  pattern?: string;
+  range?: [number, number];
+}
+
+export function fieldDescriptors(): Record<FieldName, FieldDescriptor> {
+  return Object.fromEntries(
+    (Object.entries(FIELDS) as [FieldName, FieldSpec][]).map(([name, spec]) => [
+      name,
+      {
+        label: spec.label,
+        hint: spec.hint,
+        message: spec.message,
+        oneOf: 'oneOf' in spec ? [...spec.oneOf] : undefined,
+        // Source rather than the RegExp itself: JSON cannot carry one, and the
+        // client rebuilds it with `new RegExp(...)`.
+        pattern: 'pattern' in spec ? spec.pattern.source : undefined,
+        range:
+          'range' in spec ? ([...spec.range] as [number, number]) : undefined,
+      },
+    ]),
+  ) as Record<FieldName, FieldDescriptor>;
+}
+
 export type FieldName = keyof typeof FIELDS;
+export type FieldSpec = (typeof FIELDS)[FieldName];
 export type GateConfig = Partial<Record<FieldName, string>>;
 
 export function isFieldName(key: string): key is FieldName {
@@ -133,23 +189,22 @@ export function validate(
       errors[key] = 'Must not contain line breaks.';
       continue;
     }
+    // One message per field, taken from the spec, so the text a marshal reads is
+    // identical whether the browser or the server produced it. `port` is gone as
+    // a separate case: it was a range with another name, and one fewer case is
+    // one fewer thing the client has to reimplement.
     if ('pattern' in spec && !spec.pattern.test(raw)) {
-      errors[key] = `Invalid ${spec.label.toLowerCase()}.`;
+      errors[key] = spec.message;
     } else if (
       'oneOf' in spec &&
       !(spec.oneOf as readonly string[]).includes(raw)
     ) {
-      errors[key] = `Must be one of: ${spec.oneOf.join(', ')}.`;
-    } else if ('port' in spec) {
-      const port = Number(raw);
-      if (!Number.isInteger(port) || port < 1 || port > 65535) {
-        errors[key] = 'Must be a port between 1 and 65535.';
-      }
+      errors[key] = spec.message;
     } else if ('range' in spec) {
       const value = Number(raw);
       const [min, max] = spec.range;
       if (!Number.isInteger(value) || value < min || value > max) {
-        errors[key] = `Must be a whole number between ${min} and ${max}.`;
+        errors[key] = spec.message;
       }
     }
   }
