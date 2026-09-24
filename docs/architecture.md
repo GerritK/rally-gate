@@ -117,11 +117,21 @@ anything — "plug in a gate, it appears":
   current hostname (so a pre-imaged/pre-named Pi needs no typing), and
   separately offers (optional, not forced) to rename the Pi's system
   hostname to match `GATE_ID` via `raspi-config nonint do_hostname` if they
-  differ. Keeping `GATE_ID` and hostname in sync is what makes the gate
-  reachable as `<gateid>.local` via the avahi/mDNS that Raspberry Pi OS
-  already runs — relevant groundwork for "MQTT broker discovery" above,
-  even though that idea is about `rally-server` advertising itself, not
-  gates. No central cross-club registry to actually enforce global
+  differ. That is what makes the gate reachable as `<hostname>.local` via
+  the avahi/mDNS Raspberry Pi OS already runs — nothing in rally-gate
+  publishes a record for a gate, and nothing needs one today, since gates
+  only ever connect outward to the broker. It matters for the planned gate
+  config UI (`development-roadmap.md`), which is reached by connecting *to*
+  the gate.
+
+  **The host name is derived from `GATE_ID`, not equal to it.** A host name
+  may contain only letters, digits and hyphens (RFC 1123), while the
+  recommended `GATE_ID` format is underscore-separated — so `CLUB_START_WP1`
+  becomes `club-start-wp1.local`. Passing the ID through verbatim would write
+  a host name avahi refuses to publish, leaving the gate unreachable by name,
+  which is the one thing renaming it is for. Keeping them separate also means
+  the ID is free to change format without constraining the network name.
+  No central cross-club registry to actually enforce global
   uniqueness — same "not ruled out, just very low priority" status as the
   cross-event known-gates registry idea in `deployment-modes.md`.
 - `Gate.lastHeartbeatAt` (nullable `datetime`) is stamped on every heartbeat.
