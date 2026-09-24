@@ -31,9 +31,10 @@ export interface CommandResult {
 async function attempt(
   command: string,
   args: string[],
+  timeout = 10_000,
 ): Promise<CommandResult> {
   try {
-    const { stdout } = await run(command, args, { timeout: 10_000 });
+    const { stdout } = await run(command, args, { timeout });
     return { ok: true, output: stdout.trim() };
   } catch (err) {
     // Reported rather than thrown: several of these are expected to fail on a
@@ -93,4 +94,69 @@ export async function applyTimeSource(host: string): Promise<CommandResult> {
     return { ok: false, output: (err as Error).message };
   }
   return attempt('sudo', ['chronyc', 'reload', 'sources']);
+}
+
+/**
+ * Wi-Fi, via a wrapper script rather than a sudoers rule for `nmcli` itself.
+ *
+ * A wildcard `nmcli *` grant is effectively a root shell on a service that has
+ * no authentication: `nmcli connection import type openvpn file …` runs the
+ * `up` script in that file as root, and short of that, full control of routing
+ * and DNS on the gate is a man-in-the-middle on the timing path. The wrapper
+ * fixes every argument but the SSID and password, so the grant reads "join a
+ * network / start the hotspot" instead of "be root" — see
+ * docs/gate-config-ui.md, "Applying a change".
+ *
+ * The read-only calls deliberately do not go through it, since scanning and
+ * reading device state need no privilege at all.
+ */
+const NET_WRAPPER = process.env.NET_WRAPPER ?? '/usr/local/sbin/rally-gate-net';
+
+export function networkStatus(): Promise<CommandResult> {
+  return attempt('nmcli', [
+    '-t',
+    '-f',
+    'DEVICE,TYPE,STATE,CONNECTION',
+    'device',
+    'status',
+  ]);
+}
+
+/**
+ * `--rescan auto` rather than `yes`: a forced rescan is a privileged action
+ * under polkit, and it also takes the radio off its current network for a few
+ * seconds — which, when the marshal is reading this page over the gate's own
+ * hotspot, disconnects them mid-scan. `auto` reuses a recent scan and triggers
+ * a new one only when the cache is stale.
+ */
+export function wifiScan(): Promise<CommandResult> {
+  return attempt('nmcli', [
+    '-t',
+    '-f',
+    'SSID,SIGNAL,SECURITY',
+    'device',
+    'wifi',
+    'list',
+    '--rescan',
+    'auto',
+  ]);
+}
+
+export function wifiJoin(
+  ssid: string,
+  password: string,
+): Promise<CommandResult> {
+  // Longer than the default: associating, authenticating and picking up a DHCP
+  // lease is routinely 10-20s on a busy access point, and the wrapper caps
+  // nmcli's own wait at 30s so this never sits on a dead socket.
+  return attempt('sudo', [NET_WRAPPER, 'join', ssid, password], 45_000);
+}
+
+/**
+ * No password argument: the wrapper reads it from gate.env itself, so this
+ * grant cannot be used to put the gate on an access point with a password only
+ * the caller knows.
+ */
+export function startHotspot(): Promise<CommandResult> {
+  return attempt('sudo', [NET_WRAPPER, 'hotspot']);
 }

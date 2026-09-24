@@ -1,0 +1,98 @@
+#!/bin/bash
+# Installed to /usr/local/sbin/rally-gate-net by install-gate-pi.sh, and the one
+# thing gate-config is allowed to run as root for networking.
+#
+# Why a wrapper instead of a sudoers rule for nmcli: gate-config is reachable by
+# anyone on the rally network and has no authentication, so what it can do as
+# root is the security boundary. A wildcard `nmcli *` grant is effectively a
+# root shell — `nmcli connection import type openvpn file …` executes that
+# file's `up` script as root, and even without that trick, arbitrary control of
+# routing and DNS on a gate is a man-in-the-middle on the timing path. Here the
+# only caller-supplied values are an SSID and a Wi-Fi password, in fixed
+# positions; everything else is literal.
+#
+# Keep it that way: every argument that reaches nmcli below is either a literal
+# or "$2"/"$3". Do not add a subcommand that passes through a property name.
+set -euo pipefail
+
+IFACE="${WIFI_IFACE:-wlan0}"
+CONFIG_FILE="${GATE_CONFIG_FILE:-/etc/rally-gate/gate.env}"
+HOTSPOT_CON="rally-gate-hotspot"
+
+# The hotspot password is read here rather than passed in, so the sudo grant
+# cannot be used to raise an access point with a password only the caller knows.
+# Last assignment wins, matching how systemd reads the same file.
+hotspot_password() {
+  local value=''
+  [ -f "$CONFIG_FILE" ] && value="$(sed -n 's/^HOTSPOT_PASSWORD=//p' "$CONFIG_FILE" | tail -n1)"
+  # WPA2 will not accept anything shorter than 8 characters, and a gate that
+  # refuses to raise its hotspot is a gate that needs a keyboard — so fall back
+  # to the documented default rather than failing.
+  [ "${#value}" -ge 8 ] || value='rally-gate'
+  printf '%s' "$value"
+}
+
+# Matches the .local name the gate is already reachable under, so the network to
+# join is obvious from the sticker on the box. 32 bytes is the SSID limit.
+hotspot_ssid() {
+  printf 'rally-gate-%s' "$(hostname)" | cut -c1-32
+}
+
+start_hotspot() {
+  nmcli device wifi hotspot \
+    ifname "$IFACE" \
+    con-name "$HOTSPOT_CON" \
+    ssid "$(hotspot_ssid)" \
+    password "$(hotspot_password)"
+  # Otherwise NetworkManager races the saved Wi-Fi connection at every boot and
+  # the gate comes up on its own island instead of the rally network.
+  nmcli connection modify "$HOTSPOT_CON" connection.autoconnect no
+}
+
+hotspot_active() {
+  nmcli -t -f NAME connection show --active 2>/dev/null | grep -Fxq "$HOTSPOT_CON"
+}
+
+case "${1:-}" in
+  join)
+    ssid="${2:-}"
+    password="${3:-}"
+    [ -n "$ssid" ] || exit 64
+    # A value nmcli would read as one of its own options. gate-config rejects
+    # this too; repeated here because this script is the privileged half.
+    case "$ssid" in -*) exit 64 ;; esac
+    # The hotspot holds the radio on most Pi models, so it has to go down before
+    # the join is attempted. Nothing restores it on failure by design: the
+    # watchdog does that within a minute, which is also what recovers a gate
+    # whose saved network stops working at the next event.
+    nmcli connection down "$HOTSPOT_CON" >/dev/null 2>&1 || true
+    if [ -n "$password" ]; then
+      nmcli --wait 30 device wifi connect "$ssid" password "$password" ifname "$IFACE"
+    else
+      nmcli --wait 30 device wifi connect "$ssid" ifname "$IFACE"
+    fi
+    ;;
+
+  hotspot)
+    hotspot_active && { echo "hotspot already up"; exit 0; }
+    start_hotspot
+    ;;
+
+  watchdog)
+    # Run by rally-gate-hotspot.timer. The gate must be reachable *before* it
+    # has a network — that is the state you most need the config page in — and
+    # equally after a network that used to work stops working.
+    hotspot_active && exit 0
+    # nmcli prints e.g. "100 (connected)"; 100 is the only state that means the
+    # radio is associated with a real network.
+    state="$(nmcli -g GENERAL.STATE device show "$IFACE" 2>/dev/null | cut -d' ' -f1)"
+    [ "$state" = "100" ] && exit 0
+    echo "no Wi-Fi connection on $IFACE (state ${state:-unknown}), raising hotspot"
+    start_hotspot
+    ;;
+
+  *)
+    echo "usage: rally-gate-net join <ssid> [password] | hotspot | watchdog" >&2
+    exit 64
+    ;;
+esac

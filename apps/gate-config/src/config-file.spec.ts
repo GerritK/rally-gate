@@ -243,3 +243,25 @@ describe('fieldDescriptors', () => {
     );
   });
 });
+
+describe('field groups', () => {
+  // The page renders one card per group and nothing outside them, so a field
+  // carrying a group the component does not know about is simply invisible —
+  // a setting a marshal cannot reach, with no error anywhere to say so.
+  const RENDERED_GROUPS: string[] = ['general', 'decoder'];
+
+  it('puts every field in a group the page renders', () => {
+    const stranded = Object.entries(fieldDescriptors())
+      .filter(([, descriptor]) => !RENDERED_GROUPS.includes(descriptor.group))
+      .map(([name]) => name);
+    expect(stranded).toEqual([]);
+  });
+
+  it('keeps the simulator settings with the decoder', () => {
+    const descriptors = fieldDescriptors();
+    expect(descriptors.ADAPTER.group).toBe('decoder');
+    expect(descriptors.TRANSPONDERS.group).toBe('decoder');
+    expect(descriptors.SIMULATE_INTERVAL_MS.group).toBe('decoder');
+    expect(descriptors.GATE_ID.group).toBe('general');
+  });
+});

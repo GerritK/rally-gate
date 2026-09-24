@@ -8,6 +8,7 @@ interface FieldSpec {
   label: string;
   hint?: string;
   message: string;
+  group?: 'general' | 'decoder';
   oneOf?: string[];
   pattern?: string;
   range?: [number, number];
@@ -15,6 +16,17 @@ interface FieldSpec {
 interface CommandResult {
   ok: boolean;
   output: string;
+}
+
+interface WifiNetwork {
+  ssid: string;
+  signal: number;
+  secured: boolean;
+}
+interface NetworkState {
+  available: boolean;
+  wifi: { device: string; state: string; connection: string } | null;
+  networks: WifiNetwork[];
 }
 
 const fields = ref<Record<string, FieldSpec>>({});
@@ -35,6 +47,12 @@ const notice = ref<{
   text: string;
 } | null>(null);
 const originalGateId = ref('');
+
+const network = ref<NetworkState | null>(null);
+const joinSsid = ref('');
+const joinPassword = ref('');
+const joining = ref(false);
+const wifiErrors = ref<Record<string, string>>({});
 
 let statusTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -58,9 +76,41 @@ watchEffect(() => {
 // Changing GATE_ID is not a rename on the server — it keys Gate, GateAssignment
 // and every stored detection, so the old rows stay behind and this gate comes
 // back as a new, unassigned one. Warned before saving rather than after.
+// Which card a setting belongs in is decided in config-file.ts, not here, so a
+// new field cannot end up in the wrong one — or in none at all, which is what
+// a hand-maintained list in this component would eventually do.
+function fieldsIn(group: 'general' | 'decoder') {
+  return Object.entries(fields.value).filter(
+    ([, spec]) => (spec.group ?? 'general') === group,
+  );
+}
+
 const gateIdChanged = computed(
   () => !!originalGateId.value && values.value.GATE_ID !== originalGateId.value,
 );
+
+const wifiConnection = computed(() => {
+  const wifi = network.value?.wifi;
+  if (!wifi) {
+    return null;
+  }
+  // nmcli leaves CONNECTION empty for a radio that is up but not associated,
+  // which reads as "no network" rather than as a nameless one.
+  return wifi.state === 'connected' && wifi.connection ? wifi.connection : null;
+});
+
+// The gate is serving its own access point, which means whoever is reading this
+// is almost certainly on it — so joining a network will drop them.
+const onHotspot = computed(
+  () => network.value?.wifi?.connection === 'rally-gate-hotspot',
+);
+
+const selectedSecured = computed(() => {
+  const match = network.value?.networks.find((n) => n.ssid === joinSsid.value);
+  // An SSID typed by hand (hidden network) is assumed secured: offering no
+  // password field for it would make it unjoinable.
+  return match ? match.secured : true;
+});
 
 type Rule = (value: unknown) => true | string;
 
@@ -112,6 +162,76 @@ async function load() {
   originalGateId.value = config.GATE_ID ?? '';
 }
 
+async function loadNetwork() {
+  try {
+    network.value = await (await fetch('/api/network')).json();
+  } catch {
+    network.value = null;
+  }
+}
+
+async function join() {
+  joining.value = true;
+  notice.value = null;
+  wifiErrors.value = {};
+  try {
+    const response = await fetch('/api/network', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ssid: joinSsid.value,
+        password: joinPassword.value,
+      }),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      wifiErrors.value = result.errors ?? {};
+      notice.value = { type: 'error', text: 'Could not join — check below.' };
+      return;
+    }
+    notice.value = result.joined
+      ? { type: 'success', text: `Joined ${joinSsid.value}.` }
+      : {
+          type: 'error',
+          text: result.output || 'Could not join that network.',
+        };
+    joinPassword.value = '';
+    await loadNetwork();
+  } catch {
+    // Expected whenever the page is being read over the gate's own hotspot:
+    // joining takes that hotspot down, so the reply has no route back. Saying
+    // "failed" here would send a marshal to re-enter a password that is in fact
+    // being used.
+    notice.value = {
+      type: 'warning',
+      text: `Lost contact with the gate while joining ${joinSsid.value}. That is expected if you were connected to its hotspot — reconnect to ${joinSsid.value} and reopen this page. If the gate cannot join, it raises its hotspot again within a minute.`,
+    };
+  } finally {
+    joining.value = false;
+  }
+}
+
+async function raiseHotspot() {
+  notice.value = null;
+  try {
+    const result = await (
+      await fetch('/api/network/hotspot', { method: 'POST' })
+    ).json();
+    notice.value = result.started
+      ? { type: 'success', text: 'Hotspot up.' }
+      : {
+          type: 'error',
+          text: result.output || 'Could not start the hotspot.',
+        };
+    await loadNetwork();
+  } catch {
+    notice.value = {
+      type: 'warning',
+      text: 'Lost contact with the gate — expected if it dropped the network you were on to raise the hotspot.',
+    };
+  }
+}
+
 async function loadStatus() {
   try {
     status.value = await (await fetch('/api/status')).json();
@@ -160,7 +280,7 @@ async function save() {
 
 onMounted(async () => {
   await load();
-  await loadStatus();
+  await Promise.all([loadStatus(), loadNetwork()]);
   statusTimer = setInterval(loadStatus, 5000);
 });
 onUnmounted(() => clearInterval(statusTimer));
@@ -202,11 +322,44 @@ onUnmounted(() => clearInterval(statusTimer));
           @click:close="notice = null"
         />
 
-        <v-card class="mb-6">
-          <v-card-title>Settings</v-card-title>
-          <v-card-text>
-            <v-form v-model="formValid">
-              <template v-for="(spec, name) in fields" :key="name">
+        <!-- One form across both cards: they are two halves of the same PUT, so
+             the save button sits after them rather than in either one. -->
+        <v-form v-model="formValid">
+          <v-card class="mb-6">
+            <v-card-title>Settings</v-card-title>
+            <v-card-text>
+              <template v-for="[name, spec] in fieldsIn('general')" :key="name">
+                <v-text-field
+                  v-model="values[name]"
+                  :label="spec.label"
+                  :hint="spec.hint"
+                  :rules="rulesFor(spec)"
+                  :error-messages="errors[name]"
+                  persistent-hint
+                  class="mb-4"
+                  @update:model-value="clearServerError(name)"
+                />
+              </template>
+
+              <v-alert
+                v-if="gateIdChanged"
+                type="warning"
+                variant="tonal"
+                density="comfortable"
+                text="Changing the Gate ID makes this a different gate to the server. Its
+                      existing assignment and recorded detections stay with the old ID."
+              />
+            </v-card-text>
+          </v-card>
+
+          <!-- Separate from the settings above because it is the one group that
+               changes with the hardware in the box rather than with the rally,
+               and because everything in it but the decoder itself disappears
+               once an adapter other than the simulator exists. -->
+          <v-card class="mb-6">
+            <v-card-title>Decoder</v-card-title>
+            <v-card-text>
+              <template v-for="[name, spec] in fieldsIn('decoder')" :key="name">
                 <v-select
                   v-if="spec.oneOf"
                   v-model="values[name]"
@@ -231,19 +384,10 @@ onUnmounted(() => clearInterval(statusTimer));
                   @update:model-value="clearServerError(name)"
                 />
               </template>
-            </v-form>
+            </v-card-text>
+          </v-card>
 
-            <v-alert
-              v-if="gateIdChanged"
-              type="warning"
-              variant="tonal"
-              density="comfortable"
-              text="Changing the Gate ID makes this a different gate to the server. Its
-                    existing assignment and recorded detections stay with the old ID."
-            />
-          </v-card-text>
-          <v-card-actions>
-            <v-spacer />
+          <div class="d-flex justify-end mb-6">
             <v-btn
               :loading="saving"
               :disabled="formValid === false"
@@ -252,6 +396,99 @@ onUnmounted(() => clearInterval(statusTimer));
               @click="save"
             >
               Save and apply
+            </v-btn>
+          </div>
+        </v-form>
+
+        <v-card class="mb-6">
+          <v-card-title class="d-flex align-center">
+            Network
+            <v-spacer />
+            <v-chip
+              v-if="wifiConnection"
+              :color="onHotspot ? 'warning' : 'success'"
+              :prepend-icon="onHotspot ? 'mdi-access-point' : 'mdi-wifi'"
+              size="small"
+              variant="flat"
+            >
+              {{ onHotspot ? 'own hotspot' : wifiConnection }}
+            </v-chip>
+            <v-chip
+              v-else
+              color="error"
+              prepend-icon="mdi-wifi-off"
+              size="small"
+              variant="flat"
+            >
+              no Wi-Fi
+            </v-chip>
+          </v-card-title>
+          <v-card-text>
+            <v-alert
+              v-if="network && !network.available"
+              type="info"
+              variant="tonal"
+              density="comfortable"
+              text="NetworkManager is not available on this machine, so Wi-Fi cannot be
+                    configured from here. Expected off a Raspberry Pi, or on a gate
+                    wired by Ethernet."
+              class="mb-2"
+            />
+            <template v-else>
+              <!-- A combobox, not a select: a hidden network broadcasts no SSID,
+                   so it never appears in the scan and has to be typed. -->
+              <v-combobox
+                v-model="joinSsid"
+                :items="network?.networks.map((n) => n.ssid) ?? []"
+                :error-messages="wifiErrors.ssid"
+                label="Network"
+                hint="Pick one in range, or type the name of a hidden network."
+                persistent-hint
+                class="mb-4"
+              />
+              <v-text-field
+                v-if="selectedSecured"
+                v-model="joinPassword"
+                :error-messages="wifiErrors.password"
+                label="Wi-Fi password"
+                type="password"
+                autocomplete="off"
+                hint="Stored by NetworkManager, not in the gate's config file."
+                persistent-hint
+                class="mb-4"
+              />
+
+              <v-alert
+                v-if="onHotspot"
+                type="info"
+                variant="tonal"
+                density="comfortable"
+                text="You are connected to this gate's own hotspot. Joining a network
+                      takes the hotspot down, so this page will go unreachable — that
+                      is expected. If the gate cannot join, it raises the hotspot
+                      again within a minute."
+              />
+            </template>
+          </v-card-text>
+          <v-card-actions v-if="network?.available">
+            <!-- Raising it by hand is the only way to check the hotspot from
+                 here: the watchdog fires only when the gate has no network. -->
+            <v-btn
+              variant="text"
+              prepend-icon="mdi-access-point"
+              @click="raiseHotspot"
+            >
+              Start hotspot
+            </v-btn>
+            <v-spacer />
+            <v-btn
+              :loading="joining"
+              :disabled="!joinSsid"
+              color="primary"
+              variant="flat"
+              @click="join"
+            >
+              Join
             </v-btn>
           </v-card-actions>
         </v-card>
