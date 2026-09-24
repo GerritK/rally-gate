@@ -32,8 +32,6 @@ describe('latestAttempts', () => {
     }) as StageRun;
 
   it('keeps only the most recent attempt per vehicle and stage', () => {
-    // A red-flagged stage gets re-run; the first attempt stays in the
-    // database as evidence but must not compete with the re-run.
     const first = run('v1', 'SS1', 1, 90_000);
     const rerun = run('v1', 'SS1', 2, 120_000);
 
@@ -41,8 +39,6 @@ describe('latestAttempts', () => {
   });
 
   it('picks the re-run even when it is the slower time', () => {
-    // "Latest", not "best" — a re-run replaces the original outright, so a
-    // crew cannot keep a quicker voided run by being slower second time.
     const quickVoided = run('v1', 'SS1', 1, 60_000);
     const slowRerun = run('v1', 'SS1', 2, 200_000);
 
@@ -57,8 +53,6 @@ describe('latestAttempts', () => {
   });
 
   it('yields no result at all when every attempt is voided', () => {
-    // The correct reading of "that run didn't happen" — the vehicle should
-    // drop out of the stage's results rather than keep a struck-out time.
     const only = { ...run('v1', 'SS1', 1, 90_000), voided: true };
 
     expect(latestAttempts([only])).toEqual([]);
@@ -93,8 +87,6 @@ describe('deriveStageRunStatus', () => {
   });
 
   it('is VOIDED ahead of FINISHED, even with a finish time recorded', () => {
-    // Order matters: a voided run usually *does* have a finishTime, and
-    // reporting FINISHED would present a struck-out time as a result.
     const run = { finishTime: new Date(), voided: true };
     expect(deriveStageRunStatus(run, false)).toBe(StageRunStatus.VOIDED);
     expect(deriveStageRunStatus(run, true)).toBe(StageRunStatus.VOIDED);
@@ -311,14 +303,11 @@ describe('StageRunsService.unvoidRun', () => {
   });
 
   it('refuses rather than cascading a void onto the surviving run', async () => {
-    // The whole point: striking out a run the car actually drove is the
-    // marshal's call to make explicitly, not a side effect of "restore".
     const { service, stageRuns } = makeUnvoidService([
       { id: 'r2', attempt: 2, voided: false, finishTime: new Date() },
     ]);
 
     await expect(service.unvoidRun('r1')).rejects.toThrow();
-    // Nothing was written at all — the survivor is untouched.
     expect(stageRuns.save).not.toHaveBeenCalled();
   });
 });
@@ -345,8 +334,6 @@ describe('StageRunsService.createManual', () => {
         stageId: 's1',
         startTime: '2026-01-01T00:00:00.000Z',
       }),
-      // A vehicle has at most one non-voided attempt per stage, so recording
-      // a re-run by hand means voiding the previous attempt first.
     ).rejects.toThrow('already has an attempt on stage s1 that counts');
   });
 

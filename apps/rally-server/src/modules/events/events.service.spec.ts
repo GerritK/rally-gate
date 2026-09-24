@@ -82,8 +82,7 @@ function detection(overrides: Record<string, unknown> = {}) {
 
 describe('EventsService detection failures', () => {
   it('keeps the raw detection when rule application fails', async () => {
-    // The passing itself must survive even when the timing logic blows up —
-    // it is the only evidence the car came past at all.
+    // The detection is the only evidence the car came past at all.
     const { service, saved } = makeService({
       startRun: jest.fn().mockRejectedValue(new Error('SQLITE_BUSY')),
     });
@@ -95,9 +94,8 @@ describe('EventsService detection failures', () => {
   });
 
   it('leaves a failed detection pending instead of throwing it away', async () => {
-    // @nestjs/event-emitter defaults to suppressErrors, so a thrown error
-    // here would be logged and dropped with nothing tracking it. Staying
-    // unprocessed is what makes it countable and retryable.
+    // @nestjs/event-emitter defaults to suppressErrors, so a throw here would
+    // be dropped; staying unprocessed is what makes it retryable.
     const { service, saved } = makeService({
       startRun: jest.fn().mockRejectedValue(new Error('SQLITE_BUSY')),
     });
@@ -108,9 +106,8 @@ describe('EventsService detection failures', () => {
   });
 
   it('publishes the backlog on failure instead of only logging it', async () => {
-    // The failure has to reach the live feed under the name LiveController
-    // subscribes to. An emit nothing listens for is indistinguishable from
-    // no emit at all, which is how this was missed the first time.
+    // An emit nothing listens for is indistinguishable from no emit at all,
+    // which is how this was missed the first time.
     const { service, emitter } = makeService({
       startRun: jest.fn().mockRejectedValue(new Error('SQLITE_BUSY')),
     });
@@ -127,10 +124,8 @@ describe('EventsService detection failures', () => {
   it.each([StageStatus.NOT_STARTED, StageStatus.CLOSED])(
     'stores without timing when the assigned stage is %s',
     async (stageStatus) => {
-      // GateAssignment.active and Stage.status are two records kept in step
-      // by StagesService, and activate updates them in separate steps — so a
-      // gate can be live on a stage that isn't. The detection is still kept;
-      // it just must not attach a run to a stage nobody is running.
+      // A gate can be live on a stage that isn't — see applyRules. The
+      // detection is kept, it just must not attach a run to that stage.
       const { service, saved, startRun } = makeService({ stageStatus });
 
       await service.handleMqttMessage(detection());
@@ -156,9 +151,8 @@ describe('EventsService detection failures', () => {
   it.each(nothingToApply)(
     'marks %s processed rather than leaving it pending',
     async (_l, opts) => {
-      // Nothing to apply and retrying would never change that, so these must
-      // not accumulate in the pending list — it is meant to hold real
-      // failures, not stray passings from a car that isn't in this event.
+      // Retrying would never change these, so they must not accumulate in a
+      // pending list meant to hold real failures.
       const { service, saved } = makeService(opts);
 
       await service.handleMqttMessage(detection());
@@ -169,9 +163,8 @@ describe('EventsService detection failures', () => {
 });
 
 describe('EventsService detection payload validation', () => {
-  // MQTT is the one ingress the global ValidationPipe does not cover, and the
-  // broker is unauthenticated — anything on the rally network can publish to
-  // a gate topic.
+  // MQTT is the one ingress the global ValidationPipe doesn't cover, on an
+  // unauthenticated broker.
   it.each([
     ['a missing eventId', { eventId: undefined }],
     ['an empty gateId', { gateId: '' }],
@@ -183,9 +176,7 @@ describe('EventsService detection payload validation', () => {
 
     await service.handleMqttMessage(detection(overrides));
 
-    // Dropped outright rather than stored: an invalid timestamp becomes an
-    // Invalid Date that poisons a duration silently, and a missing eventId
-    // fails the insert and would sit in the pending list forever.
+    // Dropped outright rather than stored — see parseDetection.
     expect(saved).toHaveLength(0);
     expect(startRun).not.toHaveBeenCalled();
   });

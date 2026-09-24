@@ -247,11 +247,6 @@ async function onCorrectFinish(run: StageRun, value: string) {
   );
 }
 
-/**
- * Red flag. Keeps the attempt on record but drops it from the results and
- * frees the car, so the start gate opens the re-run itself next time it goes
- * through — no restart time to type in.
- */
 async function onVoidRun(run: StageRun) {
   if (
     !confirm(
@@ -264,12 +259,7 @@ async function onVoidRun(run: StageRun) {
   upsertStageRun(await voidStageRun(run.id));
 }
 
-/**
- * Reverses a void. The server refuses if another attempt already counts, and
- * its message names the one to void first — surfaced as-is rather than
- * offering to cascade, since discarding that run is a decision the marshal
- * should make deliberately.
- */
+/** The server's 409 names the attempt to void first; surfaced as-is. */
 async function onUnvoidRun(run: StageRun) {
   try {
     upsertStageRun(await unvoidStageRun(run.id));
