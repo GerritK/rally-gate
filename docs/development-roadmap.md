@@ -121,6 +121,35 @@
   behind: the run recorded 3000ms (the true elapsed time) where an
   uncorrected server reported 8002ms.
 
+- Gate config UI, settings half (`apps/gate-config`, port 57434): a marshal can
+  change a gate's identity, server address, decoder and simulator settings from a
+  page on the gate itself, and see whether gate-agent is running, what chrony
+  reports and the recent log — no SSH, no re-running the installer. The design
+  and the reasoning behind each decision are in `docs/gate-config-ui.md`; the
+  parts worth knowing without reading it: it is a *separate* service from
+  `gate-agent`, because gate-agent restarts forever, so a bad setting becomes a
+  crash loop and a UI hosted inside it would die with the thing it exists to
+  repair; config moved out of the systemd unit into `/etc/rally-gate/gate.env`
+  behind `EnvironmentFile=`, which meant `gate-agent` needed no code change at
+  all since it already reads exactly those env vars; and the settable keys are a
+  **whitelist**, because that file becomes gate-agent's environment and an
+  arbitrary key would let anyone on the rally network set `LD_PRELOAD`.
+
+  Built with Vue + Vuetify through `packages/ui` — its second consumer, which
+  `CLAUDE.md` said the shared-component pattern needed. The cost weighed against
+  it, a Vite build in the install path, turned out to be build time only:
+  `install-gate-pi.sh` already installs every workspace's dependencies on the Pi.
+
+  Verified: 23 unit tests over the config file including every injection case,
+  and the API exercised end-to-end against the running service (save, validation
+  rejection, the chrony source file's contents, static serving, SPA fallback).
+  Also that it degrades — with no `systemctl` or `chronyc` present `/api/status`
+  returns 200 with per-probe failures, and a save reports `saved: true` alongside
+  the restart failure, so a marshal is never told to re-enter values that are in
+  fact stored. **Not** verified: the privileged actions (systemd, chrony,
+  sudoers) and how the page renders, there being no headless browser in this
+  repo. Wi-Fi/hotspot is not written; see Next.
+
 - Host networking for the headless stack, so mDNS discovery works there too: a
   bridged container can neither send nor receive LAN multicast, so
   `DiscoveryService` was advertising into the Docker bridge where no gate could
@@ -252,23 +281,19 @@ reconfiguration off the install script and into the gate's own UI (item 1).
 
 Priority order (1 = next):
 
-1. **Gate config web interface** (bigger item, own service) — **now designed,
-   see `docs/gate-config-ui.md`**; that document is the thing to read before
-   building, and it supersedes the sketch this entry used to hold. In short:
-   `apps/gate-config` on port 57434, separate from `gate-agent` so a config that
-   crash-loops it doesn't take down the tool that fixes it; config moves out of
-   the systemd unit into `/etc/rally-gate/gate.env` via `EnvironmentFile=`, so
-   `gate-agent` needs no code change; the chrony source follows `MQTT_HOST`
-   through `sourcedir` + `chronyc reload sources` rather than a restart, because
-   restarting chrony can step the clock mid-stage; and NetworkManager's
-   `nmcli device wifi hotspot` replaces the hostapd + dnsmasq stack this entry
-   originally assumed.
-
-   One decision left open there on purpose: plain server-rendered HTML (no build
-   step in the install path) versus Vue + Vuetify through `packages/ui` (one
-   product, but a Vite build on a Pi). The design recommends plain HTML first.
-
-Then, unchanged in relative order:
+1. **Gate config: Wi-Fi and AP/hotspot fallback** — the remaining half of
+   `apps/gate-config`. Settings, status and the UI are built (see Done); missing
+   is joining a Wi-Fi network from the page and the hotspot fallback that makes
+   the gate reachable *before* it has any network, which is the state you most
+   need it in. Designed in `docs/gate-config-ui.md` under "Reachability before
+   the gate has a network": NetworkManager's `nmcli device wifi hotspot` rather
+   than hostapd + dnsmasq, falling back to AP mode both on a virgin gate and
+   after a previously working Wi-Fi fails. Two things to settle while building:
+   the hotspot needs a WPA2 password (the "closed rally network is the boundary"
+   argument stops holding once the gate broadcasts its own), and `nmcli` needs a
+   wildcard sudoers rule, a materially weaker grant than the two exact commands
+   there now. Needs real hardware — station and hotspot mode may not coexist on
+   one radio on every Pi model.
 
 2. **GPS/PPS as a chrony refclock per gate** (optional, per gate). Not for
    accuracy — LAN chrony already exceeds what tenths-of-a-second margins

@@ -1,8 +1,13 @@
-# Gate Config UI (design, not built)
+# Gate Config UI
 
 A local web interface on the gate Pi, so a marshal can set up and check a gate
-without SSH and without re-running the installer. Roadmap item 1; this document
-is the design that item asked for, not a description of existing code.
+without SSH and without re-running the installer.
+
+**Status: settings, status and the UI are built (`apps/gate-config`). Wi-Fi and
+the AP/hotspot fallback are not** — the sections below describing them are still
+design. Until they land, the page is reachable only once the gate is already on
+a network, which covers changing the gate's identity or the server address but
+not first-time onboarding of a gate with no Wi-Fi.
 
 The requirement it serves is "Zero-config gates" in `development-roadmap.md`: a
 gate must be installable without knowing anything about the rally it will be
@@ -27,11 +32,9 @@ config service must be the thing that survives a broken gate-agent.
 
 ## Where configuration lives
 
-Today the installer bakes values into the systemd unit as `Environment=` lines.
-The UI must not edit that unit: a unit file is code, `daemon-reload` is
-required, and a partial write bricks the service.
-
-Instead, split data from unit:
+The installer used to bake values into the systemd unit as `Environment=`
+lines. The UI must not edit that unit: a unit file is code, `daemon-reload` is
+required, and a partial write bricks the service. So data and unit are split:
 
 ```ini
 # /etc/systemd/system/rally-gate-agent.service  (written once by the installer)
@@ -64,15 +67,19 @@ actions are needed, and the service should not run as root for them:
 
 ```
 # /etc/sudoers.d/rally-gate-config  (installed by install-gate-pi.sh)
-rally ALL=(root) NOPASSWD: /usr/bin/systemctl restart rally-gate-agent
-rally ALL=(root) NOPASSWD: /usr/bin/chronyc reload sources
-rally ALL=(root) NOPASSWD: /usr/bin/nmcli *
+<user> ALL=(root) NOPASSWD: /usr/bin/systemctl restart rally-gate-agent
+<user> ALL=(root) NOPASSWD: /usr/bin/chronyc reload sources
 ```
 
 Exact commands rather than a blanket rule, since this service is reachable by
-anyone on the rally network (see "Access" below). `nmcli` needs a wildcard
-because Wi-Fi arguments vary; that one is the weak entry and worth revisiting
-if the UI ever gains authentication.
+anyone on the rally network and has no authentication (see "Access" below) —
+what it can do as root *is* the boundary. The installer runs `visudo -c` over
+the drop-in and removes it if invalid, because a malformed sudoers file locks
+out sudo entirely.
+
+The Wi-Fi work will need `nmcli`, whose arguments vary and so would need a
+wildcard rule. That is a materially weaker grant than the two above and should
+be decided when it is written, not pre-authorised here.
 
 ### The time source must follow the server address
 
@@ -104,11 +111,15 @@ Status first, settings second. A marshal standing at a gate needs "is this
 working" far more often than "change this value", and today the only answer is
 on the server's Hardware page, a walk away.
 
-- **gate-agent**: active/failed, from `systemctl is-active`.
-- **Broker**: connected or not.
-- **Clock**: chrony's current offset, from `chronyc tracking`.
-- **Network**: current SSID and signal, from `nmcli`.
-- **Recent log**: the last ~20 journal lines, verbatim.
+- **gate-agent**: active/failed, from `systemctl is-active`. Built.
+- **Clock**: `chronyc tracking` output. Built.
+- **Recent log**: the last 20 journal lines, verbatim. Built.
+- **Network**: current SSID and signal from `nmcli`. Not built, with the rest
+  of the Wi-Fi work.
+
+Each probe reports independently, so one failing shows as unavailable for that
+row rather than failing the page — a gate without chrony is a real state, not
+an error.
 
 On "connected": the honest cheap version is that the journal already says
 `connected to broker at …`, so the log panel answers it without any new
@@ -174,26 +185,45 @@ it is predictable for the organiser and printable by the installer, rather than
 random and lost. Worth deciding deliberately rather than inheriting "no auth"
 from the server.
 
-## Open decision: how the page is built
+## How the page is built
 
-This is the one choice that changes the amount of work, and it is not obvious.
+**Vue + Vuetify through `packages/ui`** — decided, and this is that package's
+second consumer, which `CLAUDE.md` said the shared-component pattern needed
+before growing further. Every rally-gate interface therefore reads as one
+product, and the theme's conventions apply here too: the running/stopped chip
+carries an icon and text rather than colour alone, and `chronyc tracking` output
+uses `.rg-timing`.
 
-**Plain server-rendered HTML from the Node service.** No build step, no bundle,
-nothing for `install-gate-pi.sh` to compile on a Pi, and no CI addition. Six
-fields and a status panel do not need a framework. Cost: it is visibly not the
-same product as the dashboard, and `packages/ui`'s theme would be copied as a
-few CSS variables rather than used.
+The cost this was weighed against — a Vite build in the install path — turned
+out smaller than it looked: `install-gate-pi.sh` already runs `npm install` at
+the repo root, so Vite and Vuetify are downloaded onto every gate Pi today
+regardless. What is added is build time, not dependencies. The build is
+`tsc && vue-tsc && vite build`; the `vue-tsc` step matters because this app has
+no test suite over its `.vue` file, exactly as noted for `apps/web` in
+`CLAUDE.md`.
 
-**Vue + Vuetify via `packages/ui`.** The roadmap names this UI as that package's
-planned second consumer, existing precisely so every rally-gate interface reads
-as one product, and it would prove the shared-component pattern that
-`CLAUDE.md` says needs a second consumer. Cost: a Vite build in the install
-path — slow on modest Pi hardware — or shipping prebuilt assets, plus a new
-workspace in CI and `optimizeDeps` care for `.vue` files pulled from a
-workspace package.
+The bundle is roughly 680 kB of JS and 850 kB of CSS including MDI fonts. Large
+for a settings form, irrelevant over a local link, and worth revisiting only if
+the page is ever served over something slower than Wi-Fi in the same field.
 
-Recommendation: **plain HTML first.** The gate UI is a utility one person opens
-on a phone while kneeling next to a Pi, the install path should stay fast on the
-weakest hardware, and `packages/ui` gets its second consumer honestly when
-there is a second *dashboard-like* surface rather than a settings form. Revisit
-if this page grows past a form and a status list.
+## What is verified, and what is not
+
+Everything touching the operating system is confined to `src/system.ts` for this
+reason: systemd, chrony and NetworkManager do not exist on a developer machine,
+so that file is the untested surface and the rest is not.
+
+Verified on a developer machine:
+
+- `config-file.ts` under unit test, including every injection case below.
+- The API end to end against the running service: field list, save, validation
+  rejection, the chrony source file's contents, static serving and SPA fallback.
+- That failing system calls degrade rather than break — with no `systemctl` or
+  `chronyc` present, `/api/status` returns 200 with per-probe failures, and a
+  save reports `saved: true` with the restart failure alongside.
+- `tsc`/`vue-tsc`/`vite build`.
+
+Not verified, and only real hardware can:
+
+- That the restart, chrony reload and sudoers rules work.
+- That the page renders as intended — there is no headless browser in this repo.
+- Anything about Wi-Fi or hotspot mode, which is not written.
