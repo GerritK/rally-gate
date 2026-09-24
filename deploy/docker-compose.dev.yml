@@ -10,9 +10,15 @@ services:
       dockerfile: apps/gate-agent/Dockerfile
     depends_on:
       - rally-server
+    # rally-server runs on the host network, so its service name no longer
+    # resolves from inside the bridge — these reach it via the host gateway
+    # instead. Real gates use mDNS (rally-server.local), which a bridged
+    # container can't do, which is exactly why rally-server is on the host.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       GATE_ID: START_WP1
-      MQTT_HOST: rally-server
+      MQTT_HOST: host.docker.internal
       MQTT_PORT: 57431
       TRANSPONDERS: "1234567,7654321"
       SIMULATE_INTERVAL_MS: 8000
@@ -23,9 +29,11 @@ services:
       dockerfile: apps/gate-agent/Dockerfile
     depends_on:
       - rally-server
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       GATE_ID: FINISH_WP1
-      MQTT_HOST: rally-server
+      MQTT_HOST: host.docker.internal
       MQTT_PORT: 57431
       TRANSPONDERS: "1234567,7654321"
       SIMULATE_INTERVAL_MS: 8000

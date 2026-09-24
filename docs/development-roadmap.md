@@ -121,6 +121,37 @@
   behind: the run recorded 3000ms (the true elapsed time) where an
   uncorrected server reported 8002ms.
 
+- Host networking for the headless stack, so mDNS discovery works there too: a
+  bridged container can neither send nor receive LAN multicast, so
+  `DiscoveryService` was advertising into the Docker bridge where no gate could
+  ever see it. `deploy/docker-compose.yml` puts rally-server on
+  `network_mode: host` (so it publishes no ports — it already listens on
+  57430/57431/57433 directly) and reaches Postgres over `127.0.0.1` instead of by
+  service name, with Postgres published on `127.0.0.1:5432` only. **The address
+  prefix is the entire protection there** — a bare `5432:5432` would put the
+  event database on the rally WiFi, which is what publishing nothing at all used
+  to avoid.
+
+  `docker-compose.dev.yml` needed it too: its simulated gate-agents pointed at
+  `MQTT_HOST: rally-server`, a compose service name that stops resolving once
+  rally-server leaves the bridge — they would have gone silent with no error
+  anywhere. They use `host.docker.internal:host-gateway` now.
+
+  Verified against a real stack (Rancher Desktop, Docker 29.5.3): rally-server
+  reaches Postgres over loopback with no restart loop, all 9 tables synchronize
+  against the actual Postgres driver, the API answers from the host network and
+  lists both gates, the NTP server answers from another host-network process, and
+  the dev overlay's gate-agents connect through the gateway and deliver
+  detections end-to-end (18 stored from 2 gates, clock offset 1ms). The
+  advertisement itself was checked both ways: found when browsing from the host
+  network, *not* found from a bridge container — the failure this change fixes,
+  demonstrated as the control.
+
+  Caveat: on Docker Desktop/Rancher Desktop "host" is the WSL VM, not the
+  Windows LAN, so what is proven is that the advertisement reaches the host
+  network rather than a bridge. That it reaches gates on a physical rally LAN
+  still needs a Pi.
+
 - Server discovery over mDNS (`apps/rally-server/src/modules/discovery/`):
   rally-server advertises `_rally-gate._tcp` as **`rally-server.local`**, and
   `deploy/install-gate-pi.sh` defaults `MQTT_HOST` to that name — so a gate
@@ -139,16 +170,6 @@
   resolved to a global IPv6 address here while `NtpService` bound `udp4` only,
   which would have left such a gate with no time source and no error anywhere.
   The socket is now dual-stack, matching the broker, which already bound `::`.
-
-  **Known gap: not effective in headless/Docker mode.** A bridged container
-  cannot send or receive LAN multicast, so the advertisement reaches only the
-  Docker bridge and headless deployments still need `MQTT_HOST` typed in. The fix
-  is `network_mode: host` for the rally-server service plus publishing Postgres
-  on `127.0.0.1:5432` so it stays reachable (loopback-only, so it does not
-  contradict the "no Postgres on the rally WiFi" note in the compose file). Not
-  done here because it moves the database connection path and no Docker daemon
-  was available to verify it — and `deploy/` reaching master unverified is what
-  a marshal `curl | bash`es onto a Pi.
 
 - rally-server serves time itself (`apps/rally-server/src/modules/ntp/`): an
   embedded SNTP server, same reasoning as the embedded Aedes broker — a gate
@@ -227,17 +248,11 @@ gate-side work should be checked against it rather than adding another install
 prompt. Both original violations are fixed (see Done): the time reference no
 longer assumes a Pi server, and the address is no longer typed in — a gate
 install now asks only for things about the gate itself. What is left is making
-discovery work in headless/Docker mode (item 1) and moving reconfiguration off
-the install script and into the gate's own UI (item 2).
+reconfiguration off the install script and into the gate's own UI (item 1).
 
 Priority order (1 = next):
 
-1. **Host networking for the headless stack**, so mDNS discovery works there
-   too — see the known gap under "Server discovery over mDNS" in Done.
-   `network_mode: host` for the rally-server compose service plus Postgres
-   published on `127.0.0.1:5432`. Small, but needs a real Docker daemon to
-   verify, since it changes how rally-server reaches the database.
-2. **Gate config web interface** (bigger item, own service): local HTTP server
+1. **Gate config web interface** (bigger item, own service): local HTTP server
    on the gate Pi to set `GATE_ID`, Wi-Fi/network, and MQTT host without
    re-running the install script over SSH. Needs an **AP/hotspot mode**
    fallback (hostapd + dnsmasq, or a lib like balena's wifi-connect) so a
@@ -250,7 +265,7 @@ Priority order (1 = next):
 
 Then, unchanged in relative order:
 
-3. **GPS/PPS as a chrony refclock per gate** (optional, per gate). Not for
+2. **GPS/PPS as a chrony refclock per gate** (optional, per gate). Not for
    accuracy — LAN chrony already exceeds what tenths-of-a-second margins
    need — but because it removes the network from the timing path entirely,
    which matters if stages get long enough that a gate can't reliably reach
@@ -258,7 +273,7 @@ Then, unchanged in relative order:
    Requires no `rally-server` changes, and the Hardware page's clock column
    becomes its health indicator for free. Full trade-offs in
    `decoder-adapters.md` "Hardware notes".
-4. Gate/gate-node health reporting, plus expected stage time: optional
+3. Gate/gate-node health reporting, plus expected stage time: optional
    `Stage.expectedDurationMs` set by the marshal, dashboard flags any
    `STARTED` run as overdue once `now - startTime` exceeds it. Client-side
    only (SSE data already has `startTime`), no new backend push needed.
@@ -268,9 +283,9 @@ Then, unchanged in relative order:
    + per-gate `ready` ack, which also doubles as the clock-sync trigger
    (see `decoder-adapters.md` DS3231 note). Natural fit once the Hardware
    page from the frontend restructuring exists.
-5. Standalone packaging (`apps/rally-server/packaging/standalone`, Node SEA/pkg + optional tray icon) — needed to hand `rally-server` to a marshal without a dev machine.
-6. Real `OpenStintAdapter` once the RF hardware validation (two ordered gates) confirms reliable reads — critical path, but gated on external hardware validation so it runs in parallel with the above rather than blocking them.
-7. Parc Fermé / time control / service park gate roles and their state transitions. When this lands, checkpoint-to-checkpoint interval/target times should use their own formatter (MM:SS or accumulated minutes) — see the format conventions documented in `packages/ui/src/format.ts`, don't reuse `formatStageDuration`.
+4. Standalone packaging (`apps/rally-server/packaging/standalone`, Node SEA/pkg + optional tray icon) — needed to hand `rally-server` to a marshal without a dev machine.
+5. Real `OpenStintAdapter` once the RF hardware validation (two ordered gates) confirms reliable reads — critical path, but gated on external hardware validation so it runs in parallel with the above rather than blocking them.
+6. Parc Fermé / time control / service park gate roles and their state transitions. When this lands, checkpoint-to-checkpoint interval/target times should use their own formatter (MM:SS or accumulated minutes) — see the format conventions documented in `packages/ui/src/format.ts`, don't reuse `formatStageDuration`.
 
 ## Deliberately deferred
 
