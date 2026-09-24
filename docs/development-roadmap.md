@@ -252,16 +252,21 @@ reconfiguration off the install script and into the gate's own UI (item 1).
 
 Priority order (1 = next):
 
-1. **Gate config web interface** (bigger item, own service): local HTTP server
-   on the gate Pi to set `GATE_ID`, Wi-Fi/network, and MQTT host without
-   re-running the install script over SSH. Needs an **AP/hotspot mode**
-   fallback (hostapd + dnsmasq, or a lib like balena's wifi-connect) so a
-   marshal can reach it before the Pi has any network configured — Pi boots as
-   its own AP when no known Wi-Fi is set, serves the config page, switches to
-   station mode once Wi-Fi is saved. Also falls back to AP mode if it *has* a
-   saved Wi-Fi that fails to connect (wrong password, gate out of range,
-   router changed) — not just on first boot with nothing configured. Not
-   designed yet.
+1. **Gate config web interface** (bigger item, own service) — **now designed,
+   see `docs/gate-config-ui.md`**; that document is the thing to read before
+   building, and it supersedes the sketch this entry used to hold. In short:
+   `apps/gate-config` on port 57434, separate from `gate-agent` so a config that
+   crash-loops it doesn't take down the tool that fixes it; config moves out of
+   the systemd unit into `/etc/rally-gate/gate.env` via `EnvironmentFile=`, so
+   `gate-agent` needs no code change; the chrony source follows `MQTT_HOST`
+   through `sourcedir` + `chronyc reload sources` rather than a restart, because
+   restarting chrony can step the clock mid-stage; and NetworkManager's
+   `nmcli device wifi hotspot` replaces the hostapd + dnsmasq stack this entry
+   originally assumed.
+
+   One decision left open there on purpose: plain server-rendered HTML (no build
+   step in the install path) versus Vue + Vuetify through `packages/ui` (one
+   product, but a Vite build on a Pi). The design recommends plain HTML first.
 
 Then, unchanged in relative order:
 
