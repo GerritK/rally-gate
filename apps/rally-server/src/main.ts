@@ -33,7 +33,7 @@ async function bootstrap() {
   );
 
   // Absent when the server runs without a built frontend — the standalone
-  // dev loop, where Vite serves it on 57432 instead. Skipped rather than
+  // dev loop, where Vite serves it on 57440 instead. Skipped rather than
   // failing, since the API is perfectly usable on its own.
   if (existsSync(WEB_DIST)) {
     app.useStaticAssets(WEB_DIST);

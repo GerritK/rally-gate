@@ -22,7 +22,7 @@ import {
   wifiScan,
 } from './system';
 
-const PORT = Number(process.env.GATE_CONFIG_PORT ?? 57434);
+const PORT = Number(process.env.GATE_CONFIG_PORT ?? 57439);
 
 const app = express();
 app.use(express.json({ limit: '16kb' }));
