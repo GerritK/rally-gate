@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { buildDatabaseConfig } from './config/database.config';
 import { BrokerModule } from './modules/broker/broker.module';
 import { ClassificationModule } from './modules/classification/classification.module';
+import { DiscoveryModule } from './modules/discovery/discovery.module';
 import { EventsModule } from './modules/events/events.module';
 import { GatesModule } from './modules/gates/gates.module';
 import { LiveModule } from './modules/live/live.module';
@@ -22,6 +23,7 @@ import { VehiclesModule } from './modules/vehicles/vehicles.module';
     TypeOrmModule.forRoot(buildDatabaseConfig()),
     BrokerModule,
     NtpModule,
+    DiscoveryModule,
     GatesModule,
     VehiclesModule,
     RallyInfoModule,

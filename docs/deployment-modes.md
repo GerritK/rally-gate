@@ -56,8 +56,10 @@ publish `57433:57433/udp` — with the `/udp` suffix, since compose defaults to
 TCP and would silently publish a port nothing listens on.
 
 Stratum is 10, deliberately poor, so that a gate which *can* see a real
-upstream prefers it. What remains typed by hand is the address itself
-(`MQTT_HOST`) — that is the mDNS discovery item in `development-roadmap.md`.
+upstream prefers it. The address is not typed in either: chrony points at
+`rally-server.local`, the mDNS name the server advertises for itself — see
+"Server discovery" in `architecture.md`, including why that does not work in
+headless/Docker mode yet.
 
 Whether sync works is visible without touching a terminal: `Gate.clockOffsetMs`
 on the Hardware page should sit near zero for every gate. Anything reaching the
