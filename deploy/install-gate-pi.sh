@@ -5,7 +5,9 @@
 #
 # Usage: curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-gate-pi.sh | bash
 # Prompts can be skipped by pre-setting the env vars, e.g.:
-#   GATE_ID=CLUB_START_WP1 MQTT_HOST=192.168.1.10 bash -c "$(curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-gate-pi.sh)"
+#   GATE_ID=CLUB_START_WP1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-gate-pi.sh)"
+# MQTT_HOST is only needed where mDNS is blocked; it defaults to the name
+# rally-server advertises for itself.
 # GATE_ID should be globally unique — prefix it with your club's short code
 # (see "Gate discovery & heartbeat" in docs/architecture.md).
 set -euo pipefail
@@ -38,8 +40,17 @@ if [ "$GATE_ID" != "$(hostname)" ]; then
   ask SET_HOSTNAME "Also rename this Pi's hostname to $GATE_ID? (makes it easier to find on the network, e.g. via mDNS) (Y/n)" "y"
 fi
 
-ask MQTT_HOST "rally-server IP address"
-while [ -z "$MQTT_HOST" ]; do ask MQTT_HOST "rally-server IP is required"; done
+# Defaulted, not required: rally-server advertises this name over mDNS
+# (DiscoveryService), and both gate-agent and chrony resolve it through plain
+# getaddrinfo. A gate install therefore needs no knowledge of the network it
+# will be used on — see "Zero-config gates" in docs/development-roadmap.md.
+# An IP typed here still wins, which is the fallback for APs that block
+# multicast.
+echo
+echo "rally-server advertises itself as rally-server.local, so the default works"
+echo "on any rally-gate network. Only enter an address if mDNS/multicast is"
+echo "blocked on your network."
+ask MQTT_HOST "rally-server address" "rally-server.local"
 
 ask MQTT_PORT "rally-server MQTT port" "57431"
 # Not a prompt: this is a property of rally-server, not of the event, and a gate
@@ -113,6 +124,13 @@ echo "-- configuring chrony against $MQTT_HOST:$NTP_PORT --"
 sudo systemctl disable --now systemd-timesyncd >/dev/null 2>&1 || true
 sudo apt-get install -y chrony
 
+# What makes rally-server.local resolve for chrony and gate-agent alike: avahi
+# answers mDNS, libnss-mdns is what puts it behind getaddrinfo. Raspberry Pi OS
+# ships both (it is how raspberrypi.local works), installed explicitly because
+# without them the default address resolves to nothing and the gate simply
+# never connects.
+sudo apt-get install -y avahi-daemon libnss-mdns
+
 # A conf.d drop-in, not a replacement chrony.conf, because Debian's default
 # already sets `makestep 1 3` (step only on the first few updates, slew forever
 # after) — which *is* the clock policy gates require — plus driftfile and
@@ -139,6 +157,16 @@ sudo systemctl restart chrony
 # and the drop-in above was ignored.
 echo "   chrony sources ($MQTT_HOST should appear here):"
 chronyc sources || true
+
+# Exercises the exact path chrony and gate-agent use (getaddrinfo, so nss-mdns
+# included), rather than trusting that avahi is merely installed.
+if getent hosts "$MQTT_HOST" >/dev/null 2>&1; then
+  echo "   $MQTT_HOST resolves to $(getent hosts "$MQTT_HOST" | awk '{print $1}' | head -1)"
+else
+  echo "   WARNING: $MQTT_HOST does not resolve. If rally-server is running,"
+  echo "   this network is probably blocking mDNS/multicast — re-run with an IP:"
+  echo "     MQTT_HOST=<ip> bash -c \"\$(curl -fsSL <this script url>)\""
+fi
 
 REBOOT_NEEDED=0
 

@@ -202,37 +202,49 @@ round-trip probe (NTP's own arithmetic) separates offset from latency
 properly and the deadband stops being needed. Only the estimate changes —
 where it's stored and how it's applied stay as they are.
 
-## MQTT broker discovery (planned, not built)
+## Server discovery
 
-Heartbeat/discovery above assumes a gate already knows where the broker is
-(`MQTT_HOST`/`MQTT_PORT`, currently typed in by hand — an interactive prompt
-in `deploy/install-gate-pi.sh`, or plain env vars). That's one more thing a
-marshal can get wrong or that breaks silently if `rally-server`'s IP changes
-(DHCP re-lease, moved to a different machine) — a layer *before* heartbeat-based
-discovery even applies, since a gate can't publish a heartbeat to a broker it
-doesn't know the address of.
+A gate used to need `rally-server`'s address typed in (`MQTT_HOST`), which is
+one more thing a marshal can get wrong and which breaks silently when the
+server's IP changes (DHCP re-lease, moved machine). `DiscoveryService`
+(`apps/rally-server/src/modules/discovery/`) removes that: it advertises
+`_rally-gate._tcp` over mDNS when the server starts, under the name
+**`rally-server.local`** (overridable with `MDNS_HOST`, disable with
+`MDNS_DISABLE=1`).
 
-- `rally-server` advertises itself via mDNS/Bonjour (e.g. a service type like
-  `_rally-mqtt._tcp.local`, TXT record carrying the MQTT port) when
-  `BrokerService` starts listening.
-- `gate-agent` tries resolving that service first at startup, before falling
-  back to the manual `MQTT_HOST` env var. Manual entry stays as the fallback,
-  not something autodiscovery replaces — mDNS/multicast is unreliable on some
-  consumer/travel router hardware (blocked or not forwarded), so a rally site
-  with flaky APs still needs the escape hatch.
-- Fits the "closed rally WiFi" model for free: mDNS is LAN-only by nature (it
-  doesn't route off the local network), so it can't leak the broker's
-  existence to anything outside the event's own WiFi the way a
-  cloud-registry-based discovery scheme would.
-- New dependency on both ends (something like `bonjour-service` in Node) —
-  Raspberry Pi OS also ships `avahi-daemon`, which is an alternative
-  implementation path (shell out / system mDNS) worth weighing against a
-  pure-JS library once this gets built.
-- Directly relevant to the "Gate config web interface" roadmap item
-  (`development-roadmap.md`) — that item's config page already needs an
-  "MQTT host" field; autodiscovery would just make that field default to the
-  resolved address instead of requiring manual entry, with manual override
-  still available in the same UI.
+**The gate side is deliberately codeless.** What gates use is the advertised
+*name*, not a service browse: `gate-agent` resolves `rally-server.local` through
+plain `getaddrinfo` like any hostname, and so does chrony for the time source
+(see `deployment-modes.md` "Time sync"). One advertisement therefore covers both
+MQTT and NTP with no discovery logic to write, test or debug in the field, and
+`deploy/install-gate-pi.sh` just defaults `MQTT_HOST` to that name. On the gate
+this works because Raspberry Pi OS already ships `avahi-daemon` plus
+`libnss-mdns` — the latter is what puts mDNS behind `getaddrinfo`, and the
+installer installs both explicitly since the whole path fails silently without
+them. The installer verifies it with `getent hosts`, which exercises exactly
+that path.
+
+The TXT record still carries `mqtt`/`ntp`/`api` ports. Nothing reads them yet;
+they are there for the planned gate config UI, which needs to *show* what it
+found rather than resolve one known name.
+
+Consequences and limits:
+
+- **Manual entry stays the fallback, not a legacy path.** mDNS/multicast is
+  blocked or not forwarded by some consumer/travel routers, so an IP typed into
+  `MQTT_HOST` still wins over the default.
+- **mDNS is LAN-only by nature**, so this fits the closed-rally-WiFi model for
+  free — it cannot leak the server's existence off the event network the way a
+  cloud registry would.
+- **Not effective in headless/Docker mode yet.** A bridged container cannot
+  send or receive LAN multicast, so `DiscoveryService` inside
+  `deploy/docker-compose.yml` advertises only into the Docker bridge. Headless
+  deployments need `MQTT_HOST` typed in until that compose service moves to host
+  networking — which also means publishing Postgres on loopback so rally-server
+  can still reach it. See `development-roadmap.md`.
+- The name is fixed rather than per-event, so two clubs' servers on one network
+  would collide — the same hazard `GATE_ID` prefixing addresses above. `MDNS_HOST`
+  is the escape hatch.
 
 ## Gate assignment: plan vs. live
 

@@ -133,7 +133,13 @@ export class NtpService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     const port = Number(process.env.NTP_PORT ?? 57433);
-    const socket = createSocket('udp4');
+    // Dual-stack, not 'udp4'. The MQTT broker already binds `::` via
+    // net.createServer, and a gate resolves rally-server by mDNS name — which
+    // can hand it an IPv6 address on a network that has one. An IPv4-only
+    // socket would then leave that gate with no time source and no error
+    // anywhere, which is the exact silent-desync failure this service exists
+    // to prevent. ipv6Only:false accepts IPv4-mapped packets on the same socket.
+    const socket = createSocket({ type: 'udp6', ipv6Only: false });
 
     socket.on('message', (request, remote) => {
       const receivedAt = Date.now();

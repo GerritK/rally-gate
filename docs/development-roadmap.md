@@ -121,6 +121,35 @@
   behind: the run recorded 3000ms (the true elapsed time) where an
   uncorrected server reported 8002ms.
 
+- Server discovery over mDNS (`apps/rally-server/src/modules/discovery/`):
+  rally-server advertises `_rally-gate._tcp` as **`rally-server.local`**, and
+  `deploy/install-gate-pi.sh` defaults `MQTT_HOST` to that name — so a gate
+  install no longer asks for an address at all. The gate side is deliberately
+  codeless: gates resolve the advertised *name* through `getaddrinfo` (gate-agent
+  for MQTT, chrony for time) rather than browsing for a service, so one
+  advertisement covers both with nothing to debug in the field. `gate-agent`
+  gained no dependency and no new code. The installer also installs
+  `avahi-daemon`/`libnss-mdns` explicitly and verifies with `getent hosts`, since
+  the whole path fails silently without nss-mdns behind `getaddrinfo`. Full
+  design and limits in `architecture.md` "Server discovery".
+
+  Verified end-to-end against a running server: the name resolves, MQTT connects
+  over it, and the NTP server answers over it — over **both** IPv4 and IPv6.
+  That last part was a real bug found by testing rather than reading: the name
+  resolved to a global IPv6 address here while `NtpService` bound `udp4` only,
+  which would have left such a gate with no time source and no error anywhere.
+  The socket is now dual-stack, matching the broker, which already bound `::`.
+
+  **Known gap: not effective in headless/Docker mode.** A bridged container
+  cannot send or receive LAN multicast, so the advertisement reaches only the
+  Docker bridge and headless deployments still need `MQTT_HOST` typed in. The fix
+  is `network_mode: host` for the rally-server service plus publishing Postgres
+  on `127.0.0.1:5432` so it stays reachable (loopback-only, so it does not
+  contradict the "no Postgres on the rally WiFi" note in the compose file). Not
+  done here because it moves the database connection path and no Docker daemon
+  was available to verify it — and `deploy/` reaching master unverified is what
+  a marshal `curl | bash`es onto a Pi.
+
 - rally-server serves time itself (`apps/rally-server/src/modules/ntp/`): an
   embedded SNTP server, same reasoning as the embedded Aedes broker — a gate
   must never have to know what kind of machine the server runs on, so a
@@ -195,16 +224,19 @@ should work in any rally-gate environment it is plugged into, and be configured
 from the gate config UI rather than by re-running the installer. Everything
 below is ordered by that: items 1-2 are what it decomposes into, and any new
 gate-side work should be checked against it rather than adding another install
-prompt. One violation is left: `MQTT_HOST` is still typed in by hand. (The
-other — the time reference assuming a Pi server — is fixed, see Done.)
+prompt. Both original violations are fixed (see Done): the time reference no
+longer assumes a Pi server, and the address is no longer typed in — a gate
+install now asks only for things about the gate itself. What is left is making
+discovery work in headless/Docker mode (item 1) and moving reconfiguration off
+the install script and into the gate's own UI (item 2).
 
 Priority order (1 = next):
 
-1. **mDNS/Bonjour discovery** so a gate finds rally-server (MQTT *and* time)
-   on the local network instead of `MQTT_HOST` being typed in — see "MQTT broker
-   discovery" in `architecture.md`. This is the item that removes the last
-   install prompt that needs knowledge of the specific rally. Manual entry stays
-   as a fallback for APs that block multicast.
+1. **Host networking for the headless stack**, so mDNS discovery works there
+   too — see the known gap under "Server discovery over mDNS" in Done.
+   `network_mode: host` for the rally-server compose service plus Postgres
+   published on `127.0.0.1:5432`. Small, but needs a real Docker daemon to
+   verify, since it changes how rally-server reaches the database.
 2. **Gate config web interface** (bigger item, own service): local HTTP server
    on the gate Pi to set `GATE_ID`, Wi-Fi/network, and MQTT host without
    re-running the install script over SSH. Needs an **AP/hotspot mode**
