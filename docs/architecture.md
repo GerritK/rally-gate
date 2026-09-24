@@ -246,12 +246,15 @@ Consequences and limits:
 - **mDNS is LAN-only by nature**, so this fits the closed-rally-WiFi model for
   free — it cannot leak the server's existence off the event network the way a
   cloud registry would.
-- **Not effective in headless/Docker mode yet.** A bridged container cannot
-  send or receive LAN multicast, so `DiscoveryService` inside
-  `deploy/docker-compose.yml` advertises only into the Docker bridge. Headless
-  deployments need `MQTT_HOST` typed in until that compose service moves to host
-  networking — which also means publishing Postgres on loopback so rally-server
-  can still reach it. See `development-roadmap.md`.
+- **Headless mode needs host networking, and has it.** A bridged container can
+  neither send nor receive LAN multicast, so `deploy/docker-compose.yml` runs
+  rally-server with `network_mode: host` — otherwise the advertisement reaches
+  only the Docker bridge and no gate ever sees it. Consequences worth knowing
+  before editing that file: the service publishes no ports, it reaches Postgres
+  over `127.0.0.1` rather than by service name (Postgres is published on
+  loopback only, and that address prefix is the whole protection), and
+  `docker-compose.dev.yml`'s simulated gate-agents reach it through
+  `host.docker.internal:host-gateway` since the service name no longer resolves.
 - The name is fixed rather than per-event, so two clubs' servers on one network
   would collide — the same hazard `GATE_ID` prefixing addresses above. `MDNS_HOST`
   is the escape hatch.
