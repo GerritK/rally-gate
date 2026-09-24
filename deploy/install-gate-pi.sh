@@ -236,8 +236,16 @@ WantedBy=timers.target
 EOF
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now rally-gate-agent
-sudo systemctl enable --now rally-gate-config
+# `enable` then `restart`, not `enable --now`: --now leaves an already-running
+# unit alone, so re-running this installer after a `git pull` would rebuild
+# dist/ and keep serving the old code — silently, which is the worst kind. The
+# README tells a marshal to update by re-running this script, so it has to
+# actually take effect. `restart` starts a stopped unit too, so one line covers
+# both a fresh install and an upgrade.
+sudo systemctl enable rally-gate-agent
+sudo systemctl restart rally-gate-agent
+sudo systemctl enable rally-gate-config
+sudo systemctl restart rally-gate-config
 if command -v nmcli >/dev/null; then
   sudo systemctl enable --now rally-gate-hotspot.timer
 else
