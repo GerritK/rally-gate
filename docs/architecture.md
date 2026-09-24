@@ -170,7 +170,7 @@ Two mechanisms, with different jobs:
 
 1. **Real sync belongs to NTP, not to this codebase.** Gates run chrony
    against `rally-server`, which serves time from its own clock via an
-   embedded SNTP server (`NtpService`, 57433/udp, stratum 10) so it works on a
+   embedded SNTP server (`NtpService`, 57432/udp, stratum 10) so it works on a
    closed network with no internet and on any machine — see
    `deployment-modes.md` "Time sync". That gets sub-millisecond agreement. The
    gate side is a `conf.d` drop-in written by `deploy/install-gate-pi.sh`;

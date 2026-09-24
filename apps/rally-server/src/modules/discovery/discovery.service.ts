@@ -47,7 +47,7 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
         port: mqttPort,
         txt: {
           mqtt: String(mqttPort),
-          ntp: String(process.env.NTP_PORT ?? 57433),
+          ntp: String(process.env.NTP_PORT ?? 57432),
           api: String(process.env.PORT ?? 57430),
         },
       });

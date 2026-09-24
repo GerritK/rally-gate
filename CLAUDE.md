@@ -79,9 +79,8 @@ Two ranges, split so that **every number in 5743x is something that runs in the 
 |---|---|
 | 57430 | `rally-server` REST/SSE API **and** the built `apps/web` |
 | 57431 | embedded MQTT broker (Aedes) |
-| 57432 | free |
-| 57433 | embedded SNTP server (**udp** — the suffix is load-bearing in compose) |
-| 57434–57438 | free, kept contiguous for server-side growth |
+| 57432 | embedded SNTP server (**udp**) |
+| 57433–57438 | free, kept contiguous for server-side growth |
 | 57439 | `apps/gate-config` API **and** its built page — the only one that runs **on a gate**, so it sits at the far end |
 | 57440 | Vite dev server for `apps/web` — **dev only** |
 | 57449 | Vite dev server for `gate-config` — **dev only** |

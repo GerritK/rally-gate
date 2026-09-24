@@ -132,7 +132,7 @@ export class NtpService implements OnModuleInit, OnModuleDestroy {
   private socket?: Socket;
 
   async onModuleInit() {
-    const port = Number(process.env.NTP_PORT ?? 57433);
+    const port = Number(process.env.NTP_PORT ?? 57432);
     // Dual-stack, not 'udp4'. The MQTT broker already binds `::` via
     // net.createServer, and a gate resolves rally-server by mDNS name — which
     // can hand it an IPv6 address on a network that has one. An IPv4-only

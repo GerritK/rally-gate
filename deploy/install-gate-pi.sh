@@ -68,7 +68,7 @@ ask MQTT_HOST "rally-server address" "rally-server.local"
 ask MQTT_PORT "rally-server MQTT port" "57431"
 # Not a prompt: this is a property of rally-server, not of the event, and a gate
 # install must not require knowing anything about the rally it will be used at.
-NTP_PORT="${NTP_PORT:-57433}"
+NTP_PORT="${NTP_PORT:-57432}"
 
 # Wi-Fi is configured from the gate config UI, not here — but the gate has to be
 # reachable before it is on any network, so it raises its own access point when
