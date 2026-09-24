@@ -35,6 +35,34 @@ them separated. `main.ts` skips static serving entirely when
 `apps/web/dist` is absent, which is the normal dev loop — there Vite serves
 the dashboard on 57432 and talks to the API on 57430.
 
+## Time sync
+
+Gates timestamp their own detections and a stage time subtracts two gates'
+clocks, so the gates have to agree with each other — see "Clock offset" in
+`architecture.md` for why that, and not absolute correctness, is the
+requirement.
+
+`rally-server` serves time itself (`NtpService`, an embedded SNTP server), for
+the same reason the MQTT broker is embedded: **a gate must never have to know
+what kind of machine the server runs on.** So the time reference is rally-server
+in both modes, at the same address a gate already uses for MQTT, and neither
+mode needs a host time service installed.
+
+It listens on **57433/udp**, not 123, because 123 needs root/admin that a
+double-clicked standalone executable does not have. Gates reach it with
+chrony's `port` option (`server <host> port 57433 iburst prefer`), written by
+`deploy/install-gate-pi.sh`. In headless mode `deploy/docker-compose.yml` must
+publish `57433:57433/udp` — with the `/udp` suffix, since compose defaults to
+TCP and would silently publish a port nothing listens on.
+
+Stratum is 10, deliberately poor, so that a gate which *can* see a real
+upstream prefers it. What remains typed by hand is the address itself
+(`MQTT_HOST`) — that is the mDNS discovery item in `development-roadmap.md`.
+
+Whether sync works is visible without touching a terminal: `Gate.clockOffsetMs`
+on the Hardware page should sit near zero for every gate. Anything reaching the
+1000ms correction threshold means sync is broken, not merely noisy.
+
 ## Event model: one database = one event (planned)
 
 A rally ("event") doesn't need its own `Event` table. `DB_PATH` (SQLite) /

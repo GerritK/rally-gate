@@ -40,9 +40,14 @@ services:
       DB_NAME: rally_gate
       PORT: 57430
       MQTT_PORT: 57431
+      NTP_PORT: 57433
     ports:
       - "57430:57430"
       - "57431:57431"
+      # UDP, and the /udp suffix is load-bearing: compose defaults to TCP, which
+      # would publish a port nothing listens on and leave gates with no time
+      # source in headless mode — visible only as drift on the Hardware page.
+      - "57433:57433/udp"
 
 volumes:
   postgres-data:

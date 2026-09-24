@@ -121,51 +121,91 @@
   behind: the run recorded 3000ms (the true elapsed time) where an
   uncorrected server reported 8002ms.
 
+- rally-server serves time itself (`apps/rally-server/src/modules/ntp/`): an
+  embedded SNTP server, same reasoning as the embedded Aedes broker — a gate
+  must never have to know what kind of machine the server runs on, so a
+  standalone laptop and a Pi look identical from the gate's side and neither
+  needs a host time service. Listens on **57433/udp** rather than 123, since
+  123 needs root/admin a double-clicked standalone executable won't have;
+  gates reach it via chrony's `port` option on the source line. Stratum 10 and
+  refid `LOCL`, deliberately poor so a gate that can see a real upstream
+  prefers it. Only mode 3 (client) packets are answered — mode 6/7 are ntpd's
+  control protocols and the classic reflection amplifier — and a reply is the
+  same 48 bytes as the request, so it can't amplify. A bind failure logs and
+  continues rather than aborting startup like the broker's does: a gate with no
+  time source still delivers detections, and the heartbeat offset measurement
+  makes the skew visible, whereas refusing to start would take timing down
+  entirely to protect it.
+
+  This deleted the host-chrony block from `install-server-pi.sh` and the
+  gate-serves-NTP stopgap from `install-gate-pi.sh` — both existed only to work
+  around the server not serving time. `deploy/docker-compose.yml` publishes
+  `57433:57433/udp`; the `/udp` suffix is load-bearing, since compose defaults
+  to TCP and would leave headless gates with no time source, visible only as
+  drift.
+
+  Verified against a running server with a real client packet: mode 4 reply,
+  stratum 10, origin timestamp echoed byte-for-byte, offset and round-trip both
+  sane on loopback; a mode 6 packet gets no reply. `ntp.service.spec.ts` covers
+  the timestamp arithmetic, including one test that runs NTP's own offset
+  formula over a full exchange with a known 5s client skew — the rest can pass
+  with a wrong epoch constant and still leave every gate silently wrong.
+
+- chrony/NTP on gates — the actual clock sync, as opposed to the offset
+  measurement above, which is only a monitor plus a gross-failure safety net.
+  Gates point chrony at `$MQTT_HOST`
+  (`/etc/chrony/conf.d/rally-gate.conf`, written by
+  `deploy/install-gate-pi.sh`: `server $MQTT_HOST iburst prefer minpoll 4
+  maxpoll 6` — `prefer` because gates agreeing with *each other* matters more
+  than any of them being absolutely right, so it has to win even where the
+  site has internet). The server Pi serves NTP from its own clock
+  (`/etc/chrony/conf.d/rally-server.conf`, written by
+  `deploy/install-server-pi.sh`: `local stratum 10` plus RFC1918 `allow`
+  ranges) so it works with no internet, and a real upstream still wins when
+  one is reachable. chrony runs on the host there, not in compose — an NTP
+  server needs the host clock and port 123/udp.
+
+  Both scripts drop a `conf.d` file instead of replacing `chrony.conf`,
+  which keeps Debian's default `makestep 1 3` — step only on the first few
+  updates, slew forever after — that default *being* the "Gate system clock
+  policy" in `decoder-adapters.md`. Cheaper than restating it, but it means a
+  future chrony changing that default would break the policy silently, so
+  check there first if a mid-stage discontinuity ever shows up. Both also
+  disable `systemd-timesyncd` explicitly (apt's `Conflicts:` usually handles
+  it) since two daemons steering one clock is that same step waiting to
+  happen. With a DS3231 present, chrony's default `rtcsync` writes the
+  corrected time back to it, so chrony sets the clock and the RTC holds it
+  across a reboot with no network.
+
+  Fixed along the way: neither script ran `apt-get update`, so `i2c-tools`
+  (and `nodejs` when nodesource was skipped) could fail to install on a fresh
+  Pi OS image with empty apt lists.
+
+  **Not yet verified on hardware** — `chronyc sources` on a gate (the
+  installer prints it), `chronyc clients` on the server, and `Gate.clockOffsetMs`
+  on the Hardware page as the ongoing check: it should sit near zero and never
+  reach the 1000ms correction threshold once this is working.
+
 ## Next
+
+**Zero-config gates (overriding requirement, not a single item).** Installing a
+gate must not require knowing anything about the rally it will be used at — not
+an IP, and not whether rally-server runs on a laptop or a Pi. One installed gate
+should work in any rally-gate environment it is plugged into, and be configured
+from the gate config UI rather than by re-running the installer. Everything
+below is ordered by that: items 1-2 are what it decomposes into, and any new
+gate-side work should be checked against it rather than adding another install
+prompt. One violation is left: `MQTT_HOST` is still typed in by hand. (The
+other — the time reference assuming a Pi server — is fixed, see Done.)
 
 Priority order (1 = next):
 
-0. **chrony/NTP on gates** — the actual clock sync, versus the offset
-   correction above, which is only a monitor plus a gross-failure safety net
-   and can't resolve below network latency. Gates run chrony against
-   `rally-server`, which serves NTP from its local clock (`local stratum 10`)
-   so it works with no internet. Needs `deploy/install-gate-pi.sh` work and a
-   server-side NTP service, and can only be validated on real Pi hardware —
-   which is why it wasn't bundled with the measurement work.
-
-   **Must be configured to step the clock only at boot and slew thereafter**
-   (`makestep` with a small update limit) — a mid-stage step writes a
-   discontinuity straight into a `StageRun`. This applies to every gate
-   timestamp regardless of which decoder or flags are in use; see "Gate
-   system clock policy" in `decoder-adapters.md`.
-
-   Optional follow-on: **GPS/PPS as a chrony refclock per gate**. Not for
-   accuracy — LAN chrony already exceeds what tenths-of-a-second margins
-   need — but because it removes the network from the timing path entirely,
-   which matters if stages get long enough that a gate can't reliably reach
-   the broker. Needs a UART/GPIO module, *not* a USB dongle; needs sky view.
-   Requires no `rally-server` changes, and the Hardware page's clock column
-   becomes its health indicator for free. Full trade-offs in
-   `decoder-adapters.md` "Hardware notes".
-1. Gate/gate-node health reporting, plus expected stage time: optional
-   `Stage.expectedDurationMs` set by the marshal, dashboard flags any
-   `STARTED` run as overdue once `now - startTime` exceeds it. Client-side
-   only (SSE data already has `startTime`), no new backend push needed.
-   Bundled with health reporting since both are "tell the marshal something's
-   wrong" signals. Health reporting's actual mechanism is now sketched under
-   "Gate control channel" in `architecture.md` — a `stage-started` broadcast
-   + per-gate `ready` ack, which also doubles as the clock-sync trigger
-   (see `decoder-adapters.md` DS3231 note). Natural fit once the Hardware
-   page from the frontend restructuring exists.
-3. Standalone packaging (`apps/rally-server/packaging/standalone`, Node SEA/pkg + optional tray icon) — needed to hand `rally-server` to a marshal without a dev machine.
-4. Real `OpenStintAdapter` once the RF hardware validation (two ordered gates) confirms reliable reads — critical path, but gated on external hardware validation so it runs in parallel with the above rather than blocking them.
-5. mDNS/Bonjour broker autodiscovery so a gate can find `rally-server`'s MQTT
-   broker on the local network instead of `MQTT_HOST` being typed in by hand
-   — see "MQTT broker discovery" in `architecture.md`. Smaller and
-   independent of the gate config web interface item below (no AP/hotspot
-   work needed), though it feeds into that item's "MQTT host" field once
-   built. Manual entry stays as a fallback for APs that block multicast.
-6. **Gate config web interface** (bigger item, own service): local HTTP server
+1. **mDNS/Bonjour discovery** so a gate finds rally-server (MQTT *and* time)
+   on the local network instead of `MQTT_HOST` being typed in — see "MQTT broker
+   discovery" in `architecture.md`. This is the item that removes the last
+   install prompt that needs knowledge of the specific rally. Manual entry stays
+   as a fallback for APs that block multicast.
+2. **Gate config web interface** (bigger item, own service): local HTTP server
    on the gate Pi to set `GATE_ID`, Wi-Fi/network, and MQTT host without
    re-running the install script over SSH. Needs an **AP/hotspot mode**
    fallback (hostapd + dnsmasq, or a lib like balena's wifi-connect) so a
@@ -175,6 +215,29 @@ Priority order (1 = next):
    saved Wi-Fi that fails to connect (wrong password, gate out of range,
    router changed) — not just on first boot with nothing configured. Not
    designed yet.
+
+Then, unchanged in relative order:
+
+3. **GPS/PPS as a chrony refclock per gate** (optional, per gate). Not for
+   accuracy — LAN chrony already exceeds what tenths-of-a-second margins
+   need — but because it removes the network from the timing path entirely,
+   which matters if stages get long enough that a gate can't reliably reach
+   the broker. Needs a UART/GPIO module, *not* a USB dongle; needs sky view.
+   Requires no `rally-server` changes, and the Hardware page's clock column
+   becomes its health indicator for free. Full trade-offs in
+   `decoder-adapters.md` "Hardware notes".
+4. Gate/gate-node health reporting, plus expected stage time: optional
+   `Stage.expectedDurationMs` set by the marshal, dashboard flags any
+   `STARTED` run as overdue once `now - startTime` exceeds it. Client-side
+   only (SSE data already has `startTime`), no new backend push needed.
+   Bundled with health reporting since both are "tell the marshal something's
+   wrong" signals. Health reporting's actual mechanism is now sketched under
+   "Gate control channel" in `architecture.md` — a `stage-started` broadcast
+   + per-gate `ready` ack, which also doubles as the clock-sync trigger
+   (see `decoder-adapters.md` DS3231 note). Natural fit once the Hardware
+   page from the frontend restructuring exists.
+5. Standalone packaging (`apps/rally-server/packaging/standalone`, Node SEA/pkg + optional tray icon) — needed to hand `rally-server` to a marshal without a dev machine.
+6. Real `OpenStintAdapter` once the RF hardware validation (two ordered gates) confirms reliable reads — critical path, but gated on external hardware validation so it runs in parallel with the above rather than blocking them.
 7. Parc Fermé / time control / service park gate roles and their state transitions. When this lands, checkpoint-to-checkpoint interval/target times should use their own formatter (MM:SS or accumulated minutes) — see the format conventions documented in `packages/ui/src/format.ts`, don't reuse `formatStageDuration`.
 
 ## Deliberately deferred

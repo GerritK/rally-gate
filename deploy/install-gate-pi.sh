@@ -42,6 +42,10 @@ ask MQTT_HOST "rally-server IP address"
 while [ -z "$MQTT_HOST" ]; do ask MQTT_HOST "rally-server IP is required"; done
 
 ask MQTT_PORT "rally-server MQTT port" "57431"
+# Not a prompt: this is a property of rally-server, not of the event, and a gate
+# install must not require knowing anything about the rally it will be used at.
+NTP_PORT="${NTP_PORT:-57433}"
+
 ask HAS_RTC "DS3231 RTC module connected? (y/N)" "n"
 
 echo
@@ -53,6 +57,11 @@ echo "  RTC:         $([[ "$HAS_RTC" =~ ^[Yy]$ ]] && echo "DS3231" || echo "none
 echo
 read -rp "Proceed with install? [Y/n] " confirm < /dev/tty
 [[ "${confirm:-y}" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 1; }
+
+# A fresh Pi OS image ships with empty apt lists, so every apt-get install
+# below (chrony, i2c-tools, and nodejs when nodesource doesn't run) needs this.
+echo "-- updating package lists --"
+sudo apt-get update
 
 if ! command -v node >/dev/null; then
   echo "-- installing Node.js --"
@@ -96,6 +105,41 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable --now rally-gate-agent
 
+echo "-- configuring chrony against $MQTT_HOST:$NTP_PORT --"
+# apt's chrony Conflicts: with systemd-timesyncd so this is usually redundant,
+# but do it explicitly: two daemons steering one clock is precisely the
+# mid-stage discontinuity "Gate system clock policy" in docs/decoder-adapters.md
+# exists to prevent, and it would be invisible in the timing data.
+sudo systemctl disable --now systemd-timesyncd >/dev/null 2>&1 || true
+sudo apt-get install -y chrony
+
+# A conf.d drop-in, not a replacement chrony.conf, because Debian's default
+# already sets `makestep 1 3` (step only on the first few updates, slew forever
+# after) — which *is* the clock policy gates require — plus driftfile and
+# rtcsync. Only the rally-specific bits are added here. If a future chrony
+# ships a different makestep default, that policy is what silently broke.
+sudo mkdir -p /etc/chrony/conf.d
+sudo tee /etc/chrony/conf.d/rally-gate.conf >/dev/null <<EOF
+# rally-server serves time itself, on its own port rather than 123 — see
+# NtpService in apps/rally-server. That is what lets a gate use one address for
+# both MQTT and time without knowing whether the server is a Pi or a laptop.
+#
+# A stage time is a subtraction between two gates' clocks, so what matters is
+# that they agree with each other, not that either is absolutely right —
+# \`prefer\` keeps rally-server winning even at a site that happens to have
+# internet and can reach the distro's default pool.
+server $MQTT_HOST port $NTP_PORT iburst prefer minpoll 4 maxpoll 6
+EOF
+sudo systemctl restart chrony
+
+# Printed rather than asserted: a hostname typed for MQTT_HOST comes back
+# resolved here, so grepping for it would false-alarm. Look for a line whose
+# first column is '^*' or '^+' against the time reference. If it is absent
+# entirely, this chrony's chrony.conf is missing `confdir /etc/chrony/conf.d`
+# and the drop-in above was ignored.
+echo "   chrony sources ($MQTT_HOST should appear here):"
+chronyc sources || true
+
 REBOOT_NEEDED=0
 
 if [[ "$SET_HOSTNAME" =~ ^[Yy]$ ]]; then
@@ -116,11 +160,17 @@ if [[ "$HAS_RTC" =~ ^[Yy]$ ]]; then
 
   # fake-hwclock guesses the time from its last-seen value; a real RTC replaces it,
   # and leaving both installed lets fake-hwclock overwrite the RTC-read time on boot.
+  # Nothing further is needed to keep the RTC itself right: Debian's chrony.conf
+  # sets `rtcsync`, so once chrony is locked onto the time reference the kernel writes
+  # the corrected time back to the DS3231 — chrony sets it, the RTC holds it
+  # through a reboot with no network.
   sudo apt-get purge -y fake-hwclock >/dev/null 2>&1 || true
 fi
 
 echo
 echo "Done. gate-agent ($GATE_ID) is running — logs: journalctl -u rally-gate-agent -f"
+echo "Clock sync: chronyc tracking  (System time offset should settle under a"
+echo "few ms; the Hardware page's clock column is the same check from the server)"
 
 if [ "$REBOOT_NEEDED" = "1" ]; then
   echo

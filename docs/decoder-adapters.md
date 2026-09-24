@@ -175,6 +175,13 @@ running, and of whether the gate has an RTC or GPS. Any time daemon on a gate
 must be allowed to **step the clock only at boot, and slew from then on**
 (chrony's `makestep <threshold> <limit>` with a small update limit).
 
+In practice this is Debian's own chrony default (`makestep 1 3`), which is why
+`deploy/install-gate-pi.sh` adds a `/etc/chrony/conf.d/` drop-in for the rally
+time source rather than replacing `chrony.conf` — the policy comes free from
+not overriding it. The corollary: a chrony release that changed that default
+would break this policy with nothing in the timing data to show why. Check it
+first if a `StageRun` ever comes out with an unexplained discontinuity.
+
 A bounded slew is harmless — even 100ppm over a minutes-long stage moves the
 clock by milliseconds — whereas a step mid-stage writes a discontinuity
 straight into a `StageRun`: a car that started before the step and finished

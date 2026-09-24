@@ -158,11 +158,14 @@ visible — it just silently changes who won.
 
 Two mechanisms, with different jobs:
 
-1. **Real sync belongs to NTP, not to this codebase.** Gates should run
-   chrony against `rally-server`, which serves NTP from its own local clock
-   (`local stratum 10`) so it works on a closed network with no internet.
-   That gets sub-millisecond agreement. **Not built yet** — see
-   `development-roadmap.md`.
+1. **Real sync belongs to NTP, not to this codebase.** Gates run chrony
+   against `rally-server`, which serves time from its own clock via an
+   embedded SNTP server (`NtpService`, 57433/udp, stratum 10) so it works on a
+   closed network with no internet and on any machine — see
+   `deployment-modes.md` "Time sync". That gets sub-millisecond agreement. The
+   gate side is a `conf.d` drop-in written by `deploy/install-gate-pi.sh`;
+   "Gate system clock policy" in `decoder-adapters.md` has the
+   step-only-at-boot constraint it relies on.
 2. **Measured offset, for visibility and gross failures.** The heartbeat
    `gate-agent` already publishes every 15s carries `sentAt` (its own clock
    at publish time). `GatesService.recordHeartbeat` stores
