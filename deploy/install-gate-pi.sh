@@ -32,12 +32,25 @@ echo "won't collide if this gate is ever borrowed/loaned to another club or"
 echo "used at a joint event. Prefix it with your club's short code, e.g."
 echo "CLUB_START_WP1 rather than just START_WP1. Defaults to this Pi's"
 echo "current hostname, in case that's already set up the way you want."
+echo "This is the gate's identity on the server; the Pi's network name is"
+echo "derived from it separately, since host names allow no underscores."
 ask GATE_ID "Gate ID (e.g. CLUB_START_WP1)" "$(hostname)"
 while [ -z "$GATE_ID" ]; do ask GATE_ID "Gate ID is required"; done
 
+# Derived rather than reused: a host name may contain only letters, digits and
+# hyphens (RFC 1123), while GATE_ID is deliberately underscore-separated
+# (CLUB_START_WP1) and is matched verbatim by the server. Passing GATE_ID
+# straight to raspi-config would write an invalid host name that avahi will not
+# publish, so the gate would not be reachable as <name>.local at all — the one
+# thing renaming it is for. Keeping them separate lets the ID keep its format.
+# Trimmed after truncating, not before: cutting at 63 can land on a separator
+# and leave a trailing hyphen, which is invalid too.
+GATE_HOSTNAME="$(printf '%s' "$GATE_ID" | tr '[:upper:]_ ' '[:lower:]--' | tr -cd 'a-z0-9-' | cut -c1-63 | sed 's/^-*//; s/-*$//')"
+[ -n "$GATE_HOSTNAME" ] || GATE_HOSTNAME="$(hostname)"
+
 SET_HOSTNAME="n"
-if [ "$GATE_ID" != "$(hostname)" ]; then
-  ask SET_HOSTNAME "Also rename this Pi's hostname to $GATE_ID? (makes it easier to find on the network, e.g. via mDNS) (Y/n)" "y"
+if [ "$GATE_HOSTNAME" != "$(hostname)" ]; then
+  ask SET_HOSTNAME "Also rename this Pi's hostname to $GATE_HOSTNAME? (reachable as $GATE_HOSTNAME.local, which the gate config UI will need) (Y/n)" "y"
 fi
 
 # Defaulted, not required: rally-server advertises this name over mDNS
@@ -61,7 +74,7 @@ ask HAS_RTC "DS3231 RTC module connected? (y/N)" "n"
 
 echo
 echo "  Gate ID:     $GATE_ID"
-echo "  Hostname:    $([[ "$SET_HOSTNAME" =~ ^[Yy]$ ]] && echo "$GATE_ID (renaming from $(hostname))" || echo "unchanged ($(hostname))")"
+echo "  Hostname:    $([[ "$SET_HOSTNAME" =~ ^[Yy]$ ]] && echo "$GATE_HOSTNAME.local (renaming from $(hostname))" || echo "unchanged ($(hostname).local)")"
 echo "  MQTT host:   $MQTT_HOST:$MQTT_PORT"
 echo "  Install dir: $INSTALL_DIR"
 echo "  RTC:         $([[ "$HAS_RTC" =~ ^[Yy]$ ]] && echo "DS3231" || echo "none")"
@@ -171,8 +184,8 @@ fi
 REBOOT_NEEDED=0
 
 if [[ "$SET_HOSTNAME" =~ ^[Yy]$ ]]; then
-  echo "-- renaming hostname to $GATE_ID --"
-  sudo raspi-config nonint do_hostname "$GATE_ID"
+  echo "-- renaming hostname to $GATE_HOSTNAME --"
+  sudo raspi-config nonint do_hostname "$GATE_HOSTNAME"
   REBOOT_NEEDED=1
 fi
 
