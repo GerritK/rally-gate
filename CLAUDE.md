@@ -12,7 +12,7 @@ Rally Gate: open, modular timing/event management system for RC rally events. Fu
 - `docs/deployment-modes.md` — standalone vs headless, one-database-per-event model
 - `docs/api.md` — REST/SSE endpoint summary
 - `docs/frontend-structure.md` — multi-page structure of `apps/web` (routes, nav, `RallyInfo` backend piece) — built, read before changing routes/nav
-- `docs/gate-config-ui.md` — design for the on-gate config service (`apps/gate-config`, port 57434) — **designed, not built**; read before starting it
+- `docs/gate-config-ui.md` — the on-gate config service (`apps/gate-config`, port 57434); settings/status/UI built, Wi-Fi + hotspot still design
 - `docs/development-roadmap.md` — what's done, what's next, what's deliberately deferred (check this before starting new work)
 
 ## Commands
@@ -32,7 +32,11 @@ npm run seed-demo-data       # seeds a stage + gate assignments + one vehicle vi
 npm run simulate -- --gate START_WP1 --transponder 1234567   # one-off simulated detection
 npm run dev:gate-agent       # continuous simulated detections instead of one-off
 npm run dev:web              # Vue dashboard (Vite)
+npm run dev:gate-config      # on-gate config service on :57434 (API only)
+npm run dev:gate-config-web  # its Vue page on :57435, proxying /api to 57434
 ```
+
+`gate-config` shells out to systemd, chrony and journalctl, none of which exist off a Pi. Those calls all live in `apps/gate-config/src/system.ts` and report failures rather than throwing, so the service still runs and the page still loads on a dev machine — every status row just reads as unavailable. Point `GATE_CONFIG_FILE` and `CHRONY_SOURCE_DIR` at a scratch directory so it doesn't need `/etc`.
 
 `apps/rally-server` (run from that directory):
 ```bash

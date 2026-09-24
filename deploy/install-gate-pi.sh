@@ -106,7 +106,27 @@ npm install
 npm run build --workspace=@rally-gate/shared
 npm run build --workspace=@rally-gate/gate-agent
 
-echo "-- installing systemd service --"
+echo "-- building gate-config (web UI, takes a minute on slower hardware) --"
+npm run build --workspace=@rally-gate/gate-config
+
+echo "-- installing configuration --"
+# Config lives in a file, not in the unit: the gate config UI rewrites it at
+# runtime, and a unit file is code — a partial write there bricks the service,
+# and changing it needs a daemon-reload. Only written if absent, so re-running
+# this installer never discards settings a marshal made in the UI.
+sudo mkdir -p /etc/rally-gate
+if [ -f /etc/rally-gate/gate.env ]; then
+  echo "   keeping existing /etc/rally-gate/gate.env"
+else
+  sudo tee /etc/rally-gate/gate.env >/dev/null <<EOF
+# Written by deploy/install-gate-pi.sh, then owned by @rally-gate/gate-config.
+GATE_ID=$GATE_ID
+MQTT_HOST=$MQTT_HOST
+MQTT_PORT=$MQTT_PORT
+EOF
+fi
+
+echo "-- installing systemd services --"
 sudo tee /etc/systemd/system/rally-gate-agent.service >/dev/null <<EOF
 [Unit]
 Description=rally-gate gate-agent ($GATE_ID)
@@ -116,9 +136,7 @@ After=network.target
 Type=simple
 WorkingDirectory=$INSTALL_DIR
 ExecStart=/usr/bin/node apps/gate-agent/dist/main.js
-Environment=GATE_ID=$GATE_ID
-Environment=MQTT_HOST=$MQTT_HOST
-Environment=MQTT_PORT=$MQTT_PORT
+EnvironmentFile=/etc/rally-gate/gate.env
 Restart=always
 User=$USER
 
@@ -126,8 +144,41 @@ User=$USER
 WantedBy=multi-user.target
 EOF
 
+# A separate unit from gate-agent on purpose: gate-agent restarts forever, so a
+# bad setting turns into a crash loop — and a config UI hosted inside it would
+# die with the thing it exists to repair, leaving SSH as the only way in. See
+# docs/gate-config-ui.md.
+sudo tee /etc/systemd/system/rally-gate-config.service >/dev/null <<EOF
+[Unit]
+Description=rally-gate gate config UI
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$INSTALL_DIR/apps/gate-config
+ExecStart=/usr/bin/node dist/main.js
+Restart=always
+User=$USER
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Exact commands rather than a blanket rule: this service is reachable by
+# anyone on the rally network and has no authentication, so what it can do as
+# root is the boundary.
+sudo tee /etc/sudoers.d/rally-gate-config >/dev/null <<EOF
+$USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart rally-gate-agent
+$USER ALL=(root) NOPASSWD: /usr/bin/chronyc reload sources
+EOF
+sudo chmod 0440 /etc/sudoers.d/rally-gate-config
+# A malformed sudoers file locks out sudo entirely, so check before trusting it.
+sudo visudo -cf /etc/sudoers.d/rally-gate-config >/dev/null || {
+  echo "   sudoers drop-in invalid, removing it"; sudo rm -f /etc/sudoers.d/rally-gate-config; }
+
 sudo systemctl daemon-reload
 sudo systemctl enable --now rally-gate-agent
+sudo systemctl enable --now rally-gate-config
 
 echo "-- configuring chrony against $MQTT_HOST:$NTP_PORT --"
 # apt's chrony Conflicts: with systemd-timesyncd so this is usually redundant,
@@ -160,6 +211,12 @@ sudo tee /etc/chrony/conf.d/rally-gate.conf >/dev/null <<EOF
 # \`prefer\` keeps rally-server winning even at a site that happens to have
 # internet and can reach the distro's default pool.
 server $MQTT_HOST port $NTP_PORT iburst prefer minpoll 4 maxpoll 6
+
+# Lets gate-config repoint the time source when a marshal changes the server
+# address, via \`chronyc reload sources\` rather than a chrony restart — a
+# restart re-arms \`makestep\`, and a step mid-stage writes a discontinuity
+# straight into a running StageRun.
+sourcedir /run/chrony-rally
 EOF
 sudo systemctl restart chrony
 
@@ -210,6 +267,8 @@ fi
 
 echo
 echo "Done. gate-agent ($GATE_ID) is running — logs: journalctl -u rally-gate-agent -f"
+echo "Config UI: http://$GATE_HOSTNAME.local:57434  (change the gate's settings"
+echo "there instead of re-running this script)"
 echo "Clock sync: chronyc tracking  (System time offset should settle under a"
 echo "few ms; the Hardware page's clock column is the same check from the server)"
 

@@ -11,9 +11,11 @@
     "dev:server": "npm run start:dev --workspace=@rally-gate/rally-server",
     "dev:gate-agent": "npm run dev --workspace=@rally-gate/gate-agent",
     "dev:web": "npm run dev --workspace=@rally-gate/web",
+    "dev:gate-config": "npm run dev --workspace=@rally-gate/gate-config",
+    "dev:gate-config-web": "npm run dev:web --workspace=@rally-gate/gate-config",
     "simulate": "npm run simulate --workspace=@rally-gate/gate-agent --",
     "seed-demo-data": "node scripts/seed-demo-data.js",
     "build": "npm run build --workspaces --if-present",
-    "format:check": "prettier --config apps/rally-server/.prettierrc --check \"apps/gate-agent/src/**/*.ts\" \"apps/web/src/**/*.{ts,vue}\" \"packages/shared/src/**/*.ts\" \"packages/ui/src/**/*.{ts,css}\""
+    "format:check": "prettier --config apps/rally-server/.prettierrc --check \"apps/gate-agent/src/**/*.ts\" \"apps/gate-config/src/**/*.ts\" \"apps/gate-config/web/src/**/*.{ts,vue}\" \"apps/web/src/**/*.{ts,vue}\" \"packages/shared/src/**/*.ts\" \"packages/ui/src/**/*.{ts,css}\""
   }
 }

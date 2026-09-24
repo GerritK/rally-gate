@@ -1,0 +1,31 @@
+{
+  "name": "@rally-gate/gate-config",
+  "version": "0.0.1",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && vue-tsc -p tsconfig.web.json --noEmit && vite build",
+    "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "dev:web": "vite",
+    "start": "node dist/main.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@rally-gate/ui": "0.0.1",
+    "@types/express": "^5.0.0",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.7.4",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.5.4",
+    "vite": "^8.1.1",
+    "vue": "^3.5.39",
+    "vue-tsc": "^3.3.5"
+  }
+}

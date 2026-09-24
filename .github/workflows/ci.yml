@@ -37,8 +37,11 @@ jobs:
       - name: Lint
         run: npm run lint:check --workspace=@rally-gate/rally-server
 
+      # --workspaces rather than naming rally-server, so a new workspace with a
+      # test script is picked up without editing this file. --if-present skips
+      # the ones that have none.
       - name: Tests
-        run: npm test --workspace=@rally-gate/rally-server
+        run: npm test --workspaces --if-present
 
       # Builds every workspace, which is what runs vue-tsc over apps/web —
       # the frontend has no test suite, so this is its only typecheck.
