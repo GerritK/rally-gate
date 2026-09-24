@@ -39,3 +39,5 @@ sudo docker compose up -d --build
 
 IP=$(hostname -I | awk '{print $1}')
 echo "rally-server running — dashboard: http://$IP:57430  (API under http://$IP:57430/api)"
+echo "Serving time on $IP:57433/udp — the same address gates use for MQTT, so"
+echo "there is nothing extra to configure on a gate."
