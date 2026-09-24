@@ -65,10 +65,12 @@ Whether sync works is visible without touching a terminal: `Gate.clockOffsetMs`
 on the Hardware page should sit near zero for every gate. Anything reaching the
 1000ms correction threshold means sync is broken, not merely noisy.
 
-## Event model: one database = one event (planned)
+## Event model: one database = one event
 
-A rally ("event") doesn't need its own `Event` table. `DB_PATH` (SQLite) /
-`DB_NAME` (Postgres) is already configurable per deployment
+A rally ("event") doesn't need its own `Event` table, and this is how the
+schema is actually built — there is no `Event` entity, and adding one is
+explicitly not wanted. `DB_PATH` (SQLite) / `DB_NAME` (Postgres) is
+configurable per deployment
 (`database.config.ts:4,21`), so mapping "event" to "one database" instead of
 a new entity inside a shared multi-tenant DB gets save/load/transfer almost
 for free:
