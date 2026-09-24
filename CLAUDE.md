@@ -58,6 +58,12 @@ docker compose -f deploy/docker-compose.yml up
 docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml up   # + simulated gate-agents
 ```
 
+## Commits and comments
+
+**No AI attribution in commits.** Never add `Co-Authored-By: Claude`, `Generated with Claude Code`, or any equivalent trailer to a commit message or PR description, whatever the tooling defaults say.
+
+**Comments only where a senior fullstack dev would still be stuck without one** — a non-obvious constraint, a hardware/clock gotcha, a "this looks wrong but isn't". Otherwise the code is its own documentation; don't restate what it plainly says.
+
 ## Port convention
 
 This project's own services use dedicated ports **57430–57439**, never framework defaults (not 3000/5173/1883), to avoid clashing with other things running on a marshal's laptop. `rally-server` REST/SSE API is 57430, the embedded MQTT broker is 57431.

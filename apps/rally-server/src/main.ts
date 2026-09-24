@@ -16,23 +16,16 @@ const WEB_DIST = join(__dirname, '..', '..', 'web', 'dist');
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  /**
-   * Every API route lives under `/api`, because the frontend is served from
-   * the same origin and the two collide otherwise: `/vehicles` is both a
-   * REST resource and a page in the dashboard, and `/` is both the health
-   * route and `index.html`. Prefixing is what keeps the split unambiguous,
-   * rather than depending on which router happens to match first — and it
-   * stops a new endpoint from silently shadowing a page later.
-   */
+  // The frontend is served from this same origin, and `/vehicles` is both a
+  // REST resource and a dashboard page. The prefix is what keeps a new
+  // endpoint from silently shadowing a page.
   app.setGlobalPrefix('api');
   app.enableCors({ origin: '*' });
   app.useGlobalPipes(
     new ValidationPipe({
-      // Drop anything the DTO doesn't declare, then reject rather than
-      // silently ignore it. Stripping alone would close the security hole
-      // (an entity field like Stage.status can no longer be set through a
-      // generic create/update), but a marshal whose request quietly did
-      // nothing has no way to tell — a 400 naming the property does.
+      // Rejecting rather than silently stripping: both close the hole (no
+      // setting Stage.status through a generic update), but only a 400 tells
+      // a marshal their request did nothing.
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
@@ -44,17 +37,11 @@ async function bootstrap() {
   // failing, since the API is perfectly usable on its own.
   if (existsSync(WEB_DIST)) {
     app.useStaticAssets(WEB_DIST);
-    // Any GET that isn't a real file and isn't the API is a client-side
-    // route (`/results/stages/WP1`), and has to return index.html for
-    // vue-router's history mode to resolve it — otherwise a deep link or a
-    // refresh away from `/` is a 404.
+    // Non-API GETs that aren't real files are client-side routes, and need
+    // index.html for vue-router's history mode to resolve a deep link.
     //
-    // Registered here, *before* `listen()` initialises Nest, on purpose:
-    // Nest installs its own catch-all not-found handler while initialising,
-    // so middleware added afterwards never runs. Ordering ends up
-    // static files -> this fallback -> Nest, which is safe only because
-    // `setGlobalPrefix` put every API route under `/api` — nothing else
-    // needs to reach the framework's router.
+    // Registered before `listen()` on purpose: Nest installs its own catch-all
+    // 404 while initialising, so middleware added afterwards never runs.
     const expressApp = app.getHttpAdapter().getInstance();
     expressApp.use((req: Request, res: Response, next: NextFunction) => {
       if (req.method !== 'GET' || req.path.startsWith('/api')) {

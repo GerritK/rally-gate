@@ -33,17 +33,13 @@ export interface ManualStageRunInput {
 
 export type StageRunWithStatus = StageRun & { status: StageRunStatus };
 
-/**
- * STARTED/FINISHED/CANCELLED is derived, never stored: a run is FINISHED once
- * it has a finishTime, otherwise it's STARTED unless its stage has been
- * closed (marshal swept it as DNF), in which case it's CANCELLED.
- */
+/** Status is derived, never stored — see the note on `StageRun`. */
 export function deriveStageRunStatus(
   run: Pick<StageRun, 'finishTime'> & Partial<Pick<StageRun, 'voided'>>,
   stageClosed: boolean,
 ): StageRunStatus {
-  // Checked first: a voided run may well have a finishTime, and reporting it
-  // as FINISHED would present a struck-out time as a result.
+  // First: a voided run usually does have a finishTime, and FINISHED would
+  // present a struck-out time as a result.
   if (run.voided) {
     return StageRunStatus.VOIDED;
   }
@@ -64,17 +60,14 @@ export function deriveStageRunStatus(
 export function latestAttempts(runs: StageRun[]): StageRun[] {
   const latest = new Map<string, StageRun>();
   for (const run of runs) {
-    // Voided means "doesn't count" — the only reason an attempt doesn't, by
-    // the invariant the entity's unique index enforces. Every attempt voided
-    // therefore means no result at all, the correct reading of "that run
-    // didn't happen".
+    // Every attempt voided means no result at all — the correct reading of
+    // "that run didn't happen".
     if (run.voided) {
       continue;
     }
     const key = `${run.vehicleId}:${run.stageId}`;
     const seen = latest.get(key);
-    // The index guarantees at most one survivor per key, so this only ever
-    // picks between duplicates that shouldn't exist. Kept as a defensive
+    // The unique index already guarantees one survivor per key; this is a
     // tiebreak rather than trusting the schema blindly with a result.
     if (!seen || run.attempt > seen.attempt) {
       latest.set(key, run);
@@ -105,10 +98,9 @@ function assertValidRunDuration(startTime: Date, finishTime: Date): void {
 }
 
 /**
- * Corrections arrive as raw strings from an unvalidated body (there's no
- * ValidationPipe yet — see CLAUDE.md "Requests are untrusted"), and
- * `new Date('nonsense')` is an Invalid Date whose getTime() is NaN rather
- * than a throw. Unchecked, that NaN propagates into durationMs.
+ * An Invalid Date has a NaN getTime() rather than throwing, so unparseable
+ * input reaching here would propagate into durationMs. See `dto.ts` for why
+ * the pipe's `@IsISO8601` isn't the only check.
  */
 function parseTime(value: string, field: string): Date {
   const parsed = new Date(value);
@@ -426,23 +418,10 @@ export class StageRunsService {
   }
 
   /**
-   * Reverses a void — for a red flag called on the wrong car, or called and
-   * then withdrawn.
-   *
-   * Deliberately refuses rather than cascading. Voiding the later attempts
-   * automatically would strike out a run the car actually drove, as a side
-   * effect of a button labelled "unvoid"; the marshal should say so
-   * explicitly. Two states are rejected:
-   *
-   * One rule, because there is one invariant: a vehicle has at most one
-   * non-voided attempt per stage. So restoring is allowed exactly when
-   * nothing else survives, and refused otherwise — naming the attempt to
-   * void first.
-   *
-   * Deliberately not a cascade. Voiding the survivor automatically would
-   * strike out a run the car actually drove as a side effect of a control
-   * labelled "restore"; the marshal should say so, and have it recorded as a
-   * deliberate act. Two explicit steps, both visible afterwards.
+   * Reverses a void. Allowed exactly when no other attempt survives, since a
+   * vehicle has at most one non-voided attempt per stage. Refuses rather than
+   * cascading: striking out a run the car actually drove is the marshal's
+   * call to make explicitly, not a side effect of "restore".
    */
   async unvoidRun(id: string): Promise<StageRunWithStatus> {
     const run = await this.stageRuns.findOneBy({ id });
@@ -473,12 +452,9 @@ export class StageRunsService {
   }
 
   async remove(id: string): Promise<void> {
-    // Splits first, then the run. There are no foreign keys, so nothing
-    // cascades on its own and a run's splits would otherwise stay behind
-    // forever, referencing an id that no longer exists. Doing it in this
-    // order is safe without a transaction: if the run turns out not to
-    // exist, the split delete matched nothing anyway — and it quietly clears
-    // any orphans an earlier delete left behind.
+    // No foreign keys, so splits don't cascade and have to go first. Safe
+    // without a transaction: if the run doesn't exist, the split delete
+    // matched nothing anyway.
     await this.stageSplits.delete({ stageRunId: id });
     const result = await this.stageRuns.delete(id);
     if (result.affected === 0) {
@@ -515,11 +491,8 @@ export class StageRunsService {
       where: { stageRunId: In(runIds), splitIndex },
     });
     const runById = new Map(activeRuns.map((run) => [run.id, run]));
-    // Filtered rather than asserted non-null. The query above already limits
-    // splits to these runs, but pairing on that assumption with a `!` means a
-    // split whose run was excluded — voided, cancelled — would surface as a
-    // pair with no run, and `getSplitClassification` reads `pair.run` without
-    // checking. Dropping unmatched splits keeps that impossible.
+    // Dropping unmatched splits rather than asserting non-null: a pair with
+    // no run would reach `getSplitClassification`, which reads `pair.run`.
     return splits.flatMap((split) => {
       const run = runById.get(split.stageRunId);
       return run ? [{ run, split }] : [];

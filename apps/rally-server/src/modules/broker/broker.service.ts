@@ -35,12 +35,10 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
     });
 
     // Awaited, so a bind failure rejects out of onModuleInit and Nest aborts
-    // startup with it. Without this the 'error' event has no listener: node
-    // rethrows it as an uncaught exception *after* Nest has already logged
-    // "successfully started" and mapped every route, so a port clash reads as
-    // a random stack trace from a healthy-looking server. It matters most
-    // where it's least debuggable — a marshal double-clicking the packaged
-    // exe when a copy is already running.
+    // startup. Without a listener on 'error', node rethrows it *after* Nest
+    // has logged "successfully started", so a port clash — a marshal opening
+    // a second copy of the packaged exe — reads as a random stack trace from
+    // a healthy-looking server.
     await new Promise<void>((resolve, reject) => {
       this.server.once('error', reject);
       this.server.listen(port, () => {

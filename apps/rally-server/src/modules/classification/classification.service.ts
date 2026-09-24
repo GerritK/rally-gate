@@ -22,22 +22,12 @@ import { VehiclesService } from '../vehicles/vehicles.service';
 export const NOTIONAL_PENALTY_MS_KEY = 'notionalPenaltyMs';
 
 /**
- * Added on top of the slowest real time to produce a notional. Only the
- * margin is configurable — the *basis* is always the slowest time within the
- * ranking being computed, which is what keeps a notional worse than every
- * real time in that ranking and stops a retirement from paying off.
- *
- * Sized to be roughly a stage duration, and deliberately not a token few
- * seconds. A notional only guarantees that skipping a stage doesn't pay off
- * *on that stage*; whether a crew who drove more finishes ahead of one who
- * drove less depends on the penalty exceeding the advantage the shorter crew
- * built elsewhere. With a small penalty a quick crew can retire and still
- * lead the rally, which is legitimate rally arithmetic but rarely what an
- * organiser means. Erring large is the safer default: too small produces a
- * result that looks wrong, too large merely buries a retirement.
- *
- * Tune per event via the `notionalPenaltyMs` setting — the right value scales
- * with stage length, which this can't know.
+ * Added on top of the slowest real time in the ranking being computed, which
+ * is what keeps a notional worse than every real time in it. Roughly a stage
+ * duration, deliberately not a token few seconds: with a small penalty a
+ * quick crew can retire and still lead the rally. Tune per event via the
+ * `notionalPenaltyMs` setting — the right value scales with stage length,
+ * which this can't know.
  */
 export const DEFAULT_NOTIONAL_PENALTY_MS = 120_000;
 
@@ -74,20 +64,15 @@ export class ClassificationService {
   }
 
   /**
-   * Overall standings, following rally's actual rule: every counted stage
-   * contributes a time for every classified crew, so totals are comparable
-   * and the lowest one wins. A crew that didn't complete a stage gets a
-   * **notional time** for it (see "Notional times" in `docs/event-model.md`)
-   * rather than simply a shorter total — otherwise retiring early would look
-   * like winning, since less driving means less accumulated time.
+   * Overall standings: every counted stage contributes a time for every
+   * classified crew, so totals are comparable and the lowest one wins. A crew
+   * that didn't complete a stage gets a **notional time** (see "Notional
+   * times" in `docs/event-model.md`) rather than simply a shorter total —
+   * otherwise retiring early would look like winning.
    *
-   * Only **CLOSED** stages count. A stage still running has no result yet:
-   * penalising a crew for not having finished something nobody has finished
-   * would be wrong, and the crews who *have* finished it would otherwise be
-   * carrying a stage the others aren't. Same trigger `getNonFinishers` uses,
-   * so DNF/DNS and the overall table agree about when a stage is decided.
-   * Practical consequence: the overall table moves when a stage closes, not
-   * continuously during one — Live Timing is where in-progress runs show.
+   * Only **CLOSED** stages count, the same trigger `getNonFinishers` uses: a
+   * stage still running has no result to penalise anyone against. So the
+   * overall table moves when a stage closes, not continuously during one.
    */
   async getOverallClassification(): Promise<OverallClassificationEntry[]> {
     const stages = await this.stagesService.findAll();
@@ -105,14 +90,9 @@ export class ClassificationService {
     );
     // Classified = drove at least one closed stage. Without this a registered
     // car that never turned up would collect notional times for the whole
-    // rally and appear in the results on an entirely invented total.
-    //
-    // This set is also the notional's *population*, and is the one thing a
-    // per-class ranking changes: a class ranking narrows it to that class's
-    // members and the slowest time is then the slowest within the class. A
-    // car in two classes gets a different notional in each ranking, which is
-    // why notional times are computed per view and never written onto the
-    // run — see the deferred vehicle-classes item in development-roadmap.md.
+    // rally and appear in the results on an invented total. This set is also
+    // the notional's population, which is what a future per-class ranking
+    // narrows — hence notionals are computed per view, never stored on a run.
     const classified = [...new Set(finished.map((run) => run.vehicleId))];
     if (classified.length === 0) {
       return [];
@@ -138,9 +118,8 @@ export class ClassificationService {
       ]),
     );
     for (const stageTimes of timesByStage.values()) {
-      // A stage nobody finished never lands here, and rightly so: with no
-      // real time to anchor a notional, every crew would receive the same
-      // invented figure, shifting all totals equally and changing nothing.
+      // A stage nobody finished never lands here: with no real time to
+      // anchor a notional, every crew would get the same figure anyway.
       const notionalMs = Math.max(...stageTimes.values()) + notionalPenaltyMs;
       for (const vehicleId of classified) {
         const total = totals.get(vehicleId)!;

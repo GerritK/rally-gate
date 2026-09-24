@@ -41,18 +41,11 @@ export const REPROCESS_INTERVAL_MS = 30_000;
 const MAX_ID_LENGTH = 128;
 
 /**
- * Validates a detection off the wire.
- *
- * MQTT is the one ingress the global `ValidationPipe` does not cover — it
- * only guards HTTP — and the broker is unauthenticated, so anything on the
- * rally network can publish to a gate topic. Untyped JSON reaching the rule
- * engine has real consequences: an unparseable `timestampGate` becomes an
- * Invalid Date, which silently poisons a run's duration rather than throwing,
- * and a missing `eventId` fails the insert on a NOT NULL primary key and
- * lands in the pending list forever.
- *
- * Returns null for anything malformed; the caller drops it with a warning,
- * matching how an unparseable payload is already handled.
+ * MQTT is the one ingress the global `ValidationPipe` doesn't cover, and the
+ * broker is unauthenticated — anything on the rally network can publish to a
+ * gate topic. An unparseable `timestampGate` silently poisons a run's
+ * duration rather than throwing, and a missing `eventId` fails the insert and
+ * lands in the pending list forever. Returns null for anything malformed.
  */
 function parseDetection(payload: unknown): DetectionEvent | null {
   const { eventId, gateId, transponderId, timestampGate, source } = (payload ??
@@ -260,14 +253,12 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Applies the rule engine to a stored detection and marks it processed,
-   * used by both the live path and the retry sweep so the two can't drift.
+   * shared by the live path and the retry sweep so the two can't drift.
    *
-   * A failure here is deliberately swallowed rather than rethrown: the raw
-   * detection is already saved, so leaving `processed` false turns the
-   * failure into a retryable, countable record instead of an exception that
-   * `@nestjs/event-emitter` would discard anyway (its handlers default to
-   * `suppressErrors: true`, which is how these used to vanish into a log
-   * line with nothing tracking them).
+   * Failures are swallowed rather than rethrown: the raw detection is already
+   * saved, so leaving `processed` false makes it retryable and countable,
+   * where a throw would just be discarded by `@nestjs/event-emitter`
+   * (handlers default to `suppressErrors: true`).
    *
    * Returns whether the detection is now processed.
    */
@@ -276,10 +267,9 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
   ): Promise<boolean> {
     try {
       const gate = await this.gatesService.findOne(record.gateId);
-      // An unknown gate or unregistered transponder is not a failure — there
-      // is genuinely nothing to apply, and retrying would never change that.
-      // Marking these processed keeps the pending list to real problems
-      // rather than filling it with stray passings from another club's car.
+      // An unknown gate or unregistered transponder is not a failure —
+      // there's nothing to apply and retrying won't change that, so it's
+      // marked processed to keep the pending list to real problems.
       if (gate && record.vehicleId) {
         await this.applyRules(
           gate,
@@ -313,12 +303,10 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     }
     const stageId = assignment.stageId;
 
-    // `GateAssignment.active` is the hot-path check, but it and `Stage.status`
-    // are two records kept in step by `StagesService` rather than one fact —
-    // and `activate` updates them in separate steps, so a crash between the
-    // two leaves a gate live on a stage that isn't. Checking the stage as
-    // well means a detection in that window is stored without being timed,
-    // instead of quietly attaching a run to a stage nobody is running.
+    // `GateAssignment.active` and `Stage.status` are two records kept in step
+    // by `StagesService` in separate steps, so a crash between them leaves a
+    // gate live on a stage that isn't. Checking both means a detection in that
+    // window is stored untimed rather than attached to a dormant stage.
     const stage = await this.stagesService.findOne(stageId);
     if (stage?.status !== StageStatus.ACTIVE) {
       this.logger.warn(
