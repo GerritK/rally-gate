@@ -234,7 +234,7 @@
   `DiscoveryService` was advertising into the Docker bridge where no gate could
   ever see it. `deploy/docker-compose.yml` puts rally-server on
   `network_mode: host` (so it publishes no ports — it already listens on
-  57430/57431/57433 directly) and reaches Postgres over `127.0.0.1` instead of by
+  57430/57431/57432 directly) and reaches Postgres over `127.0.0.1` instead of by
   service name, with Postgres published on `127.0.0.1:5432` only. **The address
   prefix is the entire protection there** — a bare `5432:5432` would put the
   event database on the rally WiFi, which is what publishing nothing at all used
@@ -283,7 +283,7 @@
   embedded SNTP server, same reasoning as the embedded Aedes broker — a gate
   must never have to know what kind of machine the server runs on, so a
   standalone laptop and a Pi look identical from the gate's side and neither
-  needs a host time service. Listens on **57433/udp** rather than 123, since
+  needs a host time service. Listens on **57432/udp** rather than 123, since
   123 needs root/admin a double-clicked standalone executable won't have;
   gates reach it via chrony's `port` option on the source line. Stratum 10 and
   refid `LOCL`, deliberately poor so a gate that can see a real upstream
@@ -297,10 +297,13 @@
 
   This deleted the host-chrony block from `install-server-pi.sh` and the
   gate-serves-NTP stopgap from `install-gate-pi.sh` — both existed only to work
-  around the server not serving time. `deploy/docker-compose.yml` publishes
-  `57433:57433/udp`; the `/udp` suffix is load-bearing, since compose defaults
-  to TCP and would leave headless gates with no time source, visible only as
-  drift.
+  around the server not serving time. `deploy/docker-compose.yml` published
+  `57432:57432/udp`, the `/udp` suffix being load-bearing since compose
+  defaults to TCP and would leave headless gates with no time source, visible
+  only as drift. **Superseded:** rally-server moved to `network_mode: host`
+  shortly after (see that entry above), so it publishes no ports at all now and
+  binds this one on the host directly — the `/udp` lesson applies only if it
+  ever goes back to bridge networking.
 
   Verified against a running server with a real client packet: mode 4 reply,
   stratum 10, origin timestamp echoed byte-for-byte, offset and round-trip both

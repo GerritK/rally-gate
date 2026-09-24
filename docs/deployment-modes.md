@@ -48,12 +48,16 @@ what kind of machine the server runs on.** So the time reference is rally-server
 in both modes, at the same address a gate already uses for MQTT, and neither
 mode needs a host time service installed.
 
-It listens on **57433/udp**, not 123, because 123 needs root/admin that a
+It listens on **57432/udp**, not 123, because 123 needs root/admin that a
 double-clicked standalone executable does not have. Gates reach it with
-chrony's `port` option (`server <host> port 57433 iburst prefer`), written by
-`deploy/install-gate-pi.sh`. In headless mode `deploy/docker-compose.yml` must
-publish `57433:57433/udp` — with the `/udp` suffix, since compose defaults to
-TCP and would silently publish a port nothing listens on.
+chrony's `port` option (`server <host> port 57432 iburst prefer`), written by
+`deploy/install-gate-pi.sh`. In headless mode `deploy/docker-compose.yml`
+publishes no ports at all — rally-server runs on `network_mode: host` so that
+its mDNS advertisement reaches the LAN, and therefore binds this port on the
+host directly. If it is ever moved back to bridge networking, the mapping it
+needs is `57432:57432/udp` **with the suffix**: compose defaults to TCP and
+would otherwise publish a port nothing listens on, leaving gates with no time
+source and no error.
 
 Stratum is 10, deliberately poor, so that a gate which *can* see a real
 upstream prefers it. The address is not typed in either: chrony points at

@@ -43,7 +43,7 @@ services:
     # docs/architecture.md.
     #
     # Consequences, both load-bearing: the service publishes no ports (on the
-    # host network it already listens on 57430/57431/57433 directly), and it
+    # host network it already listens on 57430/57431/57432 directly), and it
     # reaches Postgres over loopback instead of by service name.
     network_mode: host
     environment:
@@ -55,7 +55,7 @@ services:
       DB_NAME: rally_gate
       PORT: 57430
       MQTT_PORT: 57431
-      NTP_PORT: 57433
+      NTP_PORT: 57432
 
 volumes:
   postgres-data:

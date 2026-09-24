@@ -21,7 +21,7 @@ const AGENT_UNIT = 'rally-gate-agent';
 
 /** Where chrony picks up dynamically supplied servers; see gate-config-ui.md. */
 const CHRONY_SOURCE_DIR = process.env.CHRONY_SOURCE_DIR ?? '/run/chrony-rally';
-const NTP_PORT = process.env.NTP_PORT ?? '57433';
+const NTP_PORT = process.env.NTP_PORT ?? '57432';
 
 export interface CommandResult {
   ok: boolean;
