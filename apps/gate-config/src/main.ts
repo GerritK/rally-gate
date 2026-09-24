@@ -2,7 +2,7 @@ import express from 'express';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import {
-  FIELDS,
+  fieldDescriptors,
   GateConfig,
   isFieldName,
   readConfig,
@@ -22,23 +22,12 @@ const PORT = Number(process.env.GATE_CONFIG_PORT ?? 57434);
 const app = express();
 app.use(express.json({ limit: '16kb' }));
 
-// Field specs travel to the browser so labels, hints and the adapter list have
-// exactly one definition. Regexes are dropped: they are the server's boundary,
-// not the form's, and shipping them invites treating client-side checks as the
-// real validation.
+// Field specs travel to the browser so labels, hints, messages and rules have
+// exactly one definition; the page rebuilds input rules from them rather than
+// restating the grammar in Vue, where the two would drift. `validate` is still
+// the boundary and runs on every save regardless.
 app.get('/api/fields', (_req, res) => {
-  res.json(
-    Object.fromEntries(
-      Object.entries(FIELDS).map(([name, spec]) => [
-        name,
-        {
-          label: spec.label,
-          hint: spec.hint,
-          oneOf: 'oneOf' in spec ? spec.oneOf : undefined,
-        },
-      ]),
-    ),
-  );
+  res.json(fieldDescriptors());
 });
 
 app.get('/api/config', (_req, res) => {

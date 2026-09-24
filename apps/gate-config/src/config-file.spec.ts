@@ -2,6 +2,9 @@ import { mkdtempSync, readFileSync, readdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import {
+  FIELDS,
+  FieldName,
+  fieldDescriptors,
   parseEnvFile,
   readConfig,
   serializeEnvFile,
@@ -147,6 +150,96 @@ describe('writeConfig', () => {
     expect(readConfig(path)).toEqual({ GATE_ID: 'GOOD' });
     expect(readdirSync(directory).filter((f) => f.endsWith('.tmp'))).toEqual(
       [],
+    );
+  });
+});
+
+/**
+ * The point of these: field rules now exist twice at runtime — once in
+ * `validate` on the server, once rebuilt from `fieldDescriptors()` in the
+ * browser. Two implementations of one rule drift, and the failure is quiet: a
+ * marshal either gets blocked by a rule the server does not have, or is told a
+ * value is fine and then rejected on save. So the two paths are asserted to
+ * agree rather than merely both existing.
+ */
+function clientSideRejects(field: FieldName, value: string): boolean {
+  const spec = fieldDescriptors()[field];
+  if (value === '') {
+    return false;
+  }
+  if (spec.pattern && !new RegExp(spec.pattern).test(value)) {
+    return true;
+  }
+  if (spec.oneOf && !spec.oneOf.includes(value)) {
+    return true;
+  }
+  if (spec.range) {
+    const parsed = Number(value);
+    const [min, max] = spec.range;
+    if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+      return true;
+    }
+  }
+  return false;
+}
+
+describe('fieldDescriptors', () => {
+  it('describes every settable field', () => {
+    expect(Object.keys(fieldDescriptors())).toEqual(Object.keys(FIELDS));
+  });
+
+  it('survives JSON, which is how it reaches the browser', () => {
+    const descriptors = fieldDescriptors();
+    expect(JSON.parse(JSON.stringify(descriptors)).GATE_ID.pattern).toBe(
+      descriptors.GATE_ID.pattern,
+    );
+  });
+
+  it('carries a rule for each field, so none silently validates client-side as anything', () => {
+    for (const [name, spec] of Object.entries(fieldDescriptors())) {
+      expect({
+        name,
+        hasRule: !!(spec.pattern || spec.oneOf || spec.range),
+      }).toEqual({ name, hasRule: true });
+    }
+  });
+
+  it.each([
+    ['GATE_ID', 'CLUB_START_WP1', true],
+    ['GATE_ID', 'CLUB START', false],
+    ['GATE_ID', 'a'.repeat(65), false],
+    ['MQTT_HOST', 'rally-server.local', true],
+    ['MQTT_HOST', '192.168.1.10', true],
+    ['MQTT_HOST', 'fe80::1', true],
+    ['MQTT_HOST', 'has space', false],
+    ['MQTT_PORT', '57431', true],
+    ['MQTT_PORT', '0', false],
+    ['MQTT_PORT', '70000', false],
+    ['MQTT_PORT', '574.31', false],
+    ['ADAPTER', 'simulated', true],
+    ['ADAPTER', 'openstint', false],
+    ['TRANSPONDERS', '1234567', true],
+    ['TRANSPONDERS', '1234567,7654321', true],
+    ['TRANSPONDERS', '1234567,', false],
+    ['TRANSPONDERS', '123,abc', false],
+    ['SIMULATE_INTERVAL_MS', '8000', true],
+    ['SIMULATE_INTERVAL_MS', '1', false],
+    ['HEARTBEAT_INTERVAL_MS', '15000', true],
+    ['HEARTBEAT_INTERVAL_MS', '60000', false],
+  ] as [FieldName, string, boolean][])(
+    'agrees between server and client for %s = %s',
+    (field, value, shouldPass) => {
+      const serverAccepts = validate({ [field]: value })[field] === undefined;
+      expect({
+        server: serverAccepts,
+        client: !clientSideRejects(field, value),
+      }).toEqual({ server: shouldPass, client: shouldPass });
+    },
+  );
+
+  it('shows the same message from both sides', () => {
+    expect(validate({ MQTT_PORT: '70000' }).MQTT_PORT).toBe(
+      fieldDescriptors().MQTT_PORT.message,
     );
   });
 });
