@@ -37,17 +37,20 @@ npm run dev:web
 Open the printed Vite URL — the stage run and detections should appear live.
 
 By default `rally-server` uses SQLite (`rally-gate.sqlite`), a REST/SSE API on
-port 57430, and an in-process MQTT broker on port 57431 — all in the
-57430–57439 range dedicated to this project to avoid clashing with other
-services on the host (e.g. a standalone Mosquitto broker on the default 1883,
-or another dev server on 3000/5173). No Docker or Postgres required for this
-flow.
+port 57430, and an in-process MQTT broker on port 57431 — in the 57430–57439
+range dedicated to this project to avoid clashing with other services on the
+host (e.g. a standalone Mosquitto broker on the default 1883). The Vite dev
+servers sit a range above, at their service's port + 10 (57440, 57449), so
+everything in 57430–57439 is something that actually runs at an event. The
+gate's own config service takes 57439, the far end, since it runs on gate
+hardware rather than beside `rally-server`. No
+Docker or Postgres required for this flow.
 
 The gate config service is separate and needs none of the above:
 
 ```bash
-npm run dev:gate-config      # API on 57434
-npm run dev:gate-config-web  # its page on 57435, proxying /api to 57434
+npm run dev:gate-config      # API on 57439
+npm run dev:gate-config-web  # its page on 57449, proxying /api to 57439
 ```
 
 It shells out to systemd, chrony and NetworkManager, which exist on a Pi and
@@ -91,6 +94,6 @@ so a gate never has to know whether the server is a laptop or a Pi. Pass
 
 No forced global uniqueness on `GATE_ID`, but pick one that won't collide with another club's — prefix it with your club's short code (e.g. `CLUB_START_WP1`) so gates stay collision-free if hardware ever gets shared or a joint event mixes clubs. The prompt defaults to the Pi's current hostname, and can optionally rename the Pi's hostname to match `GATE_ID` too, so the gate stays easy to find on the network (e.g. `club-start-wp1.local`).
 
-Installs two systemd services — `rally-gate-agent` (logs via `journalctl -u rally-gate-agent -f`) and `rally-gate-config`, the gate's own config page at `http://<hostname>.local:57434`. Optionally configures a DS3231 RTC module if one's connected (asked interactively).
+Installs two systemd services — `rally-gate-agent` (logs via `journalctl -u rally-gate-agent -f`) and `rally-gate-config`, the gate's own config page at `http://<hostname>.local:57439`. Optionally configures a DS3231 RTC module if one's connected (asked interactively).
 
 If a gate can reach no Wi-Fi it raises its own access point within a minute — `rally-gate-<hostname>`, password set at install time (default `rally-gate`) — so the config page is reachable in the state you most need it in. Join it and point the gate at the right network from the page.

@@ -8,7 +8,7 @@ Route and navigation structure, plus the reasoning behind it, is in
 shared components come from `packages/ui`, not from here.
 
 ```bash
-npm run dev      # Vite on 57432, talking to the API on 57430
+npm run dev      # Vite on 57440, talking to the API on 57430
 npm run build    # vue-tsc + vite build
 ```
 

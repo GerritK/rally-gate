@@ -333,14 +333,14 @@ fi
 
 echo
 echo "Done. gate-agent ($GATE_ID) is running — logs: journalctl -u rally-gate-agent -f"
-echo "Config UI: http://$GATE_HOSTNAME.local:57434  (change the gate's settings"
+echo "Config UI: http://$GATE_HOSTNAME.local:57439  (change the gate's settings"
 echo "there instead of re-running this script)"
 echo "Clock sync: chronyc tracking  (System time offset should settle under a"
 echo "few ms; the Hardware page's clock column is the same check from the server)"
 if command -v nmcli >/dev/null; then
   echo "If this gate ever finds no Wi-Fi it raises its own access point within a"
   echo "minute — join rally-gate-$GATE_HOSTNAME (password $HOTSPOT_PASSWORD) and open"
-  echo "http://$GATE_HOSTNAME.local:57434 to point it at the right network."
+  echo "http://$GATE_HOSTNAME.local:57439 to point it at the right network."
 fi
 
 if [ "$REBOOT_NEEDED" = "1" ]; then

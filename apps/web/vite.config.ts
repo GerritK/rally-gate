@@ -5,7 +5,7 @@ import vue from '@vitejs/plugin-vue';
 export default defineConfig({
   plugins: [vue()],
   server: {
-    port: 57432,
+    port: 57440,
   },
   // @rally-gate/shared ships a CommonJS build and is a symlinked workspace
   // package, so Vite's dev server skips it during dependency pre-bundling

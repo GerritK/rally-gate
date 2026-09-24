@@ -4,7 +4,7 @@
  * the old failure where a copied `dist/` pointed every browser at its own
  * localhost.
  *
- * In `npm run dev:web` Vite serves on 57432 while the API stays on 57430, so
+ * In `npm run dev:web` Vite serves on 57440 while the API stays on 57430, so
  * the origin has to be spelled out. `VITE_API_URL` still overrides both.
  */
 export const API_BASE: string =

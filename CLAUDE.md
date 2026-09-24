@@ -12,7 +12,7 @@ Rally Gate: open, modular timing/event management system for RC rally events. Fu
 - `docs/deployment-modes.md` — standalone vs headless, one-database-per-event model
 - `docs/api.md` — REST/SSE endpoint summary
 - `docs/frontend-structure.md` — multi-page structure of `apps/web` (routes, nav, `RallyInfo` backend piece) — built, read before changing routes/nav
-- `docs/gate-config-ui.md` — the on-gate config service (`apps/gate-config`, port 57434); built, including Wi-Fi + the hotspot fallback — read the "Wi-Fi goes through a wrapper" section before touching anything that shells out to `nmcli`
+- `docs/gate-config-ui.md` — the on-gate config service (`apps/gate-config`, port 57439); built, including Wi-Fi + the hotspot fallback — read the "Wi-Fi goes through a wrapper" section before touching anything that shells out to `nmcli`
 - `docs/development-roadmap.md` — what's done, what's next, what's deliberately deferred (check this before starting new work)
 
 ## Commands
@@ -32,8 +32,8 @@ npm run seed-demo-data       # seeds a stage + gate assignments + one vehicle vi
 npm run simulate -- --gate START_WP1 --transponder 1234567   # one-off simulated detection
 npm run dev:gate-agent       # continuous simulated detections instead of one-off
 npm run dev:web              # Vue dashboard (Vite)
-npm run dev:gate-config      # on-gate config service on :57434 (API only)
-npm run dev:gate-config-web  # its Vue page on :57435, proxying /api to 57434
+npm run dev:gate-config      # on-gate config service on :57439 (API only)
+npm run dev:gate-config-web  # its Vue page on :57449, proxying /api to 57439
 ```
 
 `gate-config` shells out to systemd, chrony and journalctl, none of which exist off a Pi. Those calls all live in `apps/gate-config/src/system.ts` and report failures rather than throwing, so the service still runs and the page still loads on a dev machine — every status row just reads as unavailable. Point `GATE_CONFIG_FILE` and `CHRONY_SOURCE_DIR` at a scratch directory so it doesn't need `/etc`.
@@ -71,9 +71,26 @@ docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml up 
 
 ## Port convention
 
-This project's own services use dedicated ports **57430–57439**, never framework defaults (not 3000/5173/1883), to avoid clashing with other things running on a marshal's laptop. `rally-server` REST/SSE API is 57430, the embedded MQTT broker is 57431.
+This project's own services use dedicated ports, never framework defaults (not 3000/5173/1883), to avoid clashing with other things running on a marshal's laptop — and, for the dev servers, with every other Vite project on yours.
 
-**Every API route is under `/api`** (`setGlobalPrefix` in `main.ts`), because `rally-server` also serves the built `apps/web` on that same port and the two collide otherwise — `/vehicles` is both a REST resource and a dashboard page. Any non-`/api` GET that isn't a real file returns `index.html`, so vue-router history-mode deep links resolve. That fallback is registered *before* `listen()`: Nest installs its own catch-all 404 while initialising, so middleware added afterwards never runs. Static serving is skipped entirely when `apps/web/dist` is absent, which is the normal dev loop (Vite on 57432 → API on 57430).
+Two ranges, split so that **every number in 5743x is something that runs in the field**. That is what makes "which port is free" answerable without grepping the repo:
+
+| Port | Service |
+|---|---|
+| 57430 | `rally-server` REST/SSE API **and** the built `apps/web` |
+| 57431 | embedded MQTT broker (Aedes) |
+| 57432 | free |
+| 57433 | embedded SNTP server (**udp** — the suffix is load-bearing in compose) |
+| 57434–57438 | free, kept contiguous for server-side growth |
+| 57439 | `apps/gate-config` API **and** its built page — the only one that runs **on a gate**, so it sits at the far end |
+| 57440 | Vite dev server for `apps/web` — **dev only** |
+| 57449 | Vite dev server for `gate-config` — **dev only** |
+
+**A Vite dev server runs on its service's port + 10.** So `apps/web` (served in production by 57430) is 57440, and `gate-config` (57439) is 57449. The rule means a new dev server needs no allocation decision, and no dev-only port ever consumes a slot that an installer, firewall rule or sticker might later need.
+
+New *server-side* services take the next free number upward from 57432. `gate-config` is deliberately at the other end: it is the only service that runs on gate hardware rather than alongside `rally-server`, so growing the server never walks into it.
+
+**Every API route is under `/api`** (`setGlobalPrefix` in `main.ts`), because `rally-server` also serves the built `apps/web` on that same port and the two collide otherwise — `/vehicles` is both a REST resource and a dashboard page. Any non-`/api` GET that isn't a real file returns `index.html`, so vue-router history-mode deep links resolve. That fallback is registered *before* `listen()`: Nest installs its own catch-all 404 while initialising, so middleware added afterwards never runs. Static serving is skipped entirely when `apps/web/dist` is absent, which is the normal dev loop (Vite on 57440 → API on 57430).
 
 ## Architecture
 

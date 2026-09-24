@@ -41,7 +41,7 @@ Not built yet: `/penalties`, `/results`, `/gate-nodes`, auth of any kind. See
 the original project doc's "API" section for the full eventual surface.
 
 Not on `rally-server` at all: a gate's *own* configuration. That lives on the
-gate, served by `apps/gate-config` on port 57434 with its own unprefixed
+gate, served by `apps/gate-config` on port 57439 with its own unprefixed
 `/api/config`, `/api/status` and `/api/network` — a separate service on a
 separate machine, deliberately (see `gate-config-ui.md`). Nothing server-owned
 appears there: gate role and stage assignment stay here, because they are the

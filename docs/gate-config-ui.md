@@ -17,8 +17,8 @@ gate afterwards.
 
 ## What it is
 
-A separate service, `apps/gate-config`, on **port 57434** (next free in the
-project's 57430-57439 range). Reached at `http://<gate-hostname>.local:57434`
+A separate service, `apps/gate-config`, on **port 57439** (see the port table in
+`CLAUDE.md`). Reached at `http://<gate-hostname>.local:57439`
 — the name the Pi already publishes via avahi, see "Gate discovery & heartbeat"
 in `architecture.md`.
 
@@ -323,7 +323,7 @@ Not verified, and only real hardware can:
   real Pi.
 - That the page renders as intended — there is no headless browser in this repo.
 - Anything `nmcli` actually does: whether hotspot and station mode coexist on the
-  radio, whether the hotspot is reachable at `<hostname>.local:57434`, and
+  radio, whether the hotspot is reachable at `<hostname>.local:57439`, and
   whether the watchdog's 60s boot delay is long enough for a slow access point.
   The stub above proves which `nmcli` commands run and with what arguments,
   never what NetworkManager does with them.

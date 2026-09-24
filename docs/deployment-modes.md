@@ -33,7 +33,7 @@ That is also why the API sits under `/api`: `/vehicles` is both a REST
 resource and a page in the dashboard, so serving both from one origin needs
 them separated. `main.ts` skips static serving entirely when
 `apps/web/dist` is absent, which is the normal dev loop — there Vite serves
-the dashboard on 57432 and talks to the API on 57430.
+the dashboard on 57440 and talks to the API on 57430.
 
 ## Time sync
 

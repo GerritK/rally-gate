@@ -200,7 +200,7 @@
   behind: the run recorded 3000ms (the true elapsed time) where an
   uncorrected server reported 8002ms.
 
-- Gate config UI, settings half (`apps/gate-config`, port 57434): a marshal can
+- Gate config UI, settings half (`apps/gate-config`, port 57439): a marshal can
   change a gate's identity, server address, decoder and simulator settings from a
   page on the gate itself, and see whether gate-agent is running, what chrony
   reports and the recent log — no SSH, no re-running the installer. The design
@@ -370,7 +370,7 @@
   they report a missing wrapper rather than throwing; and every branch of
   `rally-gate-net` against a stub `nmcli` on `PATH`, argument vectors included.
   **Not verified, and only a Pi can:** whether hotspot and station mode coexist
-  on one radio, whether the hotspot is reachable at `<hostname>.local:57434`,
+  on one radio, whether the hotspot is reachable at `<hostname>.local:57439`,
   and whether the 60s boot delay suits a slow access point. See "Next".
 
 ## Next
@@ -392,7 +392,7 @@ Priority order (1 = next):
 1. **Verify Wi-Fi and the hotspot fallback on a Pi.** The code is written (see
    Done); what no developer machine can answer is on the list at the end of
    `docs/gate-config-ui.md`. In order: does `rally-gate-net hotspot` raise an AP
-   at all on this Pi model, is `http://<hostname>.local:57434` reachable over
+   at all on this Pi model, is `http://<hostname>.local:57439` reachable over
    it, does `join` from the page get the gate onto a real network, does the
    watchdog bring the hotspot back within a minute after a deliberately wrong
    password, and is `OnBootSec=60s` long enough on a slow access point. If
