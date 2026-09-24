@@ -12,10 +12,10 @@ REST (all on `rally-server`, default port 57430; embedded MQTT broker on
 
 | Endpoint | Methods | Notes |
 |---|---|---|
-| `/gates` | GET, and `/:id` GET/PUT | PUT upserts a gate by id (name only — hardware identity, no role) |
+| `/gates` | GET, and `/:id` GET/PUT/DELETE | PUT upserts a gate by id (name only — hardware identity, no role). A gate also auto-creates from its first heartbeat unless the `autoDiscoverGates` setting is off |
 | `/gate-assignments` | GET, POST, `/:id` DELETE | the (gate, stage, role, splitIndex) plan; `active` picks which one the rule engine uses |
-| `/vehicles` | GET, POST, `/:id` GET | transponder assignment is `Vehicle.transponderId`; `startNumber` is DB-unique, POST 409s on a clash |
-| `/stages` | GET, and `/:id` GET/PUT, `/:id/activate`\|`/close` POST | sorted by `stageNumber`; `status` is `NOT_STARTED`\|`ACTIVE`\|`CLOSED`; activate flips all of the stage's `GateAssignment`s on and sets `ACTIVE` — 409s with `{ conflictingStageIds }` if another stage is already active on a shared gate (unless `?force=true`, which closes that other stage instead — DNFs anything still `STARTED` on it), or a plain 409 if the stage is already `CLOSED`; close flips the stage's gates back off and marks it `CLOSED` — terminal, no reactivating (no standalone deactivate either — see `architecture.md`) |
+| `/vehicles` | GET, POST, `/:id` GET/PATCH | transponder assignment is `Vehicle.transponderId`; `startNumber` is DB-unique, POST 409s on a clash. PATCH is a general partial update (status, names, start number, transponder) and 409s on the same clash; `status` is a `VehicleStatus` |
+| `/stages` | GET, POST, `/:id` GET/PUT/DELETE, `/:id/activate`\|`/close` POST | sorted by `stageNumber`; `status` is `NOT_STARTED`\|`ACTIVE`\|`CLOSED`; activate flips all of the stage's `GateAssignment`s on and sets `ACTIVE` — 409s with `{ conflictingStageIds }` if another stage is already active on a shared gate (unless `?force=true`, which closes that other stage instead — DNFs anything still `STARTED` on it), or a plain 409 if the stage is already `CLOSED`; close flips the stage's gates back off and marks it `CLOSED` — terminal, no reactivating (no standalone deactivate either — see `architecture.md`) |
 | `/stage-runs` | GET, POST, `/:id` PATCH\|DELETE | derived from gate detections; POST/PATCH/DELETE are the marshal's manual-correction override for missed/bad detections. A vehicle has **at most one non-voided attempt per stage** (partial unique index), so POST 409s while one still counts — void it first. GET returns every attempt including voided ones |
 | `/stage-runs/:id/void` | POST | strikes out an attempt (red flag). The row stays as evidence with status `VOIDED` but stops counting, and the vehicle is freed so the **start gate opens the re-run itself** on its next pass — both ends stay gate-timed, no restart time is typed in. see "Voiding" in `event-model.md` |
 | `/stage-runs/:id/unvoid` | POST | reverses a void. 409s with `{ blockingAttempt }` if another attempt already counts for that stage — a vehicle has at most one non-voided attempt, so that one must be voided first. Never cascades: discarding a run the car actually drove is the marshal's call to make explicitly |
@@ -23,6 +23,11 @@ REST (all on `rally-server`, default port 57430; embedded MQTT broker on
 | `/events` | GET | recent `DetectionEventRecord`s |
 | `/events/pending` | GET, `/retry` POST | detections stored but never timed, because rule application threw. The raw passing is always saved before the rules run, so a failure costs the timing, not the evidence — `processed: false` marks it. The server re-runs these every 30s (idempotent: the rule engine ignores repeats); POST forces a sweep now and returns `{ recovered }`. A non-empty list means passings are missing from the results, so the dashboard surfaces the count |
 | `/classification/stages/:stageId` | GET | ranked per-stage results with gaps |
+| `/classification/stages/:stageId/split-gates` | GET | the split points configured on that stage, as `SplitGateInfo[]` — what the dashboard's split selector lists |
+| `/classification/stages/:stageId/splits/:splitIndex` | GET | ranked by elapsed time at that split, **including runs still `STARTED`**, which is what makes it a live leaderboard rather than a results view. Excludes `CANCELLED` |
+| `/classification/stages/:stageId/non-finishers` | GET | `CANCELLED` runs as DNF, plus — only once the stage is `CLOSED` — registered vehicles with no run at all as DNS. Before that, "no run yet" just means "hasn't started" |
+| `/rally-info` | GET, PUT | the event's own name/details, a singleton pinned to `RALLY_INFO_ID` — there is no `Event` table (see `deployment-modes.md`), so this is the one place an event names itself |
+| `/settings/:key` | GET, PUT | generic key-value settings kept apart from `RallyInfo` so a new toggle needs no schema change. `autoDiscoverGates`, `clockCorrectionThresholdMs` and `notionalPenaltyMs` live here |
 | `/classification/overall` | GET | ranked overall results with gaps, lowest total wins. Counts **CLOSED stages only**; a crew that didn't complete one is charged a **notional time** (slowest real time on that stage + `notionalPenaltyMs`, default 2 min) so all totals cover the same stages — see "Notional times" in `event-model.md`. `stagesCompleted` is stages actually driven and is display-only, not the ranking key; a value below the maximum means notional time is inside that total |
 
 Live (Server-Sent Events, plain `EventSource` on the client — no Socket.IO):
@@ -32,6 +37,12 @@ Live (Server-Sent Events, plain `EventSource` on the client — no Socket.IO):
 - `GET /live/gates` — a `Gate` on each heartbeat
 - `GET /live/pending-detections` — `{ pending: DetectionEventRecord[] }` whenever the failed-detection backlog changes (a failure or a recovery). Carries the whole list, not a delta, so a reconnecting client is correct again on the next change
 
-Not built yet: `/penalties`, `/results`, `/config`, `/gate-nodes`, auth of
-any kind. See the original project doc's "API" section for the full
-eventual surface.
+Not built yet: `/penalties`, `/results`, `/gate-nodes`, auth of any kind. See
+the original project doc's "API" section for the full eventual surface.
+
+Not on `rally-server` at all: a gate's *own* configuration. That lives on the
+gate, served by `apps/gate-config` on port 57434 with its own unprefixed
+`/api/config`, `/api/status` and `/api/network` — a separate service on a
+separate machine, deliberately (see `gate-config-ui.md`). Nothing server-owned
+appears there: gate role and stage assignment stay here, because they are the
+plan for the event rather than a property of the hardware.

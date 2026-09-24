@@ -9,8 +9,10 @@ to this implementation.
 
 - `apps/rally-server` — NestJS backend: REST API, embedded MQTT broker (Aedes), TypeORM (SQLite for dev/standalone, PostgreSQL for headless deployments), Server-Sent Events live feed.
 - `apps/gate-agent` — runs on each gate node (or locally). Publishes detection events over MQTT via a swappable `DecoderAdapter` (only the `SimulatedAdapter` exists so far — see [docs/decoder-adapters.md](docs/decoder-adapters.md)).
-- `apps/web` — Vue 3 + Vite dashboard: live detections and stage run results.
-- `packages/shared` — TypeScript types shared by all three (gate roles, detection event shape, MQTT topics).
+- `apps/web` — Vue 3 + Vite dashboard: live timing, results, setup, hardware and vehicles ([docs/frontend-structure.md](docs/frontend-structure.md)).
+- `apps/gate-config` — runs *on each gate*, serving a page that configures that gate: identity, server address, decoder, Wi-Fi, plus a status panel. So a gate needs no SSH and no re-running the installer ([docs/gate-config-ui.md](docs/gate-config-ui.md)).
+- `packages/shared` — TypeScript types shared by every app (gate roles, detection event shape, MQTT topics, stage/classification/vehicle-status types).
+- `packages/ui` — the Vuetify design system both web interfaces build on, so they read as one product.
 
 ## Quickstart (local dev, no hardware needed)
 
@@ -41,6 +43,18 @@ services on the host (e.g. a standalone Mosquitto broker on the default 1883,
 or another dev server on 3000/5173). No Docker or Postgres required for this
 flow.
 
+The gate config service is separate and needs none of the above:
+
+```bash
+npm run dev:gate-config      # API on 57434
+npm run dev:gate-config-web  # its page on 57435, proxying /api to 57434
+```
+
+It shells out to systemd, chrony and NetworkManager, which exist on a Pi and
+not on a laptop — every status row just reads as unavailable off a Pi rather
+than failing. Point `GATE_CONFIG_FILE` and `CHRONY_SOURCE_DIR` at a scratch
+directory so it doesn't want to write to `/etc`.
+
 ## Headless / server deployment
 
 `deploy/docker-compose.yml` runs `rally-server` against PostgreSQL instead of
@@ -66,9 +80,17 @@ curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/in
 ```bash
 curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-gate-pi.sh | bash
 # or non-interactive:
-GATE_ID=CLUB_START_WP1 MQTT_HOST=192.168.1.10 bash -c "$(curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-gate-pi.sh)"
+GATE_ID=CLUB_START_WP1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-gate-pi.sh)"
 ```
 
-No forced global uniqueness on `GATE_ID`, but pick one that won't collide with another club's — prefix it with your club's short code (e.g. `CLUB_START_WP1`) so gates stay collision-free if hardware ever gets shared or a joint event mixes clubs. The prompt defaults to the Pi's current hostname, and can optionally rename the Pi's hostname to match `GATE_ID` too, so the gate stays easy to find on the network (e.g. `CLUB_START_WP1.local`).
+**A gate install asks nothing about the rally it will be used at.** No server
+address: `rally-server` advertises itself over mDNS as `rally-server.local`,
+which is what both `gate-agent` and chrony resolve, and it serves time itself
+so a gate never has to know whether the server is a laptop or a Pi. Pass
+`MQTT_HOST` only where the network blocks multicast.
 
-Installs as a systemd service (`rally-gate-agent`) — logs via `journalctl -u rally-gate-agent -f`. Optionally configures a DS3231 RTC module if one's connected (asked interactively).
+No forced global uniqueness on `GATE_ID`, but pick one that won't collide with another club's — prefix it with your club's short code (e.g. `CLUB_START_WP1`) so gates stay collision-free if hardware ever gets shared or a joint event mixes clubs. The prompt defaults to the Pi's current hostname, and can optionally rename the Pi's hostname to match `GATE_ID` too, so the gate stays easy to find on the network (e.g. `club-start-wp1.local`).
+
+Installs two systemd services — `rally-gate-agent` (logs via `journalctl -u rally-gate-agent -f`) and `rally-gate-config`, the gate's own config page at `http://<hostname>.local:57434`. Optionally configures a DS3231 RTC module if one's connected (asked interactively).
+
+If a gate can reach no Wi-Fi it raises its own access point within a minute — `rally-gate-<hostname>`, password set at install time (default `rally-gate`) — so the config page is reachable in the state you most need it in. Join it and point the gate at the right network from the page.

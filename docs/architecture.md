@@ -367,6 +367,7 @@ This implementation covers Phase 1/2 from the original doc's roadmap: a
 working event pipeline with `stage_start`/`stage_finish`/`stage_split` gate
 roles producing timed `StageRun`s and `StageSplit`s. Parc Fermé, service
 park, penalties, the full rule engine YAML DSL, and the RC4 learning
-registry are not built yet — the `Gate.role` enum and `GateRole` in
-`packages/shared` already include those roles so the schema doesn't need to
-change when they're added.
+registry are not built yet — `GateRole` in `packages/shared` already includes
+those roles, so the schema doesn't need to change when they're added. (The
+role lives on `GateAssignment`, not on `Gate`; see "Gate assignment: plan vs.
+live" above.)

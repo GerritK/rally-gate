@@ -1,5 +1,22 @@
-# Vue 3 + TypeScript + Vite
+# apps/web
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+The dashboard `rally-server` serves: live timing, results, setup, hardware and
+vehicles, as a `vue-router` multi-page app behind a Vuetify nav drawer.
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+Route and navigation structure, plus the reasoning behind it, is in
+[docs/frontend-structure.md](../../docs/frontend-structure.md). The theme and
+shared components come from `packages/ui`, not from here.
+
+```bash
+npm run dev      # Vite on 57432, talking to the API on 57430
+npm run build    # vue-tsc + vite build
+```
+
+No test suite. `vue-tsc` during `npm run build` is the only thing that
+typechecks this app, so a frontend type error surfaces there or in CI and
+nowhere else.
+
+`@rally-gate/shared` ships CommonJS and must stay listed in `optimizeDeps.include`
+in `vite.config.ts` — without it Vite loads the raw CJS file as native ESM and
+named imports silently fail. See the `packages/shared` note in
+[CLAUDE.md](../../CLAUDE.md).

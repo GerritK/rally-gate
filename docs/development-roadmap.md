@@ -109,6 +109,85 @@
   Verified with a full route sweep in a real browser after the split, no
   console errors.
 
+- Stage re-runs, and voiding as the way one starts. `StageRun` gained an
+  `attempt` counter and a `voided` flag; results count the latest surviving
+  attempt per vehicle+stage, and a **partial unique index** enforces that at
+  most one attempt per (vehicle, stage) is non-voided, so the invariant is the
+  database's rather than a service check. `POST /stage-runs/:id/void` strikes
+  out an attempt (red flag): the row stays as evidence — a protest turns on
+  what was originally timed — but stops counting, and because the vehicle then
+  has neither an open nor a finished attempt, **the start gate opens the re-run
+  by itself** on the car's next pass. That is the whole point of doing it this
+  way rather than typing in a replacement run: both ends of the re-run stay
+  gate-timed. `POST /stage-runs/:id/unvoid` reverses it and 409s with
+  `{ blockingAttempt }` rather than cascading — discarding a run the car
+  actually drove is a call a marshal makes explicitly. A bare post-finish gate
+  detection deliberately does **not** start a re-run: the start gate stays live
+  for the rest of the field while a finished car is recovered back past it, so
+  that would manufacture phantom runs. Full rules in `event-model.md`,
+  "Voiding, and how a re-run actually starts".
+
+- Notional times, so the overall classification means something. A sum of
+  stage times only compares crews if the totals cover the same stages —
+  otherwise retiring from one makes a total *shorter* and ranks a crew higher
+  for driving less. A crew missing a CLOSED stage is charged the slowest real
+  time on that stage within the ranking being computed, plus
+  `notionalPenaltyMs` (a `Settings` key, default 2 min), which guarantees the
+  notional is worse than every real time there. `stagesCompleted` is
+  display-only, not the ranking key. The `/setup/scoring` route is where a
+  marshal sets the penalty. What the guarantee does *not* cover, and the
+  reason the penalty wants to scale with stage length, is in `event-model.md`
+  "Notional times".
+
+- Failed detections are retried and made visible instead of lost.
+  `EventsService` saves the raw detection before running the rules, so a rule
+  failure costs the timing but never the evidence; `applyRulesForRecord`
+  catches, leaves `processed: false`, and a 30s sweep retries oldest-first.
+  `GET /events/pending` (+ `POST /events/pending/retry`) and a dashboard banner
+  surface the backlog, pushed over `/live/pending-detections` as the whole list
+  rather than a delta, so a reconnecting client is correct on the next change.
+  An unknown gate or unregistered transponder is marked processed rather than
+  retried forever — retrying changes nothing, and it would bury real problems.
+
+- `rally-server` serves the built dashboard, and every API route moved under
+  `/api`. Headless mode had no UI at all before this — nothing built or served
+  `apps/web`, and `install-server-pi.sh` printed a URL that returned JSON. The
+  prefix is forced by serving both from one origin: `/vehicles` is both a REST
+  resource and a dashboard page. Non-`/api` GETs that aren't real files return
+  `index.html` so vue-router deep links resolve, registered *before* `listen()`
+  because Nest installs its own catch-all 404 while initialising. `API_BASE` is
+  relative in a built app, so nothing needs the server's address at build time.
+  **Breaking change to every path** — see the DTO/API-contract note in
+  `CLAUDE.md`.
+
+- Live streams resync on reconnect, and MQTT ingress is validated. Only the
+  pending-detections stream refetched after a dropped connection; the other
+  four trusted SSE and went silently stale, which during a stage is missing
+  detections on the marshal's main screen. Each stream now refetches through
+  `onopen`, which covers both first connect and every automatic reconnect.
+  Separately, the broker is unauthenticated and the global `ValidationPipe`
+  guards HTTP only, so anything on the rally network could publish an untyped
+  detection: an unparseable `timestampGate` became an Invalid Date that poisons
+  a duration *silently*, and a missing `eventId` failed the insert and sat in
+  the pending list forever. Ids and timestamps are now bounds-checked and bad
+  messages dropped with a warning.
+
+- CI (`.github/workflows/ci.yml`), plus a headless-stack job that boots the
+  real compose stack against Postgres — the only thing that catches a column
+  type valid on sqlite and invalid on Postgres (see `CLAUDE.md`). Headless
+  deploy hardened alongside it: Postgres published on `127.0.0.1:5432` only,
+  builds pinned, a backup taken before a rebuild.
+
+- Sub-second timestamp precision pinned by `timestamp-precision.spec.ts`,
+  against real in-memory sqlite rather than a mock, since the whole risk lives
+  in how the driver serialises a `Date`. It separates two runs a tenth of a
+  second apart — the margin that actually decides a result — and recomputes
+  the duration from the values that come back, because a truncating driver
+  would leave `durationMs` correct while the timestamps behind it lost
+  precision. (Written after a wrong claim in these docs that sqlite `datetime`
+  has second precision: the truncation belongs to `@CreateDateColumn`, not to
+  the column type.)
+
 - Gate clock offset measurement + correction: heartbeats carry `sentAt`,
   `Gate.clockOffsetMs` holds the measured `arrivedAt - sentAt`, and
   `EventsService` corrects a detection's effective time at ingest when the
