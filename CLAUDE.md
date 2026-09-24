@@ -12,6 +12,7 @@ Rally Gate: open, modular timing/event management system for RC rally events. Fu
 - `docs/deployment-modes.md` — standalone vs headless, one-database-per-event model
 - `docs/api.md` — REST/SSE endpoint summary
 - `docs/frontend-structure.md` — multi-page structure of `apps/web` (routes, nav, `RallyInfo` backend piece) — built, read before changing routes/nav
+- `docs/gate-config-ui.md` — design for the on-gate config service (`apps/gate-config`, port 57434) — **designed, not built**; read before starting it
 - `docs/development-roadmap.md` — what's done, what's next, what's deliberately deferred (check this before starting new work)
 
 ## Commands
