@@ -9,12 +9,17 @@ export const CONFIG_PATH =
  * The settable keys, as a whitelist rather than a blocklist.
  *
  * This file is read by systemd as `EnvironmentFile=` for the gate-agent unit,
- * so every key in it becomes an environment variable of that process. Accepting
- * an arbitrary key name would therefore let anyone who can reach this service
- * set `NODE_OPTIONS`, `LD_PRELOAD` or `PATH` and run code as the gate-agent
- * user — the service has no authentication (see docs/gate-config-ui.md
- * "Access"), so the whitelist *is* the boundary. Never widen this to "anything
- * the form posted".
+ * so every key in it becomes an environment variable of that process.
+ *
+ * `group` decides which card on the page a field lands in; it is here rather
+ * than in the Vue component so the two cannot disagree about where a new
+ * setting belongs. Anything without one goes in the general card.
+ *
+ * Accepting an arbitrary key name would therefore let anyone who can reach this
+ * service set `NODE_OPTIONS`, `LD_PRELOAD` or `PATH` and run code as the
+ * gate-agent user — the service has no authentication (see
+ * docs/gate-config-ui.md "Access"), so the whitelist *is* the boundary. Never
+ * widen this to "anything the form posted".
  */
 export const FIELDS = {
   GATE_ID: {
@@ -40,24 +45,39 @@ export const FIELDS = {
     hint: 'Default 57431.',
   },
   ADAPTER: {
+    group: 'decoder',
     label: 'Decoder',
     oneOf: ['simulated'] as const,
     message: 'Pick one of the listed decoders.',
     hint: 'Only the simulator exists today.',
   },
   TRANSPONDERS: {
+    group: 'decoder',
     label: 'Simulated transponders',
     pattern: /^[0-9]+(,[0-9]+)*$/,
     message: 'Comma-separated digits, e.g. 1234567,7654321.',
     hint: 'Simulator only.',
   },
   SIMULATE_INTERVAL_MS: {
+    group: 'decoder',
     label: 'Simulated interval (ms)',
     // Lower bound because the simulator drives the real publish path: a 1ms
     // interval is a flood at the broker, not a test.
     range: [250, 3_600_000] as const,
     message: 'Must be between 250 and 3600000 ms.',
     hint: 'Leave empty to publish no simulated detections.',
+  },
+  HOTSPOT_PASSWORD: {
+    label: 'Hotspot password',
+    // WPA2's own limits: 8-63 printable ASCII. Not a generated secret — the
+    // installer prints it and the organiser needs it on a sticker, so it is
+    // predictable on purpose (docs/gate-config-ui.md, "Access"). It is also
+    // readable through GET /api/config like every other field, which is
+    // consistent: anyone already on the rally network is inside the boundary
+    // this password exists to draw around the gate's *own* access point.
+    pattern: /^[\x20-\x7e]{8,63}$/,
+    message: 'Must be 8 to 63 printable characters.',
+    hint: 'For the rally-gate-<hostname> network this gate raises when it can reach no Wi-Fi. Default rally-gate.',
   },
   HEARTBEAT_INTERVAL_MS: {
     label: 'Heartbeat interval (ms)',
@@ -89,6 +109,7 @@ export interface FieldDescriptor {
   label: string;
   hint: string;
   message: string;
+  group: FieldGroup;
   oneOf?: string[];
   pattern?: string;
   range?: [number, number];
@@ -102,6 +123,7 @@ export function fieldDescriptors(): Record<FieldName, FieldDescriptor> {
         label: spec.label,
         hint: spec.hint,
         message: spec.message,
+        group: 'group' in spec ? spec.group : 'general',
         oneOf: 'oneOf' in spec ? [...spec.oneOf] : undefined,
         // Source rather than the RegExp itself: JSON cannot carry one, and the
         // client rebuilds it with `new RegExp(...)`.
@@ -112,6 +134,9 @@ export function fieldDescriptors(): Record<FieldName, FieldDescriptor> {
     ]),
   ) as Record<FieldName, FieldDescriptor>;
 }
+
+/** Which card on the page a field appears in. */
+export type FieldGroup = 'general' | 'decoder';
 
 export type FieldName = keyof typeof FIELDS;
 export type FieldSpec = (typeof FIELDS)[FieldName];

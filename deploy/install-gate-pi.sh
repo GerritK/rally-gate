@@ -70,12 +70,30 @@ ask MQTT_PORT "rally-server MQTT port" "57431"
 # install must not require knowing anything about the rally it will be used at.
 NTP_PORT="${NTP_PORT:-57433}"
 
+# Wi-Fi is configured from the gate config UI, not here — but the gate has to be
+# reachable before it is on any network, so it raises its own access point when
+# it cannot join one. That AP needs a WPA2 password: without it the gate
+# broadcasts an open network on which anyone at the event can repoint timing
+# hardware. Predictable on purpose rather than generated — the organiser needs
+# it on a sticker, and a random one nobody wrote down is a gate that needs a
+# keyboard. 8 characters is WPA2's own minimum.
+echo
+echo "This gate raises a Wi-Fi access point called rally-gate-$GATE_HOSTNAME when"
+echo "it cannot join any network, so the config page stays reachable. Set the same"
+echo "password on every gate at your club and write it on the box."
+ask HOTSPOT_PASSWORD "Hotspot password (min 8 characters)" "rally-gate"
+while [ "${#HOTSPOT_PASSWORD}" -lt 8 ]; do
+  HOTSPOT_PASSWORD=""
+  ask HOTSPOT_PASSWORD "Too short — WPA2 needs at least 8 characters" "rally-gate"
+done
+
 ask HAS_RTC "DS3231 RTC module connected? (y/N)" "n"
 
 echo
 echo "  Gate ID:     $GATE_ID"
 echo "  Hostname:    $([[ "$SET_HOSTNAME" =~ ^[Yy]$ ]] && echo "$GATE_HOSTNAME.local (renaming from $(hostname))" || echo "unchanged ($(hostname).local)")"
 echo "  MQTT host:   $MQTT_HOST:$MQTT_PORT"
+echo "  Hotspot:     rally-gate-$GATE_HOSTNAME / $HOTSPOT_PASSWORD"
 echo "  Install dir: $INSTALL_DIR"
 echo "  RTC:         $([[ "$HAS_RTC" =~ ^[Yy]$ ]] && echo "DS3231" || echo "none")"
 echo
@@ -123,6 +141,7 @@ else
 GATE_ID=$GATE_ID
 MQTT_HOST=$MQTT_HOST
 MQTT_PORT=$MQTT_PORT
+HOTSPOT_PASSWORD=$HOTSPOT_PASSWORD
 EOF
 fi
 
@@ -164,21 +183,68 @@ User=$USER
 WantedBy=multi-user.target
 EOF
 
+# Networking goes through a wrapper rather than a sudoers rule for nmcli, whose
+# arguments vary and so would need a wildcard. That grant is effectively a root
+# shell on an unauthenticated service — `nmcli connection import type openvpn`
+# runs that file's up-script as root — where this one fixes every argument but
+# the SSID and password. See the header of deploy/rally-gate-net.
+sudo install -m 0755 "$INSTALL_DIR/deploy/rally-gate-net" /usr/local/sbin/rally-gate-net
+
 # Exact commands rather than a blanket rule: this service is reachable by
 # anyone on the rally network and has no authentication, so what it can do as
 # root is the boundary.
 sudo tee /etc/sudoers.d/rally-gate-config >/dev/null <<EOF
 $USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart rally-gate-agent
 $USER ALL=(root) NOPASSWD: /usr/bin/chronyc reload sources
+$USER ALL=(root) NOPASSWD: /usr/local/sbin/rally-gate-net
 EOF
 sudo chmod 0440 /etc/sudoers.d/rally-gate-config
 # A malformed sudoers file locks out sudo entirely, so check before trusting it.
 sudo visudo -cf /etc/sudoers.d/rally-gate-config >/dev/null || {
   echo "   sudoers drop-in invalid, removing it"; sudo rm -f /etc/sudoers.d/rally-gate-config; }
 
+# Reachability before the gate has a network — the state the config page is
+# most needed in. Also the recovery path *after* a network that used to work
+# stops working (wrong password, moved out of range, a different router at the
+# next event), which is the difference between a gate a marshal can rescue and
+# one that needs a keyboard.
+sudo tee /etc/systemd/system/rally-gate-hotspot.service >/dev/null <<'EOF'
+[Unit]
+Description=rally-gate hotspot fallback
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/rally-gate-net watchdog
+EOF
+
+sudo tee /etc/systemd/system/rally-gate-hotspot.timer >/dev/null <<'EOF'
+[Unit]
+Description=rally-gate hotspot fallback check
+
+[Timer]
+# Long enough after boot for NetworkManager to associate and pick up a lease on
+# a slow access point; anything shorter raises the hotspot over a connection
+# that was about to succeed.
+OnBootSec=60s
+OnUnitActiveSec=30s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target
+EOF
+
 sudo systemctl daemon-reload
 sudo systemctl enable --now rally-gate-agent
 sudo systemctl enable --now rally-gate-config
+if command -v nmcli >/dev/null; then
+  sudo systemctl enable --now rally-gate-hotspot.timer
+else
+  # Pi OS Bookworm ships NetworkManager; an older image or a gate wired by
+  # Ethernet has none, and the watchdog would just fail every 30s.
+  echo "   no NetworkManager — skipping the hotspot fallback"
+fi
 
 echo "-- configuring chrony against $MQTT_HOST:$NTP_PORT --"
 # apt's chrony Conflicts: with systemd-timesyncd so this is usually redundant,
@@ -271,6 +337,11 @@ echo "Config UI: http://$GATE_HOSTNAME.local:57434  (change the gate's settings"
 echo "there instead of re-running this script)"
 echo "Clock sync: chronyc tracking  (System time offset should settle under a"
 echo "few ms; the Hardware page's clock column is the same check from the server)"
+if command -v nmcli >/dev/null; then
+  echo "If this gate ever finds no Wi-Fi it raises its own access point within a"
+  echo "minute — join rally-gate-$GATE_HOSTNAME (password $HOTSPOT_PASSWORD) and open"
+  echo "http://$GATE_HOSTNAME.local:57434 to point it at the right network."
+fi
 
 if [ "$REBOOT_NEEDED" = "1" ]; then
   echo

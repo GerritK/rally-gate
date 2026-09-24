@@ -3,11 +3,11 @@
 A local web interface on the gate Pi, so a marshal can set up and check a gate
 without SSH and without re-running the installer.
 
-**Status: settings, status and the UI are built (`apps/gate-config`). Wi-Fi and
-the AP/hotspot fallback are not** — the sections below describing them are still
-design. Until they land, the page is reachable only once the gate is already on
-a network, which covers changing the gate's identity or the server address but
-not first-time onboarding of a gate with no Wi-Fi.
+**Status: built, with the hardware verification of Wi-Fi/hotspot outstanding.**
+Settings, status, the UI, joining a Wi-Fi network and the hotspot fallback are
+all written; what no developer machine can check is whether station and hotspot
+mode coexist on a given Pi's radio, which decides whether switching between them
+is instant or needs a drop. See "What is verified, and what is not".
 
 The requirement it serves is "Zero-config gates" in `development-roadmap.md`: a
 gate must be installable without knowing anything about the rally it will be
@@ -77,9 +77,49 @@ what it can do as root *is* the boundary. The installer runs `visudo -c` over
 the drop-in and removes it if invalid, because a malformed sudoers file locks
 out sudo entirely.
 
-The Wi-Fi work will need `nmcli`, whose arguments vary and so would need a
-wildcard rule. That is a materially weaker grant than the two above and should
-be decided when it is written, not pre-authorised here.
+### Wi-Fi goes through a wrapper, not a sudoers rule for `nmcli`
+
+`nmcli`'s arguments vary with the network being joined, so a sudoers rule for it
+would need a wildcard — and that grant is **effectively a root shell** on a
+service with no authentication:
+
+- `nmcli connection import type openvpn file …` runs that file's `up` script as
+  root, so anyone who can reach this page can execute arbitrary code.
+- Short of that trick, arbitrary control of routing and DNS on a gate is a
+  man-in-the-middle on the timing path.
+- sudoers wildcards are leaky in their own right: `nmcli device wifi connect *`
+  matches across spaces, so a caller can append further arguments.
+
+Polkit was considered as the native alternative — NetworkManager has its own
+action names — and rejected: `org.freedesktop.NetworkManager.settings.modify.system`
+still permits creating a VPN connection with an up-script, so it is no narrower
+in capability, only in mechanism, and it adds a second permission system whose
+behaviour on Pi OS would have to be verified.
+
+What is installed instead is `deploy/rally-gate-net`, a wrapper at
+`/usr/local/sbin/rally-gate-net` with three subcommands (`join`, `hotspot`,
+`watchdog`) in which **every argument passed to `nmcli` is a literal except the
+SSID and the Wi-Fi password**, in fixed positions:
+
+```
+<user> ALL=(root) NOPASSWD: /usr/local/sbin/rally-gate-net
+```
+
+The grant therefore reads "join a network / raise the hotspot" rather than "be
+root". Two details that carry weight:
+
+- **The hotspot password is read by the wrapper from `gate.env`, not passed in.**
+  Otherwise the grant could be used to raise an access point with a password
+  only the caller knows.
+- Read-only calls — `nmcli device status`, `nmcli device wifi list` — do not go
+  through it at all and run unprivileged. The scan uses `--rescan auto` rather
+  than `yes`: a forced rescan is privileged *and* takes the radio off its
+  current network for a few seconds, which disconnects a marshal who is reading
+  this page over the gate's own hotspot.
+
+Keep it that way when extending it. A subcommand that passes a *property name*
+through to `nmcli connection modify` would hand back everything this design
+removes.
 
 ### The time source must follow the server address
 
@@ -114,8 +154,8 @@ on the server's Hardware page, a walk away.
 - **gate-agent**: active/failed, from `systemctl is-active`. Built.
 - **Clock**: `chronyc tracking` output. Built.
 - **Recent log**: the last 20 journal lines, verbatim. Built.
-- **Network**: current SSID and signal from `nmcli`. Not built, with the rest
-  of the Wi-Fi work.
+- **Network**: which Wi-Fi the gate is on, or that it is on its own hotspot,
+  from `nmcli device status`. Built.
 
 Each probe reports independently, so one failing shows as unavailable for that
 row rather than failing the page — a gate without chrony is a real state, not
@@ -131,8 +171,19 @@ without it; add it when the log panel proves insufficient in the field.
 
 ## What it sets
 
-`GATE_ID`, `MQTT_HOST`, `MQTT_PORT`, `ADAPTER`, plus the simulator's
+`GATE_ID`, `MQTT_HOST`, `MQTT_PORT`, `HEARTBEAT_INTERVAL_MS` and
+`HOTSPOT_PASSWORD`, plus `ADAPTER` and the simulator's
 `TRANSPONDERS`/`SIMULATE_INTERVAL_MS` while `SimulatedAdapter` is the only one.
+
+The decoder settings sit in their own card: they are the one group that follows
+the hardware in the box rather than the rally, and all of them but `ADAPTER`
+disappear the moment an adapter other than the simulator exists. Which card a
+field lands in is a `group` on its spec in `config-file.ts`, not a list in the
+Vue component — the page renders one card per group and nothing outside them, so
+a field with a group the component does not know about would be a setting a
+marshal simply cannot reach, with no error to say so. `config-file.spec.ts`
+fails on exactly that. Both cards are one `<v-form>` and one PUT, so the save
+button sits after them rather than in either.
 
 Two of those need care:
 
@@ -162,15 +213,39 @@ than a hostapd + dnsmasq stack:
 nmcli device wifi hotspot ifname wlan0 ssid "rally-gate-<hostname>" password "<...>"
 ```
 
-A watchdog decides when to use it: if no saved connection comes up within a
-timeout after boot, start the hotspot; when a marshal saves Wi-Fi credentials
-through the UI, stop it and join. Crucially it must also fall back **after** a
-previously working setup fails — wrong password, gate moved out of range, a
-different router at the next event — not only on a virgin gate. That is the
-difference between a gate a marshal can rescue and one that needs a keyboard.
+The watchdog is `rally-gate-net watchdog`, run by `rally-gate-hotspot.timer`
+(`OnBootSec=60s`, then every 30s). It raises the hotspot when the radio is
+associated with nothing and the hotspot is not already up, so it covers both the
+virgin gate and — the case that actually matters — a gate whose previously
+working network stops working: wrong password, moved out of range, a different
+router at the next event. That is the difference between a gate a marshal can
+rescue and one that needs a keyboard.
 
-Verify on hardware before building: NetworkManager's hotspot and station modes
-may not coexist on one radio on every Pi model, which decides whether switching
+Two deliberate consequences:
+
+- **Joining never restores the hotspot on failure.** `join` takes the hotspot
+  down first (the radio cannot hold both on most Pi models), attempts the
+  connection, and leaves recovery to the watchdog a minute later. One recovery
+  path, exercised by every failure mode, instead of error handling that is only
+  ever reached by one of them.
+- The hotspot connection is created with `connection.autoconnect no`, or
+  NetworkManager races the saved Wi-Fi at every boot and the gate comes up on
+  its own island instead of the rally network.
+
+Known ceiling: once the hotspot is up, it stays up until someone joins a network
+through the page — a gate carried back into range of its own router does not
+reconnect by itself, because the hotspot holds the radio. Acceptable because a
+marshal is standing at the gate anyway in that situation; the upgrade, if it
+ever bites, is for the watchdog to drop the hotspot periodically and retry saved
+connections.
+
+The UI treats a lost connection during a join as success-shaped rather than as a
+failure: when the page is being read *over* the hotspot, taking the hotspot down
+means the reply has no route back. Reporting "failed" there would send a marshal
+to re-enter a password that is in fact being used.
+
+**Still unverified on hardware:** whether NetworkManager's hotspot and station
+modes coexist on one radio on a given Pi model, which decides whether switching
 is instant or needs a drop.
 
 ## Access
@@ -178,12 +253,23 @@ is instant or needs a drop.
 No authentication, consistent with the deferred-auth decision in
 `deployment-modes.md`: the closed rally network is the boundary.
 
-That reasoning does not survive hotspot mode, though. **The hotspot must have a
-WPA2 password**, otherwise the gate broadcasts an open network on which anyone
-at the event can repoint timing hardware. Derive it from the gate's identity so
-it is predictable for the organiser and printable by the installer, rather than
-random and lost. Worth deciding deliberately rather than inheriting "no auth"
-from the server.
+That reasoning does not survive hotspot mode, though. **The hotspot has a WPA2
+password**, otherwise the gate broadcasts an open network on which anyone at the
+event can repoint timing hardware.
+
+It is `HOTSPOT_PASSWORD` in `gate.env`, defaulting to `rally-gate` and asked for
+by the installer — predictable on purpose rather than generated, because the
+organiser needs it on a sticker and a random one nobody wrote down is a gate
+that needs a keyboard. The SSID is `rally-gate-<hostname>`, matching the `.local`
+name the gate is already reachable under.
+
+It is readable through `GET /api/config` like every other field, which is
+consistent rather than an oversight: anyone already on the rally network is
+inside the boundary, and this password exists to draw a boundary around the
+gate's *own* access point. The **Wi-Fi client** password is different and never
+touches `gate.env` — it goes to NetworkManager, which stores it 0600 under
+`/etc/NetworkManager/system-connections`, so this service neither writes it nor
+can read it back.
 
 ## How the page is built
 
@@ -214,7 +300,16 @@ so that file is the untested surface and the rest is not.
 
 Verified on a developer machine:
 
-- `config-file.ts` under unit test, including every injection case below.
+- `config-file.ts` and `network.ts` under unit test (63 cases), including every
+  injection case below, `nmcli --terse` escaping, and the SSID/password rules.
+- `deploy/rally-gate-net`'s branches against a stub `nmcli` on `PATH`: the
+  watchdog raises the hotspot only when the radio is associated with nothing and
+  the hotspot is not already up; `join` drops the hotspot before connecting and
+  omits the password argument entirely for an open network; the hotspot password
+  comes from `gate.env` and falls back to the default when absent; an SSID or
+  subcommand `nmcli` would read as one of its own options exits 64. Argument
+  vectors were checked directly, so an SSID or password containing spaces stays
+  one argument.
 - The API end to end against the running service: field list, save, validation
   rejection, the chrony source file's contents, static serving and SPA fallback.
 - That failing system calls degrade rather than break — with no `systemctl` or
@@ -224,6 +319,11 @@ Verified on a developer machine:
 
 Not verified, and only real hardware can:
 
-- That the restart, chrony reload and sudoers rules work.
+- That the restart, chrony reload, wrapper and sudoers rules work as root on a
+  real Pi.
 - That the page renders as intended — there is no headless browser in this repo.
-- Anything about Wi-Fi or hotspot mode, which is not written.
+- Anything `nmcli` actually does: whether hotspot and station mode coexist on the
+  radio, whether the hotspot is reachable at `<hostname>.local:57434`, and
+  whether the watchdog's 60s boot delay is long enough for a slow access point.
+  The stub above proves which `nmcli` commands run and with what arguments,
+  never what NetworkManager does with them.

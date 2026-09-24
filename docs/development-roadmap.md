@@ -148,7 +148,7 @@
   the restart failure, so a marshal is never told to re-enter values that are in
   fact stored. **Not** verified: the privileged actions (systemd, chrony,
   sudoers) and how the page renders, there being no headless browser in this
-  repo. Wi-Fi/hotspot is not written; see Next.
+  repo.
 
 - Host networking for the headless stack, so mDNS discovery works there too: a
   bridged container can neither send nor receive LAN multicast, so
@@ -265,6 +265,35 @@
   on the Hardware page as the ongoing check: it should sit near zero and never
   reach the 1000ms correction threshold once this is working.
 
+- Gate config, Wi-Fi + hotspot fallback — the other half of `apps/gate-config`.
+  A marshal can now pick a network from the page and join it, and a gate that
+  can reach no Wi-Fi raises its own WPA2 access point (`rally-gate-<hostname>`,
+  password `HOTSPOT_PASSWORD`, default `rally-gate`, asked for by the installer)
+  within a minute, so the config page is reachable in the state it is most
+  needed in. `rally-gate-hotspot.timer` runs the watchdog every 30s after a 60s
+  boot delay; it covers a gate whose previously working network stops working,
+  not only a virgin one.
+
+  The decision worth carrying forward is **not** granting `nmcli` through
+  sudoers. A wildcard rule there is effectively a root shell on an
+  unauthenticated service — `nmcli connection import type openvpn file …` runs
+  that file's up-script as root, and short of that, control of routing and DNS
+  on a gate is a man-in-the-middle on the timing path. Polkit is no narrower in
+  capability, only in mechanism. So `deploy/rally-gate-net` is installed as a
+  wrapper in which every `nmcli` argument is a literal except the SSID and
+  password, and the hotspot password is read by the wrapper from `gate.env`
+  rather than passed in, so the grant cannot raise an AP on a password only the
+  caller knows. Full reasoning in `docs/gate-config-ui.md`, "Wi-Fi goes through
+  a wrapper".
+
+  Verified on a developer machine: 63 unit tests over the config file and the
+  `nmcli` parsing/validation; the three new endpoints end to end, including that
+  they report a missing wrapper rather than throwing; and every branch of
+  `rally-gate-net` against a stub `nmcli` on `PATH`, argument vectors included.
+  **Not verified, and only a Pi can:** whether hotspot and station mode coexist
+  on one radio, whether the hotspot is reachable at `<hostname>.local:57434`,
+  and whether the 60s boot delay suits a slow access point. See "Next".
+
 ## Next
 
 **Zero-config gates (overriding requirement, not a single item).** Installing a
@@ -281,19 +310,15 @@ reconfiguration off the install script and into the gate's own UI (item 1).
 
 Priority order (1 = next):
 
-1. **Gate config: Wi-Fi and AP/hotspot fallback** — the remaining half of
-   `apps/gate-config`. Settings, status and the UI are built (see Done); missing
-   is joining a Wi-Fi network from the page and the hotspot fallback that makes
-   the gate reachable *before* it has any network, which is the state you most
-   need it in. Designed in `docs/gate-config-ui.md` under "Reachability before
-   the gate has a network": NetworkManager's `nmcli device wifi hotspot` rather
-   than hostapd + dnsmasq, falling back to AP mode both on a virgin gate and
-   after a previously working Wi-Fi fails. Two things to settle while building:
-   the hotspot needs a WPA2 password (the "closed rally network is the boundary"
-   argument stops holding once the gate broadcasts its own), and `nmcli` needs a
-   wildcard sudoers rule, a materially weaker grant than the two exact commands
-   there now. Needs real hardware — station and hotspot mode may not coexist on
-   one radio on every Pi model.
+1. **Verify Wi-Fi and the hotspot fallback on a Pi.** The code is written (see
+   Done); what no developer machine can answer is on the list at the end of
+   `docs/gate-config-ui.md`. In order: does `rally-gate-net hotspot` raise an AP
+   at all on this Pi model, is `http://<hostname>.local:57434` reachable over
+   it, does `join` from the page get the gate onto a real network, does the
+   watchdog bring the hotspot back within a minute after a deliberately wrong
+   password, and is `OnBootSec=60s` long enough on a slow access point. If
+   station and hotspot mode turn out not to coexist on one radio, the fallout is
+   in the "known ceiling" paragraph of that doc, not in the code.
 
 2. **GPS/PPS as a chrony refclock per gate** (optional, per gate). Not for
    accuracy — LAN chrony already exceeds what tenths-of-a-second margins
