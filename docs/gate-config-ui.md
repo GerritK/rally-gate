@@ -244,6 +244,16 @@ failure: when the page is being read *over* the hotspot, taking the hotspot down
 means the reply has no route back. Reporting "failed" there would send a marshal
 to re-enter a password that is in fact being used.
 
+**Captive portal.** Joining the hotspot opens the config page by itself on a
+phone, the way hotel Wi-Fi does. Two pieces: the installer drops
+`address=/#/10.42.0.1` into `/etc/NetworkManager/dnsmasq-shared.d/`, so on the
+hotspot every DNS name resolves to the gate, and gate-config listens on port 80
+too (`CAPTIVE_PORT`, set only in the unit, bound via `CAP_NET_BIND_SERVICE`
+rather than root), answering everything there with a 302 to
+`http://<address the client reached>:57439/`. The phone's connectivity probe
+gets that redirect instead of the answer it expects and shows the page. Also
+unverified on hardware.
+
 **Still unverified on hardware:** whether NetworkManager's hotspot and station
 modes coexist on one radio on a given Pi model, which decides whether switching
 is instant or needs a drop.

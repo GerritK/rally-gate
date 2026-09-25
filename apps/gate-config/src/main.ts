@@ -1,5 +1,6 @@
 import express from 'express';
 import { existsSync } from 'fs';
+import { createServer } from 'http';
 import { join } from 'path';
 import {
   fieldDescriptors,
@@ -146,3 +147,20 @@ app.listen(PORT, () => {
     console.log('[gate-config] no built UI at web/dist — API only');
   }
 });
+
+// Captive portal: on the hotspot every DNS name resolves to the gate (see
+// install-gate-pi.sh), so a phone's connectivity probe lands here and the OS
+// pops this page open by itself. Unset in the dev loop; the unit sets it to 80.
+const CAPTIVE_PORT = process.env.CAPTIVE_PORT;
+if (CAPTIVE_PORT) {
+  createServer((req, res) => {
+    // The address the phone reached us on, not a name: mDNS is not guaranteed
+    // inside a captive-portal mini-browser.
+    const host = (req.socket.localAddress ?? '').replace(/^::ffff:/, '');
+    res.writeHead(302, { Location: `http://${host}:${PORT}/` }).end();
+  })
+    .on('error', (err) =>
+      console.error(`[gate-config] captive redirect off: ${err.message}`),
+    )
+    .listen(Number(CAPTIVE_PORT));
+}
