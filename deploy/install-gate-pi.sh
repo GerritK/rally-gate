@@ -177,6 +177,9 @@ MQTT_PORT=$MQTT_PORT
 HOTSPOT_PASSWORD=$HOTSPOT_PASSWORD
 EOF
 fi
+# The directory, not just the file: gate-config saves by writing a temp file
+# beside gate.env and renaming it over, which needs write access to the dir.
+sudo chown -R "$USER": /etc/rally-gate
 
 echo "-- installing systemd services --"
 sudo tee /etc/systemd/system/rally-gate-agent.service >/dev/null <<EOF
@@ -215,6 +218,10 @@ User=$USER
 # portal. The capability lets a non-root service bind it, and nothing else.
 Environment=CAPTIVE_PORT=80
 AmbientCapabilities=CAP_NET_BIND_SERVICE
+# chrony's sourcedir, created owned by User= since gate-config writes the time
+# source there. Preserved so a gate-config restart doesn't drop the source.
+RuntimeDirectory=chrony-rally
+RuntimeDirectoryPreserve=yes
 
 [Install]
 WantedBy=multi-user.target
