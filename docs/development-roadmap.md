@@ -320,20 +320,19 @@
   sourcedir. Only-source rather than `prefer`, because gates agreeing with
   *each other* matters more than any of them being absolutely right — with
   internet sources in the mix, chrony outvoted a laptop server 3.5s off and
-  marked it a falseticker, so gates with and without internet would diverge. The server Pi serves NTP from its own clock
-  (`/etc/chrony/conf.d/rally-server.conf`, written by
-  `deploy/install-server-pi.sh`: `local stratum 10` plus RFC1918 `allow`
-  ranges) so it works with no internet, and a real upstream still wins when
-  one is reachable. chrony runs on the host there, not in compose — an NTP
-  server needs the host clock and port 123/udp.
+  marked it a falseticker, so gates with and without internet would diverge.
+  The source is rally-server's own SNTP server on 57432 (entry above), so the
+  server side needs no host chrony at all — an earlier version had
+  `install-server-pi.sh` configure one, deleted when the embedded server
+  landed.
 
-  Both scripts drop a `conf.d` file instead of replacing `chrony.conf`,
+  The gate installer drops a `conf.d` file instead of replacing `chrony.conf`,
   which keeps Debian's default `makestep 1 3` — step only on the first few
   updates, slew forever after — that default *being* the "Gate system clock
   policy" in `decoder-adapters.md`. Cheaper than restating it, but it means a
   future chrony changing that default would break the policy silently, so
-  check there first if a mid-stage discontinuity ever shows up. Both also
-  disable `systemd-timesyncd` explicitly (apt's `Conflicts:` usually handles
+  check there first if a mid-stage discontinuity ever shows up. It also
+  disables `systemd-timesyncd` explicitly (apt's `Conflicts:` usually handles
   it) since two daemons steering one clock is that same step waiting to
   happen. With a DS3231 present, chrony's default `rtcsync` writes the
   corrected time back to it, so chrony sets the clock and the RTC holds it
@@ -344,7 +343,7 @@
   Pi OS image with empty apt lists.
 
   **Not yet verified on hardware** — `chronyc sources` on a gate (the
-  installer prints it), `chronyc clients` on the server, and `Gate.clockOffsetMs`
+  installer prints it) and `Gate.clockOffsetMs`
   on the Hardware page as the ongoing check: it should sit near zero and never
   reach the 1000ms correction threshold once this is working.
 
@@ -373,9 +372,28 @@
   `nmcli` parsing/validation; the three new endpoints end to end, including that
   they report a missing wrapper rather than throwing; and every branch of
   `rally-gate-net` against a stub `nmcli` on `PATH`, argument vectors included.
-  **Not verified, and only a Pi can:** whether hotspot and station mode coexist
-  on one radio, whether the hotspot is reachable at `<hostname>.local:57439`,
-  and whether the 60s boot delay suits a slow access point. See "Next".
+  Verified on a Pi: a gate with no network boots into the hotspot, the page is
+  reachable over it, joining a network from the page works, and the gate
+  reconnects to that network after a reboot rather than raising the hotspot.
+  **Still open:** the failure paths — see "Next".
+
+- Field fixes from the first real gate installs:
+  - mDNS advertises only reachable LAN IPv4 addresses. bonjour-service
+    announced every address the host had, and nss-mdns on the gate picks one,
+    so a Hyper-V switch or link-local address on a Windows laptop sent the gate
+    somewhere unreachable (seen as mqtt.js' "connack timeout"). Virtual adapters
+    are filtered by name — a heuristic, marked `ponytail:` in
+    `discovery.service.ts`. IPv6 is no longer advertised, which supersedes the
+    "both IPv4 and IPv6" note in the discovery entry above.
+  - rally-server opens its ports in Windows Firewall on first start
+    (`windows-firewall.ts`, one UAC prompt), as port rules scoped to the local
+    subnet on every profile — Windows' own "allow node.exe" rule breaks under
+    nvm-windows symlinks and only covers the profile ticked in its prompt.
+  - Re-running `install-gate-pi.sh` defaults every prompt to the gate's current
+    `gate.env` values and writes the answers back, instead of keeping the file
+    and silently ignoring what was typed.
+  - gate-agent no longer flushes stale heartbeats on reconnect, and a failed
+    gate-config apply step now says why.
 
 ## Next
 
@@ -388,18 +406,18 @@ below is ordered by that: items 1-2 are what it decomposes into, and any new
 gate-side work should be checked against it rather than adding another install
 prompt. Both original violations are fixed (see Done): the time reference no
 longer assumes a Pi server, and the address is no longer typed in — a gate
-install now asks only for things about the gate itself. What is left is making
-reconfiguration off the install script and into the gate's own UI (item 1).
+install now asks only for things about the gate itself, and reconfiguring one
+happens in `gate-config` rather than by re-running the installer. What is left
+is proving that on real hardware (item 1).
 
 Priority order (1 = next):
 
-1. **Verify Wi-Fi and the hotspot fallback on a Pi.** The code is written (see
-   Done); what no developer machine can answer is on the list at the end of
-   `docs/gate-config-ui.md`. In order: does `rally-gate-net hotspot` raise an AP
-   at all on this Pi model, is `http://<hostname>.local:57439` reachable over
-   it, does `join` from the page get the gate onto a real network, does the
-   watchdog bring the hotspot back within a minute after a deliberately wrong
-   password, and is `OnBootSec=60s` long enough on a slow access point. If
+1. **Finish verifying the hotspot fallback on a Pi — the failure paths.** The
+   happy path is confirmed (see Done): the hotspot comes up at boot, the page is
+   reachable over it, `join` works and survives a reboot. Left, from the list at
+   the end of `docs/gate-config-ui.md`: does the watchdog bring the hotspot back
+   within a minute after a deliberately wrong password on a previously working
+   network, and is `OnBootSec=60s` long enough on a slow access point. If
    station and hotspot mode turn out not to coexist on one radio, the fallout is
    in the "known ceiling" paragraph of that doc, not in the code.
 
