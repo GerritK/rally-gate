@@ -5,6 +5,7 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
+import { ensureWindowsFirewall } from './windows-firewall';
 
 /**
  * Built frontend, served by this process so a headless deployment has a UI
@@ -52,5 +53,7 @@ async function bootstrap() {
   }
 
   await app.listen(process.env.PORT ?? 57430);
+  // Not awaited: the UAC prompt must not hold up a server that works locally.
+  void ensureWindowsFirewall();
 }
 void bootstrap();
