@@ -55,10 +55,14 @@ export interface WifiNetwork {
   ssid: string;
   signal: number;
   secured: boolean;
+  /** The network the radio is associated with. Shown instead of the connection
+   *  name, which is a profile name (`netplan-wlan0-<ssid>` on an Imager-flashed
+   *  Pi), not the network's. */
+  inUse: boolean;
 }
 
 /**
- * Parses `nmcli -t -f SSID,SIGNAL,SECURITY device wifi list`.
+ * Parses `nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY device wifi list`.
  *
  * Deduplicated by SSID keeping the strongest reading, because a mesh or an
  * extender puts the same network on screen three times with different
@@ -72,7 +76,8 @@ export function parseWifiList(output: string): WifiNetwork[] {
     if (line.trim() === '') {
       continue;
     }
-    const [ssid = '', signal = '', security = ''] = splitTerse(line);
+    const [inUse = '', ssid = '', signal = '', security = ''] =
+      splitTerse(line);
     if (ssid === '') {
       continue;
     }
@@ -82,10 +87,17 @@ export function parseWifiList(output: string): WifiNetwork[] {
       // nmcli prints `--` for an open network, and a key management name
       // (WPA2, WPA3, WEP, 802.1X) for everything else.
       secured: security !== '' && security !== '--',
+      inUse: inUse === '*',
     };
     const seen = strongest.get(ssid);
     if (!seen || seen.signal < network.signal) {
-      strongest.set(ssid, network);
+      // The associated access point need not be the strongest reading.
+      strongest.set(ssid, {
+        ...network,
+        inUse: network.inUse || !!seen?.inUse,
+      });
+    } else if (network.inUse) {
+      seen.inUse = true;
     }
   }
   return [...strongest.values()].sort((a, b) => b.signal - a.signal);
