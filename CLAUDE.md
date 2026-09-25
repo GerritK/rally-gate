@@ -82,6 +82,7 @@ Two ranges, split so that **every number in 5743x is something that runs in the 
 | 57432 | embedded SNTP server (**udp**) |
 | 57433–57438 | free, kept contiguous for server-side growth |
 | 57439 | `apps/gate-config` API **and** its built page — the only one that runs **on a gate**, so it sits at the far end |
+| 80 | `gate-config` captive-portal redirect to 57439 — **on a gate only**, fixed by what phones probe, not a choice |
 | 57440 | Vite dev server for `apps/web` — **dev only** |
 | 57449 | Vite dev server for `gate-config` — **dev only** |
 

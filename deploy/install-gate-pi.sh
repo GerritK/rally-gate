@@ -10,10 +10,28 @@
 # rally-server advertises for itself.
 # GATE_ID should be globally unique — prefix it with your club's short code
 # (see "Gate discovery & heartbeat" in docs/architecture.md).
+# Build/apt output is hidden unless a step fails; -v shows it all:
+#   curl -fsSL <url> | bash -s -- -v
 set -euo pipefail
+
+for arg in "$@"; do
+  case "$arg" in
+    -v|--verbose) VERBOSE=1 ;;
+    *) echo "Unknown option: $arg (only -v/--verbose)" >&2; exit 1 ;;
+  esac
+done
 
 REPO_URL="${REPO_URL:-https://github.com/GerritK/rally-gate.git}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/rally-gate}"
+
+quiet() {
+  if [ "${VERBOSE:-0}" = "1" ]; then "$@"; return; fi
+  local log; log="$(mktemp)"
+  "$@" >"$log" 2>&1 || { local rc=$?; cat "$log"; rm -f "$log"; return "$rc"; }
+  rm -f "$log"
+}
+# The audit report is about the repo's lockfile, not something a marshal can act on.
+export npm_config_audit=false npm_config_fund=false npm_config_update_notifier=false
 
 # Reads from the real terminal even when this script itself is piped in via curl | bash.
 ask() {
@@ -104,37 +122,38 @@ read -rp "Proceed with install? [Y/n] " confirm < /dev/tty
 # below (git, chrony, i2c-tools, and nodejs when nodesource doesn't run) needs
 # this.
 echo "-- updating package lists --"
-sudo apt-get update
+quiet sudo apt-get update
 
 # Pi OS Lite ships no git, and this script reaches the Pi through curl | bash
 # rather than from a clone — so nothing has pulled it in by the time the clone
 # below runs. Installed unconditionally: apt is a no-op when it is already
 # there, and a `command -v` guard only adds a branch that is wrong on the one
 # image that matters.
-sudo apt-get install -y git
+quiet sudo apt-get install -y git
 
 if ! command -v node >/dev/null; then
   echo "-- installing Node.js --"
-  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-  sudo apt-get install -y nodejs
+  curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
+  quiet sudo -E bash /tmp/nodesource_setup.sh
+  quiet sudo apt-get install -y nodejs
 fi
 
 echo "-- fetching rally-gate --"
 if [ -d "$INSTALL_DIR/.git" ]; then
-  git -C "$INSTALL_DIR" pull
+  quiet git -C "$INSTALL_DIR" pull
 else
-  git clone "$REPO_URL" "$INSTALL_DIR"
+  quiet git clone "$REPO_URL" "$INSTALL_DIR"
 fi
 
 echo "-- building gate-agent --"
 cd "$INSTALL_DIR"
-npm install
-npm run build --workspace=@rally-gate/shared
-npm run build --workspace=@rally-gate/gate-agent
+quiet npm install
+quiet npm run build --workspace=@rally-gate/shared
+quiet npm run build --workspace=@rally-gate/gate-agent
 
 echo "-- building gate-config (web UI, takes a minute on slower hardware) --"
 # build:deploy skips vue-tsc: it OOMs a Pi on the Vuetify types, and CI already typechecks.
-npm run build:deploy --workspace=@rally-gate/gate-config
+quiet npm run build:deploy --workspace=@rally-gate/gate-config
 
 echo "-- installing configuration --"
 # Config lives in a file, not in the unit: the gate config UI rewrites it at
@@ -187,10 +206,26 @@ WorkingDirectory=$INSTALL_DIR/apps/gate-config
 ExecStart=/usr/bin/node dist/main.js
 Restart=always
 User=$USER
+# Port 80 only redirects to 57439 — it is what phones probe to detect a captive
+# portal. The capability lets a non-root service bind it, and nothing else.
+Environment=CAPTIVE_PORT=80
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 
 [Install]
 WantedBy=multi-user.target
 EOF
+
+# The other half of the captive portal: NetworkManager's hotspot dnsmasq reads
+# this directory, so on the hotspot (and only there) every name resolves to the
+# gate. 10.42.0.1 is NetworkManager's default address for a shared connection,
+# which the hotspot never overrides.
+# dnsmasq-base is also what hands out the hotspot's DHCP leases: NetworkManager
+# only recommends it, and without it the hotspot comes up but no phone gets an
+# address. -base is the bare binary; the `dnsmasq` package would add a
+# system-wide service fighting NetworkManager's for port 53.
+quiet sudo apt-get install -y dnsmasq-base
+sudo mkdir -p /etc/NetworkManager/dnsmasq-shared.d
+echo 'address=/#/10.42.0.1' | sudo tee /etc/NetworkManager/dnsmasq-shared.d/rally-gate-captive.conf >/dev/null
 
 # Networking goes through a wrapper rather than a sudoers rule for nmcli, whose
 # arguments vary and so would need a wildcard. That grant is effectively a root
@@ -251,12 +286,12 @@ sudo systemctl daemon-reload
 # README tells a marshal to update by re-running this script, so it has to
 # actually take effect. `restart` starts a stopped unit too, so one line covers
 # both a fresh install and an upgrade.
-sudo systemctl enable rally-gate-agent
+quiet sudo systemctl enable rally-gate-agent
 sudo systemctl restart rally-gate-agent
-sudo systemctl enable rally-gate-config
+quiet sudo systemctl enable rally-gate-config
 sudo systemctl restart rally-gate-config
 if command -v nmcli >/dev/null; then
-  sudo systemctl enable --now rally-gate-hotspot.timer
+  quiet sudo systemctl enable --now rally-gate-hotspot.timer
 else
   # Pi OS Bookworm ships NetworkManager; an older image or a gate wired by
   # Ethernet has none, and the watchdog would just fail every 30s.
@@ -269,14 +304,14 @@ echo "-- configuring chrony against $MQTT_HOST:$NTP_PORT --"
 # mid-stage discontinuity "Gate system clock policy" in docs/decoder-adapters.md
 # exists to prevent, and it would be invisible in the timing data.
 sudo systemctl disable --now systemd-timesyncd >/dev/null 2>&1 || true
-sudo apt-get install -y chrony
+quiet sudo apt-get install -y chrony
 
 # What makes rally-server.local resolve for chrony and gate-agent alike: avahi
 # answers mDNS, libnss-mdns is what puts it behind getaddrinfo. Raspberry Pi OS
 # ships both (it is how raspberrypi.local works), installed explicitly because
 # without them the default address resolves to nothing and the gate simply
 # never connects.
-sudo apt-get install -y avahi-daemon libnss-mdns
+quiet sudo apt-get install -y avahi-daemon libnss-mdns
 
 # A conf.d drop-in, not a replacement chrony.conf, because Debian's default
 # already sets `makestep 1 3` (step only on the first few updates, slew forever
@@ -334,7 +369,7 @@ if [[ "$HAS_RTC" =~ ^[Yy]$ ]]; then
   BOOT_CONFIG=/boot/firmware/config.txt
   [ -f "$BOOT_CONFIG" ] || BOOT_CONFIG=/boot/config.txt
 
-  sudo apt-get install -y i2c-tools
+  quiet sudo apt-get install -y i2c-tools
 
   grep -q '^dtparam=i2c_arm=on' "$BOOT_CONFIG" || { echo 'dtparam=i2c_arm=on' | sudo tee -a "$BOOT_CONFIG" >/dev/null; REBOOT_NEEDED=1; }
   grep -q '^dtoverlay=i2c-rtc,ds3231' "$BOOT_CONFIG" || { echo 'dtoverlay=i2c-rtc,ds3231' | sudo tee -a "$BOOT_CONFIG" >/dev/null; REBOOT_NEEDED=1; }
