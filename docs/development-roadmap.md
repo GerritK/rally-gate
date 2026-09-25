@@ -314,12 +314,13 @@
 
 - chrony/NTP on gates — the actual clock sync, as opposed to the offset
   measurement above, which is only a monitor plus a gross-failure safety net.
-  Gates point chrony at `$MQTT_HOST`
-  (`/etc/chrony/conf.d/rally-gate.conf`, written by
-  `deploy/install-gate-pi.sh`: `server $MQTT_HOST iburst prefer minpoll 4
-  maxpoll 6` — `prefer` because gates agreeing with *each other* matters more
-  than any of them being absolutely right, so it has to win even where the
-  site has internet). The server Pi serves NTP from its own clock
+  Gates point chrony at `$MQTT_HOST` and nothing else: `gate-config` writes
+  it into `/run/chrony-rally` at every start and save, and
+  `deploy/install-gate-pi.sh` comments out Debian's `pool` and DHCP
+  sourcedir. Only-source rather than `prefer`, because gates agreeing with
+  *each other* matters more than any of them being absolutely right — with
+  internet sources in the mix, chrony outvoted a laptop server 3.5s off and
+  marked it a falseticker, so gates with and without internet would diverge. The server Pi serves NTP from its own clock
   (`/etc/chrony/conf.d/rally-server.conf`, written by
   `deploy/install-server-pi.sh`: `local stratum 10` plus RFC1918 `allow`
   ranges) so it works with no internet, and a real upstream still wins when

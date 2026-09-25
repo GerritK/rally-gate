@@ -332,22 +332,20 @@ quiet sudo apt-get install -y avahi-daemon libnss-mdns
 # ships a different makestep default, that policy is what silently broke.
 sudo mkdir -p /etc/chrony/conf.d
 sudo tee /etc/chrony/conf.d/rally-gate.conf >/dev/null <<EOF
-# rally-server serves time itself, on its own port rather than 123 — see
-# NtpService in apps/rally-server. That is what lets a gate use one address for
-# both MQTT and time without knowing whether the server is a Pi or a laptop.
-#
-# A stage time is a subtraction between two gates' clocks, so what matters is
-# that they agree with each other, not that either is absolutely right —
-# \`prefer\` keeps rally-server winning even at a site that happens to have
-# internet and can reach the distro's default pool.
-server $MQTT_HOST port $NTP_PORT iburst prefer minpoll 4 maxpoll 6
-
-# Lets gate-config repoint the time source when a marshal changes the server
-# address, via \`chronyc reload sources\` rather than a chrony restart — a
-# restart re-arms \`makestep\`, and a step mid-stage writes a discontinuity
-# straight into a running StageRun.
+# rally-server is this gate's only time source. gate-config writes it into
+# /run/chrony-rally from MQTT_HOST, at every start and save, and applies it with
+# \`chronyc reload sources\` rather than a chrony restart — a restart re-arms
+# \`makestep\`, and a step mid-stage writes a discontinuity straight into a
+# running StageRun. rally-server serves time itself on its own port
+# (NtpService), so one address covers MQTT and time on a Pi or a laptop.
 sourcedir /run/chrony-rally
 EOF
+# A stage time is a subtraction between two gates' clocks, so they must agree
+# with each other, not with the world. Any other source breaks that: a gate that
+# reaches the internet or a DHCP-advertised NTP server outvotes rally-server
+# (seen with a laptop 3.5s off) and follows a different clock than a gate that
+# can't. Commented out rather than replacing chrony.conf, to keep makestep.
+sudo sed -i -E 's,^(pool |sourcedir /run/chrony-dhcp),#rally-gate: &,' /etc/chrony/chrony.conf
 sudo systemctl restart chrony
 
 # Printed rather than asserted: a hostname typed for MQTT_HOST comes back
