@@ -18,6 +18,9 @@ What exists, with where its reasoning lives. History is in git.
 - **Timing:** start/finish/split roles, stage/split/overall classification, DNF/DNS,
   manual corrections, voiding and gate-timed re-runs, notional times
   (`event-model.md`).
+- **Light barrier:** `BeamAdapter` (E3Z-T61 via GPIO), unassigned passings
+  assigned by a marshal (`decoder-adapters.md`, `event-model.md`). Not yet
+  verified on hardware.
 - **Stages and gates:** gate auto-discovery via heartbeat, gate assignments as a
   plan with per-stage activation, close as terminal (`architecture.md`).
 - **Clocks:** chrony on gates with rally-server's embedded SNTP server as the
@@ -37,15 +40,19 @@ What exists, with where its reasoning lives. History is in git.
 
 ## Next
 
-1. **Expected stage time.** Optional `Stage.expectedDurationMs`; the dashboard
+1. **Verify the light barrier on a Pi** — wiring and edge per
+   `decoder-adapters.md`, then a stage timed end to end with marshal
+   assignment. Also which libgpiod the Pi has (`gpiomon --version`): both
+   branches are written, neither has run on hardware.
+2. **Expected stage time.** Optional `Stage.expectedDurationMs`; the dashboard
    flags a `STARTED` run as overdue once `now - startTime` exceeds it.
    Client-side only — the SSE data already carries `startTime`.
-2. **Standalone packaging** (Node SEA/`pkg`, optional tray icon, "new / open
+3. **Standalone packaging** (Node SEA/`pkg`, optional tray icon, "new / open
    event") — needed to hand `rally-server` to a marshal without a dev machine.
-3. **`OpenStintAdapter`** — critical path, but waits on RF hardware validation
-   (two ordered gates reading reliably); settle the `-t` question in
-   `decoder-adapters.md` first.
-4. **Gate control channel** — server → gate `sync`/`ready`/`stage-stopped`, for
+4. **`OpenStintAdapter`**, then **beam + OpenStint** combined (designed in
+   `decoder-adapters.md`) — critical path, but waits on RF hardware validation
+   (two ordered gates reading reliably); settle the `-t` question first.
+5. **Gate control channel** — server → gate `sync`/`ready`/`stage-stopped`, for
    gate health ("gates ready X/Y") and pausing decoders outside a live stage
    (`architecture.md`).
 

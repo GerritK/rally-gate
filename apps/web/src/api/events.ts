@@ -1,10 +1,13 @@
-import { apiFetch, postRequest } from './client';
+import { apiFetch, postJson, postRequest } from './client';
 
 export interface DetectionEventRecord {
   eventId: string;
   gateId: string;
-  transponderId: string;
-  vehicleId?: string;
+  /** Null for a passing the gate couldn't identify (a light barrier). */
+  transponderId: string | null;
+  vehicleId: string | null;
+  /** Unidentified passing at a live gate, waiting for a marshal. */
+  awaitingVehicle?: boolean;
   timestampGate: string;
   timestampServer: string;
   /** Clock correction applied to `timestampGate`, in ms (0 if none). */
@@ -30,4 +33,23 @@ export function fetchPendingEvents(): Promise<DetectionEventRecord[]> {
 /** Retry now instead of waiting for the server's periodic sweep. */
 export function retryPendingEvents(): Promise<{ recovered: number }> {
   return postRequest('/events/pending/retry');
+}
+
+/** Passings a gate saw but couldn't identify, oldest first. */
+export function fetchAwaitingEvents(): Promise<DetectionEventRecord[]> {
+  return apiFetch('/events/awaiting-vehicle');
+}
+
+/** 409s when the rules would time nothing, e.g. a finish before its start. */
+export function assignVehicleToEvent(
+  eventId: string,
+  vehicleId: string,
+): Promise<DetectionEventRecord> {
+  return postJson(`/events/${encodeURIComponent(eventId)}/assign`, {
+    vehicleId,
+  });
+}
+
+export function dismissEvent(eventId: string): Promise<DetectionEventRecord> {
+  return postRequest(`/events/${encodeURIComponent(eventId)}/dismiss`);
 }

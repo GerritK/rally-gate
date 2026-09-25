@@ -151,6 +151,10 @@ quiet sudo apt-get update
 # there, and a `command -v` guard only adds a branch that is wrong on the one
 # image that matters.
 quiet sudo apt-get install -y git
+# gpiod: the light-barrier adapter reads its GPIO pin through gpiomon, and the
+# gpio group is what lets the unprivileged service open /dev/gpiochip*.
+quiet sudo apt-get install -y gpiod
+getent group gpio >/dev/null && sudo usermod -aG gpio "$USER"
 
 if ! command -v node >/dev/null; then
   echo "-- installing Node.js --"

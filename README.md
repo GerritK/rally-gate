@@ -8,7 +8,7 @@ to this implementation.
 ## Stack
 
 - `apps/rally-server` — NestJS backend: REST API, embedded MQTT broker (Aedes), TypeORM (SQLite for dev/standalone, PostgreSQL for headless deployments), Server-Sent Events live feed.
-- `apps/gate-agent` — runs on each gate node (or locally). Publishes detection events over MQTT via a swappable `DecoderAdapter` (only the `SimulatedAdapter` exists so far — see [docs/decoder-adapters.md](docs/decoder-adapters.md)).
+- `apps/gate-agent` — runs on each gate node (or locally). Publishes detection events over MQTT via a swappable `DecoderAdapter` — a simulator and a light barrier on a GPIO pin so far ([docs/decoder-adapters.md](docs/decoder-adapters.md)).
 - `apps/web` — Vue 3 + Vite dashboard: live timing, results, setup, hardware and vehicles ([docs/frontend-structure.md](docs/frontend-structure.md)).
 - `apps/gate-config` — runs *on each gate*, serving a page that configures that gate: identity, server address, decoder, Wi-Fi, plus a status panel. So a gate needs no SSH and no re-running the installer ([docs/gate-config-ui.md](docs/gate-config-ui.md)).
 - `packages/shared` — TypeScript types shared by every app (gate roles, detection event shape, MQTT topics, stage/classification/vehicle-status types).

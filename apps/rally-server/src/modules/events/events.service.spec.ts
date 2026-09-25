@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { GateRole, StageStatus } from '@rally-gate/shared';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { GatesService } from '../gates/gates.service';
@@ -16,6 +17,8 @@ function makeService(opts: {
   pending?: unknown[];
   startRun?: jest.Mock;
   stageStatus?: StageStatus;
+  assignment?: unknown;
+  stored?: unknown;
 }) {
   const saved: DetectionEventRecord[] = [];
   const events = {
@@ -27,6 +30,7 @@ function makeService(opts: {
       return Promise.resolve(r);
     }),
     find: jest.fn().mockResolvedValue(opts.pending ?? []),
+    findOneBy: jest.fn().mockResolvedValue(opts.stored ?? null),
   };
   const gatesService = {
     findOne: jest.fn().mockResolvedValue('gate' in opts ? opts.gate : GATE),
@@ -36,13 +40,24 @@ function makeService(opts: {
     findByTransponder: jest
       .fn()
       .mockResolvedValue('vehicle' in opts ? opts.vehicle : VEHICLE),
+    findOne: jest.fn().mockResolvedValue(VEHICLE),
   } as unknown as VehiclesService;
   const gateAssignmentsService = {
     findActiveForGate: jest
       .fn()
-      .mockResolvedValue({ stageId: 'SS1', role: GateRole.STAGE_START }),
+      .mockResolvedValue(
+        'assignment' in opts
+          ? opts.assignment
+          : { stageId: 'SS1', role: GateRole.STAGE_START },
+      ),
   } as unknown as GateAssignmentsService;
-  const startRun = opts.startRun ?? jest.fn().mockResolvedValue({ id: 'r1' });
+  const startRun =
+    opts.startRun ??
+    jest
+      .fn()
+      .mockImplementation((_v: string, _s: string, at: Date) =>
+        Promise.resolve({ id: 'r1', startTime: at }),
+      );
   const stageRunsService = { startRun } as unknown as StageRunsService;
   const stagesService = {
     findOne: jest.fn().mockResolvedValue({
@@ -243,5 +258,93 @@ describe('EventsService.reprocessPending', () => {
 
     await expect(service.reprocessPending()).resolves.toBe(0);
     expect(startRun).not.toHaveBeenCalled();
+  });
+});
+
+describe('EventsService unidentified passings', () => {
+  const beam = { transponderId: undefined, source: 'beam' };
+  const awaiting = {
+    eventId: 'e1',
+    gateId: 'G1',
+    transponderId: null,
+    vehicleId: null,
+    timestampGate: new Date('2026-01-01T12:00:00.000Z'),
+    clockCorrectionMs: 2_000,
+    processed: true,
+    awaitingVehicle: true,
+  };
+
+  it('holds a passing without a transponder for a marshal', async () => {
+    const { service, saved, startRun, emitter } = makeService({});
+
+    await service.handleMqttMessage(detection(beam));
+
+    expect(startRun).not.toHaveBeenCalled();
+    expect(saved.at(-1)).toMatchObject({
+      transponderId: null,
+      awaitingVehicle: true,
+      processed: true,
+    });
+    expect(emitter.emit).toHaveBeenCalledWith(
+      'detection.awaiting-changed',
+      expect.anything(),
+    );
+  });
+
+  it('does not ask a marshal about a passing at an idle gate', async () => {
+    const { service, saved } = makeService({ assignment: null });
+
+    await service.handleMqttMessage(detection(beam));
+
+    expect(saved.at(-1)).toMatchObject({ awaitingVehicle: false });
+  });
+
+  it('times an assigned passing with the correction stored at ingest', async () => {
+    const { service, saved, startRun } = makeService({
+      stored: { ...awaiting },
+    });
+
+    await service.assignVehicle('e1', 'v1');
+
+    expect(startRun).toHaveBeenCalledWith(
+      'v1',
+      'SS1',
+      new Date('2026-01-01T12:00:02.000Z'),
+    );
+    expect(saved.at(-1)).toMatchObject({
+      vehicleId: 'v1',
+      awaitingVehicle: false,
+    });
+  });
+
+  it('refuses an assignment the rules would silently ignore', async () => {
+    // A duplicate start hands back the existing run. Consuming the passing
+    // anyway would lose it from the list with nothing timed.
+    const { service, saved } = makeService({
+      stored: { ...awaiting },
+      startRun: jest.fn().mockResolvedValue({
+        id: 'r1',
+        startTime: new Date('2026-01-01T11:00:00.000Z'),
+      }),
+    });
+
+    await expect(service.assignVehicle('e1', 'v1')).rejects.toThrow(
+      ConflictException,
+    );
+    expect(saved).toHaveLength(0);
+  });
+
+  it('dismisses a passing without timing it', async () => {
+    const { service, saved, startRun } = makeService({
+      stored: { ...awaiting },
+    });
+
+    await service.dismissAwaiting('e1');
+
+    expect(startRun).not.toHaveBeenCalled();
+    expect(saved.at(-1)).toMatchObject({
+      vehicleId: null,
+      awaitingVehicle: false,
+    });
   });
 });

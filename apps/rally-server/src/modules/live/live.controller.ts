@@ -46,4 +46,12 @@ export class LiveController {
       map((data): MessageEvent => ({ data: data as object })),
     );
   }
+
+  /** Unidentified passings waiting for a marshal — whole list per change. */
+  @Sse('awaiting-detections')
+  awaitingDetections(): Observable<MessageEvent> {
+    return fromEvent(this.eventEmitter, 'detection.awaiting-changed').pipe(
+      map((data): MessageEvent => ({ data: data as object })),
+    );
+  }
 }

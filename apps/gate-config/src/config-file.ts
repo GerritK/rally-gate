@@ -47,9 +47,34 @@ export const FIELDS = {
   ADAPTER: {
     group: 'decoder',
     label: 'Decoder',
-    oneOf: ['simulated'] as const,
+    oneOf: ['simulated', 'beam'] as const,
     message: 'Pick one of the listed decoders.',
-    hint: 'Only the simulator exists today.',
+    hint: 'beam: a light barrier on a GPIO pin — times passings, a marshal assigns the car.',
+  },
+  BEAM_GPIO: {
+    group: 'decoder',
+    label: 'Light barrier GPIO',
+    // A line name rather than a pin number: the same on every Pi model, where
+    // chip offsets are not.
+    pattern: /^GPIO[0-9]{1,2}$/,
+    message: 'A GPIO line name, e.g. GPIO17.',
+    hint: 'Light barrier only. BCM name of the pin the sensor output is wired to. Default GPIO17.',
+  },
+  BEAM_EDGE: {
+    group: 'decoder',
+    label: 'Light barrier trigger edge',
+    oneOf: ['rising', 'falling'] as const,
+    message: 'rising or falling.',
+    hint: 'Light barrier only. Which edge means "beam broken" — depends on the sensor Light-ON/Dark-ON setting. Default rising.',
+  },
+  BEAM_LOCKOUT_MS: {
+    group: 'decoder',
+    label: 'Light barrier lockout (ms)',
+    // Lower bound because a car body breaks the beam several times (wheels,
+    // wing); upper because a second car closer than this is lost.
+    range: [50, 10_000] as const,
+    message: 'Must be between 50 and 10000 ms.',
+    hint: 'Light barrier only. Further triggers within this time count as the same car. Default 500.',
   },
   TRANSPONDERS: {
     group: 'decoder',
