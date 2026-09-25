@@ -267,8 +267,12 @@ async function save() {
     // the time a restart can fail, and telling a marshal "not saved" then would
     // send them to re-enter values that are in fact stored.
     const failed = [
-      !result.restart.ok ? 'restarting gate-agent' : null,
-      !result.time.ok ? 'updating the time source' : null,
+      !result.restart.ok
+        ? `restarting gate-agent (${result.restart.output})`
+        : null,
+      !result.time.ok
+        ? `updating the time source (${result.time.output})`
+        : null,
     ].filter(Boolean);
     notice.value = failed.length
       ? { type: 'warning', text: `Saved, but ${failed.join(' and ')} failed.` }
