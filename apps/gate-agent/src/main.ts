@@ -6,6 +6,8 @@ import {
 } from '@rally-gate/shared';
 import mqtt from 'mqtt';
 import { ulid } from 'ulid';
+import { BeamAdapter, BeamEdge } from './adapters/beam.adapter';
+import { DecoderAdapter } from './adapters/decoder-adapter';
 import { SimulatedAdapter } from './adapters/simulated.adapter';
 
 const GATE_ID = process.env.GATE_ID ?? 'START_WP1';
@@ -20,7 +22,7 @@ const SIMULATE_INTERVAL_MS = process.env.SIMULATE_INTERVAL_MS
 const HEARTBEAT_INTERVAL_MS = Number(
   process.env.HEARTBEAT_INTERVAL_MS ?? 15000,
 );
-const CAPABILITIES = process.env.ADAPTER ?? 'simulated';
+const ADAPTER = process.env.ADAPTER ?? 'simulated';
 
 /**
  * `clientId`/`clean` are load-bearing, not boilerplate. Detections are
@@ -49,7 +51,7 @@ function publishHeartbeat() {
   // HEARTBEAT_INTERVAL_MS, so a missed one is self-healing and queueing it
   // for redelivery would only report staleness as freshness.
   const heartbeat: GateHeartbeat = {
-    capabilities: CAPABILITIES,
+    capabilities: ADAPTER,
     // Stamped here rather than anywhere upstream: the server subtracts this
     // from arrival time to estimate this gate's clock offset, so it has to be
     // read as late as possible before the packet goes out.
@@ -76,13 +78,13 @@ client.on('error', (err) => {
   );
 });
 
-function publishDetection(transponderId: string, timestamp: Date) {
+function publishDetection(transponderId: string | undefined, timestamp: Date) {
   const event: DetectionEvent = {
     eventId: ulid(),
     gateId: GATE_ID,
     transponderId,
     timestampGate: timestamp.toISOString(),
-    source: 'simulated',
+    source: ADAPTER,
   };
   // QoS 1: a lost detection is a driver with no time, and at-least-once is
   // safe because the server pipeline is idempotent — DetectionEventRecord is
@@ -94,15 +96,32 @@ function publishDetection(transponderId: string, timestamp: Date) {
   // out to lose detections across crashes in the field.
   client.publish(detectionTopicFor(GATE_ID), JSON.stringify(event), { qos: 1 });
   console.log(
-    `[gate-agent:${GATE_ID}] published detection for transponder ${transponderId}`,
+    `[gate-agent:${GATE_ID}] published detection ${transponderId ? `for transponder ${transponderId}` : 'without transponder'} at ${event.timestampGate}`,
   );
 }
 
-const adapter = new SimulatedAdapter({
-  transponderIds: TRANSPONDERS,
-  intervalMs: SIMULATE_INTERVAL_MS,
-});
-adapter.start(publishDetection);
+function createAdapter(): DecoderAdapter {
+  if (ADAPTER === 'simulated') {
+    return new SimulatedAdapter({
+      transponderIds: TRANSPONDERS,
+      intervalMs: SIMULATE_INTERVAL_MS,
+    });
+  }
+  if (ADAPTER === 'beam') {
+    return new BeamAdapter({
+      line: process.env.BEAM_GPIO ?? 'GPIO17',
+      edge: (process.env.BEAM_EDGE ?? 'rising') as BeamEdge,
+      lockoutMs: Number(process.env.BEAM_LOCKOUT_MS ?? 500),
+    });
+  }
+  // Exit rather than fall back to the simulator: a typo would otherwise run a
+  // gate at an event that times nothing real.
+  console.error(`[gate-agent:${GATE_ID}] unknown ADAPTER "${ADAPTER}"`);
+  process.exit(1);
+}
+
+const adapter = createAdapter();
+void adapter.start(publishDetection);
 
 process.on('SIGINT', async () => {
   clearInterval(heartbeatTimer);

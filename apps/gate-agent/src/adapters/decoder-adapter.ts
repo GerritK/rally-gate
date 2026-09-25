@@ -1,5 +1,6 @@
+/** `transponderId` is undefined for a sensor that can't identify the car. */
 export type DetectionCallback = (
-  transponderId: string,
+  transponderId: string | undefined,
   timestamp: Date,
 ) => void;
 

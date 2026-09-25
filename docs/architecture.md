@@ -114,8 +114,9 @@ setup. `Gate` itself is hardware identity only.
   stage-run correction endpoints.
 - `StageRun`/`StageSplit` snapshot `stageId` at creation, so reassigning a gate
   never rewrites history.
-- Known gap: `applyRules` checks only `GateAssignment.active`, never
-  `Stage.status`.
+- `applyRules` checks both `GateAssignment.active` and `Stage.status`: they are
+  written in separate steps, and a detection in between is stored untimed
+  rather than attached to a dormant stage.
 
 ## Gate control channel (planned, not built)
 
@@ -133,7 +134,7 @@ Today everything is gate → server. The planned server → gate direction:
   "gates ready X/Y" — the mechanism for gate health reporting.
 - A matching `stage-stopped` would call `adapter.stop()`, so the decoder only
   runs during a live stage. That also stops stray passings (recon, testing) from
-  creating runs, but doesn't replace the server-side `Stage.status` check above.
+  creating runs, on top of the server-side `Stage.status` check.
 - Once this exists, a round-trip probe can replace the one-way offset
   measurement and its deadband.
 

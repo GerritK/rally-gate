@@ -8,7 +8,10 @@ function arg(name: string, fallback?: string): string | undefined {
 }
 
 const gateId = arg('gate', process.env.GATE_ID ?? 'START_WP1')!;
-const transponderId = arg('transponder', '1234567')!;
+// --beam publishes a passing without a transponder, like a light barrier.
+const transponderId = process.argv.includes('--beam')
+  ? undefined
+  : arg('transponder', '1234567')!;
 const host = process.env.MQTT_HOST ?? 'localhost';
 const port = process.env.MQTT_PORT ?? '57431';
 
@@ -31,7 +34,7 @@ client.on('connect', () => {
     { qos: 1 },
     () => {
       console.log(
-        `Published detection: gate=${gateId} transponder=${transponderId}`,
+        `Published detection: gate=${gateId} transponder=${transponderId ?? 'none'}`,
       );
       client.end();
     },

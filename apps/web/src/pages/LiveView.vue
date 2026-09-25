@@ -2,6 +2,9 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { API_BASE, ApiError } from '../api/client';
 import {
+  assignVehicleToEvent,
+  dismissEvent,
+  fetchAwaitingEvents,
   fetchPendingEvents,
   fetchRecentEvents,
   retryPendingEvents,
@@ -53,6 +56,31 @@ const retryingPending = ref(false);
 
 async function refreshPending() {
   pendingDetections.value = await fetchPendingEvents();
+}
+
+const awaitingDetections = ref<DetectionEventRecord[]>([]);
+const assignVehicleIds = ref<Record<string, string>>({});
+
+async function refreshAwaiting() {
+  awaitingDetections.value = await fetchAwaitingEvents();
+}
+
+/** The live stream refreshes the list for every marshal; this is just faster
+ *  feedback for the one who clicked. */
+async function onAssign(event: DetectionEventRecord) {
+  const vehicleId = assignVehicleIds.value[event.eventId];
+  if (!vehicleId) return;
+  try {
+    await assignVehicleToEvent(event.eventId, vehicleId);
+    await refreshAwaiting();
+  } catch (err) {
+    alert(err instanceof Error ? err.message : 'Failed to assign vehicle');
+  }
+}
+
+async function onDismiss(event: DetectionEventRecord) {
+  await dismissEvent(event.eventId);
+  await refreshAwaiting();
 }
 
 async function refreshDetections() {
@@ -116,6 +144,7 @@ let stageRunsSource: EventSource;
 let stageRunSplitsSource: EventSource;
 let gatesSource: EventSource;
 let pendingSource: EventSource;
+let awaitingSource: EventSource;
 
 const FLASH_DURATION_MS = 600;
 
@@ -392,6 +421,14 @@ onMounted(async () => {
     ).pending;
   };
 
+  awaitingSource = new EventSource(`${API_BASE}/live/awaiting-detections`);
+  awaitingSource.onopen = () => void refreshAwaiting();
+  awaitingSource.onmessage = (e) => {
+    awaitingDetections.value = (
+      JSON.parse(e.data) as { awaiting: DetectionEventRecord[] }
+    ).awaiting;
+  };
+
   nowTimer = setInterval(() => {
     now.value = Date.now();
   }, 1000);
@@ -403,6 +440,7 @@ onUnmounted(() => {
   stageRunSplitsSource?.close();
   gatesSource?.close();
   pendingSource?.close();
+  awaitingSource?.close();
   clearInterval(nowTimer);
 });
 </script>
@@ -458,6 +496,65 @@ onUnmounted(() => {
       No gates assigned to this stage yet.
     </span>
   </div>
+
+  <v-card v-if="awaitingDetections.length > 0" class="mb-6">
+    <v-card-title>Unassigned passings</v-card-title>
+    <v-card-text>
+      <v-alert type="warning" variant="tonal" class="mb-4">
+        A gate saw these cars but couldn't identify them. Nothing is timed until
+        you pick the vehicle — assign a car's start before its finish.
+      </v-alert>
+      <v-table density="comfortable">
+        <thead>
+          <tr>
+            <th>Gate</th>
+            <th>Gate Time</th>
+            <th>Vehicle</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="event in awaitingDetections" :key="event.eventId">
+            <td>{{ event.gateId }}</td>
+            <td class="rg-timing">
+              {{ formatClockTime(event.timestampGate) }}
+            </td>
+            <td>
+              <v-select
+                v-model="assignVehicleIds[event.eventId]"
+                :items="vehicleOptions"
+                item-title="title"
+                item-value="id"
+                label="Vehicle"
+                density="compact"
+                hide-details
+                style="min-width: 220px"
+              />
+            </td>
+            <td>
+              <v-btn
+                size="small"
+                variant="text"
+                prepend-icon="mdi-check"
+                :disabled="!assignVehicleIds[event.eventId]"
+                @click="onAssign(event)"
+              >
+                Assign
+              </v-btn>
+              <v-btn
+                size="small"
+                variant="text"
+                prepend-icon="mdi-close"
+                @click="onDismiss(event)"
+              >
+                Not a car
+              </v-btn>
+            </td>
+          </tr>
+        </tbody>
+      </v-table>
+    </v-card-text>
+  </v-card>
 
   <v-card class="mb-6">
     <v-card-title>Stage Runs</v-card-title>
@@ -678,7 +775,7 @@ onUnmounted(() => {
         <tbody>
           <tr v-for="event in filteredDetections" :key="event.eventId">
             <td>{{ event.gateId }}</td>
-            <td>{{ event.transponderId }}</td>
+            <td>{{ event.transponderId ?? '-' }}</td>
             <td>
               {{
                 event.vehicleId

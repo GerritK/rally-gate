@@ -1,4 +1,5 @@
-import { Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { AssignVehicleDto } from './dto';
 import { EventsService } from './events.service';
 
 @Controller('events')
@@ -24,5 +25,21 @@ export class EventsController {
   @Post('pending/retry')
   async retryPending() {
     return { recovered: await this.eventsService.reprocessPending() };
+  }
+
+  /** Passings a gate saw but couldn't identify, e.g. a light barrier. */
+  @Get('awaiting-vehicle')
+  findAwaitingVehicle() {
+    return this.eventsService.findAwaitingVehicle();
+  }
+
+  @Post(':eventId/assign')
+  assign(@Param('eventId') eventId: string, @Body() body: AssignVehicleDto) {
+    return this.eventsService.assignVehicle(eventId, body.vehicleId);
+  }
+
+  @Post(':eventId/dismiss')
+  dismiss(@Param('eventId') eventId: string) {
+    return this.eventsService.dismissAwaiting(eventId);
   }
 }

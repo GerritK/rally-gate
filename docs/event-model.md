@@ -9,9 +9,9 @@ Published by `gate-agent` to `rally/gates/<gateId>/detections`, defined in
 interface DetectionEvent {
   eventId: string;         // ULID, generated on the gate — the idempotency key
   gateId: string;
-  transponderId: string;
+  transponderId?: string;  // absent when the gate can't identify the car
   timestampGate: string;   // ISO 8601, the gate's clock
-  source: string;          // 'simulated' | 'simulated-cli' | later 'openstint', ...
+  source: string;          // the gate's ADAPTER, or 'simulated-cli'
   metadata?: Record<string, unknown>;
 }
 ```
@@ -32,6 +32,20 @@ first, a 30s sweep retries oldest-first with the stored correction, and
 `GET /events/pending` plus a dashboard banner make the backlog visible. An
 unknown gate or unregistered transponder is marked processed — retrying changes
 nothing and would bury real problems.
+
+### Unassigned passings
+
+A detection without a `transponderId` (a light barrier) at a gate with an
+active assignment is stored with `awaitingVehicle: true` and not timed. Live
+Timing lists them; the marshal picks the vehicle (`POST /events/:id/assign`),
+which runs the rules with the stored clock correction, or dismisses one that was
+no car (`POST /events/:id/dismiss`). At an idle gate such a passing is just
+stored.
+
+**Assign refuses when the rules would do nothing** — a finish or split for a car
+with no running start, a duplicate start, a stage no longer active — with a 409,
+leaving the passing listed. Silently consuming it would lose the time. So a
+car's start has to be assigned before its finish.
 
 ## StageRun
 

@@ -8,11 +8,19 @@ export class DetectionEventRecord {
   @Column()
   gateId: string;
 
-  @Column()
-  transponderId: string;
+  /** Null for a passing the gate couldn't identify (a light barrier). */
+  @Column({ type: 'varchar', nullable: true })
+  transponderId: string | null;
 
-  @Column({ nullable: true })
-  vehicleId?: string;
+  @Column({ type: 'varchar', nullable: true })
+  vehicleId: string | null;
+
+  /**
+   * An unidentified passing at a gate that was live on a stage: stored untimed
+   * until a marshal assigns the vehicle or dismisses it. Cleared by either.
+   */
+  @Column({ default: false })
+  awaitingVehicle: boolean;
 
   /** As reported by the gate, never rewritten — the raw evidence. */
   @Column({ type: Date })

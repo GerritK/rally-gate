@@ -16,6 +16,9 @@ Anything outside `/api` that isn't a file returns `index.html`.
 | `/stage-runs/:id/void`, `/unvoid` | POST | red flag / reverse it — see "Voiding" in `event-model.md`. Unvoid 409s with `{ blockingAttempt }` |
 | `/stage-runs/:id/splits` | GET | ordered by `splitIndex` |
 | `/events` | GET | recent detections |
+| `/events/awaiting-vehicle` | GET | unassigned passings (no transponder) at live gates, oldest first |
+| `/events/:eventId/assign` | POST `{ vehicleId }` | times the passing as that vehicle; 409 when the rules would do nothing (e.g. finish before start) |
+| `/events/:eventId/dismiss` | POST | the passing was no car |
 | `/events/pending` | GET, `/retry` POST | detections whose rules threw; retried every 30s, POST forces it and returns `{ recovered }` |
 | `/classification/overall` | GET | closed stages only, with notional times — see `event-model.md` |
 | `/classification/stages/:stageId` | GET | ranked with gaps |
@@ -34,6 +37,8 @@ Live (SSE, plain `EventSource`), each resynced by a refetch in `onopen`:
 - `/live/gates` — a `Gate` on each heartbeat
 - `/live/pending-detections` — the whole pending list on every change, not a
   delta
+- `/live/awaiting-detections` — `{ awaiting }`, the whole unassigned list on
+  every change
 
 A gate's own configuration is not here: `apps/gate-config` serves it on the gate
 itself, port 57439 (`/api/config`, `/api/status`, `/api/network`,

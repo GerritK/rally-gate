@@ -7,7 +7,7 @@ sharing `client.ts`). Audience is marshals and organisers only.
 | Route | Nav | Contents |
 |---|---|---|
 | `/` | — | redirect to `/live` |
-| `/live` | Live Timing | detections feed, stage runs with corrections, Activate / Close Stage |
+| `/live` | Live Timing | unassigned passings (assign a vehicle), detections feed, stage runs with corrections, Activate / Close Stage |
 | `/results/overall` | Results | overall classification |
 | `/results/stages/:stageId` | Results | stage, split and DNF/DNS classification |
 | `/setup` | Setup | rally name/details, tiles to Stages and Scoring |
