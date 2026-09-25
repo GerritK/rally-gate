@@ -63,7 +63,8 @@ client.on('connect', () => {
 const heartbeatTimer = setInterval(publishHeartbeat, HEARTBEAT_INTERVAL_MS);
 
 client.on('error', (err) => {
-  console.error(`[gate-agent:${GATE_ID}] mqtt error`, err);
+  // Message only: this repeats every reconnect, and the stack is always the same DNS/socket frames.
+  console.error(`[gate-agent:${GATE_ID}] mqtt error: ${err.message}`);
 });
 
 function publishDetection(transponderId: string, timestamp: Date) {
