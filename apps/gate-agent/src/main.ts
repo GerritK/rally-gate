@@ -33,10 +33,15 @@ const CAPABILITIES = process.env.ADAPTER ?? 'simulated';
  * MQTT kicks the older connection when a second client claims the same id,
  * so the gates flap instead of quietly merging into one `Gate` row (see
  * "Gate discovery & heartbeat" in docs/architecture.md).
+ *
+ * `queueQoSZero: false` because mqtt.js otherwise buffers heartbeats while
+ * offline and flushes them all on connect: each carries a stale `sentAt`, so
+ * the server measures the outage as clock offset and corrects detections by it.
  */
 const client = mqtt.connect(`mqtt://${MQTT_HOST}:${MQTT_PORT}`, {
   clientId: GATE_ID,
   clean: false,
+  queueQoSZero: false,
 });
 
 function publishHeartbeat() {
