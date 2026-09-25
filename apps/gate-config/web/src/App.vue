@@ -22,6 +22,7 @@ interface WifiNetwork {
   ssid: string;
   signal: number;
   secured: boolean;
+  inUse: boolean;
 }
 interface NetworkState {
   available: boolean;
@@ -96,7 +97,10 @@ const wifiConnection = computed(() => {
   }
   // nmcli leaves CONNECTION empty for a radio that is up but not associated,
   // which reads as "no network" rather than as a nameless one.
-  return wifi.state === 'connected' && wifi.connection ? wifi.connection : null;
+  if (wifi.state !== 'connected' || !wifi.connection) {
+    return null;
+  }
+  return network.value?.networks.find((n) => n.inUse)?.ssid ?? wifi.connection;
 });
 
 // The gate is serving its own access point, which means whoever is reading this

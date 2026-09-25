@@ -49,7 +49,7 @@ describe('parseDeviceStatus', () => {
 describe('parseWifiList', () => {
   it('sorts by signal and marks open networks', () => {
     const networks = parseWifiList(
-      'Weak:20:WPA2\nOpenNet:55:--\nStrong:88:WPA2\n',
+      ':Weak:20:WPA2\n:OpenNet:55:--\n:Strong:88:WPA2\n',
     );
     expect(networks.map((n) => n.ssid)).toEqual(['Strong', 'OpenNet', 'Weak']);
     expect(networks[1].secured).toBe(false);
@@ -58,13 +58,15 @@ describe('parseWifiList', () => {
 
   it('keeps only the strongest reading of a repeated SSID', () => {
     const networks = parseWifiList(
-      'Mesh:31:WPA2\nMesh:77:WPA2\nMesh:12:WPA2\n',
+      ':Mesh:31:WPA2\n*:Mesh:12:WPA2\n:Mesh:77:WPA2\n',
     );
-    expect(networks).toEqual([{ ssid: 'Mesh', signal: 77, secured: true }]);
+    expect(networks).toEqual([
+      { ssid: 'Mesh', signal: 77, secured: true, inUse: true },
+    ]);
   });
 
   it('drops hidden networks, which have no name to click', () => {
-    expect(parseWifiList(':44:WPA2\nNamed:10:WPA2\n')).toHaveLength(1);
+    expect(parseWifiList('::44:WPA2\n:Named:10:WPA2\n')).toHaveLength(1);
   });
 });
 

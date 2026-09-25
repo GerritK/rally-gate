@@ -133,7 +133,7 @@ export function wifiScan(): Promise<CommandResult> {
   return attempt('nmcli', [
     '-t',
     '-f',
-    'SSID,SIGNAL,SECURITY',
+    'IN-USE,SSID,SIGNAL,SECURITY',
     'device',
     'wifi',
     'list',
