@@ -148,6 +148,15 @@ app.listen(PORT, () => {
   }
 });
 
+// /run is wiped on boot, so without this a changed MQTT_HOST would only reach
+// chrony until the next reboot, then silently revert to the installer's host.
+const { MQTT_HOST } = readConfig();
+if (MQTT_HOST) {
+  void applyTimeSource(MQTT_HOST).then((r) => {
+    if (!r.ok) console.error(`[gate-config] time source: ${r.output}`);
+  });
+}
+
 // Captive portal: on the hotspot every DNS name resolves to the gate (see
 // install-gate-pi.sh), so a phone's connectivity probe lands here and the OS
 // pops this page open by itself. Unset in the dev loop; the unit sets it to 80.
