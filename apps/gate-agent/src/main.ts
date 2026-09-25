@@ -69,7 +69,11 @@ const heartbeatTimer = setInterval(publishHeartbeat, HEARTBEAT_INTERVAL_MS);
 
 client.on('error', (err) => {
   // Message only: this repeats every reconnect, and the stack is always the same DNS/socket frames.
-  console.error(`[gate-agent:${GATE_ID}] mqtt error: ${err.message}`);
+  // A failed dual-stack connect is an AggregateError with an empty message; its code is the useful part.
+  const code = (err as NodeJS.ErrnoException).code;
+  console.error(
+    `[gate-agent:${GATE_ID}] mqtt error: ${err.message || code || err.name}`,
+  );
 });
 
 function publishDetection(transponderId: string, timestamp: Date) {
