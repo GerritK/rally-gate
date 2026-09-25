@@ -18,7 +18,7 @@ import {
   networkStatus,
   recentLog,
   restartAgent,
-  startHotspot,
+  resetWifi,
   wifiJoin,
   wifiScan,
 } from './system';
@@ -125,10 +125,10 @@ app.post('/api/network', async (req, res) => {
   res.json({ joined: result.ok, output: result.output });
 });
 
-/** Raising the hotspot by hand — the only way to check it from the page, since
- *  the watchdog only fires when the gate has no network at all. */
-app.post('/api/network/hotspot', async (_req, res) => {
-  const result = await startHotspot();
+/** Forgets the saved Wi-Fi and raises the hotspot, e.g. before a gate goes to
+ *  an event with a different network, or to test the fallback. */
+app.post('/api/network/reset', async (_req, res) => {
+  const result = await resetWifi();
   res.json({ started: result.ok, output: result.output });
 });
 

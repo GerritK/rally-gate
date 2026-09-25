@@ -157,6 +157,6 @@ export function wifiJoin(
  * grant cannot be used to put the gate on an access point with a password only
  * the caller knows.
  */
-export function startHotspot(): Promise<CommandResult> {
-  return attempt('sudo', [NET_WRAPPER, 'hotspot']);
+export function resetWifi(): Promise<CommandResult> {
+  return attempt('sudo', [NET_WRAPPER, 'reset']);
 }

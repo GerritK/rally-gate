@@ -53,6 +53,7 @@ const network = ref<NetworkState | null>(null);
 const joinSsid = ref('');
 const joinPassword = ref('');
 const joining = ref(false);
+const confirmingReset = ref(false);
 const wifiErrors = ref<Record<string, string>>({});
 
 let statusTimer: ReturnType<typeof setInterval> | undefined;
@@ -215,14 +216,15 @@ async function join() {
   }
 }
 
-async function raiseHotspot() {
+async function resetWifi() {
+  confirmingReset.value = false;
   notice.value = null;
   try {
     const result = await (
-      await fetch('/api/network/hotspot', { method: 'POST' })
+      await fetch('/api/network/reset', { method: 'POST' })
     ).json();
     notice.value = result.started
-      ? { type: 'success', text: 'Hotspot up.' }
+      ? { type: 'success', text: 'Saved networks forgotten, hotspot up.' }
       : {
           type: 'error',
           text: result.output || 'Could not start the hotspot.',
@@ -231,7 +233,7 @@ async function raiseHotspot() {
   } catch {
     notice.value = {
       type: 'warning',
-      text: 'Lost contact with the gate — expected if it dropped the network you were on to raise the hotspot.',
+      text: 'Lost contact with the gate — expected: it left this network. Join its hotspot to reach this page again.',
     };
   }
 }
@@ -479,15 +481,27 @@ onUnmounted(() => clearInterval(statusTimer));
             </template>
           </v-card-text>
           <v-card-actions v-if="network?.available">
-            <!-- Raising it by hand is the only way to check the hotspot from
-                 here: the watchdog fires only when the gate has no network. -->
             <v-btn
+              v-if="!confirmingReset"
               variant="text"
-              prepend-icon="mdi-access-point"
-              @click="raiseHotspot"
+              prepend-icon="mdi-wifi-remove"
+              @click="confirmingReset = true"
             >
-              Start hotspot
+              Reset Wi-Fi
             </v-btn>
+            <template v-else>
+              <v-btn variant="text" @click="confirmingReset = false">
+                Cancel
+              </v-btn>
+              <v-btn
+                color="error"
+                variant="text"
+                prepend-icon="mdi-access-point"
+                @click="resetWifi"
+              >
+                Forget networks, start hotspot
+              </v-btn>
+            </template>
             <v-spacer />
             <v-btn
               :loading="joining"

@@ -3,7 +3,7 @@
 A local web interface on the gate Pi, so a marshal can set up and check a gate
 without SSH and without re-running the installer.
 
-**Status: built, with the hardware verification of Wi-Fi/hotspot outstanding.**
+**Status: built; hotspot and join verified on a Pi, the failure paths not yet.**
 Settings, status, the UI, joining a Wi-Fi network and the hotspot fallback are
 all written; what no developer machine can check is whether station and hotspot
 mode coexist on a given Pi's radio, which decides whether switching between them
@@ -239,6 +239,14 @@ marshal is standing at the gate anyway in that situation; the upgrade, if it
 ever bites, is for the watchdog to drop the hotspot periodically and retry saved
 connections.
 
+**Reset Wi-Fi** on the page (`rally-gate-net reset`) forgets every saved Wi-Fi
+network and raises the hotspot. Forgetting, not just disconnecting, because a
+saved network in range autoconnects at the next boot — so it is the one way to
+force a gate into hotspot mode while its old network is still around, e.g.
+before it goes to an event with a different router, or to test the fallback.
+The page asks for confirmation first, since it takes the gate off the network
+the marshal is probably reading it over.
+
 The UI treats a lost connection during a join as success-shaped rather than as a
 failure: when the page is being read *over* the hotspot, taking the hotspot down
 means the reply has no route back. Reporting "failed" there would send a marshal
@@ -327,13 +335,22 @@ Verified on a developer machine:
   save reports `saved: true` with the restart failure alongside.
 - `tsc`/`vue-tsc`/`vite build`.
 
+Verified on a real Pi (2026-09-25):
+
+- Booted with no network to join, the gate raised its hotspot and the page was
+  reachable over it.
+- Joining a Wi-Fi network from that page worked, and after a reboot the gate came
+  back up on that network rather than the hotspot, so `autoconnect no` on the
+  hotspot connection does its job.
+
 Not verified, and only real hardware can:
 
 - That the restart, chrony reload, wrapper and sudoers rules work as root on a
   real Pi.
 - That the page renders as intended — there is no headless browser in this repo.
-- Anything `nmcli` actually does: whether hotspot and station mode coexist on the
-  radio, whether the hotspot is reachable at `<hostname>.local:57439`, and
-  whether the watchdog's 60s boot delay is long enough for a slow access point.
+- The rest of what `nmcli` actually does: whether hotspot and station mode
+  coexist on the radio, whether the watchdog brings the hotspot back after a
+  previously working network fails (e.g. a wrong password), and whether its 60s
+  boot delay is long enough for a slow access point.
   The stub above proves which `nmcli` commands run and with what arguments,
   never what NetworkManager does with them.
