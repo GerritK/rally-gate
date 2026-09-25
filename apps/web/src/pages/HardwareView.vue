@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { ApiError } from '../api/client';
+import { API_BASE, ApiError } from '../api/client';
 import {
   fetchGateAssignments,
   type GateAssignment,
@@ -24,6 +24,7 @@ const CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS = 1_000;
 
 const now = ref(Date.now());
 let nowTimer: ReturnType<typeof setInterval>;
+let gatesSource: EventSource;
 
 const gates = ref<Gate[]>([]);
 const gateAssignments = ref<GateAssignment[]>([]);
@@ -118,12 +119,23 @@ onMounted(async () => {
   clockCorrectionThresholdMs.value =
     Number(await fetchSetting(CLOCK_CORRECTION_THRESHOLD_KEY)) ||
     CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS;
+  gatesSource = new EventSource(`${API_BASE}/live/gates`);
+  gatesSource.onopen = async () => {
+    gates.value = await fetchGates();
+  };
+  gatesSource.onmessage = (e) => {
+    const gate: Gate = JSON.parse(e.data);
+    const idx = gates.value.findIndex((g) => g.id === gate.id);
+    if (idx === -1) gates.value.push(gate);
+    else gates.value[idx] = gate;
+  };
   nowTimer = setInterval(() => {
     now.value = Date.now();
   }, 1000);
 });
 
 onUnmounted(() => {
+  gatesSource?.close();
   clearInterval(nowTimer);
 });
 </script>
