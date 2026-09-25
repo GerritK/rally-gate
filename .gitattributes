@@ -4,6 +4,7 @@
 # They happen to be LF in the index today only because of the current
 # core.autocrlf setting; this pins it regardless of who clones the repo.
 *.sh text eol=lf
+deploy/rally-gate-net text eol=lf
 
 # Deliberately narrow. A blanket `* text=auto` would renormalise every file
 # in the repo, which is a large and pointless diff for no benefit here.
