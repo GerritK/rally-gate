@@ -73,9 +73,17 @@ case "${1:-}" in
     fi
     ;;
 
-  hotspot)
-    hotspot_active && { echo "hotspot already up"; exit 0; }
-    start_hotspot
+  reset)
+    # Forgets every saved Wi-Fi network, not just drops the current one: a
+    # saved network in range autoconnects again at the next boot, so the only
+    # way to make the hotspot stick is for there to be nothing else to join.
+    # By UUID, since connection names are free text.
+    nmcli -g UUID,TYPE connection show | while IFS=: read -r uuid type; do
+      [ "$type" = "802-11-wireless" ] || continue
+      [ "$(nmcli -g connection.id connection show uuid "$uuid")" = "$HOTSPOT_CON" ] && continue
+      nmcli connection delete uuid "$uuid" >/dev/null
+    done
+    hotspot_active || start_hotspot
     ;;
 
   watchdog)
@@ -92,7 +100,7 @@ case "${1:-}" in
     ;;
 
   *)
-    echo "usage: rally-gate-net join <ssid> [password] | hotspot | watchdog" >&2
+    echo "usage: rally-gate-net join <ssid> [password] | reset | watchdog" >&2
     exit 64
     ;;
 esac
