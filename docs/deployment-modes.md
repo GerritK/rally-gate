@@ -51,7 +51,7 @@ mode needs a host time service installed.
 It listens on **57432/udp**, not 123, because 123 needs root/admin that a
 double-clicked standalone executable does not have. Gates reach it with
 chrony's `port` option (`server <host> port 57432 iburst prefer`), written by
-`deploy/install-gate-pi.sh`. In headless mode `deploy/docker-compose.yml`
+`apps/gate-config` into chrony's `/run/chrony-rally` sourcedir. In headless mode `deploy/docker-compose.yml`
 publishes no ports at all — rally-server runs on `network_mode: host` so that
 its mDNS advertisement reaches the LAN, and therefore binds this port on the
 host directly. If it is ever moved back to bridge networking, the mapping it
