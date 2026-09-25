@@ -10,6 +10,8 @@
 # rally-server advertises for itself.
 # GATE_ID should be globally unique — prefix it with your club's short code
 # (see "Gate discovery & heartbeat" in docs/architecture.md).
+# Re-running it updates the gate; the prompts then default to its current
+# settings (/etc/rally-gate/gate.env), so pressing Enter keeps them.
 # Build/apt output is hidden unless a step fails; -v shows it all:
 #   curl -fsSL <url> | bash -s -- -v
 set -euo pipefail
@@ -42,7 +44,26 @@ ask() {
   printf -v "$var" '%s' "${value:-$default}"
 }
 
+GATE_ENV=/etc/rally-gate/gate.env
+BOOT_CONFIG=/boot/firmware/config.txt
+[ -f "$BOOT_CONFIG" ] || BOOT_CONFIG=/boot/config.txt
+
+# On a re-run (the documented way to update) the current settings become the
+# prompt defaults, so Enter-Enter-Enter keeps the gate as it is — including
+# whatever a marshal changed in the config UI since. Parsed, not sourced: the
+# file is writable by an unauthenticated service, and sourcing it would run it.
+if [ -r "$GATE_ENV" ]; then
+  while IFS='=' read -r key value; do
+    case "$key" in
+      GATE_ID|MQTT_HOST|MQTT_PORT|HOTSPOT_PASSWORD) printf -v "CUR_$key" '%s' "$value" ;;
+    esac
+  done < "$GATE_ENV"
+fi
+CUR_HAS_RTC=n
+grep -qs '^dtoverlay=i2c-rtc,ds3231' "$BOOT_CONFIG" && CUR_HAS_RTC=y
+
 echo "== rally-gate gate-agent setup =="
+[ -r "$GATE_ENV" ] && echo "(existing install found — current settings are the defaults)"
 echo
 
 echo "No two gates need a globally unique ID by force, but pick one that"
@@ -52,7 +73,7 @@ echo "CLUB_START_WP1 rather than just START_WP1. Defaults to this Pi's"
 echo "current hostname, in case that's already set up the way you want."
 echo "This is the gate's identity on the server; the Pi's network name is"
 echo "derived from it separately, since host names allow no underscores."
-ask GATE_ID "Gate ID (e.g. CLUB_START_WP1)" "$(hostname)"
+ask GATE_ID "Gate ID (e.g. CLUB_START_WP1)" "${CUR_GATE_ID:-$(hostname)}"
 while [ -z "$GATE_ID" ]; do ask GATE_ID "Gate ID is required"; done
 
 # Derived rather than reused: a host name may contain only letters, digits and
@@ -81,9 +102,9 @@ echo
 echo "rally-server advertises itself as rally-server.local, so the default works"
 echo "on any rally-gate network. Only enter an address if mDNS/multicast is"
 echo "blocked on your network."
-ask MQTT_HOST "rally-server address" "rally-server.local"
+ask MQTT_HOST "rally-server address" "${CUR_MQTT_HOST:-rally-server.local}"
 
-ask MQTT_PORT "rally-server MQTT port" "57431"
+ask MQTT_PORT "rally-server MQTT port" "${CUR_MQTT_PORT:-57431}"
 # Not a prompt: this is a property of rally-server, not of the event, and a gate
 # install must not require knowing anything about the rally it will be used at.
 NTP_PORT="${NTP_PORT:-57432}"
@@ -99,13 +120,13 @@ echo
 echo "This gate raises a Wi-Fi access point called rally-gate-$GATE_HOSTNAME when"
 echo "it cannot join any network, so the config page stays reachable. Set the same"
 echo "password on every gate at your club and write it on the box."
-ask HOTSPOT_PASSWORD "Hotspot password (min 8 characters)" "rally-gate"
+ask HOTSPOT_PASSWORD "Hotspot password (min 8 characters)" "${CUR_HOTSPOT_PASSWORD:-rally-gate}"
 while [ "${#HOTSPOT_PASSWORD}" -lt 8 ]; do
   HOTSPOT_PASSWORD=""
   ask HOTSPOT_PASSWORD "Too short — WPA2 needs at least 8 characters" "rally-gate"
 done
 
-ask HAS_RTC "DS3231 RTC module connected? (y/N)" "n"
+ask HAS_RTC "DS3231 RTC module connected? (y/n)" "$CUR_HAS_RTC"
 
 echo
 echo "  Gate ID:     $GATE_ID"
@@ -163,20 +184,19 @@ quiet npm run build:deploy --workspace=@rally-gate/gate-config
 echo "-- installing configuration --"
 # Config lives in a file, not in the unit: the gate config UI rewrites it at
 # runtime, and a unit file is code — a partial write there bricks the service,
-# and changing it needs a daemon-reload. Only written if absent, so re-running
-# this installer never discards settings a marshal made in the UI.
+# and changing it needs a daemon-reload. On a re-run only the keys prompted for
+# above are replaced; everything else in it (decoder settings made in the UI)
+# is kept as it is.
 sudo mkdir -p /etc/rally-gate
-if [ -f /etc/rally-gate/gate.env ]; then
-  echo "   keeping existing /etc/rally-gate/gate.env"
-else
-  sudo tee /etc/rally-gate/gate.env >/dev/null <<EOF
-# Written by deploy/install-gate-pi.sh, then owned by @rally-gate/gate-config.
-GATE_ID=$GATE_ID
-MQTT_HOST=$MQTT_HOST
-MQTT_PORT=$MQTT_PORT
-HOTSPOT_PASSWORD=$HOTSPOT_PASSWORD
-EOF
-fi
+{
+  if [ -f "$GATE_ENV" ]; then
+    grep -vE '^(GATE_ID|MQTT_HOST|MQTT_PORT|HOTSPOT_PASSWORD)=' "$GATE_ENV" || true
+  else
+    echo "# Written by deploy/install-gate-pi.sh, then owned by @rally-gate/gate-config."
+  fi
+  printf '%s\n' "GATE_ID=$GATE_ID" "MQTT_HOST=$MQTT_HOST" "MQTT_PORT=$MQTT_PORT" "HOTSPOT_PASSWORD=$HOTSPOT_PASSWORD"
+} >/tmp/rally-gate.env
+sudo mv /tmp/rally-gate.env "$GATE_ENV"
 # The directory, not just the file: gate-config saves by writing a temp file
 # beside gate.env and renaming it over, which needs write access to the dir.
 sudo chown -R "$USER": /etc/rally-gate
@@ -376,9 +396,6 @@ fi
 
 if [[ "$HAS_RTC" =~ ^[Yy]$ ]]; then
   echo "-- configuring DS3231 RTC --"
-  BOOT_CONFIG=/boot/firmware/config.txt
-  [ -f "$BOOT_CONFIG" ] || BOOT_CONFIG=/boot/config.txt
-
   quiet sudo apt-get install -y i2c-tools
 
   grep -q '^dtparam=i2c_arm=on' "$BOOT_CONFIG" || { echo 'dtparam=i2c_arm=on' | sudo tee -a "$BOOT_CONFIG" >/dev/null; REBOOT_NEEDED=1; }
