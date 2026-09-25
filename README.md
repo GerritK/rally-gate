@@ -36,15 +36,10 @@ npm run dev:web
 
 Open the printed Vite URL — the stage run and detections should appear live.
 
-By default `rally-server` uses SQLite (`rally-gate.sqlite`), a REST/SSE API on
-port 57430, and an in-process MQTT broker on port 57431 — in the 57430–57439
-range dedicated to this project to avoid clashing with other services on the
-host (e.g. a standalone Mosquitto broker on the default 1883). The Vite dev
-servers sit a range above, at their service's port + 10 (57440, 57449), so
-everything in 57430–57439 is something that actually runs at an event. The
-gate's own config service takes 57439, the far end, since it runs on gate
-hardware rather than beside `rally-server`. No
-Docker or Postgres required for this flow.
+By default `rally-server` uses SQLite (`rally-gate.sqlite`), the API on port
+57430 and the MQTT broker on 57431 — no Docker or Postgres needed. The project
+uses its own port range instead of framework defaults; see the table in
+[CLAUDE.md](CLAUDE.md).
 
 The gate config service is separate and needs none of the above:
 

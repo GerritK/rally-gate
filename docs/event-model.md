@@ -1,201 +1,104 @@
 # Event Model
 
-## DetectionEvent (wire format, MQTT payload)
+## DetectionEvent (MQTT payload)
 
 Published by `gate-agent` to `rally/gates/<gateId>/detections`, defined in
 `packages/shared/src/detection-event.ts`:
 
 ```ts
 interface DetectionEvent {
-  eventId: string;         // ULID
+  eventId: string;         // ULID, generated on the gate — the idempotency key
   gateId: string;
   transponderId: string;
-  timestampGate: string;   // ISO 8601, gate-agent's clock
-  source: string;          // 'simulated' | 'simulated-cli' | future: 'openstint', ...
+  timestampGate: string;   // ISO 8601, the gate's clock
+  source: string;          // 'simulated' | 'simulated-cli' | later 'openstint', ...
   metadata?: Record<string, unknown>;
 }
 ```
 
-## Notional times
+The broker is unauthenticated, so ids and timestamps are bounds-checked on
+ingest and bad messages dropped with a warning: an unparseable timestamp would
+otherwise poison a duration silently.
 
-Overall classification is a sum of stage times, so totals only mean anything
-if they cover the same stages. A crew that didn't complete one would otherwise
-have a *shorter* total and rank higher for having driven less.
+## DetectionEventRecord (stored)
 
-Rally's answer, which this follows, is to give them a time anyway: a
-**notional time**, defined here as **the slowest real time on that stage,
-within the ranking being computed, plus a configurable penalty**
-(`notionalPenaltyMs` setting, default 2 min). Anchoring on the slowest time is
-what guarantees the notional is worse than every real time in that ranking, so
-skipping a stage never pays off on that stage.
+Adds `vehicleId` (resolved from `transponderId`), `timestampServer`,
+`clockCorrectionMs`, `rawPayload` and `processed`. `timestampGate` is never
+rewritten; the time the rules used is `timestampGate + clockCorrectionMs` (see
+"Clock offset" in `architecture.md`).
 
-Note what that guarantee does *not* cover: it says nothing about whether a
-crew who drove more stages finishes ahead of one who drove fewer. That holds
-only if the penalty outweighs the advantage the shorter crew built on the
-stages it did finish — with a small penalty a quick crew can retire and still
-lead, which is legitimate rally arithmetic but rarely what an organiser
-intends. The penalty is the knob for this, and it wants to scale with stage
-length; roughly one stage duration is a reasonable starting point.
-
-Rules:
-
-- **Only CLOSED stages count.** A stage still running has no result yet, so
-  nobody is charged for not having finished it. Same trigger
-  `getNonFinishers` uses, so DNF/DNS and the overall table agree on when a
-  stage is decided. Practical effect: the overall table moves when a stage
-  closes, not continuously during one.
-- **A crew must have completed at least one stage to be classified.**
-  Otherwise a registered car that never turned up collects notionals for the
-  whole rally and lands in the results on an entirely invented total.
-- **A closed stage nobody finished is dropped entirely.** With no real time to
-  anchor a notional, every crew would get the same invented figure — a
-  constant added to all totals, which moves no positions. Skipping it is
-  equivalent and avoids fabricating a number.
-- **Ranking is then plain lowest-total-wins.** No stages-completed ordering:
-  once notionals make totals comparable, a separate stage-count rule would
-  actively contradict the times. Note this means a crew quick enough on the
-  stages it *did* complete can still lead on fewer stages — the penalty is the
-  knob controlling how punishing a retirement is.
-- **Notional times are computed per ranking, never stored on a `StageRun`.**
-  The basis is the slowest time *within the ranking being computed*: overall
-  ranking uses the slowest overall, a class ranking uses the slowest in that
-  class. Because a vehicle can belong to several classes at once (see the
-  deferred vehicle-classes item in `development-roadmap.md`), the same missed
-  stage yields a *different* notional in each ranking it appears in — so it
-  cannot be a property of the run. `StageRun` stays purely factual: measured
-  times only.
-
-## DetectionEventRecord (stored, `apps/rally-server`)
-
-Adds server-side fields once ingested: `vehicleId` (resolved from
-`transponderId`, if a matching vehicle exists), `timestampServer` (server's
-own clock — kept separate from `timestampGate` since gate/server clocks
-aren't assumed to be perfectly synced), `clockCorrectionMs`, `rawPayload`,
-`processed`.
-
-`timestampGate` is never rewritten. When the gate's measured clock offset is
-large enough to correct (see "Clock offset" in `architecture.md`), the
-correction is recorded separately in `clockCorrectionMs` and the time the
-rule engine actually used is `timestampGate + clockCorrectionMs` — so the raw
-reading and the adjustment stay independently inspectable.
+`processed: false` means the rules threw. The raw detection is always saved
+first, a 30s sweep retries oldest-first with the stored correction, and
+`GET /events/pending` plus a dashboard banner make the backlog visible. An
+unknown gate or unregistered transponder is marked processed — retrying changes
+nothing and would bury real problems.
 
 ## StageRun
 
-One row per *attempt*. A vehicle may have several attempts at a stage,
-because a red-flagged stage gets re-run and the original timing is kept as
-evidence rather than overwritten. `attempt` numbers them from 1, and only the
-highest counts toward results (`latestAttempts` in `stage-runs.service.ts`);
-every query that feeds classification goes through it. Created on a
-`stage_start` detection, closed on the matching `stage_finish` detection.
-`durationMs` is `finishTime - startTime`.
+One row per **attempt**. Created by a `stage_start` detection, finished by the
+matching `stage_finish`; `durationMs = finishTime - startTime`, and must be
+positive (classification sorts ascending, so a zero or negative time would win).
 
 **At most one non-voided attempt per vehicle+stage**, enforced by a partial
-unique index (`where "voided" = false`). This is the invariant the whole
-model rests on: **not voided means it counts**.
+unique index (`where "voided" = false`). The invariant is *not voided means it
+counts*: if several attempts could survive, a superseded run would show
+`FINISHED` with a duration while missing from the results. Results use the
+highest surviving `attempt` (`latestAttempts`).
 
-It has to be that and not something weaker. If several attempts could survive
-at once, an attempt could fail to count for two different reasons — voided,
-or superseded by a higher attempt — and only the first would be visible: a
-superseded run would show `FINISHED` with a duration while being absent from
-the results. One survivor per vehicle+stage removes the second reason
-entirely, so status always tells the truth without needing to know about
-sibling rows.
+`attempt` is an explicit counter rather than a creation timestamp because
+`@CreateDateColumn` stores only seconds on sqlite, and `startTime` is editable.
+Application-set `Date`s keep milliseconds on both drivers —
+`timestamp-precision.spec.ts` pins that against real sqlite.
 
-Practical consequence: **voiding the previous attempt is what makes room for
-a re-run**, rather than tidying up afterwards. `POST /stage-runs` refuses
-while a surviving attempt exists, for the same reason.
+`status` is derived on read, never stored (`deriveStageRunStatus`): `FINISHED`
+once `finishTime` is set, otherwise `STARTED`, or `CANCELLED` (DNF) once the
+stage is closed; `VOIDED` if voided. Closing a stage therefore writes nothing to
+its runs.
 
-The index also still backstops the race the original plain unique constraint
-covered, where two detections for one passing are processed concurrently and
-both clear the pre-insert `findActive` check.
+Duplicate starts and finishes without an active run are logged and ignored —
+delivery is at-least-once, so the rules must be idempotent. Marshals correct
+runs via `PATCH`/`POST`/`DELETE /stage-runs`.
 
-`attempt` is an explicit counter rather than a creation timestamp on purpose:
-`@CreateDateColumn` writes only second precision on sqlite, so two attempts
-recorded in the same second compared equal and "latest" became whichever row
-the driver happened to return first — a wrong result with no error.
-`startTime` can't serve either, since the correction endpoints can edit it.
+### Voiding, and how a re-run starts
 
-**This is specific to `@CreateDateColumn`, not to `datetime` columns.**
-Stage times keep their milliseconds: on the same column type, an
-application-set `Date` stores `2026-08-23 10:00:00.123` where
-`@CreateDateColumn` stores `2026-08-23 00:07:54`. Tenth-of-a-second margins
-are therefore safe, and `src/config/timestamp-precision.spec.ts` pins that —
-it round-trips `startTime`/`finishTime`, a split and a detection through real
-sqlite and recomputes the duration from what comes back, since a truncating
-driver would leave the stored `durationMs` correct while the timestamps
-behind it quietly lost precision. Postgres uses `timestamp`, which carries
-microseconds, so sqlite is the tighter of the two.
+A re-run is **not** started by a bare start-gate detection: the start gate stays
+live while finished cars are recovered back past it, so that would manufacture
+phantom runs that replace real times.
 
-### Voiding, and how a re-run actually starts
+Instead the marshal voids the attempt (`POST /stage-runs/:id/void`) — the red
+flag. The row stays as evidence (a protest turns on what was originally timed),
+stops counting, and leaves the vehicle with neither an open nor a finished
+attempt, so **the start gate opens the re-run by itself** on the next pass. Both
+ends stay gate-timed.
 
-A re-run is **not** started by a bare gate detection. The start gate stays
-live for the rest of the field while a finished car is recovered back past
-it, so treating any post-finish start as a new attempt would routinely
-manufacture a phantom run — and since results count the latest attempt, that
-phantom would silently replace a real time.
-
-Instead the marshal **voids** the attempt (`POST /stage-runs/:id/void`),
-which is what a red flag actually does to a run:
-
-- the row stays, with `voided: true` and status `VOIDED` — it is the record
-  of what was originally timed, which is what a protest turns on, so this is
-  deliberately not a delete;
-- `latestAttempts` skips it, so results fall back to the last surviving
-  attempt immediately, or to no result at all if every attempt is voided;
-- `findActive`/`findFinished` skip it too, so the vehicle now has neither an
-  open nor a completed attempt — and **the start gate opens the re-run by
-  itself** on the car's next pass, with the finish gate closing it.
-
-That last point is the reason for doing it this way rather than hand-entering
-a replacement run: both ends of the re-run stay gate-timed. The alternative,
-arming a whole stage for re-runs, was rejected because it re-opens the
-drive-back hole for every finished car in the field — including the crashed
-one being recovered, which is usually what caused the red flag.
-
-Voided runs must also be excluded from the partial unique index: a voided but
-unfinished run would otherwise keep occupying the one-open-attempt slot and
-block the very re-run it was voided to permit.
-
-`POST /stage-runs/:id/unvoid` reverses a void — for a red flag called on the
-wrong car, or called and then withdrawn. One rule, because there is one
-invariant: it succeeds when nothing else survives on that stage, and 409s
-with `{ blockingAttempt }` otherwise, naming the attempt to void first.
-
-It **refuses rather than cascades**. Voiding the survivor automatically would
-strike out a run the car actually drove, as a side effect of a control
-labelled "restore". The marshal should make that call explicitly so it lands
-in the record as a deliberate act.
-
-Restoring an earlier attempt after a re-run is therefore two explicit steps —
-void attempt 2, then unvoid attempt 1 — and both remain visible afterwards.
-
-Otherwise the rules stay intentionally simple: duplicate start events are
-ignored (the pre-insert check handles the common case; a race that reaches
-the index falls back to returning the existing row rather than erroring), and
-a finish event with no active run is ignored (logged, not stored). A marshal
-can also correct a run directly via `PATCH /stage-runs/:id`
-(startTime/finishTime, `durationMs` recomputed server-side) or create one
-outright via `POST /stage-runs` when the start detection never arrived —
-that now 409s only if an *unfinished* run already exists.
-`correctRun`/`createManual`.
-
-`StageRun` has no `status` column — STARTED/FINISHED/CANCELLED is derived on
-read (`deriveStageRunStatus` in `stage-runs.service.ts`), never stored:
-FINISHED once `finishTime` is set, otherwise STARTED unless the run's stage
-has been closed, in which case it's CANCELLED (DNF). This means
-`Stage.close()` (`stages.service.ts`) no longer needs to sweep/write
-anything to `StageRun` rows — every still-unfinished run on a closed stage
-reports CANCELLED for free, with no risk of the two drifting out of sync.
+`POST /stage-runs/:id/unvoid` reverses it and 409s with `{ blockingAttempt }`
+if another attempt already counts. It refuses rather than cascades: discarding a
+run the car actually drove is a call the marshal makes explicitly.
 
 ## StageSplit
 
-One row per (stage run, split gate). Recorded on a `stage_split` detection
-at a gate whose `stageId` matches the vehicle's currently active
-`StageRun` on that stage. `splitIndex` is copied from the gate's
-`splitIndex` at record time (lets a stage have multiple ordered split
-points), `elapsedMs` is time since the run's `startTime`. A split
-detection with no active run, or a duplicate detection at a gate already
-recorded for that run, is ignored (logged, not stored/duplicated) — same
-"intentionally simple" idempotent-ignore pattern as `StageRun`. No
-split-based ranking/classification exists yet — splits are recorded and
-displayed only.
+One row per (stage run, split gate), recorded on a `stage_split` detection while
+the vehicle has an active run on that stage. `splitIndex` is copied from the
+assignment, `elapsedMs` is time since `startTime`. Duplicates are ignored. Split
+classification ranks by `elapsedMs` and includes runs still `STARTED`, which is
+what makes it a live leaderboard.
+
+## Notional times
+
+The overall classification sums stage times, which only compares crews if the
+totals cover the same stages — otherwise retiring makes a total *shorter*. A
+crew missing a stage is charged a **notional time: the slowest real time on that
+stage within the ranking being computed, plus `notionalPenaltyMs`** (default
+2 min), so skipping never pays off on that stage.
+
+That does not guarantee a crew with more stages finishes ahead of one with
+fewer: a quick crew can retire and still lead if the penalty is small. The
+penalty is the knob; roughly one stage duration is a sensible start.
+
+- Only `CLOSED` stages count, so the overall table moves when a stage closes.
+- A crew needs at least one completed stage to be classified.
+- A closed stage nobody finished is dropped — a notional with no anchor would
+  add the same constant to everyone.
+- Lowest total wins; `stagesCompleted` is display-only.
+- Notionals are computed per ranking and never stored, because a future class
+  ranking has a different slowest time than the overall one.

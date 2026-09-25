@@ -1,6 +1,6 @@
 # Decoder Adapters
 
-`apps/gate-agent` gets its transponder detections from a `DecoderAdapter`:
+`apps/gate-agent` gets its detections from a `DecoderAdapter`:
 
 ```ts
 interface DecoderAdapter {
@@ -9,255 +9,92 @@ interface DecoderAdapter {
 }
 ```
 
-Only `SimulatedAdapter` (`src/adapters/simulated.adapter.ts`) exists today —
-it fires detections on an interval (`SIMULATE_INTERVAL_MS`) for a configured
-list of transponder IDs, and `src/simulate-cli.ts` fires one-off detections
-for manual testing/demos.
+Only `SimulatedAdapter` exists: it fires detections on an interval
+(`SIMULATE_INTERVAL_MS`) for the configured `TRANSPONDERS`, and
+`src/simulate-cli.ts` fires one-offs. A new adapter implements the interface and
+is picked by the `ADAPTER` env var; nothing past gate-agent changes, since the
+server only ever sees a `DetectionEvent`.
 
-Planned adapters (not implemented yet):
-- `OpenStintAdapter` — wraps OpenStint's output for real RTL-SDR gate hardware.
-  Protocol (per [zsellera/openstint](https://github.com/zsellera/openstint)
-  `docs/decoder-protocol.md`, checked 2026-08-17): OpenStint publishes over
-  **ZeroMQ pub/sub as plain space-separated text**, not JSON. A passing looks
-  like `P <decoder_timestamp> <transponder_type> <transponder_id> <rssi>
-  <hit_count> <pass_duration>`, e.g. `P 1618706341 OPN 1615544 3.50 64
-  89113`. Two things that affect the adapter:
-  - `decoder_timestamp` is a **monotonic clock since decoder process
-    startup, not wall-clock time** — `OpenStintAdapter` must stamp
-    `DetectionEvent.timestampGate` from the gate-agent host's own clock at
-    message-receipt time, not this field. Raises the stakes on the DS3231
-    RTC note below (it's not just about surviving power cycles — every
-    single detection's timestamp depends on host clock accuracy).
-  - `transponder_type` is `OPN` (OpenStint) or `AMB` (legacy RC3) — a second,
-    concrete case of the multi-ID-namespace need described below, this time
-    within "race transponder" itself, not just race-transponder-vs-RFID.
-  - Recent breaking change upstream: passing messages used to report EVM
-    (signal quality); that's gone, replaced by `pass_duration` (µs in the
-    detection loop) as the last field. Matters if any old sample
-    output/fixtures get used to build this adapter.
+## OpenStintAdapter (planned)
 
-  OpenStint has its own answer to cross-gate timing accuracy: `T` (time
-  sync) messages from reference transponders with precise clocks, letting
-  two decoders correlate timestamps directly, or running multiple decoders
-  on one host to sidestep cross-host clocks entirely. Not using either —
-  overkill for this project's precision needs (DS3231 drift is a few
-  ppm/~1 min/year, trivial against a rally stage's timescale).
+Wraps [OpenStint](https://github.com/zsellera/openstint) on RTL-SDR gate
+hardware. Protocol (`docs/decoder-protocol.md` upstream, checked 2026-08-17):
+**ZeroMQ pub/sub, plain space-separated text**. A passing is
+`P <decoder_timestamp> <transponder_type> <transponder_id> <rssi> <hit_count> <pass_duration>`,
+e.g. `P 1618706341 OPN 1615544 3.50 64 89113`.
 
-  **Provisional decision: run the decoder with `-t` (system clock instead of
-  monotonic) and have `OpenStintAdapter` use `decoder_timestamp` directly as
-  `timestampGate` — pending one check listed below.** Provisional because the
-  reasoning this originally rested on turned out not to hold, and what
-  replaces it is a question that can't be answered without reading OpenStint's
-  source or running the hardware.
+- `decoder_timestamp` is monotonic since decoder start unless the decoder runs
+  with `-t` (system clock).
+- `transponder_type` is `OPN` or `AMB` (legacy RC3) — two ID namespaces, see
+  "Multiple IDs per vehicle" below.
+- Upstream recently replaced EVM with `pass_duration` as the last field; old
+  sample output won't match.
 
-  *Superseded reasoning, kept so it isn't re-derived:* the original argument
-  was that OpenStint's warning about `-t` concerns live NTP corrections
-  (jumps, backwards time, slewing), and that gate Pis run no NTP, so the risk
-  didn't apply. Both halves are now wrong. Gates will run chrony
-  (`development-roadmap.md` item 0), so there *is* a time daemon. More
-  importantly the comparison was never symmetric in the way it implied:
+**Open question that decides the timestamp source: does `-t` change only the
+reported field, or also OpenStint's internal logic** (hit correlation,
+deduplication, `pass_duration`)? Check their source before building.
 
-  | | who stamps | which clock |
-  |---|---|---|
-  | with `-t` | decoder, at decode time | `CLOCK_REALTIME` |
-  | without `-t` | adapter, at ZeroMQ receipt | `CLOCK_REALTIME` (`new Date()`) |
+- Only the field → run with `-t` and use `decoder_timestamp` directly. It stamps
+  at decode time, avoiding 1-20ms of ZeroMQ + event-loop jitter.
+- Internal logic too → stay monotonic and calibrate in the adapter: keep the
+  minimum observed `wallNow - decoder_timestamp` and use
+  `calibratedEpoch + decoder_timestamp`. ~15 lines; a jump in the calibration
+  also reveals a stepped clock or a decoder restart.
 
-  Both paths end up reading the same system clock on the same host, so a
-  clock step corrupts `timestampGate` identically either way. Dropping `-t`
-  buys no protection from it. Clock-step safety is a property of the gate's
-  time-daemon configuration, not of this flag — see "Gate system clock
-  policy" below.
+`-t` does not make clock steps more dangerous: with or without it, the timestamp
+comes from the same system clock. Step safety comes from the clock policy below.
+Either way, compare decoder time with receipt time and warn past a bound.
 
-  **What actually decides it: does `-t` change only the reported field, or
-  OpenStint's internal behaviour too?** If the decoder also uses that clock
-  internally — correlating hits within a detection window, deduplicating,
-  computing `pass_duration` — then a backwards step under `-t` could corrupt
-  *detection itself*, not just a timestamp: a missed passing rather than a
-  wrong time on one you still caught. That asymmetry would explain why the
-  warning exists at all, given the reported-field exposure is identical. Not
-  yet checked against their source. **Check this before building the
-  adapter**; it decides the whole question.
+Keep it in proportion: this is milliseconds, the cross-gate skew that chrony
+fixes was seconds. Confirm the `-t` timestamp format against real output.
 
-  - If `-t` only affects the reported field: take it. Free accuracy, simplest
-    code — it stamps the passing inside the decoder at decode time, where
-    gate-agent's own receipt time would add ZeroMQ transport plus Node
-    event-loop jitter (order 1-20ms, occasionally worse under load).
-  - If `-t` reaches into decoder logic: drop it and use the calibrated
-    monotonic option below, which recovers almost all of the accuracy without
-    exposing the decoder to a stepped clock.
+## Other adapter ideas
 
-  **Calibrated monotonic (the option to reach for if `-t` is unsafe).** Keep
-  the decoder on monotonic, and calibrate its epoch onto wall clock in the
-  adapter: track `wallNow - decoder_timestamp` across messages, keep the
-  *minimum* observed (the least-jittered sample), then compute
-  `timestampGate = calibratedEpoch + decoder_timestamp`. Transport and
-  event-loop jitter then land only on the calibration, not on every
-  detection. This is the same min-filtered offset estimation as
-  `GatesService.measureClockOffsetMs` (`architecture.md` "Clock offset"), one
-  level further down the stack. Two things fall out free: a monotonic reset
-  identifies a decoder restart, and a jump in the calibrated offset
-  identifies a stepped wall clock — it self-detects the hazard this whole
-  discussion is about. Costs perhaps 15 lines.
+- `ManualEntryAdapter` — a marshal keying in a passing.
+- `ThroughBeamAdapter` — IR break-beam on GPIO, no transponder read: as a
+  backup trigger beside OpenStint, or a beam-only gate that guesses the car from
+  start order. Either way a detection can arrive without a `transponderId`,
+  which needs an **unconfirmed** detection state (best guess, held for marshal
+  accept/correct) rather than committing a guess. Not designed.
+- **ESP32 checkpoint gates** for Parc Fermé / pre-start, where presence matters
+  and timing doesn't (RFID reader or a button). A gate is anything that
+  publishes the right JSON to `rally/gates/<gateId>/detections` — no gate-agent
+  needed.
 
-  **Cross-check regardless of which option wins.** The adapter has both
-  numbers in hand, so compare the decoder's timestamp against its own receipt
-  time and flag divergence beyond a bound. Three lines, same shape as the
-  clock-correction deadband, and it turns a silent decoder/host clock
-  divergence into something visible.
+### Multiple IDs per vehicle
 
-  **Keep this in proportion.** `-t` is worth somewhere between 1 and 20ms of
-  jitter. The cross-gate skew that "Clock offset" in `architecture.md`
-  addresses was worth *seconds*. This is a refinement on a path gated behind
-  RF hardware validation that hasn't happened — worth having the reasoning
-  written down correctly, not worth much more until real decoder output
-  exists to test against.
-
-  Caveat that still stands: the exact `decoder_timestamp` format/units under
-  `-t` aren't specified in the protocol doc — confirm against real decoder
-  output when `OpenStintAdapter` actually gets built.
-
-- `RCHourglassAdapter` — considered as an alternative decoder, not currently pursued.
-- `ManualEntryAdapter` — for a marshal manually keying in a passage.
-- `ThroughBeamAdapter` — cheap IR break-beam sensor on GPIO, no transponder
-  read. Two use cases: (1) paired with `OpenStintAdapter` at the same gate as
-  a redundant trigger/cross-check when a transponder read is missed, or (2)
-  a beam-only gate with no transponder reader at all, where the vehicle is
-  guessed from expected start order.
-
-  Both cases mean a detection can arrive with no known `transponderId` — the
-  interface and `DetectionEvent` (`packages/shared/src/detection-event.ts`)
-  currently assume it's always present. Handling this isn't just a new
-  adapter: it needs an **unconfirmed** detection state in the pipeline (best-
-  guess vehicle attached, held for marshal accept/correct before it becomes a
-  trusted `StageRun` split) rather than committing an inferred ID straight
-  through. Not designed yet — revisit when a `ThroughBeamAdapter` is
-  actually built.
-
-Adding one of these means implementing the interface and swapping which
-adapter `apps/gate-agent/src/main.ts` instantiates based on an `ADAPTER` env
-var — nothing else in the pipeline changes, since `rally-server` only ever
-sees the resulting `DetectionEvent` over MQTT.
-
-## Non-timing checkpoint gates (Parc Fermé, pre-start)
-
-Idea: cheap ESP32 boards as "gates" for checkpoints that just need
-presence/identity confirmation, not split-second timing — Parc Fermé
-check-in, pre-start staging. Either an RFID reader (ID, but a badge/keyfob
-tag, not the race transponder) or a plain button press (no ID at all,
-marshal-confirmed).
-
-Worth noting: per `architecture.md`, a gate only needs to publish the right
-JSON to `rally/gates/<gateId>/detections` over MQTT — nothing requires it to
-be `apps/gate-agent` running on a Pi. An ESP32 running its own firmware
-(Arduino/MicroPython MQTT client) that publishes that same message is a
-valid gate on its own, no Node/`DecoderAdapter` involved. The button-press
-case is transponder-less like the `ThroughBeamAdapter` case above and would
-lean on the same unconfirmed-detection design once that exists. Not
-designed yet.
-
-RFID *does* carry an ID, but it's a badge/keyfob tag, not the car's race
-transponder — a different ID namespace on the same vehicle. `Vehicle`
-currently has a single `transponderId?: string` (`vehicle.entity.ts:18`) and
-lookup is one exact match (`vehicles.service.ts:21-22`), so a badge ID today
-would just look like an unregistered transponder and get dropped. Fix:
-generalize `Vehicle` from one `transponderId` to `1..n` IDs (race
-transponder, RFID badge, maybe a second race transponder as backup — also
-needed for OpenStint's own `OPN`/`AMB` transponder-type split, see
-`OpenStintAdapter` above) —
-`DetectionEvent.source` (`detection-event.ts:6`) already tells you which ID
-space a detection is in, so matching just needs to check the right list
-instead of one column. Expected to be a small change, not a big redesign.
+An RFID badge, a backup transponder, or OpenStint's `OPN`/`AMB` split all mean
+one vehicle with several IDs. Today `Vehicle` has one `transponderId` and lookup
+is one exact match, so anything else looks unregistered. Fix when needed: a
+list of IDs per vehicle, matched by `DetectionEvent.source`. Small change.
 
 ## Gate system clock policy
 
-Applies to every gate timestamp, independent of `-t`, of which decoder is
-running, and of whether the gate has an RTC or GPS. Any time daemon on a gate
-must be allowed to **step the clock only at boot, and slew from then on**
-(chrony's `makestep <threshold> <limit>` with a small update limit).
+Any time daemon on a gate may **step the clock only at boot, and slew from then
+on**. A step mid-stage lands in the time of every car on stage across it; a
+bounded slew moves a minutes-long stage by milliseconds.
 
-In practice this is Debian's own chrony default (`makestep 1 3`), which is why
-`deploy/install-gate-pi.sh` adds a `/etc/chrony/conf.d/` drop-in for the rally
-time source rather than replacing `chrony.conf` — the policy comes free from
-not overriding it. The corollary: a chrony release that changed that default
-would break this policy with nothing in the timing data to show why. Check it
-first if a `StageRun` ever comes out with an unexplained discontinuity.
-
-A bounded slew is harmless — even 100ppm over a minutes-long stage moves the
-clock by milliseconds — whereas a step mid-stage writes a discontinuity
-straight into a `StageRun`: a car that started before the step and finished
-after it gets the step added to its time, with nothing in the data to show
-why. GPS/PPS makes this easier rather than harder, since a continuously
-disciplined clock stays locked with tiny slews and has no reason to step
-after the initial fix.
-
-This is the constraint an earlier version of the `OpenStintAdapter` note
-mistook for a property of the `-t` flag. It isn't — both `-t` and
-adapter-side stamping read the same `CLOCK_REALTIME`, so the policy is what
-protects the timestamp either way.
+This is Debian's chrony default (`makestep 1 3`), which is why the installer adds
+a `conf.d` drop-in instead of replacing `chrony.conf`, and why `gate-config`
+changes the source with `chronyc reload sources` rather than a restart (a
+restart re-arms the boot steps). A chrony release that changed this default
+would break the policy silently — check it first if a `StageRun` ever shows an
+unexplained jump.
 
 ## Hardware notes
 
-- **DS3231 RTC module** — planned for gate-agent Pis. They run at rally
-  sites with no internet (local NTP against `rally-server` is planned, see
-  `development-roadmap.md` item 0, but that only helps once the gate is on
-  the network and synced), so without a hardware clock the system time
-  resets or drifts on every power cycle; splits depend on comparing
-  timestamps across independently-running gates, so clock accuracy here is
-  load-bearing. I2C, wired directly since gate-agent runs bare-metal on the
-  Pi (see `apps/gate-agent/Dockerfile` for why it's not containerized). The
-  RTC covers surviving power cycles; correcting for setup-time miscalibration
-  between gates is a separate planned mechanism — see "Gate control channel"
-  and "Clock offset" in `architecture.md`.
-- **GPS module with PPS** — optional per-gate upgrade, not a requirement.
-  Worth understanding what it does and doesn't buy before spending on it.
-
-  A GPS module gives two separate things, and only one is useful for timing:
-  - **NMEA sentences** (UART/USB, ~1Hz) carrying time of day, delivered with
-    tens to hundreds of ms of serial/USB jitter. On their own these are
-    *worse* than the LAN — they tell you which second it is, not when it
-    started.
-  - **PPS** — a hardware pulse on a GPIO whose rising edge tracks the top of
-    each UTC second to within tens of nanoseconds. This is the entire value.
-
-  Consequence: **a USB GPS dongle is the wrong hardware.** USB latency
-  destroys the pulse edge, and most dongles don't expose PPS at all. It needs
-  a UART/GPIO module or HAT, wired to a GPIO, with `dtoverlay=pps-gpio` and
-  chrony using the PPS refclock. GPS does not replace chrony — it becomes a
-  *source* for it, so the chrony work is a prerequisite either way, not an
-  alternative.
-
-  **Accuracy is not the reason to do this.** chrony over the rally LAN
-  already lands within a few ms, against winning margins measured in tenths
-  of a second — comfortably 20-100x more accuracy than needed. GPS/PPS is
-  ~1µs, which is overkill by any measure.
-
-  **The reason to do it is topology: it takes the network out of the timing
-  path.** A stage can be kilometres of forest track, and the start and finish
-  gates may not see the same AP. With PPS, a gate's timestamps are correct
-  whether or not it can reach `rally-server` at that instant, so delivery
-  becomes eventually-consistent rather than timing-critical. That composes
-  with the QoS 1 persistent session in `apps/gate-agent/src/main.ts` (and the
-  disk-backed outgoing store marked as a `ponytail:` ceiling there): a gate
-  could be out of contact for an entire stage, buffer its detections, and
-  sync on return with the times still exact. It also bounds the cold-start
-  hole that "Clock offset" in `architecture.md` exists to catch, without
-  depending on the server being reachable at boot.
-
-  Caveats worth weighing before buying:
-  - **Sky view is the real risk** — dense forest, valleys, under bridges, all
-    places rally stages actually go. A gate that loses fix falls back to its
-    crystal, so none of the existing fallbacks stop being necessary.
-  - Complements the DS3231 rather than replacing it: GPS sets the time
-    correctly, the RTC holds it through a fix loss or reboot. The RTC alone
-    can't set the time right in the first place.
-  - Must obey "Gate system clock policy" above — step only at boot, slew
-    thereafter.
-  - ~EUR 15-30 plus antenna placement, per gate.
-
-  **Requires no `rally-server` changes at all.** Because gates stamp their
-  own time and the server measures and optionally corrects it, a GPS-equipped
-  gate simply reports `Gate.clockOffsetMs` near zero permanently — so the
-  Hardware page's clock column doubles as a GPS health indicator for free
-  (green = good fix, amber = the antenna has lost sky).
-- **Through-beam (IR break-beam) sensor** — candidate GPIO input for
-  `ThroughBeamAdapter` above. ([example](https://de.aliexpress.com/item/1005006052871002.html))
+- **DS3231 RTC** — supported by the gate installer (asked interactively). Holds
+  the time across power cycles with no network; chrony's `rtcsync` writes the
+  synced time back to it. Wired over I2C, which is one reason gate-agent runs on
+  bare metal rather than in Docker.
+- **GPS with PPS** — optional, per gate, deferred until hardware is on hand. Not
+  for accuracy (LAN chrony is already 20-100x better than needed) but because it
+  takes the network out of the timing path: a gate with PPS keeps exact time
+  even out of contact for a whole stage, buffering detections over the QoS 1
+  session. Needs a UART/GPIO module with PPS on a GPIO (`dtoverlay=pps-gpio`),
+  **not a USB dongle** — USB destroys the pulse edge. It becomes a chrony
+  refclock, complements the RTC, needs sky view (forest and valleys are the real
+  risk), ~EUR 15-30 per gate. No server change: `Gate.clockOffsetMs` doubles as
+  its health indicator.
+- **IR break-beam** — candidate for `ThroughBeamAdapter`
+  ([example](https://de.aliexpress.com/item/1005006052871002.html)).
