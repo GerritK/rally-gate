@@ -9,6 +9,15 @@ INSTALL_DIR="${INSTALL_DIR:-$HOME/rally-gate}"
 # should never have to reason about event data sitting inside it.
 BACKUP_DIR="${BACKUP_DIR:-$HOME/rally-gate-backups}"
 
+# Pi OS Lite ships no git, and this script arrives via curl | bash rather than
+# from a clone, so nothing has pulled it in before the clone below. Guarded by
+# an apt-get update because this script has no other apt step to share one with,
+# and a fresh image has empty package lists.
+if ! command -v git >/dev/null; then
+  sudo apt-get update
+  sudo apt-get install -y git
+fi
+
 if ! command -v docker >/dev/null; then
   curl -fsSL https://get.docker.com | sh
   sudo usermod -aG docker "$USER"

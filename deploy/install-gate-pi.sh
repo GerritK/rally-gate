@@ -101,9 +101,17 @@ read -rp "Proceed with install? [Y/n] " confirm < /dev/tty
 [[ "${confirm:-y}" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 1; }
 
 # A fresh Pi OS image ships with empty apt lists, so every apt-get install
-# below (chrony, i2c-tools, and nodejs when nodesource doesn't run) needs this.
+# below (git, chrony, i2c-tools, and nodejs when nodesource doesn't run) needs
+# this.
 echo "-- updating package lists --"
 sudo apt-get update
+
+# Pi OS Lite ships no git, and this script reaches the Pi through curl | bash
+# rather than from a clone — so nothing has pulled it in by the time the clone
+# below runs. Installed unconditionally: apt is a no-op when it is already
+# there, and a `command -v` guard only adds a branch that is wrong on the one
+# image that matters.
+sudo apt-get install -y git
 
 if ! command -v node >/dev/null; then
   echo "-- installing Node.js --"
