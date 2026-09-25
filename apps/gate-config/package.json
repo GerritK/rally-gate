@@ -5,6 +5,7 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc -p tsconfig.json && vue-tsc -p tsconfig.web.json --noEmit && vite build",
+    "build:deploy": "tsc -p tsconfig.json && vite build",
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "dev:web": "vite",
     "start": "node dist/main.js",

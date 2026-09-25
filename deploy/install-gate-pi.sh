@@ -133,7 +133,8 @@ npm run build --workspace=@rally-gate/shared
 npm run build --workspace=@rally-gate/gate-agent
 
 echo "-- building gate-config (web UI, takes a minute on slower hardware) --"
-npm run build --workspace=@rally-gate/gate-config
+# build:deploy skips vue-tsc: it OOMs a Pi on the Vuetify types, and CI already typechecks.
+npm run build:deploy --workspace=@rally-gate/gate-config
 
 echo "-- installing configuration --"
 # Config lives in a file, not in the unit: the gate config UI rewrites it at
