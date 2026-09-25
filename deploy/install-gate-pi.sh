@@ -140,6 +140,9 @@ fi
 
 echo "-- fetching rally-gate --"
 if [ -d "$INSTALL_DIR/.git" ]; then
+  # Installers before the switch to `npm ci` rewrote the lockfile on the gate,
+  # which makes this pull refuse to run. Nobody edits it here on purpose.
+  git -C "$INSTALL_DIR" checkout -- package-lock.json
   quiet git -C "$INSTALL_DIR" pull
 else
   quiet git clone "$REPO_URL" "$INSTALL_DIR"
@@ -147,7 +150,9 @@ fi
 
 echo "-- building gate-agent --"
 cd "$INSTALL_DIR"
-quiet npm install
+# ci, not install: exactly what CI tested, and it never rewrites the lockfile —
+# which `install` did, blocking the `git pull` of every later update.
+quiet npm ci
 quiet npm run build --workspace=@rally-gate/shared
 quiet npm run build --workspace=@rally-gate/gate-agent
 
