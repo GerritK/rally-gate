@@ -31,14 +31,17 @@ Anything outside `/api` that isn't a file returns `index.html`.
 Every mutating endpoint binds a DTO class, and unknown fields are a 400 — see
 `CLAUDE.md` for which fields are deliberately absent.
 
-Live (SSE, plain `EventSource`), each resynced by a refetch in `onopen`:
+Live: **one** SSE stream, `GET /live`, with the kind of update as the SSE
+event type (`LiveEventType` in `packages/shared`). One stream, not one per kind:
+each open `EventSource` holds one of the browser's six connections per host,
+shared across tabs, and once they are all streams every fetch queues behind them
+and the dashboard freezes. Clients refetch in `onopen`, which also fires on every
+reconnect.
 
-- `/live/detections`, `/live/stage-runs`, `/live/stage-run-splits`
-- `/live/gates` — a `Gate` on each heartbeat
-- `/live/pending-detections` — the whole pending list on every change, not a
-  delta
-- `/live/awaiting-detections` — `{ awaiting }`, the whole unassigned list on
-  every change
+- `detection`, `stage-run`, `stage-run-split` — the record as it changes
+- `gate` — a `Gate` on each heartbeat
+- `pending-detections` — `{ pending }`, `awaiting-detections` — `{ awaiting }`:
+  the whole list on every change, not a delta
 
 A gate's own configuration is not here: `apps/gate-config` serves it on the gate
 itself, port 57439 (`/api/config`, `/api/status`, `/api/network`,

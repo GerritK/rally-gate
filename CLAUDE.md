@@ -101,7 +101,7 @@ Gate hardware (or SimulatedAdapter)
   -> EventsService (stores DetectionEventRecord, looks up gate + vehicle)
   -> rule engine (active GateAssignment.role -> start/finish/split a StageRun)
   -> EventEmitter2 internal bus ("detection.created", "stage-run.updated", "stage-run.split")
-  -> LiveController (SSE: /live/detections, /live/stage-runs, /live/stage-run-splits) -> Vue dashboard
+  -> LiveController (one SSE stream /live, event type per kind — never a stream per kind, see docs/api.md) -> Vue dashboard
 ```
 
 **Everything server-side is event-driven through `EventEmitter2`, not direct method chains.** `EventsService` never calls the live feed or rule engine directly — it emits and `LiveController`/listeners react. Follow this shape for new cross-cutting behavior (e.g. a future "stage started" trigger should be an emitted event with independent listeners, not a service calling into three other services inline) — see the "Event-based, not a hard-coded call chain" note in `architecture.md`.

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { API_BASE, ApiError } from '../api/client';
+import { ApiError } from '../api/client';
 import {
   assignVehicleToEvent,
   dismissEvent,
@@ -32,6 +32,7 @@ import {
   type StageRun,
   type StageSplit,
 } from '../api/stage-runs';
+import { openLiveStream } from '../api/live';
 import { fetchVehicles, type Vehicle } from '../api/vehicles';
 import {
   formatClockTime,
@@ -139,12 +140,7 @@ const newRun = ref<{ vehicleId: string; startTime: string }>({
   startTime: '',
 });
 
-let detectionsSource: EventSource;
-let stageRunsSource: EventSource;
-let stageRunSplitsSource: EventSource;
-let gatesSource: EventSource;
-let pendingSource: EventSource;
-let awaitingSource: EventSource;
+let liveSource: EventSource;
 
 const FLASH_DURATION_MS = 600;
 
@@ -379,55 +375,34 @@ onMounted(async () => {
   const openStage = stages.value.find((s) => s.status !== 'CLOSED');
   selectedStageId.value = (openStage ?? stages.value[0])?.id ?? '';
 
-  // Every stream below resyncs through `onopen`, which fires on the first
-  // connect *and* on each automatic reconnect — exactly when this client may
-  // have missed events. That makes it both the initial load and the recovery,
-  // so a dropped connection no longer leaves the page quietly stale until
-  // someone reloads it. Each stream refetches only what it feeds, so a
-  // simultaneous reconnect doesn't refetch everything five times over.
-  detectionsSource = new EventSource(`${API_BASE}/live/detections`);
-  detectionsSource.onopen = () => void refreshDetections();
-  detectionsSource.onmessage = (e) => {
-    const event: DetectionEventRecord = JSON.parse(e.data);
-    detections.value.unshift(event);
-    flashGate(event.gateId);
-  };
-
-  gatesSource = new EventSource(`${API_BASE}/live/gates`);
-  gatesSource.onopen = () => void refreshGates();
-  gatesSource.onmessage = (e) => {
-    upsertGateStatus(JSON.parse(e.data));
-  };
-
-  stageRunsSource = new EventSource(`${API_BASE}/live/stage-runs`);
-  // Runs carry their splits, so this refresh covers both — a run created
-  // while disconnected would otherwise appear with no split times.
-  stageRunsSource.onopen = () => void refreshStageRunsAndSplits();
-  stageRunsSource.onmessage = (e) => {
-    upsertStageRun(JSON.parse(e.data));
-  };
-
-  stageRunSplitsSource = new EventSource(`${API_BASE}/live/stage-run-splits`);
-  stageRunSplitsSource.onopen = () => void refreshSplits();
-  stageRunSplitsSource.onmessage = (e) => {
-    upsertSplit(JSON.parse(e.data));
-  };
-
-  pendingSource = new EventSource(`${API_BASE}/live/pending-detections`);
-  pendingSource.onopen = () => void refreshPending();
-  pendingSource.onmessage = (e) => {
-    pendingDetections.value = (
-      JSON.parse(e.data) as { pending: DetectionEventRecord[] }
-    ).pending;
-  };
-
-  awaitingSource = new EventSource(`${API_BASE}/live/awaiting-detections`);
-  awaitingSource.onopen = () => void refreshAwaiting();
-  awaitingSource.onmessage = (e) => {
-    awaitingDetections.value = (
-      JSON.parse(e.data) as { awaiting: DetectionEventRecord[] }
-    ).awaiting;
-  };
+  // `onOpen` is both the initial load and the recovery after a reconnect, so a
+  // dropped connection doesn't leave the page quietly stale. Runs carry their
+  // splits, so refreshStageRunsAndSplits covers both.
+  liveSource = openLiveStream(
+    {
+      detection: (event) => {
+        detections.value.unshift(event);
+        flashGate(event.gateId);
+      },
+      gate: upsertGateStatus,
+      'stage-run': upsertStageRun,
+      'stage-run-split': upsertSplit,
+      'pending-detections': ({ pending }) => {
+        pendingDetections.value = pending;
+      },
+      'awaiting-detections': ({ awaiting }) => {
+        awaitingDetections.value = awaiting;
+      },
+    },
+    () =>
+      void Promise.all([
+        refreshDetections(),
+        refreshGates(),
+        refreshStageRunsAndSplits(),
+        refreshPending(),
+        refreshAwaiting(),
+      ]),
+  );
 
   nowTimer = setInterval(() => {
     now.value = Date.now();
@@ -435,12 +410,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  detectionsSource?.close();
-  stageRunsSource?.close();
-  stageRunSplitsSource?.close();
-  gatesSource?.close();
-  pendingSource?.close();
-  awaitingSource?.close();
+  liveSource?.close();
   clearInterval(nowTimer);
 });
 </script>
