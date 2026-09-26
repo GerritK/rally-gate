@@ -11,9 +11,10 @@ export const CONFIG_PATH =
  * This file is read by systemd as `EnvironmentFile=` for the gate-agent unit,
  * so every key in it becomes an environment variable of that process.
  *
- * `group` decides which card on the page a field lands in; it is here rather
- * than in the Vue component so the two cannot disagree about where a new
- * setting belongs. Anything without one goes in the general card.
+ * `group` decides which card on the page a field lands in, and `adapter` that
+ * it only shows while that decoder is selected; both are here rather than in
+ * the Vue component so the two cannot disagree about where a new setting
+ * belongs. Anything without a group goes in the general card.
  *
  * Accepting an arbitrary key name would therefore let anyone who can reach this
  * service set `NODE_OPTIONS`, `LD_PRELOAD` or `PATH` and run code as the
@@ -53,38 +54,43 @@ export const FIELDS = {
   },
   BEAM_GPIO: {
     group: 'decoder',
+    adapter: 'beam',
     label: 'Light barrier GPIO',
     // A line name rather than a pin number: the same on every Pi model, where
     // chip offsets are not.
     pattern: /^GPIO[0-9]{1,2}$/,
     message: 'A GPIO line name, e.g. GPIO17.',
-    hint: 'Light barrier only. BCM name of the pin the sensor output is wired to. Default GPIO17.',
+    hint: 'BCM name of the pin the sensor output is wired to. Default GPIO17.',
   },
   BEAM_EDGE: {
     group: 'decoder',
+    adapter: 'beam',
     label: 'Light barrier trigger edge',
     oneOf: ['rising', 'falling'] as const,
     message: 'rising or falling.',
-    hint: 'Light barrier only. Which edge means "beam broken" — depends on the sensor Light-ON/Dark-ON setting. Default rising.',
+    hint: 'Which edge means "beam broken" — depends on the sensor Light-ON/Dark-ON setting. Default rising.',
   },
   BEAM_LOCKOUT_MS: {
     group: 'decoder',
+    adapter: 'beam',
     label: 'Light barrier lockout (ms)',
     // Lower bound because a car body breaks the beam several times (wheels,
     // wing); upper because a second car closer than this is lost.
     range: [50, 10_000] as const,
     message: 'Must be between 50 and 10000 ms.',
-    hint: 'Light barrier only. Further triggers within this time count as the same car. Default 500.',
+    hint: 'Further triggers within this time count as the same car. Default 500.',
   },
   TRANSPONDERS: {
     group: 'decoder',
+    adapter: 'simulated',
     label: 'Simulated transponders',
     pattern: /^[0-9]+(,[0-9]+)*$/,
     message: 'Comma-separated digits, e.g. 1234567,7654321.',
-    hint: 'Simulator only.',
+    hint: 'Transponder ids the simulator cycles through.',
   },
   SIMULATE_INTERVAL_MS: {
     group: 'decoder',
+    adapter: 'simulated',
     label: 'Simulated interval (ms)',
     // Lower bound because the simulator drives the real publish path: a 1ms
     // interval is a flood at the broker, not a test.
@@ -135,6 +141,8 @@ export interface FieldDescriptor {
   hint: string;
   message: string;
   group: FieldGroup;
+  /** Shown only while ADAPTER has this value. */
+  adapter?: string;
   oneOf?: string[];
   pattern?: string;
   range?: [number, number];
@@ -149,6 +157,7 @@ export function fieldDescriptors(): Record<FieldName, FieldDescriptor> {
         hint: spec.hint,
         message: spec.message,
         group: 'group' in spec ? spec.group : 'general',
+        adapter: 'adapter' in spec ? spec.adapter : undefined,
         oneOf: 'oneOf' in spec ? [...spec.oneOf] : undefined,
         // Source rather than the RegExp itself: JSON cannot carry one, and the
         // client rebuilds it with `new RegExp(...)`.

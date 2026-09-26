@@ -9,6 +9,7 @@ interface FieldSpec {
   hint?: string;
   message: string;
   group?: 'general' | 'decoder';
+  adapter?: string;
   oneOf?: string[];
   pattern?: string;
   range?: [number, number];
@@ -81,9 +82,15 @@ watchEffect(() => {
 // Which card a setting belongs in is decided in config-file.ts, not here, so a
 // new field cannot end up in the wrong one — or in none at all, which is what
 // a hand-maintained list in this component would eventually do.
+// A decoder's own settings show only while it is selected. Hidden ones keep
+// their values, so switching back and forth loses nothing. Empty ADAPTER is
+// gate-agent's default, the simulator.
 function fieldsIn(group: 'general' | 'decoder') {
+  const adapter = values.value.ADAPTER || 'simulated';
   return Object.entries(fields.value).filter(
-    ([, spec]) => (spec.group ?? 'general') === group,
+    ([, spec]) =>
+      (spec.group ?? 'general') === group &&
+      (!spec.adapter || spec.adapter === adapter),
   );
 }
 
@@ -363,9 +370,7 @@ onUnmounted(() => clearInterval(statusTimer));
           </v-card>
 
           <!-- Separate from the settings above because it is the one group that
-               changes with the hardware in the box rather than with the rally,
-               and because everything in it but the decoder itself disappears
-               once an adapter other than the simulator exists. -->
+               changes with the hardware in the box rather than with the rally. -->
           <v-card class="mb-6">
             <v-card-title>Decoder</v-card-title>
             <v-card-text>
