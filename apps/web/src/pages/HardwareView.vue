@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { API_BASE, ApiError } from '../api/client';
+import { ApiError } from '../api/client';
 import {
   fetchGateAssignments,
   type GateAssignment,
 } from '../api/gate-assignments';
 import { deleteGate, fetchGates, upsertGate, type Gate } from '../api/gates';
+import { openLiveStream } from '../api/live';
 import { fetchSetting, saveSetting } from '../api/settings';
 import { fetchStages, type Stage } from '../api/stages';
 import { formatClockTime, formatRelativeTime } from '@rally-gate/ui';
@@ -119,16 +120,18 @@ onMounted(async () => {
   clockCorrectionThresholdMs.value =
     Number(await fetchSetting(CLOCK_CORRECTION_THRESHOLD_KEY)) ||
     CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS;
-  gatesSource = new EventSource(`${API_BASE}/live/gates`);
-  gatesSource.onopen = async () => {
-    gates.value = await fetchGates();
-  };
-  gatesSource.onmessage = (e) => {
-    const gate: Gate = JSON.parse(e.data);
-    const idx = gates.value.findIndex((g) => g.id === gate.id);
-    if (idx === -1) gates.value.push(gate);
-    else gates.value[idx] = gate;
-  };
+  gatesSource = openLiveStream(
+    {
+      gate: (gate) => {
+        const idx = gates.value.findIndex((g) => g.id === gate.id);
+        if (idx === -1) gates.value.push(gate);
+        else gates.value[idx] = gate;
+      },
+    },
+    async () => {
+      gates.value = await fetchGates();
+    },
+  );
   nowTimer = setInterval(() => {
     now.value = Date.now();
   }, 1000);

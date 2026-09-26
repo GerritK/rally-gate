@@ -7,7 +7,7 @@ Gate hardware (or SimulatedAdapter)
   -> EventsService (stores DetectionEventRecord, looks up gate + vehicle)
   -> rule engine (active GateAssignment.role -> start/finish/split a StageRun)
   -> EventEmitter2 ("detection.created", "stage-run.updated", "stage-run.split")
-  -> LiveController (SSE /api/live/*) -> web dashboard
+  -> LiveController (one SSE stream, /api/live) -> web dashboard
 ```
 
 Gates are dumb: a gate-agent only knows its own `GATE_ID` and publishes to

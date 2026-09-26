@@ -1,57 +1,38 @@
 import { Controller, MessageEvent, Sse } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { fromEvent, map, Observable } from 'rxjs';
+import { LiveEventType } from '@rally-gate/shared';
+import { fromEvent, map, merge, Observable } from 'rxjs';
+
+/** Internal bus event behind each SSE event type. */
+const LIVE_EVENTS: Record<LiveEventType, string> = {
+  detection: 'detection.created',
+  'stage-run': 'stage-run.updated',
+  'stage-run-split': 'stage-run.split',
+  gate: 'gate.heartbeat',
+  // Whole lists rather than deltas, so a client that reconnects is correct
+  // again on the next change without replay.
+  'pending-detections': 'detection.pending-changed',
+  'awaiting-detections': 'detection.awaiting-changed',
+};
 
 @Controller('live')
 export class LiveController {
   constructor(private readonly eventEmitter: EventEmitter2) {}
 
-  @Sse('detections')
-  detections(): Observable<MessageEvent> {
-    return fromEvent(this.eventEmitter, 'detection.created').pipe(
-      map((data): MessageEvent => ({ data: data as object })),
-    );
-  }
-
-  @Sse('stage-runs')
-  stageRuns(): Observable<MessageEvent> {
-    return fromEvent(this.eventEmitter, 'stage-run.updated').pipe(
-      map((data): MessageEvent => ({ data: data as object })),
-    );
-  }
-
-  @Sse('stage-run-splits')
-  stageRunSplits(): Observable<MessageEvent> {
-    return fromEvent(this.eventEmitter, 'stage-run.split').pipe(
-      map((data): MessageEvent => ({ data: data as object })),
-    );
-  }
-
-  @Sse('gates')
-  gates(): Observable<MessageEvent> {
-    return fromEvent(this.eventEmitter, 'gate.heartbeat').pipe(
-      map((data): MessageEvent => ({ data: data as object })),
-    );
-  }
-
   /**
-   * The backlog of detections that failed rule application, pushed whenever
-   * it changes — a failure or a recovery. Carries the whole list rather than
-   * a delta, so a client that reconnects mid-event is correct again on the
-   * next change without needing replay.
+   * One stream for everything, told apart by SSE event type. Not one stream
+   * per kind: each open EventSource holds one of the browser's six HTTP/1.1
+   * connections per host — shared across tabs — and once they're all streams,
+   * every ordinary fetch queues behind them and the dashboard freezes.
    */
-  @Sse('pending-detections')
-  pendingDetections(): Observable<MessageEvent> {
-    return fromEvent(this.eventEmitter, 'detection.pending-changed').pipe(
-      map((data): MessageEvent => ({ data: data as object })),
-    );
-  }
-
-  /** Unidentified passings waiting for a marshal — whole list per change. */
-  @Sse('awaiting-detections')
-  awaitingDetections(): Observable<MessageEvent> {
-    return fromEvent(this.eventEmitter, 'detection.awaiting-changed').pipe(
-      map((data): MessageEvent => ({ data: data as object })),
+  @Sse()
+  stream(): Observable<MessageEvent> {
+    return merge(
+      ...Object.entries(LIVE_EVENTS).map(([type, busEvent]) =>
+        fromEvent(this.eventEmitter, busEvent).pipe(
+          map((data): MessageEvent => ({ type, data: data as object })),
+        ),
+      ),
     );
   }
 }
