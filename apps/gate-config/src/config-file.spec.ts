@@ -257,6 +257,19 @@ describe('field groups', () => {
     expect(stranded).toEqual([]);
   });
 
+  it('ties decoder settings only to decoders that exist', () => {
+    // A field whose adapter can never be selected would never be shown.
+    const descriptors = fieldDescriptors();
+    const orphaned = Object.entries(descriptors)
+      .filter(
+        ([, d]) => d.adapter && !descriptors.ADAPTER.oneOf!.includes(d.adapter),
+      )
+      .map(([name]) => name);
+    expect(orphaned).toEqual([]);
+    expect(descriptors.BEAM_GPIO.adapter).toBe('beam');
+    expect(descriptors.TRANSPONDERS.adapter).toBe('simulated');
+  });
+
   it('keeps the simulator settings with the decoder', () => {
     const descriptors = fieldDescriptors();
     expect(descriptors.ADAPTER.group).toBe('decoder');
