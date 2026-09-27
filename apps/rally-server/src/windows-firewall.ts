@@ -49,7 +49,9 @@ export async function ensureWindowsFirewall(): Promise<void> {
     'utf16le',
   ).toString('base64');
 
-  logger.log('Asking for admin rights once to open the gate ports (UAC)…');
+  // warn, not log: the standalone console hides log level, and an unexplained
+  // UAC prompt is one a marshal will decline.
+  logger.warn('Asking for admin rights once to open the gate ports (UAC)…');
   try {
     await run('powershell', [
       '-NoProfile',

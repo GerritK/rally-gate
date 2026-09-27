@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { ValidationPipe } from '@nestjs/common';
@@ -15,7 +16,10 @@ import { ensureWindowsFirewall } from './windows-firewall';
 const WEB_DIST = join(__dirname, '..', '..', 'web', 'dist');
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger:
+      process.env.LOG_LEVEL === 'warn' ? ['warn', 'error', 'fatal'] : undefined,
+  });
 
   // The frontend is served from this same origin, and `/vehicles` is both a
   // REST resource and a dashboard page. The prefix is what keeps a new
@@ -52,8 +56,25 @@ async function bootstrap() {
     });
   }
 
-  await app.listen(process.env.PORT ?? 57430);
+  const port = process.env.PORT ?? 57430;
+  await app.listen(port);
+  const url = `http://localhost:${port}`;
+  // Not through the logger: the standalone console runs at LOG_LEVEL=warn,
+  // and this is the one line a marshal needs from it.
+  console.log(`Dashboard: ${url}`);
+  if (process.env.OPEN_BROWSER === '1') {
+    openBrowser(url);
+  }
   // Not awaited: the UAC prompt must not hold up a server that works locally.
   void ensureWindowsFirewall();
 }
 void bootstrap();
+
+function openBrowser(url: string): void {
+  const [command, args]: [string, string[]] =
+    process.platform === 'win32'
+      ? ['cmd', ['/c', 'start', '', url]]
+      : [process.platform === 'darwin' ? 'open' : 'xdg-open', [url]];
+  // No browser found is fine: the URL is in the console.
+  execFile(command, args, () => {});
+}

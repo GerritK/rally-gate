@@ -3,9 +3,8 @@
 One codebase, two ways to run `rally-server`, switched by config
 (`DB_TYPE`, see `apps/rally-server/src/config/database.config.ts`):
 
-1. **Standalone / laptop** — SQLite, nothing external to install. Meant to ship
-   as a double-clickable executable (Node SEA/`pkg`, not built yet) with the UI
-   in a browser; no Electron. On Windows it opens its ports in the firewall on
+1. **Standalone / laptop** — SQLite, nothing external to install, UI in a
+   browser; no Electron. On Windows it opens its ports in the firewall on
    first start (one UAC prompt), as port rules limited to the local subnet —
    Windows' own "allow node.exe" rule breaks under nvm-windows symlinks.
 2. **Headless** — `deploy/docker-compose.yml` with Postgres, on a Pi or mini PC,
@@ -16,6 +15,33 @@ rally-server, so **a gate never needs to know which kind of machine the server
 is**. rally-server also serves the built dashboard on its API port; the
 frontend calls a relative `/api`, so nothing needs the server's address at
 build time.
+
+## Standalone packages
+
+`scripts/package-standalone.js` builds, for the OS it runs on: a Windows `.zip`
+with `Rally Gate.cmd`, a macOS `.zip` with `Rally Gate.command`, or a Linux
+`.tar.gz` with `rally-gate.sh`. No Windows installer for now: with ~100 files
+a zip unpacks quickly, and it needs no admin rights beyond the firewall
+prompt. What it costs: no Start menu entry, and Explorer lets a marshal
+double-click the launcher *inside* the zip, where it fails. CI builds all three
+(`.github/workflows/standalone.yml`, on a `v*` tag or by hand) and starts each
+one as a smoke test.
+
+A package is a plain folder of ~100 files (~100MB, most of it the node
+binary): rally-server bundled into one `main.js` by rolldown, better-sqlite3
+beside it as the only `node_modules` entry (a native addon can't be bundled),
+and the built dashboard. Not a single executable: Node SEA/`pkg` can't load a
+native addon from inside themselves. The bundle is built from the tsc output
+so decorator metadata survives, and with `keepNames` and no minification,
+because TypeORM derives table names from entity class names.
+
+Starting it opens a console window (closing it stops the server) and the
+dashboard in the browser. The console shows only the dashboard URL, the event
+file, warnings and errors (`LOG_LEVEL=warn`; unset it for the full Nest log). The event file defaults to
+`~/Documents/Rally Gate/rally-gate.sqlite`; `DB_PATH` still overrides it.
+
+Nothing is code-signed: Windows SmartScreen and macOS Gatekeeper warn on
+first start (macOS: right-click → Open). No Intel Mac build.
 
 ## Time sync
 

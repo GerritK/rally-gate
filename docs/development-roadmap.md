@@ -37,6 +37,8 @@ What exists, with where its reasoning lives. History is in git.
 - **Deployment:** SQLite standalone and Postgres headless from one codebase,
   rally-server serving the dashboard under one port, Windows firewall rules on
   first start, Pi installers for server and gates (`deployment-modes.md`).
+- **Standalone packages:** Windows and macOS zip, Linux tarball with
+  bundled node, built and smoke-tested in CI (`deployment-modes.md`).
 - **CI:** build, format, lint, tests, and a headless-stack job against real
   Postgres (`CLAUDE.md`).
 
@@ -46,8 +48,8 @@ What exists, with where its reasoning lives. History is in git.
    with a switch between GPIO and GND. Left: the E3Z-T61 wiring and its edge
    per `decoder-adapters.md`, then a stage timed end to end with marshal
    assignment.
-2. **Standalone packaging** (Node SEA/`pkg`, optional tray icon, "new / open
-   event") — needed to hand `rally-server` to a marshal without a dev machine.
+2. **"New / open event"** in the dashboard — the packages always use one
+   event file today; a new event means renaming it by hand.
 3. **`OpenStintAdapter`**, then **beam + OpenStint** combined (designed in
    `decoder-adapters.md`) — critical path, but waits on RF hardware validation
    (two ordered gates reading reliably); settle the `-t` question first.

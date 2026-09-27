@@ -57,6 +57,12 @@ npm run format:check         # from the repo root — the check-only version of 
 
 CI (`.github/workflows/ci.yml`) runs, in order: `build:shared` → `format:check` → `lint:check` → server tests → `npm run build`. That last step is what typechecks `apps/web` (via `vue-tsc`), which has no test suite of its own — so a frontend type error only ever surfaces there or in a local `npm run build`. Master being green matters more than usual here: `deploy/install-*.sh` are `curl | bash` off master, so a broken commit is one a marshal can pull onto a Pi mid-event.
 
+Standalone package for the current OS (after building shared, rally-server and web; see `docs/deployment-modes.md`):
+```bash
+node scripts/package-standalone.js   # -> dist-standalone/
+```
+The package runs rally-server as **one rolldown bundle**, so in server code a `__dirname`-relative path (outside `main.ts`) or a computed `require()` works in dev and breaks only in the package — CI's `standalone.yml` smoke test is what catches it, and it runs on tags, not on every push.
+
 Headless deployment (Postgres instead of SQLite):
 ```bash
 docker compose -f deploy/docker-compose.yml up
