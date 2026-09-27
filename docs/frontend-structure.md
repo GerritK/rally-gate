@@ -16,6 +16,7 @@ sharing `client.ts`). Audience is marshals and organisers only.
 | `/setup/scoring` | Setup | notional time penalty; later classes/penalties |
 | `/hardware` | Hardware | gate roster: online, heartbeat, clock offset, active assignment, add/rename/delete, auto-discovery toggle |
 | `/vehicles` | Vehicles | registration, inline editing, status |
+| `/event` | Event | new event, open another one (standalone only); the app bar shows the open event and links here |
 
 ## Decisions
 
@@ -35,5 +36,7 @@ sharing `client.ts`). Audience is marshals and organisers only.
 - **No store, no speculative components.** Each page fetches what it needs in
   `onMounted`; data volumes are tiny. Extract a component once it is actually
   duplicated. Shared pure helpers are in `src/format.ts`.
+- **Switching events reloads the whole app** rather than refetching: every
+  page holds the old event's data, and there is no store to reset.
 - Stage ids are caller-supplied (`WP1`, `SS2`), so the create form has an id
   field.

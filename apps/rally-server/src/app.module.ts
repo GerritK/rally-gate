@@ -7,6 +7,7 @@ import { buildDatabaseConfig } from './config/database.config';
 import { BrokerModule } from './modules/broker/broker.module';
 import { ClassificationModule } from './modules/classification/classification.module';
 import { DiscoveryModule } from './modules/discovery/discovery.module';
+import { EventFilesModule } from './modules/event-files/event-files.module';
 import { EventsModule } from './modules/events/events.module';
 import { GatesModule } from './modules/gates/gates.module';
 import { LiveModule } from './modules/live/live.module';
@@ -33,6 +34,7 @@ import { VehiclesModule } from './modules/vehicles/vehicles.module';
     EventsModule,
     LiveModule,
     ClassificationModule,
+    EventFilesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

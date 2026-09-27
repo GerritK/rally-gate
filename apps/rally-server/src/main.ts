@@ -3,9 +3,12 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { NextFunction, Request, Response } from 'express';
+import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
+import { RESTART_EXIT_CODE } from './modules/event-files/event-files';
 import { ensureWindowsFirewall } from './windows-firewall';
 
 /**
@@ -17,6 +20,8 @@ const WEB_DIST = join(__dirname, '..', '..', 'web', 'dist');
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    // Open SSE streams would otherwise hold app.close() open forever.
+    forceCloseConnections: true,
     logger:
       process.env.LOG_LEVEL === 'warn' ? ['warn', 'error', 'fatal'] : undefined,
   });
@@ -62,6 +67,15 @@ async function bootstrap() {
   // Not through the logger: the standalone console runs at LOG_LEVEL=warn,
   // and this is the one line a marshal needs from it.
   console.log(`Dashboard: ${url}`);
+  if (process.env.DB_TYPE !== 'postgres') {
+    console.log(`Event file: ${String(app.get(DataSource).options.database)}`);
+  }
+  app.get(EventEmitter2).once('app.restart', () => {
+    // A moment for the response to the switch request to reach the browser.
+    setTimeout(() => {
+      void app.close().finally(() => process.exit(RESTART_EXIT_CODE));
+    }, 200);
+  });
   if (process.env.OPEN_BROWSER === '1') {
     openBrowser(url);
   }

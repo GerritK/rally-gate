@@ -1,4 +1,9 @@
+import { join } from 'node:path';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import {
+  eventsDir,
+  resolveEventFile,
+} from '../modules/event-files/event-files';
 
 export function buildDatabaseConfig(): TypeOrmModuleOptions {
   const dbType = process.env.DB_TYPE ?? 'sqlite';
@@ -16,9 +21,12 @@ export function buildDatabaseConfig(): TypeOrmModuleOptions {
     };
   }
 
+  const dir = eventsDir();
   return {
     type: 'better-sqlite3',
-    database: process.env.DB_PATH ?? 'rally-gate.sqlite',
+    database: dir
+      ? join(dir, resolveEventFile(dir))
+      : (process.env.DB_PATH ?? 'rally-gate.sqlite'),
     autoLoadEntities: true,
     synchronize: true,
   };

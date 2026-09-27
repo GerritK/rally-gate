@@ -26,6 +26,7 @@ Anything outside `/api` that isn't a file returns `index.html`.
 | `/classification/stages/:stageId/splits/:splitIndex` | GET | live, includes `STARTED` runs, excludes `CANCELLED` |
 | `/classification/stages/:stageId/non-finishers` | GET | DNF; DNS only once the stage is `CLOSED` |
 | `/rally-info` | GET, PUT | the event's name/details; singleton, since one database is one event |
+| `/event` | GET, POST `{ name, date }`, `/open` POST `{ file }` | the open event file and the others in the folder, `switchable: false` when fixed by config. POST creates/opens by restarting the server (202, then poll GET); 409 while a stage is `ACTIVE` — see `deployment-modes.md` |
 | `/settings/:key` | GET, PUT | `autoDiscoverGates`, `clockCorrectionThresholdMs`, `notionalPenaltyMs` |
 
 Every mutating endpoint binds a DTO class, and unknown fields are a 400 — see

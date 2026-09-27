@@ -118,3 +118,8 @@ export function isOnline(
   if (!gate.lastHeartbeatAt) return false;
   return nowMs - new Date(gate.lastHeartbeatAt).getTime() < thresholdMs;
 }
+
+/** An event file without its extension, as a marshal named it. */
+export function eventName(file: string): string {
+  return file.replace(/\.sqlite$/, '');
+}

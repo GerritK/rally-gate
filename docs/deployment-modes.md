@@ -37,8 +37,9 @@ because TypeORM derives table names from entity class names.
 
 Starting it opens a console window (closing it stops the server) and the
 dashboard in the browser. The console shows only the dashboard URL, the event
-file, warnings and errors (`LOG_LEVEL=warn`; unset it for the full Nest log). The event file defaults to
-`~/Documents/Rally Gate/rally-gate.sqlite`; `DB_PATH` still overrides it.
+file, warnings and errors (`LOG_LEVEL=warn`; unset it for the full Nest log).
+Event files live in `~/Documents/Rally Gate/` (`EVENTS_DIR` overrides the
+folder); `DB_PATH` pins one file and turns switching off — see below.
 
 Nothing is code-signed: Windows SmartScreen and macOS Gatekeeper warn on
 first start (macOS: right-click → Open). No Intel Mac build.
@@ -70,9 +71,36 @@ There is no `Event` table, on purpose. `DB_PATH` (SQLite) / `DB_NAME`
 copying it (`pg_dump` for Postgres). An `Event` entity would only pay off with
 several events live in one server at once, which isn't the requirement.
 
-Missing is UX, not data model: a "new / open event" flow, which belongs to the
-standalone packaging work. A fresh event file has no gates; they re-appear via
-heartbeat auto-discovery.
+### New / open event
+
+The Event page (`/event`) creates and opens events; the app bar always shows
+which one is open. Standalone only — with `DB_PATH` or Postgres the event is
+fixed and the page just says so.
+
+- **An event is a `.sqlite` file in `EVENTS_DIR`**, and the event list is that
+  folder's contents — no register that could disagree with the files. Rename,
+  delete and back up in the file explorer.
+- **New never clears anything**: it writes a new file,
+  `<date> <name>.sqlite`, fully built (schema and rally details) before
+  switching, so a failure leaves the server on the old event.
+- **`current.json`** in the folder names the open file. A server restart (or
+  crash mid-event) reopens it without asking. A missing or stale pointer falls
+  back to the most recently changed file, and an empty folder to
+  `rally-gate.sqlite` — the file the packages used before, so an existing
+  install keeps its data.
+- **Switching is a restart.** The DataSource is injected into every repository
+  at boot and can't be swapped underneath them, so the server exits with code
+  75 and `start.js`, which runs it as a child process, starts it again on the
+  new file. That is also why switching needs the launcher: the dev loop has
+  nothing to restart it. The dashboard polls `GET /api/event` and reloads.
+- **Refused while a stage is `ACTIVE`.** Gates publish at QoS 1 on persistent
+  sessions, so a detection in flight across the restart would be replayed on
+  reconnect into the *new* event.
+- A fresh event has no gates; they re-appear via heartbeat auto-discovery.
+
+Not built: carrying vehicles/stages over from the previous event, and
+switching under Postgres (it would need `CREATE DATABASE`; Docker's restart
+policy would already do the restart).
 
 ## Future: online/spectator mode
 
