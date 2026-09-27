@@ -1,9 +1,17 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource, Repository } from 'typeorm';
+import { Gate } from '../gates/gate.entity';
 import { Stage } from '../stages/stage.entity';
 import {
   eventFileName,
@@ -11,6 +19,7 @@ import {
   writeCurrentEventFile,
 } from './event-files';
 import { EventFilesService } from './event-files.service';
+import { KnownHardwareService } from './known-hardware.service';
 
 let dir: string;
 const env = { ...process.env };
@@ -83,6 +92,7 @@ describe('EventFilesService', () => {
         options: { database: join(dir, 'current.sqlite') },
       } as unknown as DataSource,
       emitter as unknown as EventEmitter2,
+      { list: () => [] } as unknown as KnownHardwareService,
     );
     return { service, emitter };
   }
@@ -119,5 +129,42 @@ describe('EventFilesService', () => {
     await expect(service.open('../../etc/passwd')).rejects.toThrow(
       NotFoundException,
     );
+  });
+});
+
+describe('KnownHardwareService', () => {
+  const hardwareFile = () => join(dir, 'hardware.json');
+  const known = () =>
+    (JSON.parse(readFileSync(hardwareFile(), 'utf8')) as { gates: unknown })
+      .gates;
+
+  async function makeService(eventGates: Partial<Gate>[] = []) {
+    const service = new KnownHardwareService({
+      find: jest.fn().mockResolvedValue(eventGates),
+    } as unknown as Repository<Gate>);
+    await service.onModuleInit();
+    return service;
+  }
+
+  it("starts from the open event's gates", async () => {
+    await makeService([{ id: 'G1', name: 'Start', capabilities: 'beam' }]);
+    expect(known()).toEqual([{ id: 'G1', name: 'Start' }]);
+  });
+
+  it('remembers new gates and renames, and forgets on request', async () => {
+    const service = await makeService();
+    service.remember({ id: 'G1', name: 'G1' });
+    service.remember({ id: 'G2', name: 'G2' });
+    service.remember({ id: 'G1', name: 'Start' });
+    service.forget('G2');
+    expect(known()).toEqual([{ id: 'G1', name: 'Start' }]);
+    expect((await makeService()).list()).toEqual([{ id: 'G1', name: 'Start' }]);
+  });
+
+  it('keeps nothing when the event is fixed by config', async () => {
+    process.env.DB_PATH = join(dir, 'fixed.sqlite');
+    const service = await makeService([{ id: 'G1', name: 'G1' }]);
+    service.remember({ id: 'G2', name: 'G2' });
+    expect(existsSync(hardwareFile())).toBe(false);
   });
 });

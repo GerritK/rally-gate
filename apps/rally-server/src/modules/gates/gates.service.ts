@@ -83,7 +83,9 @@ export class GatesService {
 
   async upsert(gate: Gate): Promise<Gate> {
     await this.gates.save(gate);
-    return this.findOne(gate.id) as Promise<Gate>;
+    const saved = (await this.findOne(gate.id)) as Gate;
+    this.emitter.emit('gate.updated', saved);
+    return saved;
   }
 
   /**

@@ -96,7 +96,13 @@ fixed and the page just says so.
 - **Refused while a stage is `ACTIVE`.** Gates publish at QoS 1 on persistent
   sessions, so a detection in flight across the restart would be replayed on
   reconnect into the *new* event.
-- A fresh event has no gates; they re-appear via heartbeat auto-discovery.
+- **Known hardware**: `hardware.json` in the folder remembers every gate this
+  computer has seen (id and name — heartbeat, clock offset and capabilities
+  stay per event), and a new event starts with them listed as offline. Kept
+  from heartbeats and renames; "Forget" on the Event page drops one. Keyed by
+  `GATE_ID`, so a gate given a new id is a new entry. First started without
+  the file, it is seeded from the open event's gates. A plain file so a club
+  can copy it to a second laptop.
 
 Not built: carrying vehicles/stages over from the previous event, and
 switching under Postgres (it would need `CREATE DATABASE`; Docker's restart

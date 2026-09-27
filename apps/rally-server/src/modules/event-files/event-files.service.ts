@@ -10,6 +10,7 @@ import { StageStatus } from '@rally-gate/shared';
 import { existsSync, rmSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { DataSource, Repository } from 'typeorm';
+import { Gate } from '../gates/gate.entity';
 import { RALLY_INFO_ID, RallyInfo } from '../rally-info/rally-info.entity';
 import { Stage } from '../stages/stage.entity';
 import { CreateEventDto } from './dto';
@@ -21,6 +22,7 @@ import {
   listEventFiles,
   writeCurrentEventFile,
 } from './event-files';
+import { KnownHardwareService } from './known-hardware.service';
 
 export interface EventInfo {
   /** The open event: a file name, or the Postgres database name. */
@@ -36,6 +38,7 @@ export class EventFilesService {
     private readonly stages: Repository<Stage>,
     private readonly dataSource: DataSource,
     private readonly emitter: EventEmitter2,
+    private readonly knownHardware: KnownHardwareService,
   ) {}
 
   info(): EventInfo {
@@ -48,7 +51,8 @@ export class EventFilesService {
   }
 
   /**
-   * Builds the new file completely — schema and rally details — before
+   * Builds the new file completely — schema, rally details and the known
+   * gates, which show as offline until they send a heartbeat — before
    * switching, so a failure leaves the server on the event it was running
    * rather than restarting into a half-made one.
    */
@@ -73,6 +77,7 @@ export class EventFilesService {
       await target
         .getRepository(RallyInfo)
         .save({ id: RALLY_INFO_ID, name, date });
+      await target.getRepository(Gate).save(this.knownHardware.list());
     } catch (err) {
       await target.destroy().catch(() => {});
       rmSync(path, { force: true });

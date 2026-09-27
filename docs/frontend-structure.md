@@ -16,7 +16,7 @@ sharing `client.ts`). Audience is marshals and organisers only.
 | `/setup/scoring` | Setup | notional time penalty; later classes/penalties |
 | `/hardware` | Hardware | gate roster: online, heartbeat, clock offset, active assignment, add/rename/delete, auto-discovery toggle |
 | `/vehicles` | Vehicles | registration, inline editing, status |
-| `/event` | Event | new event, open another one (standalone only); the app bar shows the open event and links here |
+| `/event` | Event | new event, open another one, known gates (standalone only); the app bar shows the open event and links here |
 
 ## Decisions
 

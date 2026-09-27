@@ -40,7 +40,8 @@ What exists, with where its reasoning lives. History is in git.
 - **Standalone packages:** Windows and macOS zip, Linux tarball with
   bundled node, built and smoke-tested in CI (`deployment-modes.md`).
 - **Events:** new / open event in the dashboard, one file each, switched by
-  restarting under `start.js` (`deployment-modes.md` "New / open event").
+  restarting under `start.js`; gates remembered per computer and listed in
+  every new event (`deployment-modes.md` "New / open event").
 - **CI:** build, format, lint, tests, and a headless-stack job against real
   Postgres (`CLAUDE.md`).
 
@@ -50,12 +51,10 @@ What exists, with where its reasoning lives. History is in git.
    with a switch between GPIO and GND. Left: the E3Z-T61 wiring and its edge
    per `decoder-adapters.md`, then a stage timed end to end with marshal
    assignment.
-2. **Known hardware** — gates remembered per computer (`hardware.json` next to
-   the event files), seeded into a new event as offline gates.
-3. **`OpenStintAdapter`**, then **beam + OpenStint** combined (designed in
+2. **`OpenStintAdapter`**, then **beam + OpenStint** combined (designed in
    `decoder-adapters.md`) — critical path, but waits on RF hardware validation
    (two ordered gates reading reliably); settle the `-t` question first.
-4. **Gate control channel** — server → gate `sync`/`ready`/`stage-stopped`, for
+3. **Gate control channel** — server → gate `sync`/`ready`/`stage-stopped`, for
    gate health ("gates ready X/Y") and pausing decoders outside a live stage
    (`architecture.md`).
 
@@ -86,6 +85,8 @@ What exists, with where its reasoning lives. History is in git.
 - **Auth** on broker, API and dashboard — the closed rally network is the
   boundary until the timing pipeline is solid. Gates would authenticate against
   rally-server itself.
+- **Carrying vehicles/stages over** into a new event (the useful part of an
+  event wizard), and new/open event under Postgres (`deployment-modes.md`).
 - Online/spectator mode (`deployment-modes.md`).
 - Rule engine DSL (hardcoded branching in `EventsService` is fine at this scale),
   RC4 learning registry / transponder management UI.

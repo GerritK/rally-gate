@@ -1,4 +1,4 @@
-import { apiFetch, postJson } from './client';
+import { apiFetch, deleteRequest, postJson } from './client';
 
 export interface EventFile {
   file: string;
@@ -42,4 +42,18 @@ export async function waitForEvent(file: string): Promise<void> {
     }
   }
   throw new Error(`The server did not come back with ${file}`);
+}
+
+/** Gates this computer remembers across events (standalone only). */
+export interface KnownGate {
+  id: string;
+  name: string;
+}
+
+export function fetchKnownGates(): Promise<KnownGate[]> {
+  return apiFetch('/event/known-gates');
+}
+
+export function forgetKnownGate(id: string): Promise<void> {
+  return deleteRequest(`/event/known-gates/${id}`);
 }

@@ -3,9 +3,12 @@ import { onMounted, ref } from 'vue';
 import {
   createEvent,
   fetchEventInfo,
+  fetchKnownGates,
+  forgetKnownGate,
   openEvent,
   waitForEvent,
   type EventInfo,
+  type KnownGate,
 } from '../api/event';
 import { eventName } from '../format';
 
@@ -16,6 +19,7 @@ function today(): string {
 }
 
 const info = ref<EventInfo | null>(null);
+const knownGates = ref<KnownGate[]>([]);
 const newEvent = ref({ name: '', date: today() });
 const switchingTo = ref<string | null>(null);
 const error = ref('');
@@ -46,8 +50,14 @@ function onOpen(file: string) {
   void switchEvent(() => openEvent(file), '/live');
 }
 
+async function onForget(id: string) {
+  await forgetKnownGate(id);
+  knownGates.value = knownGates.value.filter((gate) => gate.id !== id);
+}
+
 onMounted(async () => {
   info.value = await fetchEventInfo();
+  if (info.value.switchable) knownGates.value = await fetchKnownGates();
 });
 </script>
 
@@ -139,6 +149,42 @@ onMounted(async () => {
           </tr>
         </tbody>
       </v-table>
+    </v-card>
+
+    <v-card class="mt-6">
+      <v-card-title>Known Gates</v-card-title>
+      <v-card-subtitle>
+        Remembered by this computer and listed, offline, in every new event.
+      </v-card-subtitle>
+      <v-table density="comfortable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="gate in knownGates" :key="gate.id">
+            <td>{{ gate.id }}</td>
+            <td>{{ gate.name }}</td>
+            <td class="text-right">
+              <v-btn
+                size="small"
+                variant="text"
+                prepend-icon="mdi-close"
+                title="Not listed in new events any more; the open event keeps it"
+                @click="onForget(gate.id)"
+              >
+                Forget
+              </v-btn>
+            </td>
+          </tr>
+        </tbody>
+      </v-table>
+      <v-card-text v-if="knownGates.length === 0">
+        None yet — every gate that sends a heartbeat is remembered.
+      </v-card-text>
     </v-card>
   </template>
 
