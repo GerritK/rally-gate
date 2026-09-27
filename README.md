@@ -1,94 +1,174 @@
 # Rally Gate
 
-Open, modular timing and event management system for RC rally events. See
-[ideas/RC_Rally_Timing_Project_Documentation.md](ideas/RC_Rally_Timing_Project_Documentation.md)
-for the full project background, and `docs/` for architecture notes specific
-to this implementation.
+Timing for **RC rally events**: special stages timed from start to finish gate,
+live on a laptop or tablet at the service park, with results and a stage
+classification at the end of the day.
 
-## Stack
+It is built for clubs running a small rally on their own ground: no internet,
+no timing company, and hardware a club can build and own. Everything runs on
+the rally's own closed Wi-Fi.
 
-- `apps/rally-server` — NestJS backend: REST API, embedded MQTT broker (Aedes), TypeORM (SQLite for dev/standalone, PostgreSQL for headless deployments), Server-Sent Events live feed.
-- `apps/gate-agent` — runs on each gate node (or locally). Publishes detection events over MQTT via a swappable `DecoderAdapter` — a simulator and a light barrier on a GPIO pin so far ([docs/decoder-adapters.md](docs/decoder-adapters.md)).
-- `apps/web` — Vue 3 + Vite dashboard: live timing, results, setup, hardware and vehicles ([docs/frontend-structure.md](docs/frontend-structure.md)).
-- `apps/gate-config` — runs *on each gate*, serving a page that configures that gate: identity, server address, decoder, Wi-Fi, plus a status panel. So a gate needs no SSH and no re-running the installer ([docs/gate-config-ui.md](docs/gate-config-ui.md)).
-- `packages/shared` — TypeScript types shared by every app (gate roles, detection event shape, MQTT topics, stage/classification/vehicle-status types).
-- `packages/ui` — the Vuetify design system both web interfaces build on, so they read as one product.
+> **Status: early development.** Timing works end to end with simulated gates
+> and with a switch on a gate's GPIO pin; the light barrier sensor itself is
+> still being tested, and RC transponders aren't supported yet (see
+> [What works today](#what-works-today)). Don't time a real event without a
+> paper backup.
 
-## Quickstart (local dev, no hardware needed)
+## How it works
+
+```
+ gate (Pi + sensor)  ─┐
+ gate (Pi + sensor)  ─┼─ Wi-Fi ──►  rally server (laptop or Pi)  ──►  dashboard in the browser
+ gate (Pi + sensor)  ─┘
+```
+
+- **A gate is just a sensor.** It reports "something passed at 10:42:13.412"
+  and nothing else. Whether it is the start of stage 1, a split or the finish
+  of stage 3 is decided on the server, so the same gate can be moved to
+  another stage between runs without touching it.
+- **The server does the rally.** You set up stages and assign gates to them;
+  when a car passes the start and later the finish, it becomes a stage time.
+  Several stages can run at once.
+- **Gates find the server by themselves** and take their time from it, so
+  setting up on the day means switching things on — no IP addresses, no
+  configuring gates per event.
+- **Marshals keep control.** Live Timing shows every passing; a marshal can
+  correct a time, add a missed one, mark a car DNF/DNS or void a run for a
+  re-run. Results and stage classifications update as times come in.
+- **One event, one file.** An event is a single file on the server machine:
+  copy it to back it up or hand it on. Gates you use regularly are remembered
+  and can be picked into the next event.
+
+## What works today
+
+- Stages with start, finish and split gates; stage, split and overall
+  classification; DNF/DNS, manual corrections, voided runs and re-runs.
+- **Light barrier gates**: a Raspberry Pi with a light barrier on a GPIO pin.
+  A light barrier can't tell cars apart, so a marshal assigns each passing to
+  a car on Live Timing. Verified on a Pi with a switch in place of the sensor;
+  the sensor itself is next.
+- Gate clock sync against the server, with offsets shown on the Hardware page.
+- A config page on every gate (name, sensor, Wi-Fi); a gate that finds no
+  known Wi-Fi opens its own hotspot so you can reach that page.
+- Creating and switching events from the dashboard.
+
+Not yet: **RC transponder decoding** (RC3/RC4, via OpenStint and an SDR —
+next on the list, waiting on hardware tests), time controls, Parc Fermé,
+penalties, vehicle classes, and any login. See
+[docs/development-roadmap.md](docs/development-roadmap.md).
+
+## What you need
+
+- **A server:** a laptop (Windows, macOS on Apple Silicon, or Linux), or a
+  Raspberry Pi. The dashboard runs in any browser on the same network.
+- **Per gate:** a Raspberry Pi with Raspberry Pi OS Lite and a light barrier
+  (planned: Omron E3Z-T61, wiring in
+  [docs/decoder-adapters.md](docs/decoder-adapters.md)). A DS3231 RTC module is
+  optional and keeps the clock across power cuts.
+- **A Wi-Fi network** that the server and all gates join. It does not need
+  internet access.
+
+## Installation
+
+### Server on a laptop
+
+The standalone package needs nothing else installed: unzip it and
+double-click **Rally Gate** (`Rally Gate.cmd` on Windows, `Rally Gate.command`
+on macOS, `rally-gate.sh` on Linux). A console window opens — closing it stops
+the server — and the dashboard opens in your browser at
+`http://localhost:57430`. Event files are kept in `Documents/Rally Gate`.
+
+On first start Windows asks once for permission to open the firewall for the
+gates. The package isn't code-signed yet, so Windows SmartScreen and macOS warn
+the first time (on macOS: right-click → Open).
+
+No release has been published yet. Until then, build the package yourself
+(Node.js 22):
 
 ```bash
-npm install
+npm ci
 npm run build:shared
-
-# terminal 1
-npm run dev:server
-
-# terminal 2 — seed a demo stage/gates/vehicle
-npm run seed-demo-data
-
-# terminal 3 — fire a simulated start + finish detection
-npm run simulate -- --gate START_WP1 --transponder 1234567
-npm run simulate -- --gate FINISH_WP1 --transponder 1234567
-
-# terminal 4
-npm run dev:web
+npm run build --workspace=@rally-gate/rally-server --workspace=@rally-gate/web
+node scripts/package-standalone.js   # -> dist-standalone/
 ```
 
-Open the printed Vite URL — the stage run and detections should appear live.
+### Server on a Raspberry Pi
 
-By default `rally-server` uses SQLite (`rally-gate.sqlite`), the API on port
-57430 and the MQTT broker on 57431 — no Docker or Postgres needed. The project
-uses its own port range instead of framework defaults; see the table in
-[CLAUDE.md](CLAUDE.md).
+On a fresh Raspberry Pi OS Lite:
 
-The gate config service is separate and needs none of the above:
-
-```bash
-npm run dev:gate-config      # API on 57439
-npm run dev:gate-config-web  # its page on 57449, proxying /api to 57439
-```
-
-It shells out to systemd, chrony and NetworkManager, which exist on a Pi and
-not on a laptop — every status row just reads as unavailable off a Pi rather
-than failing. Point `GATE_CONFIG_FILE` and `CHRONY_SOURCE_DIR` at a scratch
-directory so it doesn't want to write to `/etc`.
-
-## Headless / server deployment
-
-`deploy/docker-compose.yml` runs `rally-server` against PostgreSQL instead of
-SQLite. See [docs/deployment-modes.md](docs/deployment-modes.md) for the
-standalone-exe vs headless-server story.
-
-```bash
-docker compose -f deploy/docker-compose.yml up
-# with simulated gate-agents for a hardware-free demo:
-docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml up
-```
-
-## Field deployment (Raspberry Pi)
-
-One-shot installers for a stock Raspberry Pi OS Lite image — no manual git clone/build needed.
-
-`rally-server` (Docker Compose, headless/server mode):
 ```bash
 curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-server-pi.sh | bash
 ```
 
-`gate-agent` (bare-metal, needs direct USB/SDR access — see [docs/decoder-adapters.md](docs/decoder-adapters.md)). Interactive by default; pre-set the env vars to skip prompts:
+Runs the server with Docker and PostgreSQL. The dashboard is at
+`http://rally-server.local:57430`. In this mode the Pi keeps one event;
+creating and switching events from the dashboard is standalone-only for now.
+
+### Gates
+
+On each gate's Raspberry Pi:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-gate-pi.sh | bash
-# or non-interactive:
-GATE_ID=CLUB_START_WP1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-gate-pi.sh)"
 ```
 
-**A gate install asks nothing about the rally it will be used at.** No server
-address: `rally-server` advertises itself over mDNS as `rally-server.local`,
-which is what both `gate-agent` and chrony resolve, and it serves time itself
-so a gate never has to know whether the server is a laptop or a Pi. Pass
-`MQTT_HOST` only where the network blocks multicast.
+It asks for a **gate ID** — pick one prefixed with your club's short code,
+like `CLUB_START_WP1`, so gates never clash if clubs share hardware — plus a
+hotspot password and whether an RTC module is fitted. Nothing about the rally:
+the server address defaults to `rally-server.local`, which the server
+announces on the network itself, so press Enter there. Re-run the same command
+to update a gate; it offers the current settings as defaults.
 
-No forced global uniqueness on `GATE_ID`, but pick one that won't collide with another club's — prefix it with your club's short code (e.g. `CLUB_START_WP1`) so gates stay collision-free if hardware ever gets shared or a joint event mixes clubs. The prompt defaults to the Pi's current hostname, and can optionally rename the Pi's hostname to match `GATE_ID` too, so the gate stays easy to find on the network (e.g. `club-start-wp1.local`).
+Everything else is set on the gate's own config page at
+`http://<gate-name>.local:57439`: the sensor, Wi-Fi networks, and a status
+panel. Only where the network blocks discovery (some access points do) does a
+gate need the server's IP address entered there.
 
-Installs two systemd services — `rally-gate-agent` (logs via `journalctl -u rally-gate-agent -f`) and `rally-gate-config`, the gate's own config page at `http://<hostname>.local:57439`. Optionally configures a DS3231 RTC module if one's connected (asked interactively).
+### On the day
 
-If a gate can reach no Wi-Fi it raises its own access point within a minute — `rally-gate-<hostname>`, password set at install time (default `rally-gate`) — so the config page is reachable in the state you most need it in. Join it and point the gate at the right network from the page.
+1. Start the server and join the rally Wi-Fi with every gate.
+2. **Setup** → create the event, then the stages; assign gates as start,
+   finish or split.
+3. **Vehicles** → register the cars.
+4. **Hardware** → check every gate is online and its clock is in sync.
+5. **Live Timing** → activate a stage when it starts, close it when the last
+   car is through.
+
+## For developers
+
+npm workspaces monorepo, TypeScript throughout:
+
+| | |
+|---|---|
+| `apps/rally-server` | NestJS: REST API, embedded MQTT broker, time server, mDNS, SQLite or PostgreSQL |
+| `apps/web` | Vue 3 + Vuetify dashboard |
+| `apps/gate-agent` | runs on a gate; turns sensor readings into detections over MQTT |
+| `apps/gate-config` | runs on a gate; its config page |
+| `packages/shared` | types shared by all apps |
+| `packages/ui` | the shared Vuetify theme |
+
+Development needs no hardware:
+
+```bash
+npm install
+npm run build:shared         # after every change in packages/shared
+
+npm run dev:server           # API on :57430, MQTT on :57431
+npm run seed-demo-data       # a demo stage, gates and a vehicle
+npm run simulate -- --gate START_WP1 --transponder 1234567
+npm run simulate -- --gate FINISH_WP1 --transponder 1234567
+npm run dev:web              # dashboard on :57440
+```
+
+`npm run dev:gate-agent` sends continuous simulated detections instead, and
+`docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml up`
+runs the headless stack with simulated gates.
+
+Before changing an area, read its note in `docs/` — much of the "why" lives
+there: [architecture](docs/architecture.md), [event model](docs/event-model.md),
+[API](docs/api.md), [deployment modes](docs/deployment-modes.md),
+[decoder adapters](docs/decoder-adapters.md),
+[frontend](docs/frontend-structure.md), [gate config](docs/gate-config-ui.md),
+[roadmap](docs/development-roadmap.md). [CLAUDE.md](CLAUDE.md) has the
+commands, checks CI runs, and the codebase's standing rules. The original
+vision document is in [ideas/](ideas/RC_Rally_Timing_Project_Documentation.md).
