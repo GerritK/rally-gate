@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { fetchEventInfo } from './api/event';
+import { fetchRallyInfo, rallyName } from './api/rally-info';
 import { eventName } from './format';
 import { NAV_ITEMS } from './router';
 
 const drawer = ref(true);
-const event = ref('');
+/** For an event whose rally details were never filled in. */
+const fileName = ref('');
 
 onMounted(async () => {
-  event.value = eventName((await fetchEventInfo()).file);
+  await fetchRallyInfo();
+  fileName.value = eventName((await fetchEventInfo()).file);
 });
 </script>
 
@@ -19,8 +22,8 @@ onMounted(async () => {
         <v-app-bar-nav-icon @click="drawer = !drawer" />
       </template>
       <template #append>
-        <v-btn to="/event" variant="text" prepend-icon="mdi-folder-outline">
-          {{ event }}
+        <v-btn to="/setup" variant="text" prepend-icon="mdi-trophy-outline">
+          {{ rallyName || fileName }}
         </v-btn>
       </template>
     </v-app-bar>

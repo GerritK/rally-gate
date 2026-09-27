@@ -10,13 +10,12 @@ sharing `client.ts`). Audience is marshals and organisers only.
 | `/live` | Live Timing | unassigned passings (assign a vehicle), detections feed, stage runs with corrections, Activate / Close Stage |
 | `/results/overall` | Results | overall classification |
 | `/results/stages/:stageId` | Results | stage, split and DNF/DNS classification |
-| `/setup` | Setup | rally name/details, tiles to Stages and Scoring |
+| `/setup` | Setup | the event: rally details, file name, New / Open Event dialogs (standalone only); tiles to Stages and Scoring. The app bar shows the open event and links here |
 | `/setup/stages` | Setup | stage list, create |
 | `/setup/stages/:stageId` | Setup | edit stage, its gate assignments (active state read-only) |
 | `/setup/scoring` | Setup | notional time penalty; later classes/penalties |
-| `/hardware` | Hardware | gate roster: online, heartbeat, clock offset, active assignment, add/rename/delete, auto-discovery toggle |
+| `/hardware` | Hardware | gate roster: online, heartbeat, clock offset, active assignment, add/rename/delete, auto-discovery toggle; gates known to this computer: add to this event, forget (standalone only) |
 | `/vehicles` | Vehicles | registration, inline editing, status |
-| `/event` | Event | new event, open another one, known gates (standalone only); the app bar shows the open event and links here |
 
 ## Decisions
 
@@ -36,6 +35,10 @@ sharing `client.ts`). Audience is marshals and organisers only.
 - **No store, no speculative components.** Each page fetches what it needs in
   `onMounted`; data volumes are tiny. Extract a component once it is actually
   duplicated. Shared pure helpers are in `src/format.ts`.
+- **New / Open Event live in Setup**, on the rally details card: the details
+  are the event, and switching is a before-the-event action (refused while a
+  stage is active), so it has no nav entry. Known gates are on Hardware,
+  where gates are looked for.
 - **Switching events reloads the whole app** rather than refetching: every
   page holds the old event's data, and there is no store to reset.
 - Stage ids are caller-supplied (`WP1`, `SS2`), so the create form has an id

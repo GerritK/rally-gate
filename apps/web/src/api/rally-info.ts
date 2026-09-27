@@ -1,3 +1,4 @@
+import { ref } from 'vue';
 import { apiFetch, putJson } from './client';
 
 export interface RallyInfo {
@@ -6,8 +7,14 @@ export interface RallyInfo {
   location?: string;
 }
 
-export function fetchRallyInfo(): Promise<RallyInfo | null> {
-  return apiFetch('/rally-info');
+/** Kept current by the two calls below, so the app bar follows a rename in
+ * Setup without a reload. */
+export const rallyName = ref('');
+
+export async function fetchRallyInfo(): Promise<RallyInfo | null> {
+  const info = await apiFetch<RallyInfo | null>('/rally-info');
+  rallyName.value = info?.name ?? '';
+  return info;
 }
 
 /**
@@ -16,10 +23,16 @@ export function fetchRallyInfo(): Promise<RallyInfo | null> {
  * alongside the declared fields. The API rejects unknown properties, so
  * round-tripping it verbatim would 400.
  */
-export function saveRallyInfo({
+export async function saveRallyInfo({
   name,
   date,
   location,
 }: RallyInfo): Promise<RallyInfo> {
-  return putJson('/rally-info', { name, date, location });
+  const info = await putJson<RallyInfo>('/rally-info', {
+    name,
+    date,
+    location,
+  });
+  rallyName.value = info.name;
+  return info;
 }

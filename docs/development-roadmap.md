@@ -40,8 +40,8 @@ What exists, with where its reasoning lives. History is in git.
 - **Standalone packages:** Windows and macOS zip, Linux tarball with
   bundled node, built and smoke-tested in CI (`deployment-modes.md`).
 - **Events:** new / open event in the dashboard, one file each, switched by
-  restarting under `start.js`; gates remembered per computer and listed in
-  every new event (`deployment-modes.md` "New / open event").
+  restarting under `start.js`; gates remembered per computer, picked into
+  each event on the Hardware page (`deployment-modes.md` "New / open event").
 - **CI:** build, format, lint, tests, and a headless-stack job against real
   Postgres (`CLAUDE.md`).
 
@@ -87,6 +87,13 @@ What exists, with where its reasoning lives. History is in git.
   rally-server itself.
 - **Carrying vehicles/stages over** into a new event (the useful part of an
   event wizard), and new/open event under Postgres (`deployment-modes.md`).
+- **Renaming an event file** after a rally rename. The file name is fixed at
+  creation; the app bar shows the rally name, so it rarely matters. If built:
+  an explicit action, never on saving the details (that would restart the
+  server over a typo). A closed file is a plain rename; the open one is locked
+  on Windows, so `current.json` would carry `renameFrom` and the restarted
+  server renames it before TypeORM opens it — keeping the old name, with a
+  warning, if that fails.
 - Online/spectator mode (`deployment-modes.md`).
 - Rule engine DSL (hardcoded branching in `EventsService` is fine at this scale),
   RC4 learning registry / transponder management UI.

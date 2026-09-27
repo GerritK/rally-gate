@@ -92,7 +92,6 @@ describe('EventFilesService', () => {
         options: { database: join(dir, 'current.sqlite') },
       } as unknown as DataSource,
       emitter as unknown as EventEmitter2,
-      { list: () => [] } as unknown as KnownHardwareService,
     );
     return { service, emitter };
   }

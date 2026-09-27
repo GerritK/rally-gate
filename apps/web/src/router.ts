@@ -6,7 +6,6 @@ export const NAV_ITEMS = [
   { to: '/setup', label: 'Setup', icon: 'mdi-cog-outline' },
   { to: '/hardware', label: 'Hardware', icon: 'mdi-router-wireless' },
   { to: '/vehicles', label: 'Vehicles', icon: 'mdi-car' },
-  { to: '/event', label: 'Event', icon: 'mdi-folder-open-outline' },
 ];
 
 export const router = createRouter({
@@ -39,6 +38,5 @@ export const router = createRouter({
     },
     { path: '/hardware', component: () => import('./pages/HardwareView.vue') },
     { path: '/vehicles', component: () => import('./pages/VehiclesView.vue') },
-    { path: '/event', component: () => import('./pages/EventView.vue') },
   ],
 });

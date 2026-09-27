@@ -2,6 +2,12 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { ApiError } from '../api/client';
 import {
+  fetchEventInfo,
+  fetchKnownGates,
+  forgetKnownGate,
+  type KnownGate,
+} from '../api/event';
+import {
   fetchGateAssignments,
   type GateAssignment,
 } from '../api/gate-assignments';
@@ -37,6 +43,10 @@ const creatingGate = ref(false);
 const editingGateId = ref<string | null>(null);
 const deleteConflictGate = ref<Gate | null>(null);
 const deleteConflictMessage = ref('');
+/** Null when this server keeps no per-computer list (DB_PATH, Postgres). */
+const knownGates = ref<KnownGate[] | null>(null);
+
+const gateIds = computed(() => new Set(gates.value.map((g) => g.id)));
 
 /** Gates referenced by an ACTIVE/CLOSED stage's assignment — those
  * assignments can't be removed, so the gate can't be deleted at all. */
@@ -89,6 +99,16 @@ async function onDeleteGate(gate: Gate, force = false) {
   }
 }
 
+async function onAddKnownGate(gate: KnownGate) {
+  await upsertGate(gate.id, { name: gate.name });
+  await refreshGates();
+}
+
+async function onForgetKnownGate(id: string) {
+  await forgetKnownGate(id);
+  knownGates.value = knownGates.value?.filter((g) => g.id !== id) ?? null;
+}
+
 function onConfirmDeleteGate() {
   if (deleteConflictGate.value) onDeleteGate(deleteConflictGate.value, true);
 }
@@ -116,6 +136,9 @@ async function onCreateGate() {
 
 onMounted(async () => {
   await refreshGates();
+  if ((await fetchEventInfo()).switchable) {
+    knownGates.value = await fetchKnownGates();
+  }
   autoDiscover.value = (await fetchSetting(AUTO_DISCOVER_KEY)) !== 'false';
   clockCorrectionThresholdMs.value =
     Number(await fetchSetting(CLOCK_CORRECTION_THRESHOLD_KEY)) ||
@@ -307,6 +330,57 @@ onUnmounted(() => {
         </v-btn>
       </form>
     </v-card-text>
+  </v-card>
+
+  <v-card v-if="knownGates">
+    <v-card-title>Known on This Computer</v-card-title>
+    <v-card-subtitle>
+      Every gate this computer has seen, across all events. Add the ones this
+      event uses; forgetting one leaves the open event as it is.
+    </v-card-subtitle>
+    <v-table density="comfortable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="gate in knownGates" :key="gate.id">
+          <td>{{ gate.id }}</td>
+          <td>{{ gate.name }}</td>
+          <td class="text-right">
+            <v-chip v-if="gateIds.has(gate.id)" size="small">
+              in this event
+            </v-chip>
+            <v-btn
+              v-else
+              size="small"
+              variant="text"
+              prepend-icon="mdi-plus"
+              @click="onAddKnownGate(gate)"
+            >
+              Add
+            </v-btn>
+            <v-btn
+              size="small"
+              variant="text"
+              prepend-icon="mdi-close"
+              @click="onForgetKnownGate(gate.id)"
+            >
+              Forget
+            </v-btn>
+          </td>
+        </tr>
+        <tr v-if="knownGates.length === 0">
+          <td colspan="3" class="text-center text-medium-emphasis">
+            None yet — every gate that sends a heartbeat or is added above is
+            remembered.
+          </td>
+        </tr>
+      </tbody>
+    </v-table>
   </v-card>
 
   <v-dialog :model-value="!!deleteConflictGate" max-width="480">

@@ -73,9 +73,9 @@ several events live in one server at once, which isn't the requirement.
 
 ### New / open event
 
-The Event page (`/event`) creates and opens events; the app bar always shows
+Setup's event card creates and opens events; the app bar always shows
 which one is open. Standalone only — with `DB_PATH` or Postgres the event is
-fixed and the page just says so.
+fixed and the buttons are hidden.
 
 - **An event is a `.sqlite` file in `EVENTS_DIR`**, and the event list is that
   folder's contents — no register that could disagree with the files. Rename,
@@ -98,8 +98,10 @@ fixed and the page just says so.
   reconnect into the *new* event.
 - **Known hardware**: `hardware.json` in the folder remembers every gate this
   computer has seen (id and name — heartbeat, clock offset and capabilities
-  stay per event), and a new event starts with them listed as offline. Kept
-  from heartbeats and renames; "Forget" on the Event page drops one. Keyed by
+  stay per event), kept from heartbeats and renames. The Hardware page lists
+  them with **Add** (into the open event) and **Forget**. Not copied into a
+  new event automatically: the roster should hold only the gates meant for
+  this event, so one showing offline there is really missing. Keyed by
   `GATE_ID`, so a gate given a new id is a new entry. First started without
   the file, it is seeded from the open event's gates. A plain file so a club
   can copy it to a second laptop.
