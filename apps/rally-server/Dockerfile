@@ -23,8 +23,10 @@ RUN npm run build --workspace=@rally-gate/shared
 RUN npm run build --workspace=@rally-gate/rally-server
 # The dashboard is served by rally-server itself in headless mode, so it has
 # to be built here — packages/ui ships as source and is compiled by web's own
-# Vite, which is why it is copied too.
-RUN npm run build --workspace=@rally-gate/web
+# Vite, which is why it is copied too. build:deploy skips vue-tsc, which can
+# run a Pi out of memory on the Vuetify types (as it did for gate-config);
+# CI's `npm run build` still typechecks it.
+RUN npm run build:deploy --workspace=@rally-gate/web
 
 # The build needed nest-cli, typescript, webpack and jest; the runtime does
 # not. Pruning here keeps them out of the image copied below.
