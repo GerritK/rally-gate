@@ -12,11 +12,11 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # 22 to match what actually gets deployed: node:22-alpine in both
       # Dockerfiles, and setup_22.x in deploy/install-gate-pi.sh.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -58,7 +58,7 @@ jobs:
   headless-stack:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build and start the stack
         run: docker compose -f deploy/docker-compose.yml up -d --build
