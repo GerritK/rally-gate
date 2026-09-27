@@ -203,6 +203,17 @@ function runDurationDisplay(run: StageRun): string {
   return formatDuration(run.durationMs);
 }
 
+function isOverdue(run: StageRun): boolean {
+  const expected = stages.value.find(
+    (s) => s.id === run.stageId,
+  )?.expectedDurationMs;
+  return (
+    run.status === 'STARTED' &&
+    !!expected &&
+    now.value - new Date(run.startTime).getTime() > expected
+  );
+}
+
 const selectedStage = computed(() =>
   stages.value.find((stage) => stage.id === selectedStageId.value),
 );
@@ -642,6 +653,15 @@ onUnmounted(() => {
                 "
               >
                 {{ run.status }}
+              </v-chip>
+              <v-chip
+                v-if="isOverdue(run)"
+                size="small"
+                color="warning"
+                prepend-icon="mdi-timer-alert-outline"
+                class="ml-1"
+              >
+                OVERDUE
               </v-chip>
               <span
                 v-if="run.attempt > 1"

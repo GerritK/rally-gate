@@ -1,4 +1,11 @@
-import { IsInt, IsNotEmpty, IsString, Matches, Min } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  Min,
+} from 'class-validator';
 
 /**
  * `status` is deliberately absent from both DTOs. It's owned by
@@ -37,4 +44,10 @@ export class UpdateStageDto {
   @IsInt()
   @Min(1)
   stageNumber: number;
+
+  // null clears it; omitted leaves it as stored.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  expectedDurationMs?: number | null;
 }

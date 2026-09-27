@@ -137,6 +137,16 @@ describe('valid payloads still pass', () => {
     ).resolves.toEqual({ coDriverName: null });
   });
 
+  it('accepts null to clear a stage expected duration', async () => {
+    await expect(
+      transform(UpdateStageDto, {
+        name: 'Pass',
+        stageNumber: 1,
+        expectedDurationMs: null,
+      }),
+    ).resolves.toMatchObject({ expectedDurationMs: null });
+  });
+
   it('accepts null finishTime to reopen a run', async () => {
     await expect(
       transform(CorrectStageRunDto, { finishTime: null }),
@@ -164,6 +174,15 @@ describe('malformed values are rejected at the boundary', () => {
       stageNumber: 1,
     });
     expect(messages).toMatch(/id may only contain/);
+  });
+
+  it('rejects a zero expected stage duration', async () => {
+    const messages = await rejectionMessages(UpdateStageDto, {
+      name: 'Pass',
+      stageNumber: 1,
+      expectedDurationMs: 0,
+    });
+    expect(messages).toMatch(/expectedDurationMs/);
   });
 
   it('rejects an unknown gate role', async () => {

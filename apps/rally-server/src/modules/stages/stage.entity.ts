@@ -14,4 +14,7 @@ export class Stage {
 
   @Column({ type: 'varchar', default: StageStatus.NOT_STARTED })
   status: StageStatus;
+
+  @Column({ type: 'int', nullable: true })
+  expectedDurationMs: number | null;
 }

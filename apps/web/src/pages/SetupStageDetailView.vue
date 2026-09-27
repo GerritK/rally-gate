@@ -26,6 +26,19 @@ const assignmentsForStage = computed(() =>
   gateAssignments.value.filter((a) => a.stageId === props.stageId),
 );
 
+/** Entered in minutes, stored in ms; blank means no expectation. */
+const expectedMinutes = computed({
+  get: () =>
+    stage.value?.expectedDurationMs
+      ? stage.value.expectedDurationMs / 60_000
+      : '',
+  set: (value: number | string | null) => {
+    if (!stage.value) return;
+    stage.value.expectedDurationMs =
+      !value || Number(value) <= 0 ? null : Math.round(Number(value) * 60_000);
+  },
+});
+
 const stageEditable = computed(() => stage.value?.status === 'NOT_STARTED');
 
 async function refreshAssignments() {
@@ -45,6 +58,7 @@ async function onSaveStage() {
     stage.value = await upsertStage(stage.value.id, {
       name: stage.value.name,
       stageNumber: stage.value.stageNumber,
+      expectedDurationMs: stage.value.expectedDurationMs,
     });
   } finally {
     savingStage.value = false;
@@ -108,6 +122,18 @@ onMounted(load);
           hide-details
           :disabled="!stageEditable"
           style="min-width: 220px"
+        />
+        <v-text-field
+          v-model="expectedMinutes"
+          type="number"
+          min="0"
+          step="0.5"
+          label="Expected time (min)"
+          density="comfortable"
+          hide-details
+          clearable
+          :disabled="!stageEditable"
+          style="max-width: 200px"
         />
         <v-chip :color="stage.status === 'ACTIVE' ? 'success' : 'timing-idle'">
           {{ stage.status }}

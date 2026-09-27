@@ -23,6 +23,8 @@ What exists, with where its reasoning lives. History is in git.
   path is verified on a Pi with a switch to GND; the sensor itself is not.
 - **Stages and gates:** gate auto-discovery via heartbeat, gate assignments as a
   plan with per-stage activation, close as terminal (`architecture.md`).
+  Optional expected stage time; Live Timing flags a `STARTED` run past it as
+  overdue (client-side only).
 - **Clocks:** chrony on gates with rally-server's embedded SNTP server as the
   only source, measured per-gate offset with a server-side correction deadband
   (`architecture.md` "Clock offset", `deployment-modes.md` "Time sync").
@@ -44,15 +46,12 @@ What exists, with where its reasoning lives. History is in git.
    with a switch between GPIO and GND. Left: the E3Z-T61 wiring and its edge
    per `decoder-adapters.md`, then a stage timed end to end with marshal
    assignment.
-2. **Expected stage time.** Optional `Stage.expectedDurationMs`; the dashboard
-   flags a `STARTED` run as overdue once `now - startTime` exceeds it.
-   Client-side only — the SSE data already carries `startTime`.
-3. **Standalone packaging** (Node SEA/`pkg`, optional tray icon, "new / open
+2. **Standalone packaging** (Node SEA/`pkg`, optional tray icon, "new / open
    event") — needed to hand `rally-server` to a marshal without a dev machine.
-4. **`OpenStintAdapter`**, then **beam + OpenStint** combined (designed in
+3. **`OpenStintAdapter`**, then **beam + OpenStint** combined (designed in
    `decoder-adapters.md`) — critical path, but waits on RF hardware validation
    (two ordered gates reading reliably); settle the `-t` question first.
-5. **Gate control channel** — server → gate `sync`/`ready`/`stage-stopped`, for
+4. **Gate control channel** — server → gate `sync`/`ready`/`stage-stopped`, for
    gate health ("gates ready X/Y") and pausing decoders outside a live stage
    (`architecture.md`).
 
