@@ -4,6 +4,12 @@ import vue from '@vitejs/plugin-vue';
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue()],
+  build: {
+    // Full Vuetify registration (packages/ui/src/vuetify.ts) is one ~600 kB
+    // chunk. Served from localhost/LAN, never a CDN, so that is not worth
+    // per-app tree-shaking config.
+    chunkSizeWarningLimit: 1024,
+  },
   server: {
     port: 57440,
   },
