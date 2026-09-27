@@ -177,7 +177,10 @@ echo "-- building gate-agent --"
 cd "$INSTALL_DIR"
 # ci, not install: exactly what CI tested, and it never rewrites the lockfile —
 # which `install` did, blocking the `git pull` of every later update.
-quiet npm ci
+# Only the gate's workspaces: the rest of the monorepo (rally-server's Nest,
+# TypeORM and native better-sqlite3, the dashboard) is about half the install
+# and never runs here. A new workspace the gate imports must be added here too.
+quiet npm ci --workspace=@rally-gate/shared --workspace=@rally-gate/gate-agent --workspace=@rally-gate/gate-config
 quiet npm run build --workspace=@rally-gate/shared
 quiet npm run build --workspace=@rally-gate/gate-agent
 
