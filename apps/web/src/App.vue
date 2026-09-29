@@ -40,8 +40,8 @@ onMounted(async () => {
         />
       </v-list>
       <template #append>
-        <div class="text-caption text-medium-emphasis pa-4">
-          Rally Gate {{ serverVersion }}
+        <div class="text-center text-disabled pa-3" style="font-size: 0.7rem">
+          Version {{ serverVersion }}
         </div>
       </template>
     </v-navigation-drawer>
