@@ -20,4 +20,19 @@ export interface GateHeartbeat {
 
   /** The gate's build (`VERSION`), mirrored onto `Gate.version`. */
   version?: string;
+
+  /**
+   * chrony's own view, from `chronyc tracking`: whether it is synchronised,
+   * and how far it estimates the gate's clock is from its source (absolute,
+   * ms). Unlike `sentAt` this is a round-trip measurement, so it resolves
+   * below network latency. Both absent when chrony can't be read.
+   */
+  chronySynced?: boolean;
+  chronyOffsetMs?: number;
 }
+
+/** Past this without a heartbeat (sent every 15s), a gate counts as offline. */
+export const HEARTBEAT_ONLINE_THRESHOLD_MS = 30_000;
+
+/** gate-config's fixed port on every gate — see the port table in CLAUDE.md. */
+export const GATE_CONFIG_PORT = 57439;

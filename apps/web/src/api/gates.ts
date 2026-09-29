@@ -1,4 +1,4 @@
-import { apiFetch, deleteRequest, putJson } from './client';
+import { apiFetch, deleteRequest, postRequest, putJson } from './client';
 
 export interface Gate {
   id: string;
@@ -14,6 +14,16 @@ export interface Gate {
    * arrives (an older gate-agent never reports one).
    */
   clockOffsetMs?: number | null;
+  /** chrony on the gate; null when the gate can't read it. */
+  chronySynced?: boolean | null;
+  /** chrony's own offset estimate, absolute ms. */
+  chronyOffsetMs?: number | null;
+}
+
+export interface GatePowerOffResult {
+  gateId: string;
+  ok: boolean;
+  message?: string;
 }
 
 export function fetchGates(): Promise<Gate[]> {
@@ -26,4 +36,9 @@ export function upsertGate(id: string, input: { name: string }): Promise<Gate> {
 
 export function deleteGate(id: string, force = false): Promise<void> {
   return deleteRequest(`/gates/${id}${force ? '?force=true' : ''}`);
+}
+
+/** 409 while a stage is active. */
+export function powerOffAllGates(): Promise<GatePowerOffResult[]> {
+  return postRequest('/gates/power-off');
 }

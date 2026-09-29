@@ -46,6 +46,10 @@ export class GateAssignmentsService {
     return this.assignments.find({ where: { gateId } });
   }
 
+  hasActiveStage(): Promise<boolean> {
+    return this.stages.existsBy({ status: StageStatus.ACTIVE });
+  }
+
   findActiveForGate(gateId: string): Promise<GateAssignment | null> {
     return this.assignments.findOneBy({ gateId, active: true });
   }

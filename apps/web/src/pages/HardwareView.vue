@@ -11,11 +11,19 @@ import {
   fetchGateAssignments,
   type GateAssignment,
 } from '../api/gate-assignments';
-import { deleteGate, fetchGates, upsertGate, type Gate } from '../api/gates';
+import {
+  deleteGate,
+  fetchGates,
+  powerOffAllGates,
+  upsertGate,
+  type Gate,
+  type GatePowerOffResult,
+} from '../api/gates';
 import { openLiveStream } from '../api/live';
 import { serverVersion } from '../api/version';
 import { fetchSetting, saveSetting } from '../api/settings';
 import { fetchStages, type Stage } from '../api/stages';
+import { GATE_CONFIG_PORT, StageStatus } from '@rally-gate/shared';
 import { formatClockTime, formatRelativeTime } from '@rally-gate/ui';
 import {
   clockOffsetColor,
@@ -47,9 +55,32 @@ const deleteConflictMessage = ref('');
 /** Null when this server keeps no per-computer list (DB_PATH, Postgres). */
 const knownGates = ref<KnownGate[] | null>(null);
 
-/** gate-config's fixed port, see the port table in CLAUDE.md. */
 function gateConfigUrl(address: string): string {
-  return `http://${address.includes(':') ? `[${address}]` : address}:57439/`;
+  return `http://${address.includes(':') ? `[${address}]` : address}:${GATE_CONFIG_PORT}/`;
+}
+
+const confirmingPowerOff = ref(false);
+const poweringOff = ref(false);
+const powerOffResults = ref<GatePowerOffResult[] | null>(null);
+const stageActive = computed(() =>
+  stages.value.some((s) => s.status === StageStatus.ACTIVE),
+);
+
+async function onPowerOffAll() {
+  poweringOff.value = true;
+  try {
+    powerOffResults.value = await powerOffAllGates();
+  } catch (err) {
+    confirmingPowerOff.value = false;
+    alert(err instanceof Error ? err.message : 'Failed to shut down gates');
+  } finally {
+    poweringOff.value = false;
+  }
+}
+
+function closePowerOff() {
+  confirmingPowerOff.value = false;
+  powerOffResults.value = null;
 }
 
 const gateIds = computed(() => new Set(gates.value.map((g) => g.id)));
@@ -174,7 +205,29 @@ onUnmounted(() => {
 
 <template>
   <v-card class="mb-6">
-    <v-card-title>Gates</v-card-title>
+    <v-card-title class="d-flex align-center">
+      Gates
+      <v-spacer />
+      <v-tooltip
+        :disabled="!stageActive"
+        text="A stage is active — close it first"
+      >
+        <template #activator="{ props: tooltipProps }">
+          <span v-bind="tooltipProps">
+            <v-btn
+              size="small"
+              variant="outlined"
+              color="error"
+              prepend-icon="mdi-power"
+              :disabled="stageActive"
+              @click="confirmingPowerOff = true"
+            >
+              Shut down all gates
+            </v-btn>
+          </span>
+        </template>
+      </v-tooltip>
+    </v-card-title>
     <v-card-text>
       <v-switch
         :model-value="autoDiscover"
@@ -277,6 +330,26 @@ onUnmounted(() => {
                   </v-chip>
                 </template>
               </v-tooltip>
+              <v-chip
+                v-if="gate.chronySynced != null"
+                size="small"
+                class="rg-timing ml-1"
+                :color="gate.chronySynced ? 'success' : 'error'"
+                :prepend-icon="
+                  gate.chronySynced ? 'mdi-sync' : 'mdi-sync-alert'
+                "
+                :title="
+                  gate.chronySynced
+                    ? 'chrony on the gate is synced'
+                    : 'chrony on the gate is not synced — its times are not comparable with other gates'
+                "
+              >
+                {{
+                  gate.chronySynced
+                    ? `NTP ${(gate.chronyOffsetMs ?? 0).toFixed(1)} ms`
+                    : 'NTP not synced'
+                }}
+              </v-chip>
             </td>
             <td>{{ gate.capabilities ?? '-' }}</td>
             <td>
@@ -418,6 +491,37 @@ onUnmounted(() => {
       </tbody>
     </v-table>
   </v-card>
+
+  <v-dialog :model-value="confirmingPowerOff" max-width="480" persistent>
+    <v-card>
+      <v-card-title>Shut down all gates?</v-card-title>
+      <v-card-text v-if="!powerOffResults">
+        Every online gate powers off and has to be switched back on by hand. Use
+        this after the event, before pulling their power.
+      </v-card-text>
+      <v-card-text v-else>
+        <div v-if="powerOffResults.length === 0">No gate was online.</div>
+        <div v-for="r in powerOffResults" :key="r.gateId">
+          <v-icon
+            :icon="r.ok ? 'mdi-check' : 'mdi-alert'"
+            :color="r.ok ? 'success' : 'error'"
+            size="small"
+          />
+          {{ r.gateId }}: {{ r.ok ? 'shutting down' : r.message }}
+        </div>
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer />
+        <template v-if="!powerOffResults">
+          <v-btn variant="text" @click="closePowerOff">Cancel</v-btn>
+          <v-btn color="error" :loading="poweringOff" @click="onPowerOffAll">
+            Shut down
+          </v-btn>
+        </template>
+        <v-btn v-else variant="text" @click="closePowerOff">Close</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 
   <v-dialog :model-value="!!deleteConflictGate" max-width="480">
     <v-card>

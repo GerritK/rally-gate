@@ -42,7 +42,10 @@ import {
 import {
   combineDateAndTime,
   formatDuration,
+  gateStatusColor,
+  gateStatusIcon,
   isOnline,
+  isReady,
   runStatusColor,
   stageName,
   toLocalTimeValue,
@@ -462,13 +465,26 @@ onUnmounted(() => {
     </div>
   </v-alert>
 
-  <div class="d-flex flex-wrap justify-center ga-2 mb-6">
+  <div class="d-flex flex-wrap justify-center align-center ga-2 mb-6">
+    <span v-if="selectedStageGates.length > 0" class="text-medium-emphasis">
+      Gates ready
+      {{ selectedStageGates.filter((g) => isReady(g, now)).length }}/{{
+        selectedStageGates.length
+      }}
+    </span>
     <v-chip
       v-for="gate in selectedStageGates"
       :key="gate.id"
       :class="{ 'gate-flash': flashingGateIds[gate.id] }"
-      :color="isOnline(gate, now) ? 'success' : 'error'"
-      prepend-icon="mdi-access-point"
+      :color="gateStatusColor(gate, now)"
+      :prepend-icon="gateStatusIcon(gate, now)"
+      :title="
+        !isOnline(gate, now)
+          ? 'Offline'
+          : isReady(gate, now)
+            ? 'Ready'
+            : 'Online, but its clock is not synced'
+      "
       size="small"
     >
       {{ gate.name }}

@@ -1,9 +1,8 @@
+import { HEARTBEAT_ONLINE_THRESHOLD_MS } from '@rally-gate/shared';
 import { formatStageDuration } from '@rally-gate/ui';
 import type { Gate } from './api/gates';
 import type { Stage } from './api/stages';
 import type { Vehicle } from './api/vehicles';
-
-export const HEARTBEAT_ONLINE_THRESHOLD_MS = 30_000;
 
 /**
  * Where a clock offset stops looking like ordinary network transit and
@@ -117,6 +116,22 @@ export function isOnline(
 ): boolean {
   if (!gate.lastHeartbeatAt) return false;
   return nowMs - new Date(gate.lastHeartbeatAt).getTime() < thresholdMs;
+}
+
+/** Fit to time: online, and chrony not known to be unsynced. A gate that
+ * can't report chrony (unknown) still counts — the offset column covers it. */
+export function isReady(gate: Gate, nowMs: number): boolean {
+  return isOnline(gate, nowMs) && gate.chronySynced !== false;
+}
+
+export function gateStatusIcon(gate: Gate, nowMs: number): string {
+  if (!isOnline(gate, nowMs)) return 'mdi-access-point-off';
+  return isReady(gate, nowMs) ? 'mdi-access-point' : 'mdi-clock-alert-outline';
+}
+
+export function gateStatusColor(gate: Gate, nowMs: number): string {
+  if (!isOnline(gate, nowMs)) return 'error';
+  return isReady(gate, nowMs) ? 'success' : 'warning';
 }
 
 /** An event file without its extension, as a marshal named it. */

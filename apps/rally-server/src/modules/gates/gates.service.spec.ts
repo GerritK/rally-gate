@@ -9,12 +9,15 @@ function makeService(opts: {
   autoDiscoverGates?: boolean;
   clockCorrectionThresholdMs?: number;
   removeAllForGate?: () => Promise<void>;
+  allGates?: unknown[];
+  hasActiveStage?: boolean;
 }) {
   const gates = {
     findOneBy: jest.fn().mockResolvedValue(opts.existingGate ?? null),
     create: jest.fn().mockImplementation((v: unknown) => v),
     save: jest.fn().mockImplementation((v: unknown) => Promise.resolve(v)),
     delete: jest.fn().mockResolvedValue(undefined),
+    find: jest.fn().mockResolvedValue(opts.allGates ?? []),
   };
   const settingsService = {
     getBoolean: jest.fn().mockResolvedValue(opts.autoDiscoverGates ?? true),
@@ -30,6 +33,7 @@ function makeService(opts: {
     removeAllForGate: jest
       .fn()
       .mockImplementation(opts.removeAllForGate ?? (() => Promise.resolve())),
+    hasActiveStage: jest.fn().mockResolvedValue(opts.hasActiveStage ?? false),
   };
   return {
     service: new GatesService(
@@ -113,6 +117,20 @@ describe('GatesService.recordHeartbeat', () => {
     });
 
     expect(gate?.clockOffsetMs).toBe(4_000);
+  });
+
+  it('records chrony state, and clears it when a heartbeat stops carrying it', async () => {
+    const { service } = makeService({ existingGate: { id: 'GATE1' } });
+
+    const synced = await service.recordHeartbeat('GATE1', {
+      chronySynced: true,
+      chronyOffsetMs: 0.4,
+    });
+    expect(synced).toMatchObject({ chronySynced: true, chronyOffsetMs: 0.4 });
+
+    // Unknown, not "still synced": the last report may be long out of date.
+    const unknown = await service.recordHeartbeat('GATE1', {});
+    expect(unknown).toMatchObject({ chronySynced: null, chronyOffsetMs: null });
   });
 });
 
@@ -198,5 +216,66 @@ describe('GatesService.remove', () => {
 
     await expect(service.remove('GATE1')).rejects.toThrow('refused');
     expect(gates.delete).not.toHaveBeenCalled();
+  });
+});
+
+describe('GatesService.powerOffAll', () => {
+  const now = new Date('2026-01-01T12:00:00Z').getTime();
+  const fetchMock = jest.fn();
+
+  beforeEach(() => {
+    fetchMock.mockReset();
+    global.fetch = fetchMock as never;
+  });
+
+  it('refuses while a stage is active, without calling any gate', async () => {
+    const { service } = makeService({ hasActiveStage: true });
+
+    await expect(service.powerOffAll(now)).rejects.toThrow('stage is active');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('calls gate-config on online gates only and reports each result', async () => {
+    const { service } = makeService({
+      allGates: [
+        {
+          id: 'ONLINE',
+          address: '10.0.0.5',
+          lastHeartbeatAt: new Date(now - 5_000),
+        },
+        {
+          id: 'STALE',
+          address: '10.0.0.6',
+          lastHeartbeatAt: new Date(now - 60_000),
+        },
+        {
+          id: 'FAILS',
+          address: '10.0.0.7',
+          lastHeartbeatAt: new Date(now - 5_000),
+        },
+      ],
+    });
+    fetchMock.mockImplementation((url: string) =>
+      Promise.resolve({
+        status: 200,
+        json: () =>
+          Promise.resolve(
+            url.includes('10.0.0.5')
+              ? { started: true, output: '' }
+              : { started: false, output: 'sudo: not allowed' },
+          ),
+      }),
+    );
+
+    const results = await service.powerOffAll(now);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://10.0.0.5:57439/api/power-off',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(results).toEqual([
+      { gateId: 'ONLINE', ok: true },
+      { gateId: 'FAILS', ok: false, message: 'sudo: not allowed' },
+    ]);
   });
 });

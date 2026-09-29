@@ -1,7 +1,7 @@
 import { createAdapter } from './adapters/create-adapter';
 import { config } from './config';
 import { log } from './log';
-import { refreshTimeSource } from './time-sync';
+import { readChrony, refreshTimeSource } from './time-sync';
 import { Uplink } from './uplink';
 
 const adapter = createAdapter();
@@ -13,14 +13,13 @@ if (!adapter) {
 }
 
 const uplink = new Uplink();
+const sendHeartbeat = () =>
+  void readChrony().then((sync) => uplink.publishHeartbeat(sync));
 uplink.onConnect(() => {
-  uplink.publishHeartbeat();
+  sendHeartbeat();
   refreshTimeSource();
 });
-const heartbeatTimer = setInterval(
-  () => uplink.publishHeartbeat(),
-  config.heartbeatIntervalMs,
-);
+const heartbeatTimer = setInterval(sendHeartbeat, config.heartbeatIntervalMs);
 
 void adapter.start((transponderId, timestamp) =>
   uplink.publishDetection(transponderId, timestamp),

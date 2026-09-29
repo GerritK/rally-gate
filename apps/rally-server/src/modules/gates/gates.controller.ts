@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Post,
   Put,
   Query,
 } from '@nestjs/common';
@@ -17,6 +18,12 @@ export class GatesController {
   @Get()
   findAll() {
     return this.gatesService.findAll();
+  }
+
+  /** 409 while a stage is active; otherwise one result per online gate. */
+  @Post('power-off')
+  powerOffAll() {
+    return this.gatesService.powerOffAll();
   }
 
   @Get(':id')

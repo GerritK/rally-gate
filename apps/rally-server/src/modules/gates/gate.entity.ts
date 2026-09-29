@@ -38,4 +38,15 @@ export class Gate {
    */
   @Column({ type: 'int', nullable: true })
   clockOffsetMs?: number | null;
+
+  /**
+   * chrony on the gate, as reported in its heartbeat: synchronised or not,
+   * and its own (round-trip) estimate of the offset, absolute ms. Null when
+   * the gate can't read chrony — unknown, not unsynced.
+   */
+  @Column({ type: 'boolean', nullable: true })
+  chronySynced?: boolean | null;
+
+  @Column({ type: 'float', nullable: true })
+  chronyOffsetMs?: number | null;
 }

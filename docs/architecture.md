@@ -20,10 +20,17 @@ mode has nothing external to install.
 ## Gate discovery & heartbeat
 
 - `gate-agent` publishes a heartbeat every `HEARTBEAT_INTERVAL_MS` (15s) with
-  `sentAt`, `capabilities` (the adapter it runs) and `version`. A heartbeat from an unknown
+  `sentAt`, `capabilities` (the adapter it runs), `version`, and chrony's state
+  (`chronySynced`, `chronyOffsetMs` from `chronyc -c tracking`; absent when
+  chrony can't be read, which the dashboard shows as unknown, not unsynced). A heartbeat from an unknown
   `gateId` auto-creates a `Gate` row, unless the `autoDiscoverGates` setting is
   off. Gates can also be added by hand on the Hardware page.
-- Online/offline is `now - lastHeartbeatAt > 30s`, computed in the dashboard.
+- Online/offline is `now - lastHeartbeatAt > 30s`
+  (`HEARTBEAT_ONLINE_THRESHOLD_MS`). *Ready* is online and chrony not reported
+  unsynced; Live Timing shows "Gates ready X/Y" for the selected stage.
+- **No decoder status in the heartbeat.** `BeamAdapter` exits the process when
+  gpiomon fails, so a dead decoder already reads as an offline gate. Revisit
+  with `OpenStintAdapter`, where a lost serial link wouldn't kill the process.
 - `Gate.address` is the remote address of the gate's MQTT connection, stored
   per heartbeat — observed rather than reported, because a gate on Wi-Fi,
   Ethernet and its own hotspot can't know which address the rally network
@@ -61,8 +68,9 @@ Two mechanisms with different jobs:
 2. **Measured offset, for visibility and gross failures.** `GatesService`
    stores `arrivedAt - sentAt` of each heartbeat as `Gate.clockOffsetMs`
    (positive = gate behind). The Hardware page shows it, amber past 250ms, red
-   once it is being corrected — that is how anyone notices chrony *isn't*
-   working.
+   once it is being corrected. Next to it, the gate's own chrony report
+   (synced, and its round-trip offset) — that is how anyone notices chrony
+   *isn't* working.
 
 **Deadband, not always-correct.** The measurement is one-way, so it is offset
 plus network latency and cannot separate the two; correcting below that would
@@ -137,8 +145,9 @@ setup. `Gate` itself is hardware identity only.
 
 ## No server → gate commands
 
-Everything is gate → server. Gate health comes from the heartbeat, shutdown
-goes through gate-config's HTTP API (`development-roadmap.md`).
+Everything is gate → server. Gate health comes from the heartbeat; "shut down
+all gates" is rally-server calling each online gate's gate-config
+`POST /api/power-off` over the observed `Gate.address`.
 
 **Decoders run all the time, never only during a live stage.** A lost or late
 "start" leaves a gate silently deaf mid-stage — drivers with no time — while a

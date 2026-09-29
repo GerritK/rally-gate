@@ -34,6 +34,9 @@ What exists, with where its reasoning lives. History is in git.
   Vehicles (`frontend-structure.md`).
 - **Gate config UI:** settings, status, Wi-Fi, hotspot fallback, Wi-Fi reset;
   verified on a Pi. Shutdown built, not yet tried on a Pi (`gate-config-ui.md`).
+- **Gate health:** chrony state in the heartbeat, "Gates ready X/Y" in Live
+  Timing, "Shut down all gates" on the Hardware page via gate-config
+  (`architecture.md`). Not yet tried on a Pi.
 - **Versions:** git build stamped into `packages/shared`, reported by gates in
   the heartbeat, shown in gate-config and the dashboard, mismatch flagged
   (`architecture.md`).
@@ -57,15 +60,6 @@ What exists, with where its reasoning lives. History is in git.
 2. **`OpenStintAdapter`**, then **beam + OpenStint** combined (designed in
    `decoder-adapters.md`) — critical path, but waits on RF hardware validation
    (two ordered gates reading reliably); settle the `-t` question first.
-3. **Gate health and shutdown:**
-   - Heartbeat gains decoder status (adapter running / reading) and chrony
-     status (synced, offset from `chronyc tracking`); a status change sends a
-     heartbeat immediately.
-   - Dashboard shows "gates ready X/Y" per stage from assignments + heartbeats.
-   - Unassigned passings from gates not in an active stage stay stored but
-     out of the marshal's list.
-   - "Shut down all gates" after the event: rally-server calls each online
-     gate's gate-config `POST /api/power-off`, refused while a stage is active.
 
 ## Deliberately deferred
 

@@ -9,6 +9,7 @@ import mqtt, { MqttClient } from 'mqtt';
 import { ulid } from 'ulid';
 import { config } from './config';
 import { log } from './log';
+import { ChronyState } from './time-sync';
 
 /** The gate's MQTT link to rally-server: heartbeats and detections out. */
 export class Uplink {
@@ -52,13 +53,14 @@ export class Uplink {
     });
   }
 
-  publishHeartbeat(): void {
+  publishHeartbeat(chrony?: ChronyState): void {
     // Deliberately QoS 0: a heartbeat is a liveness ping that repeats every
     // HEARTBEAT_INTERVAL_MS, so a missed one is self-healing and queueing it
     // for redelivery would only report staleness as freshness.
     const heartbeat: GateHeartbeat = {
       capabilities: config.adapter,
       version: VERSION,
+      ...chrony,
       // Stamped here rather than anywhere upstream: the server subtracts this
       // from arrival time to estimate this gate's clock offset, so it has to be
       // read as late as possible before the packet goes out.

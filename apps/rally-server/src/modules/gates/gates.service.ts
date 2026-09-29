@@ -1,7 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
-import { DETECTION_TOPIC_PREFIX, GateHeartbeat } from '@rally-gate/shared';
+import {
+  DETECTION_TOPIC_PREFIX,
+  GATE_CONFIG_PORT,
+  GateHeartbeat,
+  HEARTBEAT_ONLINE_THRESHOLD_MS,
+} from '@rally-gate/shared';
 import { Repository } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
 import { GateAssignmentsService } from './gate-assignments.service';
@@ -40,10 +45,9 @@ const MAX_CAPABILITIES_LENGTH = 64;
  * would only be smoothing transit jitter. Heartbeats are published at QoS 0
  * precisely so a stale one can't be redelivered later and poison this.
  *
- * ponytail: one-way, so it cannot separate clock offset from transit time.
- * Replace with a round-trip probe once the server->gate `sync` channel in
- * docs/architecture.md exists; the deadband in `clockCorrectionMsFor` is
- * what compensates until then.
+ * One-way, so it cannot separate clock offset from transit time — the
+ * deadband in `clockCorrectionMsFor` compensates. The precise figure is
+ * chrony's own, reported separately as `chronyOffsetMs`.
  */
 export function measureClockOffsetMs(
   sentAt: string | undefined,
@@ -57,6 +61,43 @@ export function measureClockOffsetMs(
     return null;
   }
   return arrivedAt.getTime() - sentMs;
+}
+
+export interface GatePowerOffResult {
+  gateId: string;
+  ok: boolean;
+  message?: string;
+}
+
+/**
+ * Through gate-config's own endpoint rather than an MQTT command, so a gate
+ * never listens for anything from the server (docs/architecture.md, "No
+ * server → gate commands").
+ */
+async function powerOffGate(
+  gateId: string,
+  address: string,
+): Promise<GatePowerOffResult> {
+  const host = address.includes(':') ? `[${address}]` : address;
+  try {
+    const res = await fetch(
+      `http://${host}:${GATE_CONFIG_PORT}/api/power-off`,
+      {
+        method: 'POST',
+        signal: AbortSignal.timeout(5000),
+      },
+    );
+    const body = (await res.json()) as { started?: boolean; output?: string };
+    return body.started
+      ? { gateId, ok: true }
+      : { gateId, ok: false, message: body.output || `HTTP ${res.status}` };
+  } catch (err) {
+    return {
+      gateId,
+      ok: false,
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
 
 const HEARTBEAT_TOPIC_REGEX = new RegExp(
@@ -97,6 +138,26 @@ export class GatesService {
   async remove(id: string, force = false): Promise<void> {
     await this.gateAssignmentsService.removeAllForGate(id, force);
     await this.gates.delete(id);
+  }
+
+  /**
+   * End of the event: shuts down every gate seen within the online window.
+   * Refused while a stage is active — a gate powered off mid-stage is drivers
+   * with no time.
+   */
+  async powerOffAll(now = Date.now()): Promise<GatePowerOffResult[]> {
+    if (await this.gateAssignmentsService.hasActiveStage()) {
+      throw new ConflictException(
+        'A stage is active — close it before shutting down the gates',
+      );
+    }
+    const online = (await this.gates.find()).filter(
+      (g) =>
+        g.address &&
+        g.lastHeartbeatAt &&
+        now - g.lastHeartbeatAt.getTime() < HEARTBEAT_ONLINE_THRESHOLD_MS,
+    );
+    return Promise.all(online.map((g) => powerOffGate(g.id, g.address!)));
   }
 
   @OnEvent('mqtt.message')
@@ -179,6 +240,15 @@ export class GatesService {
     if (typeof heartbeat.version === 'string' && heartbeat.version) {
       gate.version = heartbeat.version.slice(0, MAX_CAPABILITIES_LENGTH);
     }
+    // Always overwritten: a gate that stops reporting chrony must read as
+    // unknown, not keep its last "synced".
+    gate.chronySynced =
+      typeof heartbeat.chronySynced === 'boolean'
+        ? heartbeat.chronySynced
+        : null;
+    gate.chronyOffsetMs = Number.isFinite(heartbeat.chronyOffsetMs)
+      ? Math.abs(heartbeat.chronyOffsetMs as number)
+      : null;
     const offsetMs = measureClockOffsetMs(heartbeat.sentAt, arrivedAt);
     if (offsetMs !== null) {
       gate.clockOffsetMs = offsetMs;
