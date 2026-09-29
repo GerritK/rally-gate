@@ -46,6 +46,7 @@ and what it can do as root *is* the boundary:
 <user> ALL=(root) NOPASSWD: /usr/bin/systemctl restart rally-gate-agent
 <user> ALL=(root) NOPASSWD: /usr/bin/systemctl poweroff
 <user> ALL=(root) NOPASSWD: /usr/bin/chronyc reload sources
+<user> ALL=(root) NOPASSWD: /usr/bin/chronyc refresh
 <user> ALL=(root) NOPASSWD: /usr/local/sbin/rally-gate-net
 ```
 
@@ -62,6 +63,13 @@ locks out sudo.
 on boot, and on every save) and runs `chronyc reload sources`. Not a chrony
 restart: that re-arms `makestep` and can step the clock mid-stage — see "Gate
 system clock policy" in `decoder-adapters.md`.
+
+**gate-agent runs `chronyc refresh` on every MQTT connect** (same user, so the
+rule above covers it). chrony resolves a source name once; if that fails —
+the gate booted before the server — it retries only after hours, leaving the
+gate unsynced while it times happily. A connect proves the name resolves now,
+and also follows the server to a new IP. Refresh only re-resolves; it never
+steps the clock.
 
 ### Wi-Fi goes through a wrapper, not `nmcli` in sudoers
 

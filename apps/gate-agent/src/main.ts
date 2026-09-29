@@ -1,6 +1,7 @@
 import { createAdapter } from './adapters/create-adapter';
 import { config } from './config';
 import { log } from './log';
+import { refreshTimeSource } from './time-sync';
 import { Uplink } from './uplink';
 
 const adapter = createAdapter();
@@ -14,6 +15,7 @@ if (!adapter) {
 const uplink = new Uplink();
 uplink.onConnect(() => {
   uplink.publishHeartbeat();
+  refreshTimeSource();
 });
 const heartbeatTimer = setInterval(
   () => uplink.publishHeartbeat(),

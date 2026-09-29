@@ -280,6 +280,7 @@ sudo tee /etc/sudoers.d/rally-gate-config >/dev/null <<EOF
 $USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart rally-gate-agent
 $USER ALL=(root) NOPASSWD: /usr/bin/systemctl poweroff
 $USER ALL=(root) NOPASSWD: /usr/bin/chronyc reload sources
+$USER ALL=(root) NOPASSWD: /usr/bin/chronyc refresh
 $USER ALL=(root) NOPASSWD: /usr/local/sbin/rally-gate-net
 EOF
 sudo chmod 0440 /etc/sudoers.d/rally-gate-config
