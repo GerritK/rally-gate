@@ -57,10 +57,15 @@ What exists, with where its reasoning lives. History is in git.
 2. **`OpenStintAdapter`**, then **beam + OpenStint** combined (designed in
    `decoder-adapters.md`) — critical path, but waits on RF hardware validation
    (two ordered gates reading reliably); settle the `-t` question first.
-3. **Gate control channel** — server → gate `sync`/`ready`/`stage-stopped`, for
-   gate health ("gates ready X/Y") and pausing decoders outside a live stage
-   (`architecture.md`). Also `shutdown` — "shut down all gates" after the
-   event, refused while a stage is active.
+3. **Gate health and shutdown:**
+   - Heartbeat gains decoder status (adapter running / reading) and chrony
+     status (synced, offset from `chronyc tracking`); a status change sends a
+     heartbeat immediately.
+   - Dashboard shows "gates ready X/Y" per stage from assignments + heartbeats.
+   - Unassigned passings from gates not in an active stage stay stored but
+     out of the marshal's list.
+   - "Shut down all gates" after the event: rally-server calls each online
+     gate's gate-config `POST /api/power-off`, refused while a stage is active.
 
 ## Deliberately deferred
 

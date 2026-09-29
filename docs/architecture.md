@@ -135,24 +135,12 @@ setup. `Gate` itself is hardware identity only.
   written in separate steps, and a detection in between is stored untimed
   rather than attached to a dormant stage.
 
-## Gate control channel (planned, not built)
+## No server → gate commands
 
-Today everything is gate → server. The planned server → gate direction:
+Everything is gate → server. Gate health comes from the heartbeat, shutdown
+goes through gate-config's HTTP API (`development-roadmap.md`).
 
-- Starting a stage emits one internal `stage.started` event with independent
-  listeners — one activates the gates, one publishes to each of the stage's
-  gates — same event-bus shape as the rest of the server, so the trigger (a
-  button now, maybe the first start detection later) can change without
-  touching either.
-- **Per-gate topics** (`rally/gates/<gateId>/sync`), not a global one: stages
-  run concurrently, and a broadcast would reach gates mid-run on another stage.
-  The gate still only knows its own `GATE_ID`.
-- Gates answer on `rally/gates/<gateId>/ready`, so the dashboard can show
-  "gates ready X/Y" — the mechanism for gate health reporting.
-- A matching `stage-stopped` would call `adapter.stop()`, so the decoder only
-  runs during a live stage. That also stops stray passings (recon, testing) from
-  creating runs, on top of the server-side `Stage.status` check.
-- Once this exists, a round-trip probe can replace the one-way offset
-  measurement and its deadband.
-
-Not designed in detail: message schema, ack timeout, what a missing ack means.
+**Decoders run all the time, never only during a live stage.** A lost or late
+"start" leaves a gate silently deaf mid-stage — drivers with no time — while a
+stray passing costs nothing: `applyRules` already stores it untimed, and recon
+passings double as a gate test.

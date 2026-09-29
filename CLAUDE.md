@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Rally Gate: open, modular timing/event management system for RC rally events. Full background: [ideas/RC_Rally_Timing_Project_Documentation.md](ideas/RC_Rally_Timing_Project_Documentation.md). Implementation-specific design notes live in `docs/` — read the relevant one before touching that area, since a lot of "why" lives there rather than in code comments:
 
-- `docs/architecture.md` — event pipeline, gate discovery, clock offset, server discovery, gate assignment, the planned gate control channel
+- `docs/architecture.md` — event pipeline, gate discovery, clock offset, server discovery, gate assignment, no server → gate commands
 - `docs/event-model.md` — `DetectionEvent`/`StageRun`/`StageSplit` shapes and rules
 - `docs/decoder-adapters.md` — `DecoderAdapter` interface, planned adapters, hardware notes
 - `docs/deployment-modes.md` — standalone vs headless, one-database-per-event model
@@ -110,7 +110,7 @@ Gate hardware (or SimulatedAdapter)
   -> LiveController (one SSE stream /live, event type per kind — never a stream per kind, see docs/api.md) -> Vue dashboard
 ```
 
-**Everything server-side is event-driven through `EventEmitter2`, not direct method chains.** `EventsService` never calls the live feed or rule engine directly — it emits and `LiveController`/listeners react. Follow this shape for new cross-cutting behavior (e.g. a future "stage started" trigger should be an emitted event with independent listeners, not a service calling into three other services inline) — see the "Event-based, not a hard-coded call chain" note in `architecture.md`.
+**Everything server-side is event-driven through `EventEmitter2`, not direct method chains.** `EventsService` never calls the live feed or rule engine directly — it emits and `LiveController`/listeners react. Follow this shape for new cross-cutting behavior (e.g. a "stage activated" reaction should be an emitted event with independent listeners, not a service calling into three other services inline).
 
 **Gates are dumb.** A `gate-agent` only knows its own `GATE_ID`; it publishes to `rally/gates/<gateId>/detections` and `rally/gates/<gateId>/heartbeat`. All meaning is assigned centrally on the server — a gate never has hardcoded behavior.
 
