@@ -60,6 +60,12 @@ What exists, with where its reasoning lives. History is in git.
 2. **`OpenStintAdapter`**, then **beam + OpenStint** combined (designed in
    `decoder-adapters.md`) — critical path, but waits on RF hardware validation
    (two ordered gates reading reliably); settle the `-t` question first.
+3. **Vehicle classes** with per-class classification — the one piece of
+   deferred work that needs no hardware and matters at a real event. Two
+   constraints known up front: classes are organiser-defined **data**, not an
+   enum; and a vehicle can be in **several classes at once** (many-to-many),
+   each class ranking being a filtered view over the same runs, with the
+   overall ranking unchanged.
 
 ## Deliberately deferred
 
@@ -75,8 +81,9 @@ What exists, with where its reasoning lives. History is in git.
   (gate-config), since the battery is gate hardware like `BEAM_EDGE` — no
   per-gate server config. Needs an I²C chip first (the Pi has no ADC):
   INA219/INA226 (voltage + current, preferred) or ADS1115 + divider.
-  `vcgencmd get_throttled` (5V undervoltage flag) works without hardware as a
-  fallback. Smooth over several readings with hysteresis (sensor/WiFi load
+  Not `vcgencmd get_throttled` as a fallback: it reads the Pi's 5V rail after
+  the regulator, which holds until the battery collapses, so it warns too late
+  to act on. Smooth over several readings with hysteresis (sensor/WiFi load
   sags); prefer per-chemistry presets over a raw volt value, as LiFePO4's flat
   curve warns late. A gate that dies of a flat battery only reads "offline", so
   log the warning on the gate too.
@@ -96,15 +103,12 @@ What exists, with where its reasoning lives. History is in git.
   would finish the run, so it needs a minimum stage time or similar; and the
   stage config needs a sanity check (e.g. a combined gate excludes separate
   start/finish gates on the same stage).
-- **Vehicle classes** with per-class classification. Two constraints known up
-  front: classes are organiser-defined **data**, not an enum; and a vehicle can
-  be in **several classes at once** (many-to-many), each class ranking being a
-  filtered view over the same runs, with the overall ranking unchanged.
 - **Auth** on broker, API and dashboard — the closed rally network is the
   boundary until the timing pipeline is solid. Gates would authenticate against
   rally-server itself.
 - **Carrying vehicles/stages over** into a new event (the useful part of an
-  event wizard), and new/open event under Postgres (`deployment-modes.md`).
+  event wizard) — low priority, re-entering them per event is acceptable — and
+  new/open event under Postgres (`deployment-modes.md`).
 - **Renaming an event file** after a rally rename. The file name is fixed at
   creation; the app bar shows the rally name, so it rarely matters. If built:
   an explicit action, never on saving the details (that would restart the
