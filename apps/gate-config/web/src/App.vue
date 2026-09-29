@@ -55,6 +55,7 @@ const joinSsid = ref('');
 const joinPassword = ref('');
 const joining = ref(false);
 const confirmingReset = ref(false);
+const confirmingPowerOff = ref(false);
 const wifiErrors = ref<Record<string, string>>({});
 
 let statusTimer: ReturnType<typeof setInterval> | undefined;
@@ -243,6 +244,33 @@ async function resetWifi() {
       text: 'Lost contact with the gate — expected: it left this network. Join its hotspot to reach this page again.',
     };
   }
+}
+
+async function powerOff() {
+  confirmingPowerOff.value = false;
+  notice.value = null;
+  const done = {
+    type: 'success' as const,
+    text: 'Shutting down. Wait until the green LED on the Pi has stopped flashing (about 10 seconds), then disconnect power.',
+  };
+  try {
+    const result = await (
+      await fetch('/api/power-off', { method: 'POST' })
+    ).json();
+    if (!result.started) {
+      notice.value = {
+        type: 'error',
+        text: result.output || 'Could not shut down.',
+      };
+      return;
+    }
+    notice.value = done;
+  } catch {
+    // The gate may take the network down before the reply gets out.
+    notice.value = done;
+  }
+  // Polling a gate that is going away would only flip the chip to "unknown".
+  clearInterval(statusTimer);
 }
 
 async function loadStatus() {
@@ -535,6 +563,29 @@ onUnmounted(() => clearInterval(statusTimer));
               status?.log.output || 'unavailable'
             }}</pre>
           </v-card-text>
+          <v-card-actions>
+            <v-btn
+              v-if="!confirmingPowerOff"
+              variant="text"
+              prepend-icon="mdi-power"
+              @click="confirmingPowerOff = true"
+            >
+              Shut down
+            </v-btn>
+            <template v-else>
+              <v-btn variant="text" @click="confirmingPowerOff = false">
+                Cancel
+              </v-btn>
+              <v-btn
+                color="error"
+                variant="text"
+                prepend-icon="mdi-power"
+                @click="powerOff"
+              >
+                Shut down gate
+              </v-btn>
+            </template>
+          </v-card-actions>
         </v-card>
       </v-container>
     </v-main>

@@ -43,9 +43,15 @@ and what it can do as root *is* the boundary:
 
 ```
 <user> ALL=(root) NOPASSWD: /usr/bin/systemctl restart rally-gate-agent
+<user> ALL=(root) NOPASSWD: /usr/bin/systemctl poweroff
 <user> ALL=(root) NOPASSWD: /usr/bin/chronyc reload sources
 <user> ALL=(root) NOPASSWD: /usr/local/sbin/rally-gate-net
 ```
+
+**Shut down** (confirmed on the page) exists because pulling power mid-write
+can corrupt the SD card. Anyone on the rally network can press it — same
+boundary as Wi-Fi reset, until auth lands. A lost connection afterwards is
+reported as expected.
 
 The installer runs `visudo -c` and removes an invalid drop-in, since a broken one
 locks out sudo.

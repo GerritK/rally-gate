@@ -16,6 +16,7 @@ import {
   applyTimeSource,
   clockTracking,
   networkStatus,
+  powerOff,
   recentLog,
   restartAgent,
   resetWifi,
@@ -129,6 +130,14 @@ app.post('/api/network', async (req, res) => {
  *  an event with a different network, or to test the fallback. */
 app.post('/api/network/reset', async (_req, res) => {
   const result = await resetWifi();
+  res.json({ started: result.ok, output: result.output });
+});
+
+/** Pulling power mid-write can corrupt the SD card, so a gate is shut down
+ *  first. `systemctl poweroff` returns once the job is queued, so the reply
+ *  usually still makes it out before the network goes down. */
+app.post('/api/power-off', async (_req, res) => {
+  const result = await powerOff();
   res.json({ started: result.ok, output: result.output });
 });
 

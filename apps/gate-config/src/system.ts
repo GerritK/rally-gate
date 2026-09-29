@@ -50,6 +50,10 @@ export function restartAgent(): Promise<CommandResult> {
   return attempt('sudo', ['systemctl', 'restart', AGENT_UNIT]);
 }
 
+export function powerOff(): Promise<CommandResult> {
+  return attempt('sudo', ['systemctl', 'poweroff']);
+}
+
 export function agentActive(): Promise<CommandResult> {
   return attempt('systemctl', ['is-active', AGENT_UNIT]);
 }

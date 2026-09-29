@@ -33,7 +33,7 @@ What exists, with where its reasoning lives. History is in git.
 - **Dashboard:** multi-page `apps/web` — Live Timing, Results, Setup, Hardware,
   Vehicles (`frontend-structure.md`).
 - **Gate config UI:** settings, status, Wi-Fi, hotspot fallback, Wi-Fi reset;
-  verified on a Pi (`gate-config-ui.md`).
+  verified on a Pi. Shutdown built, not yet tried on a Pi (`gate-config-ui.md`).
 - **Deployment:** SQLite standalone and Postgres headless from one codebase,
   rally-server serving the dashboard under one port, Windows firewall rules on
   first start, Pi installers for server and gates (`deployment-modes.md`).
@@ -58,11 +58,7 @@ What exists, with where its reasoning lives. History is in git.
    gate health ("gates ready X/Y") and pausing decoders outside a live stage
    (`architecture.md`). Also `shutdown` — "shut down all gates" after the
    event, refused while a stage is active.
-4. **Gate shutdown from gate-config** — protects the SD card. A sudoers rule
-   for `systemctl poweroff` in `install-gate-pi.sh` beside the existing ones,
-   an endpoint, a confirmed button. No auth, like Wi-Fi reset: the closed
-   network is the boundary until auth lands.
-5. **Versions** — `package.json` versions are all `0.0.1` and never bumped, so
+4. **Versions** — `package.json` versions are all `0.0.1` and never bumped, so
    report the git commit instead — stamped once at build time into a
    `version.json`, read at startup, never `git` at runtime. Gate: the
    installer builds on the Pi, so its build writes the file; `version` goes in
