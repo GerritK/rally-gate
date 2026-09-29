@@ -56,12 +56,41 @@ What exists, with where its reasoning lives. History is in git.
    (two ordered gates reading reliably); settle the `-t` question first.
 3. **Gate control channel** — server → gate `sync`/`ready`/`stage-stopped`, for
    gate health ("gates ready X/Y") and pausing decoders outside a live stage
-   (`architecture.md`).
+   (`architecture.md`). Also `shutdown` — "shut down all gates" after the
+   event, refused while a stage is active.
+4. **Gate shutdown from gate-config** — protects the SD card. A sudoers rule
+   for `systemctl poweroff` in `install-gate-pi.sh` beside the existing ones,
+   an endpoint, a confirmed button. No auth, like Wi-Fi reset: the closed
+   network is the boundary until auth lands.
+5. **Versions** — `package.json` versions are all `0.0.1` and never bumped, so
+   report the git commit instead — stamped once at build time into a
+   `version.json`, read at startup, never `git` at runtime. Gate: the
+   installer builds on the Pi, so its build writes the file; `version` goes in
+   the heartbeat, shown in gate-config and the dashboard's gate list. Server:
+   shown in the dashboard; the standalone package writes it in
+   `package-standalone.js`, Docker has no `.git` in its context and gets it as
+   a build arg. The actual payoff: warn when a gate runs a different commit
+   than the server.
 
 ## Deliberately deferred
 
 - **GPS/PPS per gate** — waiting on hardware (`decoder-adapters.md` "Hardware
   notes").
+- **Gate updates from the server** — rally WiFi is closed, so gates can't reach
+  GitHub in the field; rally-server has to distribute the update. Never
+  automatic: a manual "update now" outside active stages, tagged releases
+  only — an unattended pull of master mid-event is the failure `CLAUDE.md`
+  warns about.
+- **Gate supply voltage** — optional `supplyVoltage` + `supplyWarnBelow` in
+  the heartbeat, the dashboard compares. The threshold lives on the gate
+  (gate-config), since the battery is gate hardware like `BEAM_EDGE` — no
+  per-gate server config. Needs an I²C chip first (the Pi has no ADC):
+  INA219/INA226 (voltage + current, preferred) or ADS1115 + divider.
+  `vcgencmd get_throttled` (5V undervoltage flag) works without hardware as a
+  fallback. Smooth over several readings with hysteresis (sensor/WiFi load
+  sags); prefer per-chemistry presets over a raw volt value, as LiFePO4's flat
+  curve warns late. A gate that dies of a flat battery only reads "offline", so
+  log the warning on the gate too.
 - **Discovery edge cases** — mDNS from a server Pi reaching gates on a physical
   LAN (only proven from a laptop and inside WSL so far), and two rally-servers on
   one network both claiming `rally-server.local`.
