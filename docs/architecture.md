@@ -89,6 +89,11 @@ gate installer installs and checks with `getent hosts`.
   announce every address, and nss-mdns picks one, so a Hyper-V switch or
   link-local address on a Windows laptop sent gates somewhere unreachable.
   Virtual adapters are filtered by name (a heuristic, see the `ponytail:` note).
+- …and answers are *sent* on the first of those addresses. Filtering the
+  records alone isn't enough: multicast-dns otherwise sends from whichever
+  adapter Node lists first, which on a laptop with Hyper-V is the vEthernet
+  switch — the answer is correct and never reaches the LAN, so gates fail with
+  `ENOTFOUND rally-server.local` while the server log says it is advertising.
 - A typed `MQTT_HOST` still wins, for networks that block multicast.
 - Headless mode runs rally-server with `network_mode: host`, because a bridged
   container can't multicast to the LAN. Consequences in `CLAUDE.md` "Field

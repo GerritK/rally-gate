@@ -62,7 +62,19 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
     const mqttPort = Number(process.env.MQTT_PORT ?? 57431);
 
     try {
-      this.bonjour = new Bonjour();
+      const lan = lanAddresses();
+      // Filtering the A records below fixes what is answered, not where:
+      // multicast-dns otherwise sends from the first non-internal IPv4 adapter
+      // Node lists, which on a Windows laptop with Hyper-V is the vEthernet
+      // switch — a correct answer that never reaches the LAN.
+      // ponytail: one LAN interface; a server on Wi-Fi *and* Ethernet answers
+      // on the first only.
+      // Typed as a ServiceConfig, but passed straight to multicast-dns.
+      this.bonjour = new Bonjour(
+        (lan.length > 0
+          ? { interface: lan[0], bind: '0.0.0.0' }
+          : {}) as ConstructorParameters<typeof Bonjour>[0],
+      );
       this.service = this.bonjour.publish({
         name: host.replace(/\.local$/, ''),
         type: 'rally-gate',
@@ -84,7 +96,6 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
       const allRecords = this.service.records.bind(
         this.service,
       ) as Service['records'];
-      const lan = lanAddresses();
       if (lan.length > 0) {
         this.service.records = () =>
           allRecords().filter(
