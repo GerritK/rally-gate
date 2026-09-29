@@ -2,7 +2,8 @@
 
 `apps/gate-config`: a page on each gate Pi, at
 `http://<gate-hostname>.local:57439`, so a marshal can check and reconfigure a
-gate without SSH or re-running the installer. Built and verified on a Pi.
+gate without SSH or re-running the installer — or from the link next to an
+online gate on the dashboard's Hardware page. Built and verified on a Pi.
 
 **Separate from `gate-agent` on purpose.** gate-agent runs under
 `Restart=always`, so a config that makes it exit becomes a crash loop — and a UI

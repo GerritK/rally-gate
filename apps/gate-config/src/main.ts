@@ -1,3 +1,4 @@
+import { VERSION } from '@rally-gate/shared';
 import express from 'express';
 import { existsSync } from 'fs';
 import { createServer } from 'http';
@@ -82,7 +83,7 @@ app.get('/api/status', async (_req, res) => {
     clockTracking(),
     recentLog(),
   ]);
-  res.json({ agent, clock, log });
+  res.json({ agent, clock, log, version: VERSION });
 });
 
 /**

@@ -88,6 +88,19 @@ describe('GatesService.recordHeartbeat', () => {
     expect(gate?.clockOffsetMs).toBe(4_000);
   });
 
+  it('records the address the heartbeat came from, without the IPv4-mapped prefix', async () => {
+    const { service } = makeService({ existingGate: { id: 'GATE1' } });
+
+    const gate = await service.recordHeartbeat(
+      'GATE1',
+      {},
+      new Date(),
+      '::ffff:192.168.1.23',
+    );
+
+    expect(gate?.address).toBe('192.168.1.23');
+  });
+
   it('leaves a previous offset alone when a heartbeat carries no sentAt', async () => {
     // An older gate-agent still counts as alive; "no measurement" must not
     // be confused with "measured zero".

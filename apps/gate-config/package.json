@@ -12,6 +12,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@rally-gate/shared": "0.0.1",
     "express": "^5.1.0"
   },
   "devDependencies": {

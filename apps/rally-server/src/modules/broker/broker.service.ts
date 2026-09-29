@@ -5,7 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { createServer, Server } from 'net';
+import { createServer, Server, Socket } from 'net';
 import Aedes from 'aedes';
 
 @Injectable()
@@ -31,6 +31,7 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
       this.events.emit('mqtt.message', {
         topic: packet.topic,
         payload: packet.payload,
+        address: (client.conn as Socket).remoteAddress,
       });
     });
 

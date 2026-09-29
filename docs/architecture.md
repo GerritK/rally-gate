@@ -20,10 +20,22 @@ mode has nothing external to install.
 ## Gate discovery & heartbeat
 
 - `gate-agent` publishes a heartbeat every `HEARTBEAT_INTERVAL_MS` (15s) with
-  `sentAt` and `capabilities` (the adapter it runs). A heartbeat from an unknown
+  `sentAt`, `capabilities` (the adapter it runs) and `version`. A heartbeat from an unknown
   `gateId` auto-creates a `Gate` row, unless the `autoDiscoverGates` setting is
   off. Gates can also be added by hand on the Hardware page.
 - Online/offline is `now - lastHeartbeatAt > 30s`, computed in the dashboard.
+- `Gate.address` is the remote address of the gate's MQTT connection, stored
+  per heartbeat — observed rather than reported, because a gate on Wi-Fi,
+  Ethernet and its own hotspot can't know which address the rally network
+  reaches. The Hardware page links an online gate's gate-config through it.
+- **Versions are the git build, not `package.json`** (all `0.0.1`, never
+  bumped). `packages/shared`'s build writes `git describe --tags --always
+  --dirty` into `dist/version.js` as `VERSION`, so every app that builds shared
+  carries it with no runtime `git` and nothing to resolve in the standalone
+  bundle. Docker has no `.git`, so compose passes `RALLY_GATE_VERSION` as a
+  build arg (`install-server-pi.sh` sets it); without it the version reads
+  `unknown`. The Hardware page flags a gate whose version differs from the
+  server's.
 - **`GATE_ID` should carry a club prefix** (`CLUB_START_WP1`). The server
   enforces no format, and two clubs' gates on one network with the same id
   would silently merge into one `Gate` row.

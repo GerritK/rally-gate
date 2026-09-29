@@ -16,13 +16,17 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
-  it('/api (GET)', () => {
+  it('/api/version (GET)', () => {
     // Under /api since the dashboard is served from the same origin at `/`
     // — see setGlobalPrefix in main.ts.
     return request(app.getHttpServer())
-      .get('/api')
+      .get('/api/version')
       .expect(200)
-      .expect('Hello World!');
+      .expect((res) =>
+        expect(typeof (res.body as { version: unknown }).version).toBe(
+          'string',
+        ),
+      );
   });
 
   afterEach(async () => {

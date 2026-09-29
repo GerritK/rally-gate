@@ -3,6 +3,7 @@ import {
   heartbeatTopicFor,
   DetectionEvent,
   GateHeartbeat,
+  VERSION,
 } from '@rally-gate/shared';
 import mqtt from 'mqtt';
 import { ulid } from 'ulid';
@@ -52,6 +53,7 @@ function publishHeartbeat() {
   // for redelivery would only report staleness as freshness.
   const heartbeat: GateHeartbeat = {
     capabilities: ADAPTER,
+    version: VERSION,
     // Stamped here rather than anywhere upstream: the server subtracts this
     // from arrival time to estimate this gate's clock offset, so it has to be
     // read as late as possible before the packet goes out.

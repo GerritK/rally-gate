@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { buildDatabaseConfig } from './config/database.config';
 import { BrokerModule } from './modules/broker/broker.module';
 import { ClassificationModule } from './modules/classification/classification.module';
@@ -37,6 +36,5 @@ import { VehiclesModule } from './modules/vehicles/vehicles.module';
     EventFilesModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}

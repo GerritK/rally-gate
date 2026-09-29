@@ -6,6 +6,7 @@ Anything outside `/api` that isn't a file returns `index.html`.
 
 | Endpoint | Methods | Notes |
 |---|---|---|
+| `/version` | GET | `{ version }`, the server's build — see "Gate discovery & heartbeat" in `architecture.md` |
 | `/gates` | GET, `/:id` GET/PUT/DELETE | hardware identity only (PUT sets the name). Auto-created from a first heartbeat unless `autoDiscoverGates` is off |
 | `/gate-assignments` | GET, POST, `/:id` DELETE | the (gate, stage, role, splitIndex) plan. `active` is not settable — activation is per stage |
 | `/vehicles` | GET, POST, `/:id` GET/PATCH | `startNumber` is unique, POST/PATCH 409 on a clash |

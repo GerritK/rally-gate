@@ -14,6 +14,17 @@ export class Gate {
   @Column({ nullable: true })
   capabilities?: string;
 
+  @Column({ nullable: true })
+  version?: string;
+
+  /**
+   * Where this gate's MQTT connection comes from — observed, not reported,
+   * since a gate with Wi-Fi, Ethernet and a hotspot can't tell which of its
+   * addresses the rally network reaches. The dashboard links gate-config here.
+   */
+  @Column({ nullable: true })
+  address?: string;
+
   /**
    * Latest measured difference between this gate's clock and the server's,
    * from the `sentAt` in its heartbeat: `arrivedAt - sentAt`. **Positive

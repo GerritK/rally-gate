@@ -102,6 +102,20 @@ describe('server-owned fields are not settable through the API', () => {
       { name: 'Start', lastHeartbeatAt: new Date().toISOString() },
       'lastHeartbeatAt',
     ],
+    // Would hide that a gate runs a different build than the server.
+    [
+      'Gate.version',
+      UpsertGateDto,
+      { name: 'Start', version: 'v1' },
+      'version',
+    ],
+    // Would point the dashboard's gate-config link at another host.
+    [
+      'Gate.address',
+      UpsertGateDto,
+      { name: 'Start', address: '10.0.0.66' },
+      'address',
+    ],
     // Would make a gate live while skipping the cross-stage conflict check.
     [
       'GateAssignment.active',

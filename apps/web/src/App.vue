@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue';
 import { fetchEventInfo } from './api/event';
 import { fetchRallyInfo, rallyName } from './api/rally-info';
+import { fetchServerVersion, serverVersion } from './api/version';
 import { eventName } from './format';
 import { NAV_ITEMS } from './router';
 
@@ -10,6 +11,7 @@ const drawer = ref(true);
 const fileName = ref('');
 
 onMounted(async () => {
+  void fetchServerVersion();
   await fetchRallyInfo();
   fileName.value = eventName((await fetchEventInfo()).file);
 });
@@ -37,6 +39,11 @@ onMounted(async () => {
           :title="item.label"
         />
       </v-list>
+      <template #append>
+        <div class="text-caption text-medium-emphasis pa-4">
+          Rally Gate {{ serverVersion }}
+        </div>
+      </template>
     </v-navigation-drawer>
     <v-main>
       <v-container fluid class="py-6">

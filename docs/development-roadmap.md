@@ -34,6 +34,9 @@ What exists, with where its reasoning lives. History is in git.
   Vehicles (`frontend-structure.md`).
 - **Gate config UI:** settings, status, Wi-Fi, hotspot fallback, Wi-Fi reset;
   verified on a Pi. Shutdown built, not yet tried on a Pi (`gate-config-ui.md`).
+- **Versions:** git build stamped into `packages/shared`, reported by gates in
+  the heartbeat, shown in gate-config and the dashboard, mismatch flagged
+  (`architecture.md`).
 - **Deployment:** SQLite standalone and Postgres headless from one codebase,
   rally-server serving the dashboard under one port, Windows firewall rules on
   first start, Pi installers for server and gates (`deployment-modes.md`).
@@ -58,15 +61,6 @@ What exists, with where its reasoning lives. History is in git.
    gate health ("gates ready X/Y") and pausing decoders outside a live stage
    (`architecture.md`). Also `shutdown` — "shut down all gates" after the
    event, refused while a stage is active.
-4. **Versions** — `package.json` versions are all `0.0.1` and never bumped, so
-   report the git commit instead — stamped once at build time into a
-   `version.json`, read at startup, never `git` at runtime. Gate: the
-   installer builds on the Pi, so its build writes the file; `version` goes in
-   the heartbeat, shown in gate-config and the dashboard's gate list. Server:
-   shown in the dashboard; the standalone package writes it in
-   `package-standalone.js`, Docker has no `.git` in its context and gets it as
-   a build arg. The actual payoff: warn when a gate runs a different commit
-   than the server.
 
 ## Deliberately deferred
 

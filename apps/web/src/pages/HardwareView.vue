@@ -13,6 +13,7 @@ import {
 } from '../api/gate-assignments';
 import { deleteGate, fetchGates, upsertGate, type Gate } from '../api/gates';
 import { openLiveStream } from '../api/live';
+import { serverVersion } from '../api/version';
 import { fetchSetting, saveSetting } from '../api/settings';
 import { fetchStages, type Stage } from '../api/stages';
 import { formatClockTime, formatRelativeTime } from '@rally-gate/ui';
@@ -45,6 +46,11 @@ const deleteConflictGate = ref<Gate | null>(null);
 const deleteConflictMessage = ref('');
 /** Null when this server keeps no per-computer list (DB_PATH, Postgres). */
 const knownGates = ref<KnownGate[] | null>(null);
+
+/** gate-config's fixed port, see the port table in CLAUDE.md. */
+function gateConfigUrl(address: string): string {
+  return `http://${address.includes(':') ? `[${address}]` : address}:57439/`;
+}
 
 const gateIds = computed(() => new Set(gates.value.map((g) => g.id)));
 
@@ -188,12 +194,24 @@ onUnmounted(() => {
             <th>Last Heartbeat</th>
             <th>Clock</th>
             <th>Capabilities</th>
+            <th>Version</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="gate in gates" :key="gate.id">
-            <td>{{ gate.id }}</td>
+            <td class="text-no-wrap">
+              {{ gate.id }}
+              <v-btn
+                v-if="gate.address && isOnline(gate, now)"
+                :href="gateConfigUrl(gate.address)"
+                target="_blank"
+                icon="mdi-open-in-new"
+                size="x-small"
+                variant="text"
+                :title="`Open gate config (${gate.address})`"
+              />
+            </td>
             <td>
               <v-text-field
                 v-if="editingGateId === gate.id"
@@ -261,6 +279,24 @@ onUnmounted(() => {
               </v-tooltip>
             </td>
             <td>{{ gate.capabilities ?? '-' }}</td>
+            <td>
+              <!-- A gate on another build than the server is the one to
+                   re-install before the event, not a curiosity. -->
+              <v-chip
+                v-if="
+                  gate.version &&
+                  serverVersion &&
+                  gate.version !== serverVersion
+                "
+                size="small"
+                color="warning"
+                prepend-icon="mdi-alert"
+                :title="`Server runs ${serverVersion}`"
+              >
+                {{ gate.version }}
+              </v-chip>
+              <span v-else>{{ gate.version ?? '-' }}</span>
+            </td>
             <td>
               <v-btn
                 size="small"

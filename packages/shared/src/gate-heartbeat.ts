@@ -1,7 +1,7 @@
 /**
  * Payload of `rally/gates/<gateId>/heartbeat`.
  *
- * Both fields are optional so a gate running an older build still registers
+ * Every field is optional so a gate running an older build still registers
  * and still counts as alive — a heartbeat's primary job is liveness, and
  * losing clock-offset measurement is not a reason to drop it.
  */
@@ -17,4 +17,7 @@ export interface GateHeartbeat {
    * measures the clock as it is now rather than as it was at boot.
    */
   sentAt?: string;
+
+  /** The gate's build (`VERSION`), mirrored onto `Gate.version`. */
+  version?: string;
 }

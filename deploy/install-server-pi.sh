@@ -44,7 +44,8 @@ if [ -n "$(sudo docker compose ps --status running --quiet postgres 2>/dev/null 
   echo "   restore with: sudo docker compose exec -T postgres psql -U rally rally_gate < $BACKUP"
 fi
 
-sudo docker compose up -d --build
+# sudo drops the environment, hence the assignment inside it.
+sudo env RALLY_GATE_VERSION="$(git -C "$INSTALL_DIR" describe --tags --always --dirty)" docker compose up -d --build
 
 IP=$(hostname -I | awk '{print $1}')
 echo "rally-server running — dashboard: http://$IP:57430  (API under http://$IP:57430/api)"

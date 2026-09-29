@@ -19,6 +19,8 @@ COPY packages/shared packages/shared
 COPY packages/ui packages/ui
 COPY apps/rally-server apps/rally-server
 COPY apps/web apps/web
+# No .git in the build context, so the version comes in from compose.
+ARG RALLY_GATE_VERSION
 RUN npm run build --workspace=@rally-gate/shared
 RUN npm run build --workspace=@rally-gate/rally-server
 # The dashboard is served by rally-server itself in headless mode, so it has

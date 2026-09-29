@@ -103,9 +103,11 @@ export class GatesService {
   async handleMqttMessage({
     topic,
     payload,
+    address,
   }: {
     topic: string;
     payload: Buffer;
+    address?: string;
   }) {
     const match = HEARTBEAT_TOPIC_REGEX.exec(topic);
     if (!match) {
@@ -120,7 +122,7 @@ export class GatesService {
     }
     // Arrival is read here, at the edge, so the offset measures transit
     // rather than however long this handler queued behind other work.
-    await this.recordHeartbeat(gateId, heartbeat, new Date());
+    await this.recordHeartbeat(gateId, heartbeat, new Date(), address);
   }
 
   /**
@@ -151,6 +153,7 @@ export class GatesService {
     gateId: string,
     heartbeat: GateHeartbeat = {},
     arrivedAt: Date = new Date(),
+    address?: string,
   ): Promise<Gate | null> {
     let gate = await this.gates.findOneBy({ id: gateId });
     if (!gate) {
@@ -169,6 +172,12 @@ export class GatesService {
         0,
         MAX_CAPABILITIES_LENGTH,
       );
+    }
+    if (address) {
+      gate.address = address.replace(/^::ffff:/, '');
+    }
+    if (typeof heartbeat.version === 'string' && heartbeat.version) {
+      gate.version = heartbeat.version.slice(0, MAX_CAPABILITIES_LENGTH);
     }
     const offsetMs = measureClockOffsetMs(heartbeat.sentAt, arrivedAt);
     if (offsetMs !== null) {

@@ -28,6 +28,8 @@ services:
     build:
       context: ..
       dockerfile: apps/rally-server/Dockerfile
+      args:
+        RALLY_GATE_VERSION: ${RALLY_GATE_VERSION:-}
     restart: unless-stopped
     depends_on:
       postgres:

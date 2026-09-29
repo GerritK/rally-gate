@@ -38,6 +38,7 @@ const status = ref<{
   agent: CommandResult;
   clock: CommandResult;
   log: CommandResult;
+  version: string;
 } | null>(null);
 
 const saving = ref(false);
@@ -551,6 +552,11 @@ onUnmounted(() => clearInterval(statusTimer));
         <v-card>
           <v-card-title>Status</v-card-title>
           <v-card-text>
+            <div class="text-medium-emphasis text-caption mb-1">Version</div>
+            <div class="rg-timing mb-4">
+              {{ status?.version ?? 'unavailable' }}
+            </div>
+
             <div class="text-medium-emphasis text-caption mb-1">Clock</div>
             <pre class="rg-timing status-block mb-4">{{
               status?.clock.output || 'unavailable'

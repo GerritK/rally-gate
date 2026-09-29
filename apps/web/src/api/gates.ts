@@ -5,6 +5,9 @@ export interface Gate {
   name: string;
   lastHeartbeatAt?: string;
   capabilities?: string;
+  version?: string;
+  /** Where its MQTT connection comes from, i.e. where gate-config listens. */
+  address?: string;
   /**
    * Measured gap between this gate's clock and the server's, in ms.
    * Positive = the gate is behind. Null until a heartbeat carrying `sentAt`
