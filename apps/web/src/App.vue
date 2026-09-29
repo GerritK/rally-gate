@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watchEffect } from 'vue';
 import { fetchEventInfo } from './api/event';
 import { fetchRallyInfo, rallyName } from './api/rally-info';
 import { fetchServerVersion, serverVersion } from './api/version';
@@ -9,6 +9,11 @@ import { NAV_ITEMS } from './router';
 const drawer = ref(true);
 /** For an event whose rally details were never filled in. */
 const fileName = ref('');
+
+watchEffect(() => {
+  const event = rallyName.value || fileName.value;
+  document.title = event ? `${event} · Rally Gate` : 'Rally Gate';
+});
 
 onMounted(async () => {
   void fetchServerVersion();

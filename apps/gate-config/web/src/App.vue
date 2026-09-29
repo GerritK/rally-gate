@@ -74,7 +74,7 @@ const gateName = computed(() => originalGateId.value || 'unconfigured gate');
 // end.
 watchEffect(() => {
   document.title = originalGateId.value
-    ? `${originalGateId.value} - Gate Config`
+    ? `${originalGateId.value} · Gate Config`
     : 'Gate Config';
 });
 
