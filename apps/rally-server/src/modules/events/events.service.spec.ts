@@ -19,16 +19,21 @@ function makeService(opts: {
   stageStatus?: StageStatus;
   assignment?: unknown;
   stored?: unknown;
+  alreadyStored?: boolean;
+  insert?: jest.Mock;
 }) {
   const saved: DetectionEventRecord[] = [];
+  const write = (r: DetectionEventRecord) => {
+    saved.push({ ...r });
+    return Promise.resolve(r);
+  };
   const events = {
     create: jest
       .fn()
       .mockImplementation((r: DetectionEventRecord) => ({ ...r })),
-    save: jest.fn().mockImplementation((r: DetectionEventRecord) => {
-      saved.push({ ...r });
-      return Promise.resolve(r);
-    }),
+    insert: opts.insert ?? jest.fn().mockImplementation(write),
+    save: jest.fn().mockImplementation(write),
+    existsBy: jest.fn().mockResolvedValue(opts.alreadyStored ?? false),
     find: jest.fn().mockResolvedValue(opts.pending ?? []),
     findOneBy: jest.fn().mockResolvedValue(opts.stored ?? null),
   };
@@ -175,6 +180,45 @@ describe('EventsService detection failures', () => {
       expect(saved.at(-1)).toMatchObject({ processed: true });
     },
   );
+});
+
+describe('EventsService redelivered detections', () => {
+  // QoS 1 is at-least-once: a lost PUBACK makes the gate publish again.
+  it('leaves an already stored detection untouched', async () => {
+    const { service, events, saved, startRun, emitter } = makeService({
+      alreadyStored: true,
+    });
+
+    await service.handleMqttMessage(detection());
+
+    // A rewrite would re-measure the clock correction and un-assign a passing
+    // a marshal already timed.
+    expect(saved).toHaveLength(0);
+    expect(events.insert).not.toHaveBeenCalled();
+    expect(startRun).not.toHaveBeenCalled();
+    expect(emitter.emit).not.toHaveBeenCalled();
+  });
+
+  it('drops the loser of two concurrent deliveries', async () => {
+    const { service, events, startRun } = makeService({
+      insert: jest.fn().mockRejectedValue(new Error('UNIQUE constraint')),
+    });
+    events.existsBy.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+    await expect(service.handleMqttMessage(detection())).resolves.not.toThrow();
+
+    expect(startRun).not.toHaveBeenCalled();
+  });
+
+  it('still fails loudly when the insert fails for another reason', async () => {
+    const { service } = makeService({
+      insert: jest.fn().mockRejectedValue(new Error('SQLITE_FULL')),
+    });
+
+    await expect(service.handleMqttMessage(detection())).rejects.toThrow(
+      'SQLITE_FULL',
+    );
+  });
 });
 
 describe('EventsService detection payload validation', () => {

@@ -289,6 +289,9 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async processDetection(detection: DetectionEvent): Promise<void> {
+    if (await this.isDuplicate(detection.eventId)) {
+      return;
+    }
     const gate = await this.gatesService.findOne(detection.gateId);
     if (!gate) {
       this.logger.warn(
@@ -332,13 +335,37 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       rawPayload: JSON.stringify(detection),
       processed: false,
     });
-    await this.events.save(record);
+    try {
+      await this.events.insert(record);
+    } catch (err) {
+      // Two deliveries of one detection can both pass the check above when
+      // they're handled concurrently; the primary key decides which one wins.
+      if (await this.isDuplicate(detection.eventId)) {
+        return;
+      }
+      throw err;
+    }
     this.emitter.emit('detection.created', record);
     if (awaitingVehicle) {
       await this.emitAwaitingChanged();
     }
 
     await this.applyRulesForRecord(record);
+  }
+
+  /**
+   * QoS 1 is at-least-once: a gate that never saw the PUBACK republishes a
+   * detection the server already stored. The stored record must win — a
+   * re-ingest would re-measure `clockCorrectionMs` and, for a passing a
+   * marshal already assigned, clear `vehicleId` and list it as awaiting again.
+   * `save()` would do exactly that, as it upserts on the primary key.
+   */
+  private async isDuplicate(eventId: string): Promise<boolean> {
+    if (!(await this.events.existsBy({ eventId }))) {
+      return false;
+    }
+    this.logger.debug(`Ignoring redelivered detection ${eventId}`);
+    return true;
   }
 
   /**
