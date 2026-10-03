@@ -37,8 +37,11 @@ defineEmits<{
           {{ gateName }}
         </div>
       </div>
-      <!-- Fixed width: sized to its content, picking a driver would resize it
-         and shift the buttons under the marshal's pointer. -->
+    </div>
+    <!-- Its own row, the select filling it: sized to its content, picking a
+         driver would resize it and shift the buttons under the marshal's
+         pointer, and sharing the first row it wrapped apart in a narrow card. -->
+    <div class="rg-passing-actions">
       <v-select
         :model-value="vehicleId"
         :items="vehicleOptions"
@@ -113,11 +116,14 @@ defineEmits<{
   background: rgba(var(--v-theme-warning), 0.1);
   border-radius: 4px;
 }
-.rg-passing-main {
+.rg-passing-main,
+.rg-passing-actions {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
+}
+.rg-passing-actions {
+  margin-top: 8px;
 }
 .rg-passing-queued {
   margin-top: 8px;
@@ -125,10 +131,11 @@ defineEmits<{
   border-top: 1px solid rgba(var(--v-theme-warning), 0.3);
 }
 .rg-passing-what {
-  flex: 1 1 140px;
+  flex: 1 1 auto;
   min-width: 0;
 }
 .rg-passing-vehicle {
-  flex: 0 0 240px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 </style>
