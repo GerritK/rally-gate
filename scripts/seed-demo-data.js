@@ -47,7 +47,7 @@ async function main() {
   console.log(await post('/stages/WP1/activate'));
   console.log(
     await post('/vehicles', {
-      startNumber: '12',
+      startNumber: 12,
       driverName: 'Demo Driver',
       transponderId: '1234567',
     }),

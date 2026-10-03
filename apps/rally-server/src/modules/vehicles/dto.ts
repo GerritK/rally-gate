@@ -3,8 +3,10 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsInt,
   IsNotEmpty,
   IsOptional,
+  IsPositive,
   IsString,
   ValidateIf,
 } from 'class-validator';
@@ -15,9 +17,9 @@ import {
  * the save at a different row.
  */
 export class CreateVehicleDto {
-  @IsString()
-  @IsNotEmpty()
-  startNumber: string;
+  @IsInt()
+  @IsPositive()
+  startNumber: number;
 
   @IsString()
   @IsNotEmpty()
@@ -48,9 +50,9 @@ export class CreateVehicleDto {
 
 export class UpdateVehicleDto {
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  startNumber?: string;
+  @IsInt()
+  @IsPositive()
+  startNumber?: number;
 
   @IsOptional()
   @IsString()

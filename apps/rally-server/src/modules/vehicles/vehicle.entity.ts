@@ -13,8 +13,8 @@ export class Vehicle {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true })
-  startNumber: string;
+  @Column({ type: 'int', unique: true })
+  startNumber: number;
 
   @Column()
   driverName: string;

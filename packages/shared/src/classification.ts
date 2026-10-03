@@ -1,7 +1,8 @@
 export interface ClassificationEntry {
   position: number;
   vehicleId: string;
-  startNumber: string;
+  /** `null` only if the vehicle was deleted after it drove. */
+  startNumber: number | null;
   driverName: string;
   coDriverName?: string;
   durationMs: number;
@@ -25,7 +26,7 @@ export interface OverallClassificationEntry extends ClassificationEntry {
 export interface SplitClassificationEntry {
   position: number;
   vehicleId: string;
-  startNumber: string;
+  startNumber: number | null;
   driverName: string;
   coDriverName?: string;
   splitIndex: number;
@@ -36,7 +37,7 @@ export interface SplitClassificationEntry {
 
 export interface StageOutcomeEntry {
   vehicleId: string;
-  startNumber: string;
+  startNumber: number | null;
   driverName: string;
   coDriverName?: string;
   outcome: 'DNF' | 'DNS';

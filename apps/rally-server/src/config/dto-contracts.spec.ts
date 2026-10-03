@@ -92,6 +92,13 @@ describe('server-owned fields are not settable through the API', () => {
       { name: 'Pass', stageNumber: 1, status: 'CLOSED' },
       'status',
     ],
+    // The frozen start order is the published list; only activation writes it.
+    [
+      'Stage.startOrder on update',
+      UpdateStageDto,
+      { name: 'Pass', stageNumber: 1, startOrder: ['v1'] },
+      'startOrder',
+    ],
     // Object.assign in VehiclesService.update would retarget the save.
     [
       'Vehicle.id on update',
@@ -223,7 +230,7 @@ describe('malformed values are rejected at the boundary', () => {
 
   it('rejects an unknown vehicle status', async () => {
     const messages = await rejectionMessages(CreateVehicleDto, {
-      startNumber: '1',
+      startNumber: 1,
       driverName: 'A',
       status: 'VIBING',
     });

@@ -39,3 +39,43 @@ input[type='time']::-webkit-calendar-picker-indicator {
   font-family: 'Barlow Condensed', sans-serif;
   font-weight: 600;
 }
+
+/*
+ * Printing (a posted start list). The dark theme's light text would land on
+ * white paper, since browsers drop backgrounds, so flip the theme to black on
+ * white. Vuetify re-applies the theme class on every themed component
+ * (v-card, v-table…), so the override has to sit on each of them, not just on
+ * .v-application. The app shell is fixed-position and would print over the
+ * content. Hide page controls with Vuetify's own `d-print-none`.
+ */
+@media print {
+  @page {
+    margin: 12mm;
+  }
+  [class*='v-theme--'] {
+    --v-theme-background: 255, 255, 255 !important;
+    --v-theme-on-background: 0, 0, 0 !important;
+    --v-theme-surface: 255, 255, 255 !important;
+    --v-theme-on-surface: 0, 0, 0 !important;
+    --v-medium-emphasis-opacity: 0.8 !important;
+  }
+  /* color-scheme: dark is what paints the page margins, not a background. */
+  :root {
+    color-scheme: light !important;
+  }
+  html,
+  body,
+  .v-application {
+    background: white !important;
+  }
+  .v-app-bar,
+  .v-navigation-drawer {
+    display: none !important;
+  }
+  .v-main {
+    padding: 0 !important;
+  }
+  .v-main > .v-container {
+    padding: 0 !important;
+  }
+}

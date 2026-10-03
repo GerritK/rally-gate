@@ -34,11 +34,11 @@ describe('isUniqueViolation', () => {
   it('recognises a duplicate on a plain unique column', async () => {
     const vehicles = dataSource.getRepository(Vehicle);
     await vehicles.save(
-      vehicles.create({ startNumber: '7', driverName: 'First' }),
+      vehicles.create({ startNumber: 7, driverName: 'First' }),
     );
 
     const err = await vehicles
-      .save(vehicles.create({ startNumber: '7', driverName: 'Second' }))
+      .save(vehicles.create({ startNumber: 7, driverName: 'Second' }))
       .then(
         () => null,
         (e: unknown) => e,

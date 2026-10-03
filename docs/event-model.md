@@ -131,3 +131,41 @@ so who is classified, which stages count and every notional come from within
 that group. No hierarchy (Rookie *under* 2WD): categories exist in every main
 class, and "all Rookies" must stay a ranking of its own. The overall ranking
 always includes everyone.
+
+## Start order
+
+The official start list per stage: what the announcer reads out and what gets
+posted. It is also the reference for later work: unassigned-passing
+suggestions, planned start times, and penalties for starting out of order.
+
+**Computed**, per stage, from three event-wide settings that are independent of
+each other:
+
+- **Grouping**: by main class, or none. Blocks go in alphabetical order of class
+  name, and vehicles with no main class start last. A vehicle in several main
+  classes counts under the first one alphabetically, because the server doesn't
+  stop that from happening.
+- **Key within a group**: start number, overall time, or last stage time.
+- **Direction**: fastest first or slowest first. It has no effect when the key
+  is the start number.
+
+Vehicles with no value for the key go to the end of their group. Ties, and those
+vehicles at the end, are always ordered by start number. That also covers stage 1
+under "last stage time". **Overall time** comes from the group's own ranking
+(the main class ranking when grouping by class), because notionals depend on the
+ranking. Otherwise the list would contradict the class results posted next to
+it. **Last stage time** is from the most recent `CLOSED` stage with a lower
+`stageNumber`, which is consistent with overall time counting only closed
+stages. Nobody is left off: retired and DNS crews stay in the list, because at
+a hobby event a crew that has fixed its car gets to drive again.
+
+**Frozen when published.** Until then the list is computed live, so a time
+correction on an earlier stage still moves it. Freezing stores it on the stage
+as a snapshot of vehicle ids with `startOrderFrozenAt` (the "as of" on a
+posted copy), and it is never recomputed. A marshal freezes it when posting or
+announcing it (`POST /stages/:id/start-order/freeze`); otherwise the first
+activation does. Unfreezing is only allowed while the stage is `NOT_STARTED`,
+to fix a wrongly posted list: once a stage runs, its list is what starts are
+measured against. A crew registered after that is added at the end, ordered by
+start number. A time-based list that kept moving after it was announced would
+be a different list from the one posted.

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 
 export const NAV_ITEMS = [
   { to: '/live', label: 'Live Timing', icon: 'mdi-timer-outline' },
+  { to: '/start-list', label: 'Start List', icon: 'mdi-format-list-numbered' },
   { to: '/results/overall', label: 'Results', icon: 'mdi-podium' },
   { to: '/vehicles', label: 'Vehicles', icon: 'mdi-car' },
   { to: '/hardware', label: 'Hardware', icon: 'mdi-router-wireless' },
@@ -13,6 +14,11 @@ export const router = createRouter({
   routes: [
     { path: '/', redirect: '/live' },
     { path: '/live', component: () => import('./pages/LiveView.vue') },
+    {
+      path: '/start-list/:stageId?',
+      component: () => import('./pages/StartListView.vue'),
+      props: true,
+    },
     {
       path: '/results/overall',
       component: () => import('./pages/ResultsOverallView.vue'),
@@ -30,6 +36,10 @@ export const router = createRouter({
     {
       path: '/setup/classes',
       component: () => import('./pages/SetupClassesView.vue'),
+    },
+    {
+      path: '/setup/start-order',
+      component: () => import('./pages/SetupStartOrderView.vue'),
     },
     {
       path: '/setup/scoring',

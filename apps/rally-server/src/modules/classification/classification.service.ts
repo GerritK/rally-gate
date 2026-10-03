@@ -198,7 +198,7 @@ export class ClassificationService {
       return {
         position: index + 1,
         vehicleId: pair.run.vehicleId,
-        startNumber: vehicle?.startNumber ?? '?',
+        startNumber: vehicle?.startNumber ?? null,
         driverName: vehicle?.driverName ?? 'Unknown',
         coDriverName: vehicle?.coDriverName ?? undefined,
         splitIndex,
@@ -230,7 +230,7 @@ export class ClassificationService {
       const vehicle = vehicleById.get(vehicleId);
       return {
         vehicleId,
-        startNumber: vehicle?.startNumber ?? '?',
+        startNumber: vehicle?.startNumber ?? null,
         driverName: vehicle?.driverName ?? 'Unknown',
         coDriverName: vehicle?.coDriverName ?? undefined,
         outcome,
@@ -303,7 +303,7 @@ export class ClassificationService {
       return {
         position: index + 1,
         vehicleId: entry.vehicleId,
-        startNumber: vehicle?.startNumber ?? '?',
+        startNumber: vehicle?.startNumber ?? null,
         driverName: vehicle?.driverName ?? 'Unknown',
         coDriverName: vehicle?.coDriverName ?? undefined,
         durationMs: entry.durationMs,

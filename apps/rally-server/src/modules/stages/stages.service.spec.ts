@@ -57,6 +57,7 @@ function makeService(initialStages: StageRow[]) {
     service: new StagesService(
       stages as never,
       gateAssignmentsService as never,
+      { emitAsync: jest.fn().mockResolvedValue([]) } as never,
     ),
     gateAssignmentsService,
     state,

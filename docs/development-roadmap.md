@@ -30,6 +30,11 @@ What exists, with where its reasoning lives. History is in git.
   (`architecture.md` "Clock offset", `deployment-modes.md` "Time sync").
 - **Discovery:** mDNS `rally-server.local`, so a gate install needs no address
   (`architecture.md` "Server discovery").
+- **Start order:** integer start numbers, per-stage start list grouped by main
+  class and sorted by start number, overall or last stage time in either
+  direction, one card per main class, frozen by hand when posted or on first
+  activation, printable with an "as of" time (`event-model.md`
+  "Start order").
 - **Dashboard:** multi-page `apps/web` — Live Timing, Results, Setup, Hardware,
   Vehicles (`frontend-structure.md`).
 - **Gate config UI:** settings, status, Wi-Fi, hotspot fallback, Wi-Fi reset;
@@ -53,7 +58,16 @@ What exists, with where its reasoning lives. History is in git.
 
 ## Next
 
-Nothing queued; OpenStint (below) resumes when the hardware arrives.
+- **Marshal view on the start list**: Live Timing rebuilt around one table,
+  every vehicle in start order with its run status (waiting, on stage,
+  finished, DNF, voided), times and corrections, and the next car highlighted.
+  Unassigned passings pre-select that car. The manual-run form becomes a row
+  action on a waiting car, the raw detections feed moves out of the way
+  (Hardware, or collapsed), and the Start List page merges into it, with
+  printing kept as a print stylesheet. Stage choice becomes one
+  `StagePicker.vue` (a chip row, one tap, status icon per stage incl. a frozen
+  start list) used there, on the Start List and on stage Results, replacing
+  the three dropdowns.
 
 ## Deliberately deferred
 
@@ -87,6 +101,11 @@ Nothing queued; OpenStint (below) resumes when the hardware arrives.
   undesigned; don't grow Setup UI for them speculatively. When checkpoint
   interval times land, give them their own formatter rather than reusing
   `formatStageDuration` (see `packages/ui/src/format.ts`).
+- **Manual start-order edits** on the frozen snapshot (late entry, car moved
+  to the back after a repair, swaps). Until then, change start numbers before
+  activation.
+- **Out-of-order start penalties**, measured against the frozen start order.
+  They depend on penalties as a whole (Rally controls, above).
 - **Start order suggestions** for unassigned passings — once a start order
   exists, pre-select a vehicle, never assign it: a wrong assignment is a wrong
   time nobody notices in the classification, so the marshal always confirms.

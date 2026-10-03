@@ -15,6 +15,10 @@ type VehicleInput = Partial<Omit<Vehicle, 'id' | 'classes'>> & {
   classIds?: string[];
 };
 
+export function compareClassNames(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
 @Injectable()
 export class VehiclesService {
   constructor(
@@ -25,7 +29,7 @@ export class VehiclesService {
   ) {}
 
   findAll(): Promise<Vehicle[]> {
-    return this.vehicles.find();
+    return this.vehicles.find({ order: { startNumber: 'ASC' } });
   }
 
   findOne(id: string): Promise<Vehicle | null> {
@@ -89,11 +93,7 @@ export class VehiclesService {
   async findAllClasses(): Promise<VehicleClass[]> {
     return (await this.classes.find()).sort(
       (a, b) =>
-        Number(b.main) - Number(a.main) ||
-        a.name.localeCompare(b.name, undefined, {
-          numeric: true,
-          sensitivity: 'base',
-        }),
+        Number(b.main) - Number(a.main) || compareClassNames(a.name, b.name),
     );
   }
 

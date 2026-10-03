@@ -6,7 +6,7 @@ export { VehicleStatus };
 
 export interface Vehicle {
   id: string;
-  startNumber: string;
+  startNumber: number;
   driverName: string;
   coDriverName?: string | null;
   transponderId?: string | null;
@@ -24,7 +24,7 @@ export function fetchVehicles(): Promise<Vehicle[]> {
 }
 
 export function createVehicle(input: {
-  startNumber: string;
+  startNumber: number;
   driverName: string;
   coDriverName?: string;
   transponderId?: string;

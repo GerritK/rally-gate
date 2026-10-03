@@ -8,3 +8,4 @@ export * from './classification';
 export * from './vehicle';
 export * from './live-events';
 export * from './version';
+export * from './start-order';

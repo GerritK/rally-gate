@@ -143,6 +143,12 @@ onMounted(async () => {
       </v-card>
     </v-col>
     <v-col cols="12" sm="4">
+      <v-card to="/setup/start-order" prepend-icon="mdi-sort-numeric-ascending">
+        <v-card-title>Start order</v-card-title>
+        <v-card-text>Who starts when on each stage.</v-card-text>
+      </v-card>
+    </v-col>
+    <v-col cols="12" sm="4">
       <v-card to="/setup/scoring" prepend-icon="mdi-calculator-variant-outline">
         <v-card-title>Scoring</v-card-title>
         <v-card-text> How a stage a crew didn't finish is scored. </v-card-text>

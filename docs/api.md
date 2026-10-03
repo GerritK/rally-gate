@@ -15,6 +15,9 @@ Anything outside `/api` that isn't a file returns `index.html`.
 | `/stages` | GET, POST, `/:id` GET/PUT/DELETE | sorted by `stageNumber`; `status` is server-owned |
 | `/stages/:id/activate` | POST | activates the stage's gate assignments. 409 `{ conflictingStageIds }` if a gate is active elsewhere (`?force=true` closes that stage), 409 if already `CLOSED` |
 | `/stages/:id/close` | POST | deactivates its gates, marks it `CLOSED`. Terminal |
+| `/stages/:id/start-order` | GET | `{ frozen, frozenAt, grouped, entries }`; computed live until frozen. See `event-model.md` "Start order" |
+| `/stages/:id/start-order/freeze` | POST | stores the snapshot; no-op if already frozen (activation also freezes) |
+| `/stages/:id/start-order/unfreeze` | POST | back to live; 409 unless the stage is `NOT_STARTED` |
 | `/stage-runs` | GET, POST, `/:id` PATCH/DELETE | POST/PATCH/DELETE are manual corrections. POST 409s while a non-voided attempt exists. GET includes voided attempts |
 | `/stage-runs/:id/void`, `/unvoid` | POST | red flag / reverse it — see "Voiding" in `event-model.md`. Unvoid 409s with `{ blockingAttempt }` |
 | `/stage-runs/:id/splits` | GET | ordered by `splitIndex` |
@@ -32,7 +35,7 @@ Anything outside `/api` that isn't a file returns `index.html`.
 | `/rally-info` | GET, PUT | the event's name/details; singleton, since one database is one event |
 | `/event` | GET, POST `{ name, date }`, `/open` POST `{ file }` | the open event file and the others in the folder, `switchable: false` when fixed by config. POST creates/opens by restarting the server (202, then poll GET); 409 while a stage is `ACTIVE` — see `deployment-modes.md` |
 | `/event/known-gates` | GET, `/:id` DELETE | gates this computer remembers across events (standalone only); DELETE forgets one, the open event keeps it |
-| `/settings/:key` | GET, PUT | `autoDiscoverGates`, `clockCorrectionThresholdMs`, `notionalPenaltyMs` |
+| `/settings/:key` | GET, PUT | `autoDiscoverGates`, `clockCorrectionThresholdMs`, `notionalPenaltyMs`, `startOrderGrouping`/`startOrderKey`/`startOrderDirection` (enums in `packages/shared/src/start-order.ts`; an unknown value reads as the default) |
 
 Every mutating endpoint binds a DTO class, and unknown fields are a 400 — see
 `CLAUDE.md` for which fields are deliberately absent.

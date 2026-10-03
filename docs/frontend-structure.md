@@ -8,18 +8,25 @@ sharing `client.ts`). Audience is marshals and organisers only.
 |---|---|---|
 | `/` | — | redirect to `/live` |
 | `/live` | Live Timing | unassigned passings (assign a vehicle), detections feed, stage runs with corrections, Activate / Close Stage |
+| `/start-list/:stageId?` | Start List | a stage's start list, frozen or provisional, printable; no stage picks the active one, else the next |
 | `/results/overall` | Results | overall classification, filterable by class |
 | `/results/stages/:stageId` | Results | stage, split and DNF/DNS classification, filterable by class |
 | `/vehicles` | Vehicles | registration, inline editing, status, classes |
 | `/hardware` | Hardware | gate roster: online, heartbeat, clock offset, active assignment, add/rename/delete, auto-discovery toggle; gates known to this computer: add to this event, forget (standalone only) |
-| `/setup` | Setup | the event: rally details, file name, New / Open Event dialogs (standalone only); tiles to Stages, Classes and Scoring. The app bar shows the open event and links here |
+| `/setup` | Setup | the event: rally details, file name, New / Open Event dialogs (standalone only); tiles to Stages, Classes, Start order and Scoring. The app bar shows the open event and links here |
 | `/setup/stages` | Setup | stage list, create |
 | `/setup/stages/:stageId` | Setup | edit stage, its gate assignments (active state read-only) |
 | `/setup/classes` | Setup | vehicle classes table: add/rename/delete, main class or category, vehicle count. Assigned on Vehicles |
+| `/setup/start-order` | Setup | start order rules: grouping, key, direction. Later planned start times |
 | `/setup/scoring` | Setup | notional time penalty; later penalties |
 
 ## Decisions
 
+- **Start List is top-level**, not under Setup or Results: the announcer reads
+  it mid-event, and it says who drives next, not who won. Its rules are
+  configured under Setup. Printing is `window.print()` with the print styles in
+  `packages/ui/src/utilities.css`, no PDF library. It is meant to become the
+  backbone of a new marshal view (see the roadmap) and be absorbed into it.
 - **Split classification is under Results**, although it ranks running cars: it
   answers "who's winning", Live Timing answers "what's happening at the gates".
 - **Gate assignments live under their stage**; the gate-centric view of "what

@@ -46,7 +46,7 @@ async function onUpdateVehicle(vehicle: Vehicle, patch: VehiclePatch) {
 
 function onUpdateStartNumber(vehicle: Vehicle, value: string) {
   if (!value) return;
-  onUpdateVehicle(vehicle, { startNumber: value });
+  onUpdateVehicle(vehicle, { startNumber: Number(value) });
 }
 
 function onUpdateDriverName(vehicle: Vehicle, value: string) {
@@ -74,7 +74,7 @@ async function onCreateVehicle() {
   if (!newVehicle.value.startNumber || !newVehicle.value.driverName) return;
   try {
     await createVehicle({
-      startNumber: newVehicle.value.startNumber,
+      startNumber: Number(newVehicle.value.startNumber),
       driverName: newVehicle.value.driverName,
       coDriverName: newVehicle.value.coDriverName || undefined,
       transponderId: newVehicle.value.transponderId || undefined,
@@ -112,6 +112,8 @@ onMounted(refresh);
               <td>
                 <v-text-field
                   :model-value="vehicle.startNumber"
+                  type="number"
+                  min="1"
                   density="compact"
                   hide-details
                   @change="
@@ -211,6 +213,8 @@ onMounted(refresh);
         <v-text-field
           v-model="newVehicle.startNumber"
           label="Start #"
+          type="number"
+          min="1"
           density="comfortable"
           hide-details
           style="max-width: 140px"

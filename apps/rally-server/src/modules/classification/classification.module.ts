@@ -17,5 +17,6 @@ import { ClassificationService } from './classification.service';
   ],
   controllers: [ClassificationController],
   providers: [ClassificationService],
+  exports: [ClassificationService],
 })
 export class ClassificationModule {}

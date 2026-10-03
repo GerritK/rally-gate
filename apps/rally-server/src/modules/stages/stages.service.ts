@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { StageStatus } from '@rally-gate/shared';
 import { Not, Repository } from 'typeorm';
@@ -16,6 +17,7 @@ export class StagesService {
     @InjectRepository(Stage)
     private readonly stages: Repository<Stage>,
     private readonly gateAssignmentsService: GateAssignmentsService,
+    private readonly emitter: EventEmitter2,
   ) {}
 
   findAll(): Promise<Stage[]> {
@@ -137,6 +139,17 @@ export class StagesService {
       await this.close(bumpedStageId);
     }
     stage.status = StageStatus.ACTIVE;
-    return this.stages.save(stage);
+    const saved = await this.stages.save(stage);
+    // Awaited so the start order is frozen by the time the response arrives.
+    await this.emitter.emitAsync('stage.activated', saved);
+    return saved;
+  }
+
+  /** `null` unfreezes. */
+  async setStartOrder(id: string, vehicleIds: string[] | null): Promise<void> {
+    await this.stages.update(id, {
+      startOrder: vehicleIds,
+      startOrderFrozenAt: vehicleIds ? new Date() : null,
+    });
   }
 }
