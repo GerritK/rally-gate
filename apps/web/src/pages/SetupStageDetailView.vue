@@ -191,7 +191,6 @@ onMounted(load);
                 v-if="stageEditable"
                 size="small"
                 variant="text"
-                color="error"
                 prepend-icon="mdi-delete"
                 @click="onDeleteAssignment(assignment)"
               >

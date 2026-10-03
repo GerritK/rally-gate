@@ -1434,7 +1434,6 @@ onUnmounted(() => {
                 size="small"
                 variant="text"
                 icon="mdi-delete"
-                color="error"
                 aria-label="Delete attempt"
                 @click="onDeleteRun(voided)"
               />

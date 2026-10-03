@@ -100,7 +100,6 @@ onMounted(refresh);
                 v-if="stage.status === 'NOT_STARTED'"
                 size="small"
                 variant="text"
-                color="error"
                 prepend-icon="mdi-delete"
                 :loading="deletingId === stage.id"
                 @click="onDeleteStage(stage)"

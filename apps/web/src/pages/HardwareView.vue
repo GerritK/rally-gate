@@ -390,7 +390,6 @@ onUnmounted(() => {
                     <v-btn
                       size="small"
                       variant="text"
-                      color="error"
                       prepend-icon="mdi-delete"
                       :disabled="lockedGateIds.has(gate.id)"
                       @click="onDeleteGate(gate)"
