@@ -54,6 +54,7 @@ import {
 import { fetchVehicles, type Vehicle } from '../api/vehicles';
 import FormDialog from '../components/FormDialog.vue';
 import ManualMark from '../components/ManualMark.vue';
+import RunningTime from '../components/RunningTime.vue';
 import TableLegend from '../components/TableLegend.vue';
 import PassingBlock from '../components/PassingBlock.vue';
 import StagePicker from '../components/StagePicker.vue';
@@ -235,17 +236,6 @@ const stateCounts = computed(() => {
     .filter((state) => counts.has(state))
     .map((state) => ({ state, count: counts.get(state)! }));
 });
-
-function runDurationDisplay(run: StageRun): string {
-  if (run.status === StageRunStatus.STARTED) {
-    // Clamped: `now` ticks once a second, so a run started since the last
-    // tick would otherwise read as negative.
-    return formatStageDuration(
-      Math.max(0, now.value - new Date(run.startTime).getTime()),
-    );
-  }
-  return formatDuration(run.durationMs);
-}
 
 function isOverdue(run?: StageRun): boolean {
   const expected = stage.value?.expectedDurationMs;
@@ -1313,7 +1303,13 @@ onUnmounted(() => {
                 </template>
               </td>
               <td class="rg-timing text-right text-h6">
-                {{ runDurationDisplay(car.run) }}
+                <RunningTime
+                  v-if="car.run.status === StageRunStatus.STARTED"
+                  :start-time="car.run.startTime"
+                />
+                <template v-else>{{
+                  formatDuration(car.run.durationMs)
+                }}</template>
               </td>
               <td style="width: 120px">
                 <v-chip
@@ -1430,7 +1426,13 @@ onUnmounted(() => {
               </span>
             </td>
             <td class="d-print-none rg-timing rg-time">
-              {{ row.run ? runDurationDisplay(row.run) : '' }}
+              <RunningTime
+                v-if="row.run?.status === StageRunStatus.STARTED"
+                :start-time="row.run.startTime"
+              />
+              <template v-else-if="row.run">{{
+                formatDuration(row.run.durationMs)
+              }}</template>
             </td>
             <td class="d-print-none text-no-wrap text-right">
               <v-btn
