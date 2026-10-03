@@ -508,13 +508,6 @@ export class StageRunsService {
     }
   }
 
-  findSplitsForRun(stageRunId: string): Promise<StageSplit[]> {
-    return this.stageSplits.find({
-      where: { stageRunId },
-      order: { splitIndex: 'ASC' },
-    });
-  }
-
   async findSplitsForStage(stageId: string): Promise<StageSplit[]> {
     const runs = await this.stageRuns.find({
       where: { stageId },

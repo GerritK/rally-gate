@@ -27,11 +27,6 @@ export class StageRunsController {
     return this.stageRunsService.findSplitsForStage(stageId);
   }
 
-  @Get(':id/splits')
-  findSplits(@Param('id') id: string) {
-    return this.stageRunsService.findSplitsForRun(id);
-  }
-
   @Post()
   create(@Body() body: CreateStageRunDto) {
     return this.stageRunsService.createManual(body);
