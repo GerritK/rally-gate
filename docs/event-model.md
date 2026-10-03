@@ -78,6 +78,13 @@ once `finishTime` is set, otherwise `STARTED`, or `CANCELLED` (DNF) once the
 stage is closed; `VOIDED` if voided. Closing a stage therefore writes nothing to
 its runs.
 
+`startManual`/`finishManual` record which ends a marshal set by hand: Start
+now, Finish now (both stamped with the server clock) or a correction. A hand
+time carries the marshal's reaction time, and a protest turns on exactly
+which times were hand-set, so Live Timing marks them. Assigning an
+unassigned passing doesn't set them: the time is still the gate's. Clearing a
+finish clears its flag.
+
 Duplicate starts and finishes without an active run are logged and ignored —
 delivery is at-least-once, so the rules must be idempotent. Marshals correct
 runs via `PATCH`/`POST`/`DELETE /stage-runs`.

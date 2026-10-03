@@ -181,6 +181,19 @@ describe('StageRunsService.correctRun', () => {
     expect(emitter.emit).toHaveBeenCalledWith('stage-run.updated', corrected);
   });
 
+  it('marks only the corrected end as hand-set, and a cleared finish as not', async () => {
+    const { service } = makeService({ ...baseRun });
+
+    const corrected = await service.correctRun('r1', {
+      startTime: '2026-01-01T00:00:05.000Z',
+    });
+    expect(corrected.startManual).toBe(true);
+    expect(corrected.finishManual).toBeFalsy();
+
+    const cleared = await service.correctRun('r1', { finishTime: null });
+    expect(cleared.finishManual).toBe(false);
+  });
+
   it('reports STARTED when finishTime is cleared and the stage is open', async () => {
     const { service } = makeService(
       { ...baseRun },
@@ -406,6 +419,7 @@ describe('StageRunsService.finishNow', () => {
     const finished = await service.finishNow('r1');
 
     expect(finished.durationMs).toBeGreaterThanOrEqual(60_000);
+    expect(finished.finishManual).toBe(true);
     expect(emitter.emit).toHaveBeenCalledWith('stage-run.updated', finished);
   });
 

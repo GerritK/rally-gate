@@ -275,6 +275,7 @@ export class StageRunsService {
     vehicleId: string,
     stageId: string,
     finishTime: Date,
+    manual = false,
   ): Promise<StageRunWithStatus | null> {
     const run = await this.findActive(vehicleId, stageId);
     if (!run) {
@@ -293,6 +294,7 @@ export class StageRunsService {
       return null;
     }
     run.finishTime = finishTime;
+    run.finishManual = manual;
     run.durationMs = finishTime.getTime() - run.startTime.getTime();
     return this.withStatus(await this.stageRuns.save(run));
   }
@@ -342,11 +344,13 @@ export class StageRunsService {
     }
     if (patch.startTime !== undefined) {
       run.startTime = parseTime(patch.startTime, 'startTime');
+      run.startManual = true;
     }
     if (patch.finishTime !== undefined) {
       run.finishTime = patch.finishTime
         ? parseTime(patch.finishTime, 'finishTime')
         : null;
+      run.finishManual = !!run.finishTime;
     }
     // Checked against the merged result, not the patch: correcting only one
     // of the two still has to leave the pair ordered.
@@ -379,6 +383,8 @@ export class StageRunsService {
       attempt: await this.nextAttempt(input.vehicleId, input.stageId),
       startTime,
       finishTime,
+      startManual: true,
+      finishManual: !!finishTime,
       durationMs: finishTime
         ? finishTime.getTime() - startTime.getTime()
         : null,
@@ -435,6 +441,7 @@ export class StageRunsService {
       run.vehicleId,
       run.stageId,
       new Date(),
+      true,
     );
     if (!finished) {
       throw new ConflictException(

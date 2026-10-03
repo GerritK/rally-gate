@@ -92,7 +92,15 @@ describe('server-owned fields are not settable through the API', () => {
       { name: 'Pass', stageNumber: 1, status: 'CLOSED' },
       'status',
     ],
-    // The frozen start order is the published list; only activation writes it.
+    // Whether a time was hand-set is evidence; a client claiming a corrected
+    // time came from the gate would hide exactly what a protest asks about.
+    [
+      'StageRun.finishManual on correction',
+      CorrectStageRunDto,
+      { finishTime: '2026-01-01T00:01:00.000Z', finishManual: false },
+      'finishManual',
+    ],
+    // The frozen start order is the published list; freezing writes it.
     [
       'Stage.startOrder on update',
       UpdateStageDto,

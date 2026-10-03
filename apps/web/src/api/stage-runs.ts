@@ -19,6 +19,9 @@ export interface StageRun {
   attempt: number;
   /** Struck out by a marshal (red flag) — kept as evidence, counts for nothing. */
   voided: boolean;
+  /** Hand-set (Start now / Finish now / a correction) rather than gate-timed. */
+  startManual: boolean;
+  finishManual: boolean;
 }
 
 export interface StageSplit {

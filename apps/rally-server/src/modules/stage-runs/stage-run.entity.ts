@@ -68,6 +68,18 @@ export class StageRun {
   @Column({ default: false })
   voided: boolean;
 
+  /**
+   * Set by a marshal (Start now / Finish now / a correction) instead of a
+   * gate. A hand time carries the marshal's reaction time, and a protest
+   * turns on exactly which times were hand-set. Assigning an unassigned
+   * passing doesn't set these: the time is still the gate's.
+   */
+  @Column({ default: false })
+  startManual: boolean;
+
+  @Column({ default: false })
+  finishManual: boolean;
+
   @Column()
   vehicleId: string;
 

@@ -51,6 +51,7 @@ import {
 } from '../api/start-order';
 import { measureServerOffsetMs } from '../api/time';
 import { fetchVehicles, type Vehicle } from '../api/vehicles';
+import ManualMark from '../components/ManualMark.vue';
 import StagePicker from '../components/StagePicker.vue';
 import {
   formatClockTime,
@@ -1095,7 +1096,7 @@ onUnmounted(() => {
                 #{{ car.row.entry.startNumber }}
               </td>
               <td class="text-no-wrap">{{ car.row.entry.driverName }}</td>
-              <td class="text-no-wrap">
+              <td v-if="splitIndices.length > 0" class="text-no-wrap">
                 <v-icon
                   v-for="index in splitIndices"
                   :key="index"
@@ -1230,8 +1231,9 @@ onUnmounted(() => {
                   )
                 "
               />
-              <span v-else-if="row.run" class="rg-timing">
+              <span v-else-if="row.run" class="rg-timing text-no-wrap">
                 {{ formatClockTime(row.run.startTime) }}
+                <ManualMark v-if="row.run.startManual" />
               </span>
             </td>
             <td class="d-print-none rg-timing">
@@ -1254,8 +1256,12 @@ onUnmounted(() => {
                   )
                 "
               />
-              <span v-else-if="row.run?.finishTime" class="rg-timing">
+              <span
+                v-else-if="row.run?.finishTime"
+                class="rg-timing text-no-wrap"
+              >
                 {{ formatClockTime(row.run.finishTime) }}
+                <ManualMark v-if="row.run.finishManual" />
               </span>
             </td>
             <td class="d-print-none rg-timing">
@@ -1328,10 +1334,14 @@ onUnmounted(() => {
                 >attempt {{ voided.attempt }}</span
               >
             </td>
-            <td class="rg-timing">{{ formatClockTime(voided.startTime) }}</td>
+            <td class="rg-timing text-no-wrap">
+              {{ formatClockTime(voided.startTime) }}
+              <ManualMark v-if="voided.startManual" />
+            </td>
             <td class="rg-timing">{{ formatSplits(voided.id) }}</td>
             <td class="rg-timing">
               {{ voided.finishTime ? formatClockTime(voided.finishTime) : '' }}
+              <ManualMark v-if="voided.finishTime && voided.finishManual" />
             </td>
             <td class="rg-timing">{{ formatDuration(voided.durationMs) }}</td>
             <td class="text-no-wrap text-right">
