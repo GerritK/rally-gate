@@ -34,9 +34,10 @@ What exists, with where its reasoning lives. History is in git.
   class and sorted by start number, overall or last stage time in either
   direction, frozen by hand when posted or on first activation (`event-model.md`
   "Start order").
-- **Marshal view:** Live Timing is one table of every vehicle in start order
-  with run state, the next car highlighted, corrections and "enter start" per
-  row, and unassigned passings pre-selected from the start order (never
+- **Marshal view:** Live Timing is laid out like the stage: "Up next" with
+  Start now beside the cars on stage in expected arrival order, above one
+  table of every vehicle in start order with run state, corrections and
+  Start now per row, and unassigned passings pre-selected from the start order (never
   auto-assigned). Prints as the posted start list (`frontend-structure.md`).
 - **Dashboard:** multi-page `apps/web` — Live Timing, Results, Setup, Hardware,
   Vehicles (`frontend-structure.md`).
@@ -100,6 +101,13 @@ Nothing queued; OpenStint (below) resumes when the hardware arrives.
   activation.
 - **Out-of-order start penalties**, measured against the frozen start order.
   They depend on penalties as a whole (Rally controls, above).
+- **Manual times as durations, not clock times** — get rid of typed
+  timestamps. Starting by hand is already "Start now" (server-stamped). Still
+  typed: correcting a start or finish (`Correct` on a row). A marshal knows
+  "3:12.4 on the stopwatch" more reliably than a time of day, so a correction
+  could take the stage time and derive the missing end from the other one.
+  Also covers a start missed on a stage that is already closed, which has no
+  manual path since "Enter start" went.
 - **Smarter passing suggestions** — today a start passing suggests the next
   car in start order and a split/finish one the first car on stage
   (`LiveView.vue` `suggestedVehicleIds`). Planned start times could narrow it

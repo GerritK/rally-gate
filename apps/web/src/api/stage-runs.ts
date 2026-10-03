@@ -39,10 +39,11 @@ export function fetchSplitsForStage(stageId: string): Promise<StageSplit[]> {
   return apiFetch(`/stage-runs/splits?stageId=${encodeURIComponent(stageId)}`);
 }
 
+/** Without `startTime` the server stamps the start with its own clock. */
 export function createStageRun(input: {
   vehicleId: string;
   stageId: string;
-  startTime: string;
+  startTime?: string;
 }): Promise<StageRun> {
   return postJson('/stage-runs', input);
 }

@@ -27,7 +27,8 @@ export interface StageRunCorrection {
 export interface ManualStageRunInput {
   vehicleId: string;
   stageId: string;
-  startTime: string;
+  /** Absent means "now" by the server's clock, which the gates sync to. */
+  startTime?: string;
   finishTime?: string;
 }
 
@@ -363,7 +364,9 @@ export class StageRunsService {
 
   /** Admin override: record a run whose start (and maybe finish) detection never arrived. */
   async createManual(input: ManualStageRunInput): Promise<StageRunWithStatus> {
-    const startTime = parseTime(input.startTime, 'startTime');
+    const startTime = input.startTime
+      ? parseTime(input.startTime, 'startTime')
+      : new Date();
     const finishTime = input.finishTime
       ? parseTime(input.finishTime, 'finishTime')
       : null;

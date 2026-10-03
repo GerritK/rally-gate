@@ -319,6 +319,17 @@ const onStage = computed(() =>
     ),
 );
 
+/**
+ * Cars yet to start, from the next one on. Before activation there is no
+ * "next" yet, so it's simply the start list's waiting cars.
+ */
+const dueToStart = computed(() => {
+  const nextIndex = rows.value.findIndex((row) => row.state === 'NEXT');
+  return rows.value
+    .slice(Math.max(nextIndex, 0))
+    .filter((row) => row.state === 'NEXT' || row.state === 'WAITING');
+});
+
 // ---- Unassigned passings, with a suggested vehicle -----------------------
 
 const vehicleOptions = computed(() =>
@@ -339,10 +350,6 @@ const vehicleOptions = computed(() =>
 const suggestedVehicleIds = computed(() => {
   const suggestions: Record<string, string> = {};
   const taken = new Set<string>();
-  const nextIndex = rows.value.findIndex((row) => row.state === 'NEXT');
-  const dueToStart = rows.value
-    .slice(Math.max(nextIndex, 0))
-    .filter((row) => row.state === 'NEXT' || row.state === 'WAITING');
   const running = onStage.value.map((car) => car.row);
   const byTime = [...awaitingDetections.value].sort(
     (a, b) =>
@@ -355,7 +362,7 @@ const suggestedVehicleIds = computed(() => {
     if (!assignment || assignment.stageId !== props.stageId) continue;
     const candidates =
       assignment.role === GateRole.STAGE_START
-        ? dueToStart
+        ? dueToStart.value
         : assignment.role === GateRole.STAGE_SPLIT ||
             assignment.role === GateRole.STAGE_FINISH
           ? running
@@ -475,18 +482,25 @@ function toggleEdit(vehicleId: string) {
     editingVehicleId.value === vehicleId ? null : vehicleId;
 }
 
-async function onEnterStart(row: Row, value: string) {
-  if (!value || !props.stageId) return;
+const startingVehicleId = ref<string | null>(null);
+
+function canStart(row: Row): boolean {
+  return (
+    stage.value?.status === StageStatus.ACTIVE &&
+    ['NEXT', 'WAITING', 'RERUN'].includes(row.state)
+  );
+}
+
+/** The server stamps the start, so its clock counts, not this device's. */
+async function onStartNow(vehicleId: string) {
+  if (!props.stageId || startingVehicleId.value) return;
+  startingVehicleId.value = vehicleId;
   try {
-    upsertStageRun(
-      await createStageRun({
-        vehicleId: row.entry.vehicleId,
-        stageId: props.stageId,
-        startTime: combineDateAndTime(new Date(), value),
-      }),
-    );
+    upsertStageRun(await createStageRun({ vehicleId, stageId: props.stageId }));
   } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to add run');
+    alert(err instanceof Error ? err.message : 'Failed to start');
+  } finally {
+    startingVehicleId.value = null;
   }
 }
 
@@ -991,68 +1005,130 @@ onUnmounted(() => {
     </v-card-text>
   </v-card>
 
-  <v-card v-if="onStage.length > 0" class="mb-4 d-print-none">
-    <v-card-item>
-      <v-card-title class="d-flex align-center ga-2">
-        On stage
-        <v-chip size="small" :color="runStatusColor('STARTED')">
-          {{ onStage.length }}
-        </v-chip>
-      </v-card-title>
-      <v-card-subtitle>Expected order at the next gate</v-card-subtitle>
-    </v-card-item>
-    <v-table density="comfortable">
-      <tbody>
-        <tr v-for="car in onStage" :key="car.run.id">
-          <td class="rg-timing font-weight-bold" style="width: 72px">
-            #{{ car.row.entry.startNumber }}
-          </td>
-          <td>{{ car.row.entry.driverName }}</td>
-          <td class="text-no-wrap">
-            <v-icon
-              v-for="index in splitIndices"
-              :key="index"
-              :icon="
-                car.passed.has(index) ? 'mdi-circle' : 'mdi-circle-outline'
-              "
-              :color="car.passed.has(index) ? 'success' : undefined"
-              :title="`Split ${index}`"
-              size="x-small"
-              class="mr-1"
-            />
-            <v-icon
-              icon="mdi-flag-checkered"
-              size="x-small"
-              title="Finish"
-              class="text-medium-emphasis"
-            />
-          </td>
-          <td class="rg-timing text-no-wrap">
-            <template v-if="car.last">
-              S{{ car.last.splitIndex }}
-              {{ formatStageDuration(car.last.elapsedMs) }}
-              <span class="text-medium-emphasis">
-                {{ car.gapMs ? formatGap(car.gapMs) : 'best' }}
-              </span>
-            </template>
-          </td>
-          <td class="rg-timing text-right text-h6">
-            {{ runDurationDisplay(car.run) }}
-          </td>
-          <td style="width: 120px">
-            <v-chip
-              v-if="isOverdue(car.run)"
-              size="small"
-              color="warning"
-              prepend-icon="mdi-timer-alert-outline"
+  <v-row
+    v-if="stage && stage.status !== StageStatus.CLOSED"
+    class="mb-1 d-print-none"
+  >
+    <v-col cols="12" md="4">
+      <v-card class="h-100">
+        <v-card-item>
+          <v-card-title>
+            {{
+              stage.status === StageStatus.ACTIVE ? 'Up next' : 'First to start'
+            }}
+          </v-card-title>
+        </v-card-item>
+        <v-card-text v-if="dueToStart.length > 0">
+          <div class="d-flex align-center ga-4">
+            <div class="rg-timing rg-next-number">
+              #{{ dueToStart[0].entry.startNumber }}
+            </div>
+            <div>
+              <div class="text-h6">{{ dueToStart[0].entry.driverName }}</div>
+              <div class="text-medium-emphasis">
+                {{ dueToStart[0].entry.mainClassName }}
+              </div>
+            </div>
+          </div>
+          <v-btn
+            v-if="stage.status === StageStatus.ACTIVE"
+            color="primary"
+            size="large"
+            block
+            prepend-icon="mdi-play"
+            class="mt-4"
+            :loading="startingVehicleId === dueToStart[0].entry.vehicleId"
+            @click="onStartNow(dueToStart[0].entry.vehicleId)"
+          >
+            Start now
+          </v-btn>
+          <div v-if="dueToStart.length > 1" class="mt-4 text-medium-emphasis">
+            Then
+            <span
+              v-for="row in dueToStart.slice(1, 3)"
+              :key="row.entry.vehicleId"
+              class="ml-2"
             >
-              Overdue
+              <span class="rg-timing font-weight-bold"
+                >#{{ row.entry.startNumber }}</span
+              >
+              {{ row.entry.driverName }}
+            </span>
+          </div>
+        </v-card-text>
+        <v-card-text v-else class="text-medium-emphasis">
+          Everyone has started.
+        </v-card-text>
+      </v-card>
+    </v-col>
+    <v-col v-if="stage.status === StageStatus.ACTIVE" cols="12" md="8">
+      <v-card class="h-100">
+        <v-card-item>
+          <v-card-title class="d-flex align-center ga-2">
+            On stage
+            <v-chip size="small" :color="runStatusColor('STARTED')">
+              {{ onStage.length }}
             </v-chip>
-          </td>
-        </tr>
-      </tbody>
-    </v-table>
-  </v-card>
+          </v-card-title>
+          <v-card-subtitle>Expected order at the next gate</v-card-subtitle>
+        </v-card-item>
+        <v-table density="comfortable">
+          <tbody>
+            <tr v-for="car in onStage" :key="car.run.id">
+              <td class="rg-timing font-weight-bold" style="width: 72px">
+                #{{ car.row.entry.startNumber }}
+              </td>
+              <td>{{ car.row.entry.driverName }}</td>
+              <td class="text-no-wrap">
+                <v-icon
+                  v-for="index in splitIndices"
+                  :key="index"
+                  :icon="
+                    car.passed.has(index) ? 'mdi-circle' : 'mdi-circle-outline'
+                  "
+                  :color="car.passed.has(index) ? 'success' : undefined"
+                  :title="`Split ${index}`"
+                  size="x-small"
+                  class="mr-1"
+                />
+                <v-icon
+                  icon="mdi-flag-checkered"
+                  size="x-small"
+                  title="Finish"
+                  class="text-medium-emphasis"
+                />
+              </td>
+              <td class="rg-timing text-no-wrap">
+                <template v-if="car.last">
+                  S{{ car.last.splitIndex }}
+                  {{ formatStageDuration(car.last.elapsedMs) }}
+                  <span class="text-medium-emphasis">
+                    {{ car.gapMs ? formatGap(car.gapMs) : 'best' }}
+                  </span>
+                </template>
+              </td>
+              <td class="rg-timing text-right text-h6">
+                {{ runDurationDisplay(car.run) }}
+              </td>
+              <td style="width: 120px">
+                <v-chip
+                  v-if="isOverdue(car.run)"
+                  size="small"
+                  color="warning"
+                  prepend-icon="mdi-timer-alert-outline"
+                >
+                  Overdue
+                </v-chip>
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
+        <v-card-text v-if="onStage.length === 0" class="text-medium-emphasis">
+          No car on stage.
+        </v-card-text>
+      </v-card>
+    </v-col>
+  </v-row>
 
   <v-card v-if="stage && startOrder" class="mb-4">
     <v-table density="comfortable" class="rg-marshal-table">
@@ -1112,20 +1188,19 @@ onUnmounted(() => {
             </td>
             <td class="d-print-none">
               <v-text-field
-                v-if="editingVehicleId === row.entry.vehicleId"
+                v-if="editingVehicleId === row.entry.vehicleId && row.run"
                 type="time"
                 step="1"
                 density="compact"
                 hide-details
                 append-inner-icon="mdi-clock-outline"
-                :model-value="toLocalTimeValue(row.run?.startTime)"
+                :model-value="toLocalTimeValue(row.run.startTime)"
                 @click:append-inner="openTimePicker"
                 @change="
-                  (e: Event) => {
-                    const value = (e.target as HTMLInputElement).value;
-                    if (row.run) onCorrectStart(row.run, value);
-                    else onEnterStart(row, value);
-                  }
+                  onCorrectStart(
+                    row.run!,
+                    ($event.target as HTMLInputElement).value,
+                  )
                 "
               />
               <span v-else-if="row.run" class="rg-timing">
@@ -1161,24 +1236,29 @@ onUnmounted(() => {
             </td>
             <td class="d-print-none text-no-wrap text-right">
               <v-btn
+                v-if="row.run"
                 size="small"
                 variant="text"
                 :prepend-icon="
                   editingVehicleId === row.entry.vehicleId
                     ? 'mdi-check'
-                    : row.run
-                      ? 'mdi-pencil'
-                      : 'mdi-clock-plus-outline'
+                    : 'mdi-pencil'
                 "
                 @click="toggleEdit(row.entry.vehicleId)"
               >
                 {{
-                  editingVehicleId === row.entry.vehicleId
-                    ? 'Done'
-                    : row.run
-                      ? 'Correct'
-                      : 'Enter start'
+                  editingVehicleId === row.entry.vehicleId ? 'Done' : 'Correct'
                 }}
+              </v-btn>
+              <v-btn
+                v-else-if="canStart(row)"
+                size="small"
+                variant="text"
+                prepend-icon="mdi-play"
+                :loading="startingVehicleId === row.entry.vehicleId"
+                @click="onStartNow(row.entry.vehicleId)"
+              >
+                Start now
               </v-btn>
               <v-menu v-if="row.run">
                 <template #activator="{ props: menu }">
@@ -1332,6 +1412,13 @@ onUnmounted(() => {
   font-weight: 600;
   font-size: 1.05rem;
   background: rgba(var(--v-theme-on-surface), 0.06);
+}
+
+/* Readable from a tablet at arm's length or more. */
+.rg-next-number {
+  font-size: 3.5rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 /* The next car is a marshal's main cue, so it gets more than the chip. */

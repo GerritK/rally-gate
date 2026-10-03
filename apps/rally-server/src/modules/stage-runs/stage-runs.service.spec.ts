@@ -337,6 +337,27 @@ describe('StageRunsService.createManual', () => {
     ).rejects.toThrow('already has an attempt on stage s1 that counts');
   });
 
+  it('stamps a run without a start time with the server clock', async () => {
+    const stageRuns = {
+      findOne: jest.fn().mockResolvedValue(null),
+      create: jest.fn((r: { startTime: Date }) => r),
+      save: jest.fn((r: unknown) => Promise.resolve(r)),
+    };
+    const service = new StageRunsService(
+      stageRuns as never,
+      {} as never,
+      { findOne: jest.fn().mockResolvedValue(null) } as never,
+      { emit: jest.fn() } as never,
+    );
+    const before = Date.now();
+
+    await service.createManual({ vehicleId: 'v1', stageId: 's1' });
+
+    const { startTime } = stageRuns.create.mock.calls[0][0];
+    expect(startTime.getTime()).toBeGreaterThanOrEqual(before);
+    expect(startTime.getTime()).toBeLessThanOrEqual(Date.now());
+  });
+
   it('rejects a finish time at or before the start time', async () => {
     const { service, stageRuns } = makeService(null);
 

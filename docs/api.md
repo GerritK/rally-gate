@@ -19,7 +19,7 @@ Anything outside `/api` that isn't a file returns `index.html`.
 | `/stages/:id/start-order` | GET | `{ frozen, frozenAt, grouped, entries }`; computed live until frozen. See `event-model.md` "Start order" |
 | `/stages/:id/start-order/freeze` | POST | stores the snapshot; no-op if already frozen (activation also freezes) |
 | `/stages/:id/start-order/unfreeze` | POST | back to live; 409 unless the stage is `NOT_STARTED` |
-| `/stage-runs` | GET, POST, `/:id` PATCH/DELETE | POST/PATCH/DELETE are manual corrections. POST 409s while a non-voided attempt exists. GET includes voided attempts; `?stageId=` narrows to one stage |
+| `/stage-runs` | GET, POST, `/:id` PATCH/DELETE | POST/PATCH/DELETE are manual corrections. POST without `startTime` is "Start now", stamped with the server clock. POST 409s while a non-voided attempt exists. GET includes voided attempts; `?stageId=` narrows to one stage |
 | `/stage-runs/splits?stageId=` | GET | every split of every attempt on the stage, one request per page |
 | `/stage-runs/:id/void`, `/unvoid` | POST | red flag / reverse it — see "Voiding" in `event-model.md`. Unvoid 409s with `{ blockingAttempt }` |
 | `/stage-runs/:id/splits` | GET | ordered by `splitIndex` |

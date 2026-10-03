@@ -7,7 +7,7 @@ sharing `client.ts`). Audience is marshals and organisers only.
 | Route | Nav | Contents |
 |---|---|---|
 | `/` | — | redirect to `/live` |
-| `/live/:stageId?` | Live Timing | the marshal view: cars on stage in expected arrival order (split progress, last split with gap to the best); every vehicle in start order with its run state, times and corrections; unassigned passings with a suggested vehicle; Activate / Close; freeze and print the start list; raw detections collapsed. No stage picks the active one, else the next |
+| `/live/:stageId?` | Live Timing | the marshal view, laid out like the stage: "Up next" (next car large with Start now, the two after it) beside cars on stage in expected arrival order (split progress, last split with gap to the best); every vehicle in start order with its run state, times and corrections; unassigned passings with a suggested vehicle; Activate / Close; freeze and print the start list; raw detections collapsed. No stage picks the active one, else the next |
 | `/results/overall` | Results | overall classification, filterable by class |
 | `/results/stages/:stageId` | Results | stage, split and DNF/DNS classification, filterable by class |
 | `/vehicles` | Vehicles | registration, inline editing, status, classes |

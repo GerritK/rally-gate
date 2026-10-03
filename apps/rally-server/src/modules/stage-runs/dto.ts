@@ -23,8 +23,10 @@ export class CreateStageRunDto {
   @IsNotEmpty()
   stageId: string;
 
+  /** Omitted for "Start now": the server stamps it with its own clock. */
+  @IsOptional()
   @IsISO8601()
-  startTime: string;
+  startTime?: string;
 
   @IsOptional()
   @IsISO8601()
