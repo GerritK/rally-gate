@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watchEffect } from 'vue';
+import { REPO_URL, SUPPORT_URL } from '@rally-gate/ui';
 import { fetchEventInfo } from './api/event';
 import { fetchRallyInfo, rallyName } from './api/rally-info';
 import { fetchServerVersion, serverVersion } from './api/version';
@@ -45,6 +46,20 @@ onMounted(async () => {
         />
       </v-list>
       <template #append>
+        <v-list nav density="compact">
+          <v-list-item
+            :href="REPO_URL"
+            target="_blank"
+            prepend-icon="mdi-github"
+            title="GitHub"
+          />
+          <v-list-item
+            :href="SUPPORT_URL"
+            target="_blank"
+            prepend-icon="mdi-heart-outline"
+            title="Support the project"
+          />
+        </v-list>
         <div class="text-center text-disabled pa-3" style="font-size: 0.7rem">
           Version {{ serverVersion }}
         </div>

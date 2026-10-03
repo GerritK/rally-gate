@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue';
+import { REPO_URL } from '@rally-gate/ui';
 
 // Mirrors FieldDescriptor in ../../src/config-file.ts, which is where the rules
 // are actually defined. Rebuilt here into input rules rather than restated, so
@@ -555,6 +556,14 @@ onUnmounted(() => clearInterval(statusTimer));
             <div class="text-medium-emphasis text-caption mb-1">Version</div>
             <div class="rg-timing mb-4">
               {{ status?.version ?? 'unavailable' }}
+              <a
+                :href="REPO_URL"
+                target="_blank"
+                class="text-medium-emphasis ml-2"
+                aria-label="Rally Gate on GitHub"
+              >
+                <v-icon icon="mdi-github" size="small" />
+              </a>
             </div>
 
             <div class="text-medium-emphasis text-caption mb-1">Clock</div>

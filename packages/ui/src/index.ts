@@ -6,3 +6,6 @@ export {
   formatRelativeTime,
   formatStageDuration,
 } from './format';
+
+export const REPO_URL = 'https://github.com/GerritK/rally-gate';
+export const SUPPORT_URL = 'https://paypal.me/GerritKaul';
