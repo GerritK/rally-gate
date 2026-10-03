@@ -155,12 +155,7 @@ function onStageChange(stageId: string) {
             <th>#</th>
             <th>Driver</th>
             <th>Co-Driver</th>
-            <th
-              v-for="gate in splitGates"
-              :key="gate.gateId"
-              v-tooltip:top="gate.name"
-              class="rg-time"
-            >
+            <th v-for="gate in splitGates" :key="gate.gateId" class="rg-time">
               Split {{ gate.splitIndex }}
             </th>
             <th class="rg-time">Time</th>

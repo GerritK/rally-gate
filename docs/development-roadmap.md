@@ -42,6 +42,8 @@ What exists, with where its reasoning lives. History is in git.
   table of every vehicle in start order with run state, corrections and
   Start now per row, and unassigned passings pre-selected from the start order (never
   auto-assigned). Prints as the posted start list (`frontend-structure.md`).
+- **Overall stage headers** link to that stage's results, class filter
+  kept. Header only: a row click is kept free for a vehicle detail page.
 - **Printed results:** Overall and each stage's results print as the posted
   result, with the print time and "Provisional" while a stage runs
   (`design-system.md` "Print").
@@ -70,10 +72,6 @@ What exists, with where its reasoning lives. History is in git.
   Postgres (`CLAUDE.md`).
 
 ## Next
-
-- **Stage column headers on Overall link to that stage's results.** Header
-  only: a row click is kept free for a vehicle detail page (`design-system.md`
-  "Tables").
 
 OpenStint (below) resumes when the hardware arrives.
 

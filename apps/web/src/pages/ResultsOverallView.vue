@@ -158,13 +158,16 @@ onMounted(async () => {
             <th>#</th>
             <th>Driver</th>
             <th>Co-Driver</th>
-            <th
-              v-for="stage in countedStages"
-              :key="stage.id"
-              v-tooltip:top="stage.name"
-              class="rg-time"
-            >
-              {{ stage.id }}
+            <th v-for="stage in countedStages" :key="stage.id" class="rg-time">
+              <router-link
+                :to="{
+                  path: `/results/stages/${stage.id}`,
+                  query: route.query,
+                }"
+                class="rg-stage-link"
+              >
+                {{ stage.id }} </router-link
+              ><span class="rg-time-mark" />
             </th>
             <th class="rg-time">Total Time</th>
             <th class="rg-time">Gap</th>
@@ -275,3 +278,14 @@ onMounted(async () => {
     </v-card-text>
   </v-card>
 </template>
+
+<style scoped>
+/* A header, not a body link: same look until hovered. */
+.rg-stage-link {
+  color: inherit;
+  text-decoration: none;
+}
+.rg-stage-link:hover {
+  text-decoration: underline;
+}
+</style>
