@@ -1,6 +1,7 @@
 export { createRallyVuetify } from './vuetify';
 export { rallyGateDark } from './theme';
 export { openTimePicker } from './datetime';
+export { default as logoUrl } from './logo.svg';
 export {
   formatClockTime,
   formatRelativeTime,

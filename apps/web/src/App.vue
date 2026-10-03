@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue';
-import { REPO_URL, SUPPORT_URL } from '@rally-gate/ui';
+import { logoUrl, REPO_URL, SUPPORT_URL } from '@rally-gate/ui';
 import { fetchEventInfo } from './api/event';
 import { fetchRallyInfo, rallyName } from './api/rally-info';
 import { liveStatus } from './api/live';
@@ -48,11 +48,16 @@ onMounted(async () => {
         <v-app-bar-nav-icon @click="drawer = !drawer" />
       </template>
       <v-app-bar-title>
-        <div class="text-caption text-medium-emphasis app-bar-label">
-          Rally Gate
-        </div>
-        <div class="text-subtitle-1 font-weight-medium app-bar-event">
-          {{ rallyName || fileName }}
+        <div class="d-flex align-center ga-3">
+          <img :src="logoUrl" alt="" class="app-bar-logo" />
+          <div class="app-bar-text">
+            <div class="text-caption text-medium-emphasis app-bar-label">
+              Rally Gate
+            </div>
+            <div class="text-subtitle-1 font-weight-medium app-bar-event">
+              {{ rallyName || fileName }}
+            </div>
+          </div>
         </div>
       </v-app-bar-title>
       <template #append>
@@ -139,6 +144,13 @@ onMounted(async () => {
 <style scoped>
 .app-bar-label {
   line-height: 1.1;
+}
+.app-bar-logo {
+  height: 22px;
+  flex-shrink: 0;
+}
+.app-bar-text {
+  min-width: 0;
 }
 .app-bar-clock {
   font-size: 1.15rem;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue';
-import { REPO_URL } from '@rally-gate/ui';
+import { logoUrl, REPO_URL } from '@rally-gate/ui';
 
 // Mirrors FieldDescriptor in ../../src/config-file.ts, which is where the rules
 // are actually defined. Rebuilt here into input rules rather than restated, so
@@ -337,11 +337,16 @@ onUnmounted(() => clearInterval(statusTimer));
   <v-app>
     <v-app-bar flat>
       <v-app-bar-title>
-        <div class="text-caption text-medium-emphasis app-bar-label">
-          Gate Config
-        </div>
-        <div class="text-subtitle-1 font-weight-medium app-bar-gate">
-          {{ gateName }}
+        <div class="d-flex align-center ga-3">
+          <img :src="logoUrl" alt="" class="app-bar-logo" />
+          <div class="app-bar-text">
+            <div class="text-caption text-medium-emphasis app-bar-label">
+              Gate Config
+            </div>
+            <div class="text-subtitle-1 font-weight-medium app-bar-gate">
+              {{ gateName }}
+            </div>
+          </div>
         </div>
       </v-app-bar-title>
       <template #append>
@@ -613,6 +618,13 @@ onUnmounted(() => clearInterval(statusTimer));
    title on a phone, so the label is what gets truncated. */
 .app-bar-label {
   line-height: 1.1;
+}
+.app-bar-logo {
+  height: 22px;
+  flex-shrink: 0;
+}
+.app-bar-text {
+  min-width: 0;
 }
 .app-bar-gate {
   line-height: 1.25;
