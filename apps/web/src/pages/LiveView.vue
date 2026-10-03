@@ -589,16 +589,12 @@ const frozenAt = computed(() =>
     : null,
 );
 
-const subtitle = computed(() =>
-  [
-    rallyName.value,
-    startOrder.value &&
-      (startOrder.value.frozen
-        ? `Start list published ${frozenAt.value}`
-        : 'Start list provisional'),
-  ]
-    .filter(Boolean)
-    .join(' · '),
+const startListStatus = computed(() =>
+  !startOrder.value
+    ? ''
+    : startOrder.value.frozen
+      ? `Start list published ${frozenAt.value}`
+      : 'Start list provisional',
 );
 
 function stageTitle(stageId: string): string {
@@ -847,7 +843,13 @@ onUnmounted(() => {
         <span class="d-none d-print-inline">Start list — </span
         >{{ stage.stageNumber }}. {{ stage.name }}
       </v-card-title>
-      <v-card-subtitle>{{ subtitle }}</v-card-subtitle>
+      <v-card-subtitle>
+        <!-- The app bar names the rally on screen; a print has no app bar. -->
+        <span v-if="rallyName" class="d-none d-print-inline"
+          >{{ rallyName }} ·
+        </span>
+        {{ startListStatus }}
+      </v-card-subtitle>
       <template #append>
         <div class="d-flex flex-wrap justify-end ga-2 d-print-none">
           <v-btn

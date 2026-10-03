@@ -25,14 +25,28 @@ onMounted(async () => {
 
 <template>
   <v-app>
-    <v-app-bar title="Rally Gate" color="primary">
+    <!-- Dark, not primary: orange is kept for the one main action on a page
+         (packages/ui/theme.ts). Two-line title as in gate-config, the event
+         first: which event is open matters, the product name doesn't. -->
+    <v-app-bar flat>
       <template #prepend>
         <v-app-bar-nav-icon @click="drawer = !drawer" />
       </template>
-      <template #append>
-        <v-btn to="/setup" variant="text" prepend-icon="mdi-trophy-outline">
+      <v-app-bar-title>
+        <div class="text-caption text-medium-emphasis app-bar-label">
+          Rally Gate
+        </div>
+        <div class="text-subtitle-1 font-weight-medium app-bar-event">
           {{ rallyName || fileName }}
-        </v-btn>
+        </div>
+      </v-app-bar-title>
+      <template #append>
+        <v-btn
+          to="/setup"
+          icon="mdi-cog-outline"
+          aria-label="Setup"
+          title="Setup"
+        />
       </template>
     </v-app-bar>
     <v-navigation-drawer v-model="drawer">
@@ -72,3 +86,15 @@ onMounted(async () => {
     </v-main>
   </v-app>
 </template>
+
+<style scoped>
+.app-bar-label {
+  line-height: 1.1;
+}
+.app-bar-event {
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>
