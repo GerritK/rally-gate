@@ -1093,7 +1093,7 @@ onUnmounted(() => {
               density="compact"
               variant="outlined"
               hide-details
-              style="max-width: 320px"
+              class="rg-passing-vehicle"
               @update:model-value="
                 (id: string) => (pickedVehicleIds[event.eventId] = id)
               "
@@ -1541,6 +1541,11 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* Fixed, not max-width: sized to its content, picking a driver would resize
+   the column and shift the whole table under the marshal's pointer. */
+.rg-passing-vehicle {
+  width: 280px;
+}
 /*
  * Gates as nodes on one track, like the stage itself. Every node gets the
  * same width, so the track runs from the first icon's centre to the last
