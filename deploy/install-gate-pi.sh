@@ -221,6 +221,9 @@ WorkingDirectory=$INSTALL_DIR
 ExecStart=/usr/bin/node apps/gate-agent/dist/main.js
 EnvironmentFile=/etc/rally-gate/gate.env
 Restart=always
+# Without a delay, five failed starts in 10s make systemd give up for good — a
+# gate whose sensor or SDR was unplugged at boot would never come back.
+RestartSec=5
 User=$USER
 
 [Install]
