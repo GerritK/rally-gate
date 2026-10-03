@@ -144,7 +144,8 @@ Values live in `theme.ts`. The rules:
   `utilities.css`), so digits line up down a column. An icon qualifying a
   time (best, hand-set, notional) sits right after it in an `.rg-time-mark`
   slot. Every time in that column gets the slot, empty where there is no
-  icon, so the times stay in line either way.
+  icon, so the times stay in line either way; the header too, or it ends
+  a slot's width right of them.
 - **Actions sit in the last column**, kept to its minimum width
   (`width="1%"`, `text-no-wrap`) so it really ends the row.
 - **At most one direct action and one ⋮ menu** per row, either alone is

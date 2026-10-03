@@ -1340,9 +1340,13 @@ onUnmounted(() => {
           <th class="d-none d-print-table-cell">Co-driver</th>
           <th v-if="!startOrder.grouped">Class</th>
           <th class="d-print-none">Status</th>
-          <th class="d-print-none rg-time">Start</th>
+          <th class="d-print-none rg-time">
+            Start<span class="rg-time-mark" />
+          </th>
           <th class="d-print-none rg-time">Splits</th>
-          <th class="d-print-none rg-time">Finish</th>
+          <th class="d-print-none rg-time">
+            Finish<span class="rg-time-mark" />
+          </th>
           <th class="d-print-none rg-time">Time</th>
           <th class="d-print-none"></th>
         </tr>

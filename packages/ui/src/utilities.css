@@ -104,7 +104,8 @@ input[type='time']::-webkit-calendar-picker-indicator {
  * .rg-time on the header and the cell. An icon qualifying a time (best,
  * hand-set, notional) goes in an .rg-time-mark slot right after it. Every
  * time in that column gets the slot, empty or not, so the times stay
- * aligned whether a row has an icon or not.
+ * aligned whether a row has an icon or not; so does the column's header,
+ * or it sits a slot's width right of the times.
  */
 .v-table > .v-table__wrapper > table > thead > tr > th.rg-time,
 .v-table > .v-table__wrapper > table > tbody > tr > td.rg-time {
