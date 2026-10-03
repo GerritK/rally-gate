@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { fetchSetting, saveSetting } from '../api/settings';
+import { useUnsavedChanges } from '../unsaved-changes';
+import { notify } from '@rally-gate/ui';
 
 const NOTIONAL_PENALTY_KEY = 'notionalPenaltyMs';
 /** Mirrors DEFAULT_NOTIONAL_PENALTY_MS server-side; only used until the
@@ -9,18 +11,18 @@ const NOTIONAL_PENALTY_FALLBACK_S = 120;
 
 const notionalPenaltyS = ref(NOTIONAL_PENALTY_FALLBACK_S);
 const savingPenalty = ref(false);
-const saved = ref(false);
+const { markSaved } = useUnsavedChanges(() => notionalPenaltyS.value);
 
 async function onSavePenalty() {
   if (savingPenalty.value) return;
   savingPenalty.value = true;
-  saved.value = false;
   try {
     await saveSetting(
       NOTIONAL_PENALTY_KEY,
       String(Math.round(notionalPenaltyS.value * 1000)),
     );
-    saved.value = true;
+    markSaved();
+    notify('Penalty saved');
   } finally {
     savingPenalty.value = false;
   }
@@ -31,6 +33,7 @@ onMounted(async () => {
   if (Number.isFinite(storedMs) && storedMs > 0) {
     notionalPenaltyS.value = storedMs / 1000;
   }
+  markSaved();
 });
 </script>
 
@@ -75,14 +78,6 @@ onMounted(async () => {
         >
           Save
         </v-btn>
-        <v-chip
-          v-if="saved"
-          color="success"
-          size="small"
-          prepend-icon="mdi-check"
-        >
-          Saved
-        </v-chip>
       </form>
     </v-card-text>
   </v-card>

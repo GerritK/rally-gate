@@ -12,6 +12,7 @@ import { fetchStage, upsertStage, type Stage } from '../api/stages';
 import FormDialog from '../components/FormDialog.vue';
 import { required, STAGE_STATUS_DISPLAY } from '../format';
 import { notify } from '@rally-gate/ui';
+import { useUnsavedChanges } from '../unsaved-changes';
 
 const props = defineProps<{ stageId: string }>();
 
@@ -19,6 +20,15 @@ const stage = ref<Stage | null>(null);
 const gates = ref<Gate[]>([]);
 const gateAssignments = ref<GateAssignment[]>([]);
 const savingStage = ref(false);
+const { markSaved } = useUnsavedChanges(() =>
+  stage.value
+    ? [
+        stage.value.name,
+        stage.value.stageNumber,
+        stage.value.expectedDurationMs,
+      ]
+    : null,
+);
 const assignmentDialogOpen = ref(false);
 const newAssignment = ref<{
   gateId: string;
@@ -56,6 +66,7 @@ async function refreshAssignments() {
 
 async function load() {
   stage.value = await fetchStage(props.stageId);
+  markSaved();
   gates.value = await fetchGates();
   await refreshAssignments();
 }
@@ -69,6 +80,8 @@ async function onSaveStage() {
       stageNumber: stage.value.stageNumber,
       expectedDurationMs: stage.value.expectedDurationMs,
     });
+    markSaved();
+    notify('Stage saved');
   } finally {
     savingStage.value = false;
   }

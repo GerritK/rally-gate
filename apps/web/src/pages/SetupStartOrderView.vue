@@ -9,6 +9,8 @@ import {
 } from '@rally-gate/shared';
 import { onMounted, ref } from 'vue';
 import { fetchSetting, saveSetting } from '../api/settings';
+import { useUnsavedChanges } from '../unsaved-changes';
+import { notify } from '@rally-gate/ui';
 
 const GROUPING_OPTIONS = [
   { value: StartOrderGrouping.MAIN_CLASS, title: 'By main class' },
@@ -29,17 +31,21 @@ const grouping = ref(StartOrderGrouping.MAIN_CLASS);
 const key = ref(StartOrderKey.START_NUMBER);
 const direction = ref(StartOrderDirection.FASTEST_FIRST);
 const saving = ref(false);
-const saved = ref(false);
+const { markSaved } = useUnsavedChanges(() => [
+  grouping.value,
+  key.value,
+  direction.value,
+]);
 
 async function onSave() {
   if (saving.value) return;
   saving.value = true;
-  saved.value = false;
   try {
     await saveSetting(START_ORDER_GROUPING_KEY, grouping.value);
     await saveSetting(START_ORDER_KEY_KEY, key.value);
     await saveSetting(START_ORDER_DIRECTION_KEY, direction.value);
-    saved.value = true;
+    markSaved();
+    notify('Start order saved');
   } finally {
     saving.value = false;
   }
@@ -52,6 +58,7 @@ onMounted(async () => {
     key.value) as StartOrderKey;
   direction.value = ((await fetchSetting(START_ORDER_DIRECTION_KEY)) ??
     direction.value) as StartOrderDirection;
+  markSaved();
 });
 </script>
 
@@ -101,14 +108,6 @@ onMounted(async () => {
           >
             Save
           </v-btn>
-          <v-chip
-            v-if="saved"
-            color="success"
-            size="small"
-            prepend-icon="mdi-check"
-          >
-            Saved
-          </v-chip>
         </div>
       </form>
     </v-card-text>

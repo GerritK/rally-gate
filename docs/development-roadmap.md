@@ -41,6 +41,9 @@ What exists, with where its reasoning lives. History is in git.
   auto-assigned). Prints as the posted start list (`frontend-structure.md`).
 - **Dashboard:** multi-page `apps/web` — Live Timing, Results, Setup, Hardware,
   Vehicles (`frontend-structure.md`).
+- **UI guidelines** (`design-system.md`): shared confirm dialog and
+  snackbar in both apps, add/edit forms in `FormDialog`, one direct action
+  plus a menu per row, unsaved changes guarded on page forms.
 - **Gate config UI:** settings, status, Wi-Fi, hotspot fallback, Wi-Fi reset;
   verified on a Pi. Shutdown built, not yet tried on a Pi (`gate-config-ui.md`).
 - **Gate health:** chrony state in the heartbeat, each gate's state on Live
@@ -62,12 +65,7 @@ What exists, with where its reasoning lives. History is in git.
 
 ## Next
 
-- **UI guidelines in the code** (`design-system.md` "Editing", "Tables",
-  "Confirmations", "Dialogs and feedback"): the shared `useConfirm()` dialog
-  and snackbar, `FormDialog` for every add/edit form, action columns cut to
-  one direct action plus a menu are built. Still open: unsaved-changes guard
-  on the page forms (Rally details, Stage details, Scoring, Start order:
-  router + `beforeunload`), each confirming its save with the snackbar.
+
 - **Every vehicle in the overall classification**: crews without a
   completed stage listed below the ranking as "Not classified", no
   position, no total. They stay out of the ranking itself: an invented total

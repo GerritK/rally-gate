@@ -13,6 +13,8 @@ import {
   type RallyInfo,
 } from '../api/rally-info';
 import { eventName } from '../format';
+import { useUnsavedChanges } from '../unsaved-changes';
+import { notify } from '@rally-gate/ui';
 
 function today(): string {
   const d = new Date();
@@ -28,12 +30,15 @@ const openDialog = ref(false);
 const newEvent = ref({ name: '', date: today() });
 const switchingTo = ref<string | null>(null);
 const error = ref('');
+const { markSaved } = useUnsavedChanges(() => rallyInfo.value);
 
 async function onSave() {
   if (!rallyInfo.value.name || saving.value) return;
   saving.value = true;
   try {
     rallyInfo.value = await saveRallyInfo(rallyInfo.value);
+    markSaved();
+    notify('Rally details saved');
   } finally {
     saving.value = false;
   }
@@ -63,6 +68,7 @@ function onCreate() {
 onMounted(async () => {
   const existing = await fetchRallyInfo();
   if (existing) rallyInfo.value = existing;
+  markSaved();
   eventInfo.value = await fetchEventInfo();
 });
 </script>
