@@ -646,7 +646,7 @@ const startListStatus = computed(() =>
 
 function stageTitle(stageId: string): string {
   const s = stages.value.find((st) => st.id === stageId);
-  return s ? `${s.stageNumber}. ${s.name}` : stageId;
+  return s ? `${s.id} · ${s.name}` : stageId;
 }
 
 /**
@@ -1022,15 +1022,23 @@ onUnmounted(() => {
     density="compact"
     class="mb-4 d-print-none"
   >
-    Unassigned passings on other stages:
-    <router-link
+    <div
       v-for="{ stageId, count } in passingsByStage.elsewhere"
       :key="stageId"
-      :to="`/live/${stageId}`"
-      class="ml-2"
+      class="d-flex align-center flex-wrap ga-2"
     >
-      {{ count }} on {{ stageTitle(stageId) }}
-    </router-link>
+      {{ count }} unassigned passing{{ count === 1 ? '' : 's' }} on
+      {{ stageTitle(stageId) }}
+      <v-spacer />
+      <v-btn
+        :to="`/live/${stageId}`"
+        size="small"
+        variant="tonal"
+        append-icon="mdi-arrow-right"
+      >
+        Open {{ stageId }}
+      </v-btn>
+    </div>
   </v-alert>
 
   <v-card
