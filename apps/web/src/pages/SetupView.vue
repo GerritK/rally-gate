@@ -12,7 +12,8 @@ import {
   saveRallyInfo,
   type RallyInfo,
 } from '../api/rally-info';
-import { eventName } from '../format';
+import FormDialog from '../components/FormDialog.vue';
+import { eventName, required } from '../format';
 import { useUnsavedChanges } from '../unsaved-changes';
 import { notify } from '@rally-gate/ui';
 
@@ -29,7 +30,6 @@ const newDialog = ref(false);
 const openDialog = ref(false);
 const newEvent = ref({ name: '', date: today() });
 const switchingTo = ref<string | null>(null);
-const error = ref('');
 const { markSaved } = useUnsavedChanges(() => rallyInfo.value);
 
 async function onSave() {
@@ -46,23 +46,25 @@ async function onSave() {
 
 /** Reloads the whole app afterwards: every page holds the old event's data. */
 async function switchEvent(request: () => Promise<{ file: string }>) {
-  newDialog.value = false;
-  openDialog.value = false;
-  error.value = '';
+  const { file } = await request();
+  switchingTo.value = file;
   try {
-    const { file } = await request();
-    switchingTo.value = file;
     await waitForEvent(file);
-    location.reload();
   } catch (err) {
     switchingTo.value = null;
-    error.value = err instanceof Error ? err.message : String(err);
+    throw err;
   }
+  location.reload();
 }
 
-function onCreate() {
-  if (!newEvent.value.name || !newEvent.value.date) return;
-  void switchEvent(() => createEvent(newEvent.value));
+function openNew() {
+  newEvent.value = { name: '', date: today() };
+  newDialog.value = true;
+}
+
+function onOpen(file: string) {
+  openDialog.value = false;
+  return switchEvent(() => openEvent(file));
 }
 
 onMounted(async () => {
@@ -74,10 +76,6 @@ onMounted(async () => {
 </script>
 
 <template>
-  <v-alert v-if="error" type="error" variant="tonal" class="mb-6" closable>
-    {{ error }}
-  </v-alert>
-
   <v-card class="mb-6">
     <v-card-item>
       <v-card-title>Event</v-card-title>
@@ -86,7 +84,7 @@ onMounted(async () => {
         {{ eventInfo.file }}
       </v-card-subtitle>
       <template v-if="eventInfo?.switchable" #append>
-        <v-btn variant="text" prepend-icon="mdi-plus" @click="newDialog = true">
+        <v-btn variant="text" prepend-icon="mdi-plus" @click="openNew">
           New Event
         </v-btn>
         <v-btn
@@ -162,39 +160,30 @@ onMounted(async () => {
     </v-col>
   </v-row>
 
-  <v-dialog v-model="newDialog" max-width="480">
-    <v-card>
-      <v-card-title>New Event</v-card-title>
-      <v-card-subtitle>
-        A new, empty event file. The current one stays as it is.
-      </v-card-subtitle>
-      <form @submit.prevent="onCreate">
-        <v-card-text class="d-flex flex-column ga-3">
-          <v-text-field
-            v-model="newEvent.name"
-            label="Rally name"
-            density="comfortable"
-            hide-details
-            autofocus
-          />
-          <v-text-field
-            v-model="newEvent.date"
-            type="date"
-            label="Date"
-            density="comfortable"
-            hide-details
-          />
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="newDialog = false">Cancel</v-btn>
-          <v-btn type="submit" color="primary" :disabled="!newEvent.name">
-            Create and open
-          </v-btn>
-        </v-card-actions>
-      </form>
-    </v-card>
-  </v-dialog>
+  <FormDialog
+    v-model="newDialog"
+    title="New event"
+    :form="newEvent"
+    :save="() => switchEvent(() => createEvent(newEvent))"
+    saved="Event created"
+    save-text="Create and open"
+  >
+    <p class="text-body-2 text-medium-emphasis">
+      A new, empty event file. The current one stays as it is.
+    </p>
+    <v-text-field
+      v-model="newEvent.name"
+      label="Rally name"
+      :rules="[required]"
+      autofocus
+    />
+    <v-text-field
+      v-model="newEvent.date"
+      type="date"
+      label="Date"
+      :rules="[required]"
+    />
+  </FormDialog>
 
   <v-dialog v-model="openDialog" max-width="600">
     <v-card v-if="eventInfo">
@@ -223,7 +212,7 @@ onMounted(async () => {
                 size="small"
                 variant="text"
                 prepend-icon="mdi-folder-open-outline"
-                @click="switchEvent(() => openEvent(event.file))"
+                @click="onOpen(event.file)"
               >
                 Open
               </v-btn>
