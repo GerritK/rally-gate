@@ -59,6 +59,7 @@ import {
   formatClockTime,
   formatStageDuration,
   openTimePicker,
+  parseStageDuration,
   useConfirm,
 } from '@rally-gate/ui';
 import {
@@ -587,16 +588,74 @@ async function onStartNow(vehicleId: string) {
 
 const correctDialogOpen = ref(false);
 const correcting = ref<StageRun | null>(null);
-const correction = ref({ start: '', finish: '' });
+/** "Enter time" on a car with no run: a missed start, typically on a closed
+ * stage where Start now is long gone. */
+const enteringVehicleId = ref<string | null>(null);
+const correction = ref({ start: '', finish: '', stageTime: '' });
+const initialStageTime = ref('');
 
 function openCorrect(run: StageRun) {
   correcting.value = run;
+  enteringVehicleId.value = null;
+  initialStageTime.value =
+    run.durationMs != null ? formatStageDuration(run.durationMs) : '';
   correction.value = {
     start: toLocalTimeValue(run.startTime),
     finish: toLocalTimeValue(run.finishTime),
+    stageTime: initialStageTime.value,
   };
   correctDialogOpen.value = true;
 }
+
+function openEnterTime(vehicleId: string) {
+  correcting.value = null;
+  enteringVehicleId.value = vehicleId;
+  initialStageTime.value = '';
+  correction.value = { start: '', finish: '', stageTime: '' };
+  correctDialogOpen.value = true;
+}
+
+/** A changed stage time sets the finish (correcting) or the start (entering),
+ * so that field is derived instead of typed. */
+const stageTimeChanged = computed(
+  () =>
+    correction.value.stageTime.trim() !== '' &&
+    correction.value.stageTime !== initialStageTime.value,
+);
+
+function stageTimeRule(value: string) {
+  return !value.trim() || parseStageDuration(value) !== null
+    ? true
+    : 'A time like 3:12.4';
+}
+
+/** Start as it will be saved: the stored one, to the millisecond, unless
+ * the field was changed. No run (entering): from the finish, dated today
+ * like any correction without one. */
+function startIso(run: StageRun): string {
+  const { start } = correction.value;
+  return start === toLocalTimeValue(run.startTime)
+    ? run.startTime
+    : combineDateAndTime(run.startTime, start);
+}
+
+/** The finish (correcting) or start (entering) a changed stage time gives,
+ * to the millisecond, so the result is exactly the stopwatch's. */
+const derivedIso = computed(() => {
+  const { start, finish, stageTime } = correction.value;
+  const durationMs = stageTimeChanged.value
+    ? parseStageDuration(stageTime)
+    : null;
+  if (!durationMs) return null;
+  const run = correcting.value;
+  if (run) {
+    if (!start) return null;
+    return new Date(Date.parse(startIso(run)) + durationMs).toISOString();
+  }
+  if (!finish) return null;
+  const finishMs = Date.parse(combineDateAndTime(new Date(), finish));
+  return new Date(finishMs - durationMs).toISOString();
+});
 
 /**
  * Sends only the times that changed: the fields hold whole seconds, so
@@ -604,15 +663,29 @@ function openCorrect(run: StageRun) {
  * time as hand-set.
  */
 async function onSaveCorrection() {
+  const { start, finish } = correction.value;
+  const vehicleId = enteringVehicleId.value;
+  if (vehicleId && props.stageId) {
+    const finishTime = combineDateAndTime(new Date(), finish);
+    upsertStageRun(
+      await createStageRun({
+        vehicleId,
+        stageId: props.stageId,
+        startTime: derivedIso.value ?? combineDateAndTime(finishTime, start),
+        finishTime,
+      }),
+    );
+    return;
+  }
   const run = correcting.value;
   if (!run) return;
-  const { start } = correction.value;
-  const finish = correction.value.finish || '';
   const patch: { startTime?: string; finishTime?: string | null } = {};
   if (start !== toLocalTimeValue(run.startTime)) {
-    patch.startTime = combineDateAndTime(run.startTime, start);
+    patch.startTime = startIso(run);
   }
-  if (finish !== toLocalTimeValue(run.finishTime)) {
+  if (derivedIso.value) {
+    patch.finishTime = derivedIso.value;
+  } else if ((finish || '') !== toLocalTimeValue(run.finishTime)) {
     patch.finishTime = finish
       ? combineDateAndTime(run.finishTime ?? run.startTime, finish)
       : null;
@@ -1351,6 +1424,26 @@ onUnmounted(() => {
               >
                 Start now
               </v-btn>
+              <v-menu
+                v-if="!row.run && stage.status !== StageStatus.NOT_STARTED"
+              >
+                <template #activator="{ props: menu }">
+                  <v-btn
+                    v-bind="menu"
+                    size="small"
+                    variant="text"
+                    icon="mdi-dots-vertical"
+                    aria-label="More actions"
+                  />
+                </template>
+                <v-list density="compact">
+                  <v-list-item
+                    prepend-icon="mdi-timer-edit-outline"
+                    title="Enter time (missed start)"
+                    @click="openEnterTime(row.entry.vehicleId)"
+                  />
+                </v-list>
+              </v-menu>
               <v-menu v-if="row.run">
                 <template #activator="{ props: menu }">
                   <v-btn
@@ -1483,36 +1576,77 @@ onUnmounted(() => {
     :title="
       correcting
         ? `Correct ${vehicleName(vehicles, correcting.vehicleId)}, attempt ${correcting.attempt}`
-        : ''
+        : enteringVehicleId
+          ? `Enter time for ${vehicleName(vehicles, enteringVehicleId)}`
+          : ''
     "
     :form="correction"
     :save="onSaveCorrection"
-    saved="Times corrected"
+    :saved="enteringVehicleId ? 'Time entered' : 'Times corrected'"
   >
     <p class="text-body-2 text-medium-emphasis">
-      Time of day, to the second. A corrected time is marked as hand-set.
+      Start and finish are times of day, to the second; the stage time is what
+      the stopwatch read.
+      {{
+        enteringVehicleId
+          ? 'With a stage time, the start is worked out from the finish.'
+          : 'A changed stage time sets the finish from the start.'
+      }}
+      Entered times are marked as hand-set.
     </p>
     <v-text-field
+      v-if="enteringVehicleId && derivedIso"
+      :model-value="toLocalTimeValue(derivedIso)"
+      type="time"
+      step="1"
+      label="Start"
+      class="rg-timing"
+      hint="Set by the stage time"
+      persistent-hint
+      disabled
+    />
+    <v-text-field
+      v-else
       v-model="correction.start"
       type="time"
       step="1"
       label="Start"
       class="rg-timing"
       append-inner-icon="mdi-clock-outline"
-      :rules="[required]"
+      :rules="enteringVehicleId && stageTimeChanged ? [] : [required]"
       @click:append-inner="openTimePicker"
     />
     <v-text-field
+      v-if="!enteringVehicleId && derivedIso"
+      :model-value="toLocalTimeValue(derivedIso)"
+      type="time"
+      step="1"
+      label="Finish"
+      class="rg-timing"
+      hint="Set by the stage time"
+      persistent-hint
+      disabled
+    />
+    <v-text-field
+      v-else
       v-model="correction.finish"
       type="time"
       step="1"
       label="Finish"
       class="rg-timing"
-      hint="Empty while the car is still on stage"
+      :hint="enteringVehicleId ? '' : 'Empty while the car is still on stage'"
       persistent-hint
-      clearable
+      :clearable="!enteringVehicleId"
+      :rules="enteringVehicleId ? [required] : []"
       append-inner-icon="mdi-clock-outline"
       @click:append-inner="openTimePicker"
+    />
+    <v-text-field
+      v-model="correction.stageTime"
+      label="Stage time"
+      placeholder="3:12.4"
+      class="rg-timing"
+      :rules="[stageTimeRule]"
     />
   </FormDialog>
 </template>

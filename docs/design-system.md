@@ -98,7 +98,9 @@ Values live in `theme.ts`. The rules:
   Finish now and corrections. They carry the marshal's reaction time, and a
   protest asks which times were hand-set.
 - **Prefer an action to a typed time.** "Start now" / "Finish now" are
-  stamped by the server. Typed times remain only for corrections.
+  stamped by the server. Typed times remain only for corrections and a
+  missed start, and there a stage time ("3:12.4" off the stopwatch) derives
+  the other end: a marshal knows that more reliably than a time of day.
 
 ## Editing
 

@@ -39,6 +39,23 @@ export function formatStageDuration(ms: number): string {
 }
 
 /**
+ * Inverse of formatStageDuration, for a time read off a stopwatch:
+ * `3:12.4`, `03:12.45`, `72.4`, `1:02:03.4`. Null unless it's a positive
+ * duration.
+ */
+export function parseStageDuration(text: string): number | null {
+  const match = /^(?:(?:(\d+):)?(\d+):)?(\d+(?:[.,]\d{1,3})?)$/.exec(
+    text.trim(),
+  );
+  if (!match) return null;
+  const [, h = '0', m = '0', s] = match;
+  const ms = Math.round(
+    (Number(h) * 3600 + Number(m) * 60 + Number(s.replace(',', '.'))) * 1000,
+  );
+  return ms > 0 ? ms : null;
+}
+
+/**
  * Relative "how long ago" for freshness checks (gate heartbeats, that kind
  * of thing) — pass a live-ticking `now` from the caller (e.g. a ref updated
  * on a 1s interval) so the display keeps counting up without new data

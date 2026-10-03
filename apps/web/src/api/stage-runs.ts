@@ -47,6 +47,7 @@ export function createStageRun(input: {
   vehicleId: string;
   stageId: string;
   startTime?: string;
+  finishTime?: string;
 }): Promise<StageRun> {
   return postJson('/stage-runs', input);
 }

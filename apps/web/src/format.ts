@@ -54,8 +54,8 @@ export function clockOffsetHint(
   return `Clock is within tolerance (${formatClockOffset(offsetMs)}); no correction applied.`;
 }
 
-export function formatDuration(ms?: number): string {
-  return ms === undefined ? '-' : formatStageDuration(ms);
+export function formatDuration(ms?: number | null): string {
+  return ms == null ? '-' : formatStageDuration(ms);
 }
 
 export function formatGap(ms: number): string {

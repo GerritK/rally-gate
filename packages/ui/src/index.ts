@@ -6,6 +6,7 @@ export {
   formatClockTime,
   formatRelativeTime,
   formatStageDuration,
+  parseStageDuration,
 } from './format';
 
 export const REPO_URL = 'https://github.com/GerritK/rally-gate';

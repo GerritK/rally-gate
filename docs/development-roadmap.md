@@ -16,7 +16,8 @@ What exists, with where its reasoning lives. History is in git.
   SSE → dashboard; QoS 1 persistent sessions, idempotent rules, failed
   detections retried and surfaced (`CLAUDE.md`, `event-model.md`).
 - **Timing:** start/finish/split roles, stage/split/overall classification, DNF/DNS,
-  manual corrections, voiding and gate-timed re-runs, notional times,
+  manual corrections (a time of day or a stage time), a missed start
+  entered from finish and stage time, voiding and gate-timed re-runs, notional times,
   vehicle classes as filtered rankings, splits as columns of the stage
   classification, crews without a counted stage listed
   as "Not classified" below the overall (`event-model.md`).
@@ -118,13 +119,6 @@ OpenStint (below) resumes when the hardware arrives.
   the start list is frozen.
 - **Out-of-order start penalties**, measured against the frozen start order.
   They depend on penalties as a whole (Rally controls, above).
-- **Manual times as durations, not clock times** — get rid of typed
-  timestamps. Starting by hand is already "Start now" (server-stamped). Still
-  typed: correcting a start or finish (`Correct` on a row). A marshal knows
-  "3:12.4 on the stopwatch" more reliably than a time of day, so a correction
-  could take the stage time and derive the missing end from the other one.
-  Also covers a start missed on a stage that is already closed, which has no
-  manual path since "Enter start" went.
 - **Smarter passing suggestions** — today a start passing suggests the next
   car in start order and a split/finish one the first car on stage
   (`LiveView.vue` `suggestedVehicleIds`). Planned start times could narrow it
