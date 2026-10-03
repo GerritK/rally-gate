@@ -7,9 +7,15 @@ import { liveStatus } from './api/live';
 import { serverOffsetMs, syncServerClock } from './api/time';
 import { fetchServerVersion, serverVersion } from './api/version';
 import { eventName } from './format';
+import { useRoute } from 'vue-router';
 import { NAV_ITEMS } from './router';
 
 const drawer = ref(true);
+const route = useRoute();
+/** By first path segment: sub-pages (/setup/stages, /hardware/gates/…,
+ *  /results/stages/…) aren't nested routes, so the link's own active state
+ *  misses them. */
+const section = (path: string) => path.split('/')[1];
 /** For an event whose rally details were never filled in. */
 const fileName = ref('');
 
@@ -107,6 +113,7 @@ onMounted(async () => {
           v-for="item in NAV_ITEMS"
           :key="item.to"
           :to="item.to"
+          :active="section(route.path) === section(item.to)"
           :prepend-icon="item.icon"
           :title="item.label"
         />
