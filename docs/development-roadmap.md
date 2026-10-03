@@ -71,6 +71,30 @@ What exists, with where its reasoning lives. History is in git.
   plus a menu, Delete in the menu; the add forms below tables (Vehicles,
   Classes, Stages, Assignments) become dialogs opened from an Add button in
   the card title.
+- **Every vehicle in the overall classification**: crews without a
+  completed stage listed below the ranking as "Not classified", no
+  position, no total. They stay out of the ranking itself: an invented total
+  from notionals alone is what `event-model.md` "Notional times" rules out.
+  Before the first stage closes, that list is everyone, which also explains
+  an otherwise empty table.
+- **Splits as columns in the stage classification**, replacing the separate
+  Split Classification card and its picker: each cell the split time plus
+  that split's rank, the best one marked (`timing-best` and a second cue).
+  No rows for cars still on stage: mid-stage, Live Timing's On stage card
+  already shows each car's split against the best, and Results is read
+  after the stage. No server change, the per-split data exists. Update the
+  "Split classification is under Results" note in `frontend-structure.md`.
+- **Print results** like the start list (`design-system.md` "Print"): a
+  Print button on Overall and on a stage's results, printing the table as
+  the posted result. Rally name (no app bar on paper), title, class filter
+  from the subtitle, and the time it was printed, since results move while
+  a stage runs; a stage still running prints as "Provisional". The stage
+  page prints its classification, split columns included, plus DNF/DNS.
+  Overall
+  goes landscape (`@page`) once its stage columns no longer fit portrait.
+- **Stage column headers on Overall link to that stage's results.** Header
+  only: a row click is kept free for a vehicle detail page (`design-system.md`
+  "Tables").
 
 OpenStint (below) resumes when the hardware arrives.
 
