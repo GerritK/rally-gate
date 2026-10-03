@@ -53,9 +53,9 @@ What exists, with where its reasoning lives. History is in git.
 
 ## Next
 
-1. **`OpenStintAdapter`**, then **beam + OpenStint** combined (designed in
-   `decoder-adapters.md`) — critical path, but waits on RF hardware validation
-   (two ordered gates reading reliably); settle the `-t` question first.
+1. **Verify `OpenStintAdapter` on the real loop**, then **beam + OpenStint**
+   combined (designed in `decoder-adapters.md`) — critical path. The adapter
+   is built; it has not yet timed a car through a real loop.
 2. **Vehicle classes** with per-class classification — the one piece of
    deferred work that needs no hardware and matters at a real event. Two
    constraints known up front: classes are organiser-defined **data**, not an

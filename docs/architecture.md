@@ -28,9 +28,9 @@ mode has nothing external to install.
 - Online/offline is `now - lastHeartbeatAt > 30s`
   (`HEARTBEAT_ONLINE_THRESHOLD_MS`). *Ready* is online and chrony not reported
   unsynced; Live Timing shows "Gates ready X/Y" for the selected stage.
-- **No decoder status in the heartbeat.** `BeamAdapter` exits the process when
-  gpiomon fails, so a dead decoder already reads as an offline gate. Revisit
-  with `OpenStintAdapter`, where a lost serial link wouldn't kill the process.
+- **No decoder status in the heartbeat.** `BeamAdapter` and `OpenStintAdapter`
+  exit the process when their decoder process (gpiomon, openstint_rtlsdr) dies,
+  so a dead decoder already reads as an offline gate.
 - `Gate.address` is the remote address of the gate's MQTT connection, stored
   per heartbeat — observed rather than reported, because a gate on Wi-Fi,
   Ethernet and its own hotspot can't know which address the rally network

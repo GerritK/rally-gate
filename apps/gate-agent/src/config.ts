@@ -20,4 +20,7 @@ export const config = {
     edge: (process.env.BEAM_EDGE ?? 'rising') as BeamEdge,
     lockoutMs: Number(process.env.BEAM_LOCKOUT_MS ?? 500),
   },
+  openstint: {
+    gain: Number(process.env.OPENSTINT_GAIN ?? 20),
+  },
 };

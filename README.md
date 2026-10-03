@@ -52,8 +52,8 @@ the rally's own closed Wi-Fi.
   known Wi-Fi opens its own hotspot so you can reach that page.
 - Creating and switching events from the dashboard.
 
-Not yet: **RC transponder decoding** (RC3/RC4, via OpenStint and an SDR —
-next on the list, waiting on hardware tests), time controls, Parc Fermé,
+Not yet: **RC transponder decoding** (RC3 and OpenStint transponders via
+OpenStint and an SDR — built, being tested on a real loop), time controls, Parc Fermé,
 penalties, vehicle classes, and any login. See
 [docs/development-roadmap.md](docs/development-roadmap.md).
 

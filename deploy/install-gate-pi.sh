@@ -155,6 +155,18 @@ quiet sudo apt-get install -y git
 # gpio group is what lets the unprivileged service open /dev/gpiochip*.
 quiet sudo apt-get install -y gpiod
 getent group gpio >/dev/null && sudo usermod -aG gpio "$USER"
+# openstint: the transponder adapter spawns its openstint_rtlsdr itself, so the
+# package's own service is disabled — two decoders can't share one SDR. Upstream
+# only publishes arm64; plugdev opens the SDR, users writes /var/lib/openstint.
+if [ "$(dpkg --print-architecture)" = arm64 ]; then
+  echo 'deb [trusted=yes arch=arm64] https://repo.lapbeeps.com/apt/ /' | sudo tee /etc/apt/sources.list.d/openstint.list >/dev/null
+  quiet sudo apt-get update
+  quiet sudo apt-get install -y openstint
+  sudo systemctl disable --now openstint.service >/dev/null 2>&1 || true
+  sudo usermod -aG plugdev,users "$USER"
+else
+  echo "   (not arm64: skipping OpenStint, ADAPTER=openstint won't run on this gate)"
+fi
 
 if ! command -v node >/dev/null; then
   echo "-- installing Node.js --"
@@ -222,6 +234,8 @@ ExecStart=/usr/bin/node apps/gate-agent/dist/main.js
 EnvironmentFile=/etc/rally-gate/gate.env
 Restart=always
 User=$USER
+# Lets the openstint adapter run its decoder SCHED_FIFO (chrt) without root.
+LimitRTPRIO=70
 
 [Install]
 WantedBy=multi-user.target

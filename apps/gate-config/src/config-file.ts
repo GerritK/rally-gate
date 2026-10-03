@@ -48,9 +48,17 @@ export const FIELDS = {
   ADAPTER: {
     group: 'decoder',
     label: 'Decoder',
-    oneOf: ['simulated', 'beam'] as const,
+    oneOf: ['simulated', 'beam', 'openstint'] as const,
     message: 'Pick one of the listed decoders.',
-    hint: 'beam: a light barrier on a GPIO pin — times passings, a marshal assigns the car.',
+    hint: 'beam: a light barrier on a GPIO pin — times passings, a marshal assigns the car. openstint: transponder loop on an RTL-SDR.',
+  },
+  OPENSTINT_GAIN: {
+    group: 'decoder',
+    adapter: 'openstint',
+    label: 'RTL-SDR gain (dB)',
+    range: [0, 40] as const,
+    message: 'Must be between 0 and 40 dB.',
+    hint: 'Default 20. Lower it if passings report an RSSI above -3 (clipping).',
   },
   BEAM_GPIO: {
     group: 'decoder',

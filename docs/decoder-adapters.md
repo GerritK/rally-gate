@@ -17,6 +17,7 @@ ever sees a `DetectionEvent`.
   configured `TRANSPONDERS`. `src/simulate-cli.ts` fires one-offs, `--beam` for
   one without a transponder.
 - `beam` — a light barrier, below.
+- `openstint` — a transponder loop on an RTL-SDR, below.
 
 ## BeamAdapter (light barrier)
 
@@ -85,40 +86,46 @@ adapter wrapping the two, no server change:
   precisely, rather than being lost.
 
 W and the beam lockout interact: two cars inside one lockout are one trigger.
-Settle W against real hardware together with the `-t` question below.
+Settle W against real hardware.
 
-## OpenStintAdapter (planned)
+## OpenStintAdapter
 
-Wraps [OpenStint](https://github.com/zsellera/openstint) on RTL-SDR gate
-hardware. Protocol (`docs/decoder-protocol.md` upstream, checked 2026-08-17):
-**ZeroMQ pub/sub, plain space-separated text**. A passing is
-`P <decoder_timestamp> <transponder_type> <transponder_id> <rssi> <hit_count> <pass_duration>`,
-e.g. `P 1618706341 OPN 1615544 3.50 64 89113`.
+Wraps [OpenStint](https://github.com/zsellera/openstint) on an RTL-SDR. gate-agent
+spawns `chrt -f 70 openstint_rtlsdr -t -g <OPENSTINT_GAIN> -s /var/lib/openstint`
+and reads its **stdout**: OpenStint prints every message it also publishes over
+ZeroMQ, so there is no ZeroMQ client and nothing native to compile. Upstream
+source checked 2026-10-03 (`512e8da`).
 
-- `decoder_timestamp` is monotonic since decoder start unless the decoder runs
-  with `-t` (system clock).
-- `transponder_type` is `OPN` or `AMB` (legacy RC3) — two ID namespaces, see
-  "Multiple IDs per vehicle" below.
-- Upstream recently replaced EVM with `pass_duration` as the last field; old
-  sample output won't match.
+A passing is
+`P <timestamp_ms> <transponder_type> <transponder_id> <rssi> <hit_count> <pass_duration_us> <mer>`,
+e.g. `P 1791234567890 OPN 1615544 -3.50 64 89113 24.3`. Fields are positional
+and upstream may append more, so only a minimum length is checked.
 
-**Open question that decides the timestamp source: does `-t` change only the
-reported field, or also OpenStint's internal logic** (hit correlation,
-deduplication, `pass_duration`)? Check their source before building.
+- **`-t` changes only the reported field.** `reporting_timestamp` in upstream
+  `src/commons.cpp` converts the steady-clock time to system time at report
+  time; passing detection, dedup and `pass_duration` stay on the steady clock.
+  So the timestamp is used directly. It is the RSSI-weighted centre of the
+  passing, stamped at decode time — no pipe or event-loop jitter.
+- A passing is reported **~250ms after the car leaves the loop**. A timestamp
+  lagging receipt by more than 5s, or ahead of it, falls back to receipt time
+  with a warning (decoder without `-t`, or a stepped clock).
+- `transponder_type` is `OPN` or `AMB` (RC3 — RC4 hybrids are read through
+  their RC3 frames). Only the id is published; see "Multiple IDs per vehicle".
+- Each passing is logged with `rssi`, `hits` and `mer` — what to look at
+  while setting up a loop. Upstream: RSSI above -3 dB is clipping (lower the
+  gain); MER below 3 dB is bad, above 6 dB good.
+- **SCHED_FIFO** because upstream calls sample capture hard real-time and runs
+  its own unit that way; `LimitRTPRIO=70` in the gate-agent unit lets an
+  unprivileged user do it.
+- If the decoder exits, gate-agent exits, like `gpiomon` for the beam.
 
-- Only the field → run with `-t` and use `decoder_timestamp` directly. It stamps
-  at decode time, avoiding 1-20ms of ZeroMQ + event-loop jitter.
-- Internal logic too → stay monotonic and calibrate in the adapter: keep the
-  minimum observed `wallNow - decoder_timestamp` and use
-  `calibratedEpoch + decoder_timestamp`. ~15 lines; a jump in the calibration
-  also reveals a stepped clock or a decoder restart.
+The installer adds upstream's apt repo (arm64 only), installs `openstint`, and
+**disables the package's own `openstint.service`** — two decoders can't share
+one SDR. The gate user joins `plugdev` (SDR) and `users` (`/var/lib/openstint`).
 
-`-t` does not make clock steps more dangerous: with or without it, the timestamp
-comes from the same system clock. Step safety comes from the clock policy below.
-Either way, compare decoder time with receipt time and warn past a bound.
-
-Keep it in proportion: this is milliseconds, the cross-gate skew that chrony
-fixes was seconds. Confirm the `-t` timestamp format against real output.
+| Setting | Default | |
+|---|---|---|
+| `OPENSTINT_GAIN` | `20` | RTL-SDR tuner gain in dB, 0-40 |
 
 ## Other adapter ideas
 
