@@ -975,9 +975,11 @@ onUnmounted(() => {
               class="rg-gate-node"
               :title="`${node.gate.name}: ${gateStatusText(node.gate)}`"
             >
-              <span class="rg-gate-icon">
+              <span
+                class="rg-gate-icon"
+                :class="{ 'gate-flash': flashingGateIds[node.gate.id] }"
+              >
                 <v-icon
-                  :class="{ 'gate-flash': flashingGateIds[node.gate.id] }"
                   :icon="gateStatusIcon(node.gate, now)"
                   :color="gateStatusColor(node.gate, now)"
                 />
@@ -1515,6 +1517,8 @@ onUnmounted(() => {
  */
 .rg-gate-scroll {
   overflow-x: auto;
+  /* Scrolling clips vertically too; room for the passing pulse. */
+  padding: 10px 0 4px;
 }
 .rg-gate-flow {
   position: relative;
@@ -1524,7 +1528,7 @@ onUnmounted(() => {
 .rg-gate-flow::before {
   content: '';
   position: absolute;
-  top: 11px;
+  top: 15px;
   left: calc(50% / var(--gates));
   right: calc(50% / var(--gates));
   height: 2px;
@@ -1540,11 +1544,15 @@ onUnmounted(() => {
   text-align: center;
   padding: 0 4px;
 }
-/* Cuts the track behind the icon so the icon reads as a node on it. */
+/* A round node that cuts the track behind it; the passing pulse rings it. */
 .rg-gate-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   background: rgb(var(--v-theme-surface));
-  padding: 0 6px;
-  line-height: 0;
 }
 .rg-gate-name {
   max-width: 100%;
