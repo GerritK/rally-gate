@@ -5,7 +5,7 @@ set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/GerritK/rally-gate.git}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/rally-gate}"
-# Outside INSTALL_DIR on purpose: that directory is a git clone, and `git pull`
+# Outside INSTALL_DIR on purpose: that directory is a git clone, and an update
 # should never have to reason about event data sitting inside it.
 BACKUP_DIR="${BACKUP_DIR:-$HOME/rally-gate-backups}"
 
@@ -24,7 +24,9 @@ if ! command -v docker >/dev/null; then
 fi
 
 if [ -d "$INSTALL_DIR/.git" ]; then
-  git -C "$INSTALL_DIR" pull
+  # Not `pull`, which refuses once upstream history has been rewritten.
+  git -C "$INSTALL_DIR" fetch
+  git -C "$INSTALL_DIR" reset --hard '@{u}'
 else
   git clone "$REPO_URL" "$INSTALL_DIR"
 fi

@@ -165,10 +165,11 @@ fi
 
 echo "-- fetching rally-gate --"
 if [ -d "$INSTALL_DIR/.git" ]; then
-  # Installers before the switch to `npm ci` rewrote the lockfile on the gate,
-  # which makes this pull refuse to run. Nobody edits it here on purpose.
-  git -C "$INSTALL_DIR" checkout -- package-lock.json
-  quiet git -C "$INSTALL_DIR" pull
+  # Not `pull`: it refuses on a rewritten upstream history or on a lockfile an
+  # older installer's `npm install` left modified. Nobody edits this clone on
+  # purpose — config lives in /etc, build output is gitignored.
+  quiet git -C "$INSTALL_DIR" fetch
+  quiet git -C "$INSTALL_DIR" reset --hard '@{u}'
 else
   quiet git clone "$REPO_URL" "$INSTALL_DIR"
 fi
@@ -176,7 +177,7 @@ fi
 echo "-- building gate-agent --"
 cd "$INSTALL_DIR"
 # ci, not install: exactly what CI tested, and it never rewrites the lockfile —
-# which `install` did, blocking the `git pull` of every later update.
+# which `install` did, leaving the clone dirty.
 # Only the gate's workspaces: the rest of the monorepo (rally-server's Nest,
 # TypeORM and native better-sqlite3, the dashboard) is about half the install
 # and never runs here. A new workspace the gate imports must be added here too.
@@ -322,7 +323,7 @@ EOF
 
 sudo systemctl daemon-reload
 # `enable` then `restart`, not `enable --now`: --now leaves an already-running
-# unit alone, so re-running this installer after a `git pull` would rebuild
+# unit alone, so re-running this installer after an update would rebuild
 # dist/ and keep serving the old code — silently, which is the worst kind. The
 # README tells a marshal to update by re-running this script, so it has to
 # actually take effect. `restart` starts a stopped unit too, so one line covers
