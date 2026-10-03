@@ -3,9 +3,9 @@ import { createRouter, createWebHistory } from 'vue-router';
 export const NAV_ITEMS = [
   { to: '/live', label: 'Live Timing', icon: 'mdi-timer-outline' },
   { to: '/results/overall', label: 'Results', icon: 'mdi-podium' },
-  { to: '/setup', label: 'Setup', icon: 'mdi-cog-outline' },
-  { to: '/hardware', label: 'Hardware', icon: 'mdi-router-wireless' },
   { to: '/vehicles', label: 'Vehicles', icon: 'mdi-car' },
+  { to: '/hardware', label: 'Hardware', icon: 'mdi-router-wireless' },
+  { to: '/setup', label: 'Setup', icon: 'mdi-cog-outline' },
 ];
 
 export const router = createRouter({
