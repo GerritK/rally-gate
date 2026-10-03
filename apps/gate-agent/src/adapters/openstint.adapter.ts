@@ -57,6 +57,11 @@ export class OpenStintAdapter implements DecoderAdapter {
     createInterface({ input: this.child.stdout! }).on('line', (line) => {
       const passing = parsePassing(line);
       if (!passing) {
+        // Startup lines (dongle model, V4 mode) and RC4 learning (`L`) are
+        // what setting up a gate needs to see; status (`S`) comes every second.
+        if (line.trim() && !line.startsWith('S ')) {
+          console.log(`[openstint] ${line.trim()}`);
+        }
         return;
       }
       console.log(
