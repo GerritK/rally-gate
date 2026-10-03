@@ -55,6 +55,11 @@ export function correctStageRun(
   return patchJson(`/stage-runs/${id}`, patch);
 }
 
+/** Hand-timed finish, stamped by the server. 409 if already finished. */
+export function finishStageRunNow(id: string): Promise<StageRun> {
+  return postRequest(`/stage-runs/${id}/finish`);
+}
+
 export function deleteStageRun(id: string): Promise<void> {
   return deleteRequest(`/stage-runs/${id}`);
 }

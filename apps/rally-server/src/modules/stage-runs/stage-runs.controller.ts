@@ -42,6 +42,12 @@ export class StageRunsController {
     return this.stageRunsService.correctRun(id, body);
   }
 
+  /** Hand-timed finish, server-stamped. 409 if finished, voided or closed. */
+  @Post(':id/finish')
+  finishNow(@Param('id') id: string) {
+    return this.stageRunsService.finishNow(id);
+  }
+
   /**
    * Strikes out an attempt (red flag). Keeps the row as evidence, drops it
    * from results, and frees the vehicle so the start gate can open a re-run

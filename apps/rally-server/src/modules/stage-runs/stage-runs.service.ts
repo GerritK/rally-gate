@@ -412,6 +412,39 @@ export class StageRunsService {
    * pass. That is the point of doing it this way rather than hand-entering a
    * replacement run: both ends of the re-run stay gate-timed.
    */
+  /**
+   * "Finish now": a hand-timed finish stamped with the server clock, the
+   * fallback when the finish gate misses a car. Unlike a gate finish it
+   * refuses instead of ignoring, so a double click can't move a time.
+   */
+  async finishNow(id: string): Promise<StageRunWithStatus> {
+    const run = await this.stageRuns.findOneBy({ id });
+    if (!run) {
+      throw new NotFoundException(`StageRun ${id} not found`);
+    }
+    if (
+      run.voided ||
+      run.finishTime ||
+      (await this.isStageClosed(run.stageId))
+    ) {
+      throw new ConflictException(
+        `StageRun ${id} is ${run.voided ? 'voided' : run.finishTime ? 'already finished' : 'on a closed stage'}`,
+      );
+    }
+    const finished = await this.finishRun(
+      run.vehicleId,
+      run.stageId,
+      new Date(),
+    );
+    if (!finished) {
+      throw new ConflictException(
+        `StageRun ${id} starts after now; correct its start first`,
+      );
+    }
+    this.emitter.emit('stage-run.updated', finished);
+    return finished;
+  }
+
   async voidRun(id: string): Promise<StageRunWithStatus> {
     const run = await this.stageRuns.findOneBy({ id });
     if (!run) {

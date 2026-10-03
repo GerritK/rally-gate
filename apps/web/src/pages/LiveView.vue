@@ -36,6 +36,7 @@ import {
   createStageRun,
   deleteStageRun,
   fetchSplitsForStage,
+  finishStageRunNow,
   fetchStageRuns,
   unvoidStageRun,
   voidStageRun,
@@ -483,6 +484,21 @@ function toggleEdit(vehicleId: string) {
 }
 
 const startingVehicleId = ref<string | null>(null);
+
+const finishingRunId = ref<string | null>(null);
+
+/** The fallback when the finish gate misses a car; no confirm, it'd cost time. */
+async function onFinishNow(run: StageRun) {
+  if (finishingRunId.value) return;
+  finishingRunId.value = run.id;
+  try {
+    upsertStageRun(await finishStageRunNow(run.id));
+  } catch (err) {
+    alert(err instanceof Error ? err.message : 'Failed to finish');
+  } finally {
+    finishingRunId.value = null;
+  }
+}
 
 function canStart(row: Row): boolean {
   return (
@@ -1078,7 +1094,7 @@ onUnmounted(() => {
               <td class="rg-timing font-weight-bold" style="width: 72px">
                 #{{ car.row.entry.startNumber }}
               </td>
-              <td>{{ car.row.entry.driverName }}</td>
+              <td class="text-no-wrap">{{ car.row.entry.driverName }}</td>
               <td class="text-no-wrap">
                 <v-icon
                   v-for="index in splitIndices"
@@ -1119,6 +1135,17 @@ onUnmounted(() => {
                 >
                   Overdue
                 </v-chip>
+              </td>
+              <td class="text-right" style="width: 1%">
+                <v-btn
+                  size="small"
+                  variant="tonal"
+                  prepend-icon="mdi-flag-checkered"
+                  :loading="finishingRunId === car.run.id"
+                  @click="onFinishNow(car.run)"
+                >
+                  Finish now
+                </v-btn>
               </td>
             </tr>
           </tbody>

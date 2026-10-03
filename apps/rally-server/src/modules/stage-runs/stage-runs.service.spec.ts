@@ -373,6 +373,55 @@ describe('StageRunsService.createManual', () => {
   });
 });
 
+describe('StageRunsService.finishNow', () => {
+  function makeFinishNowService(run: Record<string, unknown>) {
+    const stageRuns = {
+      findOneBy: jest.fn().mockResolvedValue(run),
+      findOne: jest.fn().mockResolvedValue(run),
+      save: jest.fn((r: unknown) => Promise.resolve(r)),
+    };
+    const stagesService = {
+      findOne: jest.fn().mockResolvedValue({ status: 'ACTIVE' }),
+    };
+    const emitter = { emit: jest.fn() };
+    const service = new StageRunsService(
+      stageRuns as never,
+      {} as never,
+      stagesService as never,
+      emitter as never,
+    );
+    return { service, stageRuns, emitter };
+  }
+
+  it('finishes a running car with the server clock', async () => {
+    const { service, emitter } = makeFinishNowService({
+      id: 'r1',
+      vehicleId: 'v1',
+      stageId: 's1',
+      startTime: new Date(Date.now() - 60_000),
+      finishTime: null,
+      voided: false,
+    });
+
+    const finished = await service.finishNow('r1');
+
+    expect(finished.durationMs).toBeGreaterThanOrEqual(60_000);
+    expect(emitter.emit).toHaveBeenCalledWith('stage-run.updated', finished);
+  });
+
+  it('refuses a run that already finished, so a double click moves nothing', async () => {
+    const { service, stageRuns } = makeFinishNowService({
+      id: 'r1',
+      startTime: new Date(Date.now() - 60_000),
+      finishTime: new Date(),
+      voided: false,
+    });
+
+    await expect(service.finishNow('r1')).rejects.toThrow('already finished');
+    expect(stageRuns.save).not.toHaveBeenCalled();
+  });
+});
+
 describe('StageRunsService.finishRun', () => {
   const activeRun = {
     id: 'r1',
