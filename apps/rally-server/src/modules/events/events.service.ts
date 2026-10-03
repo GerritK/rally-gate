@@ -109,8 +109,9 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     clearInterval(this.reprocessTimer);
   }
 
-  findRecent(limit = 100): Promise<DetectionEventRecord[]> {
+  findRecent(gateId?: string, limit = 100): Promise<DetectionEventRecord[]> {
     return this.events.find({
+      where: gateId ? { gateId } : {},
       order: { timestampServer: 'DESC' },
       take: limit,
     });

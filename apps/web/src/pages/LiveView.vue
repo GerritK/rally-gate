@@ -65,6 +65,7 @@ import {
   formatDuration,
   formatGap,
   gateStatusColor,
+  gateRoleLabel,
   gateStatusIcon,
   isOnline,
   isReady,
@@ -467,15 +468,7 @@ const gateFlow = computed(() => {
     .flatMap((a) => {
       const gate = gates.value.find((g) => g.id === a.gateId);
       if (!gate) return [];
-      const label =
-        a.role === GateRole.STAGE_START
-          ? 'Start'
-          : a.role === GateRole.STAGE_FINISH
-            ? 'Finish'
-            : a.role === GateRole.STAGE_SPLIT
-              ? `Split ${a.splitIndex ?? ''}`
-              : a.role;
-      return [{ gate, label }];
+      return [{ gate, label: gateRoleLabel(a) }];
     });
 });
 

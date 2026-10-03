@@ -23,7 +23,7 @@ Anything outside `/api` that isn't a file returns `index.html`.
 | `/stage-runs/splits?stageId=` | GET | every split of every attempt on the stage, one request per page |
 | `/stage-runs/:id/finish` | POST | "Finish now": hand-timed finish stamped with the server clock. 409 if already finished, voided or the stage is closed |
 | `/stage-runs/:id/void`, `/unvoid` | POST | red flag / reverse it — see "Voiding" in `event-model.md`. Unvoid 409s with `{ blockingAttempt }` |
-| `/events` | GET | recent detections |
+| `/events` | GET | the 100 most recent detections; `?gateId=` for one gate's |
 | `/events/awaiting-vehicle` | GET | unassigned passings (no transponder) at live gates, oldest first |
 | `/events/:eventId/assign` | POST `{ vehicleId }` | times the passing as that vehicle; 409 when the rules would do nothing (e.g. finish before start) |
 | `/events/:eventId/dismiss` | POST | the passing was no car |

@@ -1,9 +1,12 @@
 import {
+  GATE_CONFIG_PORT,
+  GateRole,
   HEARTBEAT_ONLINE_THRESHOLD_MS,
   StageStatus,
   VehicleStatus,
 } from '@rally-gate/shared';
 import { formatStageDuration } from '@rally-gate/ui';
+import type { GateAssignment } from './api/gate-assignments';
 import type { Gate } from './api/gates';
 import type { Stage } from './api/stages';
 import type { Vehicle } from './api/vehicles';
@@ -201,3 +204,22 @@ export function eventName(file: string): string {
 /** Vuetify field rule for a field the form can't save without. */
 export const required = (value: unknown) =>
   (value !== '' && value != null) || 'Required';
+
+export function gateConfigUrl(address: string): string {
+  return `http://${address.includes(':') ? `[${address}]` : address}:${GATE_CONFIG_PORT}/`;
+}
+
+export function gateRoleLabel(
+  assignment: Pick<GateAssignment, 'role' | 'splitIndex'>,
+): string {
+  switch (assignment.role) {
+    case GateRole.STAGE_START:
+      return 'Start';
+    case GateRole.STAGE_FINISH:
+      return 'Finish';
+    case GateRole.STAGE_SPLIT:
+      return `Split ${assignment.splitIndex ?? ''}`;
+    default:
+      return assignment.role;
+  }
+}

@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
-import { AssignVehicleDto } from './dto';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { AssignVehicleDto, RecentEventsQueryDto } from './dto';
 import { EventsService } from './events.service';
 
 @Controller('events')
@@ -7,8 +7,8 @@ export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 
   @Get()
-  findRecent() {
-    return this.eventsService.findRecent();
+  findRecent(@Query() query: RecentEventsQueryDto) {
+    return this.eventsService.findRecent(query.gateId);
   }
 
   /**

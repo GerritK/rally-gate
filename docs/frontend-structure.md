@@ -10,8 +10,9 @@ sharing `client.ts`). Audience is marshals and organisers only.
 | `/live/:stageId?` | Live Timing | the marshal view, laid out like the stage: its gates on a line in the order a car meets them, each with its health; "Up next" (next car large with Start now, the two after it) beside cars on stage in expected arrival order, each with Finish now (split progress, last split with gap to the best); every vehicle in start order with its run state, times and corrections; unassigned passings with a suggested vehicle; Activate / Close; freeze and print the start list; raw detections collapsed. No stage picks the active one, else the next |
 | `/results/overall` | Results | overall classification, filterable by class |
 | `/results/stages/:stageId` | Results | stage, split and DNF/DNS classification, filterable by class |
-| `/vehicles` | Vehicles | registration, inline editing, status, classes |
-| `/hardware` | Hardware | gate roster: online, heartbeat, clock offset, active assignment, add/rename/delete, auto-discovery toggle; gates known to this computer: add to this event, forget (standalone only) |
+| `/vehicles` | Vehicles | registration, editing in a dialog, status, classes |
+| `/hardware` | Hardware | gate roster: online, heartbeat, clock offset, version, add/delete, auto-discovery toggle, shut down all gates; a row opens the gate. Gates known to this computer: add to this event, forget (standalone only) |
+| `/hardware/gates/:gateId` | Hardware | one gate: status, clock, address with a link to its gate-config, version, rename; its assignments on every stage; its last 100 detections, live, with clock correction and what became of each |
 | `/setup` | Setup | the event: rally details, file name, New / Open Event dialogs (standalone only); tiles to Stages, Classes, Start order and Scoring. The app bar's cog links here |
 | `/setup/stages` | Setup | stage list, create |
 | `/setup/stages/:stageId` | Setup | edit stage, its gate assignments (active state read-only) |
@@ -38,7 +39,12 @@ sharing `client.ts`). Audience is marshals and organisers only.
 - **Split classification is under Results**, although it ranks running cars: it
   answers "who's winning", Live Timing answers "what's happening at the gates".
 - **Gate assignments live under their stage**; the gate-centric view of "what
-  is every gate doing" is the Hardware page.
+  is every gate doing" is the Hardware page, and a gate's own page lists its
+  assignments read-only, linking to each stage.
+- **Raw detections are on the gate's page**, filtered server-side
+  (`GET /events?gateId=`): the unfiltered list is the last 100 of every gate,
+  where a quiet gate's passings would scroll out. Live Timing keeps its
+  stage-wide panel.
 - **Activation is on Live Timing and per stage** — it is an operational
   mid-event action, like Close. There is no deactivate button; gates turn off by
   closing the stage.

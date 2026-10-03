@@ -49,6 +49,11 @@ export const router = createRouter({
       props: true,
     },
     { path: '/hardware', component: () => import('./pages/HardwareView.vue') },
+    {
+      path: '/hardware/gates/:gateId',
+      component: () => import('./pages/GateDetailView.vue'),
+      props: true,
+    },
     { path: '/vehicles', component: () => import('./pages/VehiclesView.vue') },
   ],
 });

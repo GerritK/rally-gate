@@ -21,9 +21,14 @@ import {
 } from '../api/gates';
 import { closeLiveStream, openLiveStream } from '../api/live';
 import { serverVersion } from '../api/version';
-import { fetchSetting, saveSetting } from '../api/settings';
+import {
+  CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS,
+  fetchClockCorrectionThresholdMs,
+  fetchSetting,
+  saveSetting,
+} from '../api/settings';
 import { fetchStages, type Stage } from '../api/stages';
-import { GATE_CONFIG_PORT, StageStatus } from '@rally-gate/shared';
+import { StageStatus } from '@rally-gate/shared';
 import {
   formatClockTime,
   formatRelativeTime,
@@ -31,19 +36,11 @@ import {
   useConfirm,
 } from '@rally-gate/ui';
 import FormDialog from '../components/FormDialog.vue';
-import {
-  clockOffsetColor,
-  clockOffsetHint,
-  formatClockOffset,
-  isOnline,
-  required,
-} from '../format';
+import GateClockChips from '../components/GateClockChips.vue';
+import { useRouter } from 'vue-router';
+import { gateConfigUrl, isOnline, required } from '../format';
 
 const AUTO_DISCOVER_KEY = 'autoDiscoverGates';
-const CLOCK_CORRECTION_THRESHOLD_KEY = 'clockCorrectionThresholdMs';
-/** Mirrors DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS; only used until the real
- * value arrives from settings, so the two can't drift in practice. */
-const CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS = 1_000;
 
 const now = ref(Date.now());
 let nowTimer: ReturnType<typeof setInterval>;
@@ -55,15 +52,11 @@ const stages = ref<Stage[]>([]);
 const autoDiscover = ref(true);
 const clockCorrectionThresholdMs = ref(CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS);
 const gateDialogOpen = ref(false);
-const editingGate = ref<Gate | null>(null);
 const gateDraft = ref({ id: '', name: '' });
 const confirm = useConfirm();
+const router = useRouter();
 /** Null when this server keeps no per-computer list (DB_PATH, Postgres). */
 const knownGates = ref<KnownGate[] | null>(null);
-
-function gateConfigUrl(address: string): string {
-  return `http://${address.includes(':') ? `[${address}]` : address}:${GATE_CONFIG_PORT}/`;
-}
 
 const confirmingPowerOff = ref(false);
 const poweringOff = ref(false);
@@ -110,9 +103,8 @@ async function refreshGates() {
   stages.value = await fetchStages();
 }
 
-function openGateDialog(gate: Gate | null) {
-  editingGate.value = gate;
-  gateDraft.value = { id: gate?.id ?? '', name: gate?.name ?? '' };
+function openGateDialog() {
+  gateDraft.value = { id: '', name: '' };
   gateDialogOpen.value = true;
 }
 
@@ -166,9 +158,7 @@ onMounted(async () => {
     knownGates.value = await fetchKnownGates();
   }
   autoDiscover.value = (await fetchSetting(AUTO_DISCOVER_KEY)) !== 'false';
-  clockCorrectionThresholdMs.value =
-    Number(await fetchSetting(CLOCK_CORRECTION_THRESHOLD_KEY)) ||
-    CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS;
+  clockCorrectionThresholdMs.value = await fetchClockCorrectionThresholdMs();
   gatesSource = openLiveStream(
     {
       gate: (gate) => {
@@ -197,11 +187,7 @@ onUnmounted(() => {
     <v-card-title class="d-flex align-center">
       Gates
       <v-spacer />
-      <v-btn
-        variant="tonal"
-        prepend-icon="mdi-plus"
-        @click="openGateDialog(null)"
-      >
+      <v-btn variant="tonal" prepend-icon="mdi-plus" @click="openGateDialog">
         Add Gate
       </v-btn>
     </v-card-title>
@@ -229,7 +215,12 @@ onUnmounted(() => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="gate in gates" :key="gate.id">
+          <tr
+            v-for="gate in gates"
+            :key="gate.id"
+            class="cursor-pointer"
+            @click="router.push(`/hardware/gates/${gate.id}`)"
+          >
             <td class="text-no-wrap">
               {{ gate.id }}
               <v-btn
@@ -240,6 +231,7 @@ onUnmounted(() => {
                 size="x-small"
                 variant="text"
                 :title="`Open gate config (${gate.address})`"
+                @click.stop
               />
             </td>
             <td>{{ gate.name }}</td>
@@ -267,58 +259,11 @@ onUnmounted(() => {
                   : 'never'
               }}
             </td>
-            <td>
-              <v-tooltip
-                :text="
-                  clockOffsetHint(
-                    gate.clockOffsetMs,
-                    clockCorrectionThresholdMs,
-                  )
-                "
-                location="top"
-              >
-                <template #activator="{ props }">
-                  <v-chip
-                    v-bind="props"
-                    size="small"
-                    class="rg-timing"
-                    :color="
-                      clockOffsetColor(
-                        gate.clockOffsetMs,
-                        clockCorrectionThresholdMs,
-                      )
-                    "
-                    :prepend-icon="
-                      gate.clockOffsetMs != null &&
-                      Math.abs(gate.clockOffsetMs) >= clockCorrectionThresholdMs
-                        ? 'mdi-clock-alert-outline'
-                        : 'mdi-clock-check-outline'
-                    "
-                  >
-                    {{ formatClockOffset(gate.clockOffsetMs) }}
-                  </v-chip>
-                </template>
-              </v-tooltip>
-              <v-chip
-                v-if="gate.chronySynced != null"
-                size="small"
-                class="rg-timing ml-1"
-                :color="gate.chronySynced ? 'success' : 'error'"
-                :prepend-icon="
-                  gate.chronySynced ? 'mdi-sync' : 'mdi-sync-alert'
-                "
-                :title="
-                  gate.chronySynced
-                    ? 'chrony on the gate is synced'
-                    : 'chrony on the gate is not synced — its times are not comparable with other gates'
-                "
-              >
-                {{
-                  gate.chronySynced
-                    ? `NTP ${(gate.chronyOffsetMs ?? 0).toFixed(1)} ms`
-                    : 'NTP not synced'
-                }}
-              </v-chip>
+            <td class="text-no-wrap">
+              <GateClockChips
+                :gate="gate"
+                :correction-threshold-ms="clockCorrectionThresholdMs"
+              />
             </td>
             <td>{{ gate.capabilities ?? '-' }}</td>
             <td>
@@ -340,14 +285,6 @@ onUnmounted(() => {
               <span v-else>{{ gate.version ?? '-' }}</span>
             </td>
             <td class="text-no-wrap">
-              <v-btn
-                size="small"
-                variant="text"
-                prepend-icon="mdi-pencil"
-                @click="openGateDialog(gate)"
-              >
-                Rename
-              </v-btn>
               <v-menu>
                 <template #activator="{ props: menu }">
                   <v-btn
@@ -356,6 +293,7 @@ onUnmounted(() => {
                     size="small"
                     variant="text"
                     :aria-label="`More for ${gate.id}`"
+                    @click.stop
                   />
                 </template>
                 <v-list density="compact">
@@ -501,14 +439,13 @@ onUnmounted(() => {
 
   <FormDialog
     v-model="gateDialogOpen"
-    :title="editingGate ? `Rename gate ${editingGate.id}` : 'Add gate'"
+    title="Add gate"
     :form="gateDraft"
     :save="onSaveGate"
-    :saved="editingGate ? 'Gate renamed' : 'Gate added'"
-    :save-text="editingGate ? 'Rename' : 'Add gate'"
+    saved="Gate added"
+    save-text="Add gate"
   >
     <v-text-field
-      v-if="!editingGate"
       v-model="gateDraft.id"
       label="Gate ID"
       hint="Its GATE_ID, e.g. START_WP2"
@@ -516,10 +453,6 @@ onUnmounted(() => {
       :rules="[required]"
       autofocus
     />
-    <v-text-field
-      v-model="gateDraft.name"
-      :label="editingGate ? 'Name' : 'Name (optional)'"
-      :autofocus="!!editingGate"
-    />
+    <v-text-field v-model="gateDraft.name" label="Name (optional)" />
   </FormDialog>
 </template>

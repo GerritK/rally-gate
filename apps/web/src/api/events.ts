@@ -17,8 +17,13 @@ export interface DetectionEventRecord {
   processed?: boolean;
 }
 
-export function fetchRecentEvents(): Promise<DetectionEventRecord[]> {
-  return apiFetch('/events');
+/** The 100 most recent, newest first; one gate's with `gateId`. */
+export function fetchRecentEvents(
+  gateId?: string,
+): Promise<DetectionEventRecord[]> {
+  return apiFetch(
+    gateId ? `/events?gateId=${encodeURIComponent(gateId)}` : '/events',
+  );
 }
 
 /**
