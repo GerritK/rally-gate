@@ -1041,7 +1041,9 @@ onUnmounted(() => {
               #{{ dueToStart[0].entry.startNumber }}
             </div>
             <div>
-              <div class="text-h6">{{ dueToStart[0].entry.driverName }}</div>
+              <div class="rg-next-driver">
+                {{ dueToStart[0].entry.driverName }}
+              </div>
               <div class="text-medium-emphasis">
                 {{ dueToStart[0].entry.mainClassName }}
               </div>
@@ -1456,6 +1458,12 @@ onUnmounted(() => {
   font-size: 3.5rem;
   font-weight: 700;
   line-height: 1;
+}
+
+.rg-next-driver {
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 /* The next car is a marshal's main cue, so it gets more than the chip. */
