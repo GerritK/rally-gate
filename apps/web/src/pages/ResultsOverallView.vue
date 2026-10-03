@@ -10,6 +10,7 @@ import ClassFilter from '../components/ClassFilter.vue';
 import StagePicker from '../components/StagePicker.vue';
 import { fetchStages, type Stage } from '../api/stages';
 import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
+import { StageStatus } from '@rally-gate/shared';
 import { formatDuration, formatGap } from '../format';
 
 const route = useRoute();
@@ -31,6 +32,11 @@ const countedStages = computed(() =>
     id: stageId,
     name: stages.value.find((s) => s.id === stageId)?.name,
   })),
+);
+
+/** Not in the overall at all until they close (only closed stages count). */
+const runningStages = computed(() =>
+  stages.value.filter((s) => s.status === StageStatus.ACTIVE),
 );
 
 const classLabel = computed(() =>
@@ -71,6 +77,18 @@ onMounted(async () => {
     <v-card-title> Overall Classification </v-card-title>
     <v-card-subtitle>{{ classLabel }}</v-card-subtitle>
     <v-card-text>
+      <v-alert
+        v-if="runningStages.length > 0"
+        type="warning"
+        variant="tonal"
+        density="compact"
+        class="mb-4"
+      >
+        {{ runningStages.map((s) => `${s.id} · ${s.name}`).join(', ') }}
+        {{ runningStages.length === 1 ? 'is' : 'are' }} still running and not
+        counted yet. The standings change when
+        {{ runningStages.length === 1 ? 'it closes' : 'they close' }}.
+      </v-alert>
       <v-table density="comfortable">
         <thead>
           <tr>

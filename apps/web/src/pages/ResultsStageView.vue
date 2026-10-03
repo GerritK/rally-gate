@@ -11,6 +11,7 @@ import {
   type SplitGateInfo,
   type StageOutcomeEntry,
 } from '../api/classification';
+import { StageStatus } from '@rally-gate/shared';
 import { classFilterLabel, useClassQuery } from '../class-query';
 import ClassFilter from '../components/ClassFilter.vue';
 import StagePicker from '../components/StagePicker.vue';
@@ -123,6 +124,25 @@ function onStageChange(stageId: string) {
     </v-card-title>
     <v-card-subtitle>{{ classLabel }}</v-card-subtitle>
     <v-card-text>
+      <v-alert
+        v-if="stage?.status === StageStatus.ACTIVE"
+        type="warning"
+        variant="tonal"
+        density="compact"
+        class="mb-4"
+      >
+        Provisional: this stage is still running. Cars still on stage aren't
+        listed yet, and DNF/DNS are only set when it closes.
+      </v-alert>
+      <v-alert
+        v-else-if="stage?.status === StageStatus.NOT_STARTED"
+        type="info"
+        variant="tonal"
+        density="compact"
+        class="mb-4"
+      >
+        This stage hasn't started yet.
+      </v-alert>
       <v-table density="comfortable">
         <thead>
           <tr>
