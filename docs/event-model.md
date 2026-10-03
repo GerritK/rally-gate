@@ -138,7 +138,8 @@ fewer: a quick crew can retire and still lead if the penalty is small. The
 penalty is the knob; roughly one stage duration is a sensible start.
 
 - Only `CLOSED` stages count, so the overall table moves when a stage closes.
-- A crew needs at least one completed stage to be classified.
+- A crew needs at least one completed stage to be classified. The rest are
+  listed below the ranking as "Not classified", with no position or total.
 - A closed stage nobody finished is dropped — a notional with no anchor would
   add the same constant to everyone.
 - Lowest total wins; `stagesCompleted` is display-only.

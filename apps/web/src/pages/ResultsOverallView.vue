@@ -10,14 +10,16 @@ import ClassFilter from '../components/ClassFilter.vue';
 import StagePicker from '../components/StagePicker.vue';
 import { fetchStages, type Stage } from '../api/stages';
 import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
+import { fetchVehicles, type Vehicle } from '../api/vehicles';
 import { StageStatus } from '@rally-gate/shared';
-import { formatDuration, formatGap } from '../format';
+import { formatDuration, formatGap, VEHICLE_STATUS_DISPLAY } from '../format';
 
 const route = useRoute();
 const router = useRouter();
 const overallClassification = ref<OverallClassificationEntry[]>([]);
 const stages = ref<Stage[]>([]);
 const classes = ref<VehicleClass[]>([]);
+const vehicles = ref<Vehicle[]>([]);
 const selectedClassIds = useClassQuery();
 
 /** Stages counted toward the overall — every closed stage that anyone
@@ -33,6 +35,21 @@ const countedStages = computed(() =>
     name: stages.value.find((s) => s.id === stageId)?.name,
   })),
 );
+
+// No completed closed stage yet. Listed without a total: one made of
+// notionals alone is what event-model.md "Notional times" rules out.
+const notClassified = computed(() => {
+  const ranked = new Set(overallClassification.value.map((e) => e.vehicleId));
+  return vehicles.value
+    .filter(
+      (v) =>
+        !ranked.has(v.id) &&
+        selectedClassIds.value.every((id) =>
+          v.classes.some((c) => c.id === id),
+        ),
+    )
+    .sort((a, b) => a.startNumber - b.startNumber);
+});
 
 /** Not in the overall at all until they close (only closed stages count). */
 const runningStages = computed(() =>
@@ -59,6 +76,7 @@ onMounted(async () => {
   await refresh();
   stages.value = await fetchStages();
   classes.value = await fetchVehicleClasses();
+  vehicles.value = await fetchVehicles();
 });
 </script>
 
@@ -89,7 +107,7 @@ onMounted(async () => {
         counted yet. The standings change when
         {{ runningStages.length === 1 ? 'it closes' : 'they close' }}.
       </v-alert>
-      <v-table density="comfortable">
+      <v-table v-if="overallClassification.length > 0" density="comfortable">
         <thead>
           <tr>
             <th>Pos</th>
@@ -155,6 +173,39 @@ onMounted(async () => {
           </tr>
         </tbody>
       </v-table>
+
+      <template v-if="notClassified.length > 0">
+        <div class="text-subtitle-2 mt-6 mb-1">Not classified</div>
+        <div class="text-caption text-medium-emphasis mb-2">
+          No completed stage that counts yet.
+        </div>
+        <v-table density="comfortable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Driver</th>
+              <th>Co-Driver</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="vehicle in notClassified" :key="vehicle.id">
+              <td>{{ vehicle.startNumber }}</td>
+              <td>{{ vehicle.driverName }}</td>
+              <td>{{ vehicle.coDriverName ?? '-' }}</td>
+              <td>
+                <v-chip
+                  size="small"
+                  :color="VEHICLE_STATUS_DISPLAY[vehicle.status].color"
+                  :prepend-icon="VEHICLE_STATUS_DISPLAY[vehicle.status].icon"
+                >
+                  {{ VEHICLE_STATUS_DISPLAY[vehicle.status].label }}
+                </v-chip>
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
+      </template>
     </v-card-text>
   </v-card>
 </template>
