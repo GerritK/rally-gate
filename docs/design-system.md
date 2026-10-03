@@ -77,10 +77,12 @@ Values live in `theme.ts`. The rules:
   concept, reused wherever that status shows: Live Timing's row states
   (`ROW_STATE_DISPLAY`) drive the table, the On stage card and the counters
   in the stage header.
-- **A card that only appears when something needs a marshal** (unassigned
-  passings) gets a warning-tinted header band with a warning underline; the
-  table and fields below stay neutral. Tinting the whole card made every
-  field in it hard to read, a warning frame around it looked crude.
+- **Something waiting on a marshal shows where it happened**, not in a card
+  of its own: an unidentified start passing in Up next, a split or finish in
+  On stage (`PassingBlock`: warning stripe on the left, lightly tinted, the
+  fields neutral). A card that appears and disappears pushes everything
+  below it around mid-event; tinting a whole card made its fields hard to
+  read.
 - **Counts, not filters**, for a status overview: "2 On stage · 3 Waiting"
   as chips. The table stays complete and in start order.
 - **The live connection** shows in the app bar: Live / Connecting / Offline,
@@ -257,6 +259,8 @@ Extract a component once it is actually used twice, not before.
   Every results card names it as its subtitle, "All classes" included, so
   a printout always says which ranking it is.
 - `ManualMark`: the hand-timed icon.
+- `PassingBlock`: one unidentified passing with its vehicle picker, Assign
+  and a ⋮ for Not a car, in Up next and On stage.
 - `GateClockChips`: a gate's measured offset (tooltip says whether it is
   being corrected) and chrony state, on Hardware and the gate's page.
 - `FormDialog`: every add/edit dialog. Saves on its submit (Enter), shows

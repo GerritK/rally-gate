@@ -53,6 +53,7 @@ import {
 import { fetchVehicles, type Vehicle } from '../api/vehicles';
 import FormDialog from '../components/FormDialog.vue';
 import ManualMark from '../components/ManualMark.vue';
+import PassingBlock from '../components/PassingBlock.vue';
 import StagePicker from '../components/StagePicker.vue';
 import {
   formatClockTime,
@@ -409,7 +410,18 @@ const passingsByStage = computed(() => {
     if (!stageId || stageId === props.stageId) here.push(event);
     else elsewhere.set(stageId, (elsewhere.get(stageId) ?? 0) + 1);
   }
+  const isStart = (gateId: string) =>
+    gateAssignments.value.some(
+      (a) =>
+        a.active &&
+        a.gateId === gateId &&
+        a.stageId === props.stageId &&
+        a.role === GateRole.STAGE_START,
+    );
   return {
+    // Shown where the car is: a start in Up next, the rest in On stage.
+    starts: here.filter((event) => isStart(event.gateId)),
+    onCourse: here.filter((event) => !isStart(event.gateId)),
     here,
     elsewhere: [...elsewhere].map(([stageId, count]) => ({ stageId, count })),
   };
@@ -1046,92 +1058,6 @@ onUnmounted(() => {
     </div>
   </v-alert>
 
-  <v-card v-if="passingsByStage.here.length > 0" class="mb-4 d-print-none">
-    <v-card-item class="rg-attention">
-      <template #prepend>
-        <v-icon icon="mdi-account-question" color="warning" />
-      </template>
-      <v-card-title class="d-flex align-center ga-2">
-        Unassigned passings
-        <v-chip size="small" color="warning" variant="flat">
-          {{ passingsByStage.here.length }}
-        </v-chip>
-      </v-card-title>
-      <v-card-subtitle class="text-wrap">
-        A gate saw a car it couldn't identify. Nothing is timed until you
-        confirm the vehicle; the suggestion follows the start order. Assign a
-        car's start before its finish.
-      </v-card-subtitle>
-    </v-card-item>
-    <v-table density="comfortable">
-      <thead>
-        <tr>
-          <th>Gate</th>
-          <th>Gate time</th>
-          <th width="1%">Vehicle</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="event in passingsByStage.here" :key="event.eventId">
-          <td class="text-no-wrap">
-            <template v-if="gateRole(event.gateId)">
-              {{ gateRole(event.gateId) }} ·
-            </template>
-            {{ gateName(event.gateId) }}
-          </td>
-          <td class="rg-timing">
-            {{ formatClockTime(event.timestampGate) }}
-          </td>
-          <td>
-            <div class="d-flex align-center ga-2">
-              <v-select
-                :model-value="vehicleFor(event)"
-                :items="vehicleOptions"
-                item-title="title"
-                item-value="id"
-                placeholder="Pick a vehicle"
-                density="compact"
-                variant="outlined"
-                hide-details
-                class="rg-passing-vehicle"
-                @update:model-value="
-                  (id: string) => (pickedVehicleIds[event.eventId] = id)
-                "
-              />
-              <v-btn
-                variant="tonal"
-                prepend-icon="mdi-check"
-                :disabled="!vehicleFor(event)"
-                @click="onAssign(event)"
-              >
-                Assign
-              </v-btn>
-              <v-menu>
-                <template #activator="{ props: menu }">
-                  <v-btn
-                    v-bind="menu"
-                    size="small"
-                    variant="text"
-                    icon="mdi-dots-vertical"
-                    aria-label="More actions"
-                  />
-                </template>
-                <v-list density="compact">
-                  <v-list-item
-                    prepend-icon="mdi-close"
-                    title="Not a car"
-                    subtitle="Dismiss this passing"
-                    @click="onDismiss(event)"
-                  />
-                </v-list>
-              </v-menu>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </v-table>
-  </v-card>
-
   <div
     v-if="stage && stage.status !== StageStatus.CLOSED"
     class="rg-stage-flow mb-4 d-print-none"
@@ -1145,6 +1071,23 @@ onUnmounted(() => {
             }}
           </v-card-title>
         </v-card-item>
+        <v-card-text
+          v-if="passingsByStage.starts.length > 0"
+          class="d-flex flex-column ga-2 pb-0"
+        >
+          <PassingBlock
+            v-for="event in passingsByStage.starts"
+            :key="event.eventId"
+            :passing="event"
+            :role="gateRole(event.gateId)"
+            :gate-name="gateName(event.gateId)"
+            :vehicle-id="vehicleFor(event)"
+            :vehicle-options="vehicleOptions"
+            @pick="(id) => (pickedVehicleIds[event.eventId] = id)"
+            @assign="onAssign(event)"
+            @dismiss="onDismiss(event)"
+          />
+        </v-card-text>
         <v-card-text v-if="dueToStart.length > 0">
           <div class="d-flex align-center ga-4">
             <div class="rg-timing rg-next-number">
@@ -1210,6 +1153,23 @@ onUnmounted(() => {
           </v-card-title>
           <v-card-subtitle>Expected order at the next gate</v-card-subtitle>
         </v-card-item>
+        <v-card-text
+          v-if="passingsByStage.onCourse.length > 0"
+          class="d-flex flex-column ga-2 pb-0"
+        >
+          <PassingBlock
+            v-for="event in passingsByStage.onCourse"
+            :key="event.eventId"
+            :passing="event"
+            :role="gateRole(event.gateId)"
+            :gate-name="gateName(event.gateId)"
+            :vehicle-id="vehicleFor(event)"
+            :vehicle-options="vehicleOptions"
+            @pick="(id) => (pickedVehicleIds[event.eventId] = id)"
+            @assign="onAssign(event)"
+            @dismiss="onDismiss(event)"
+          />
+        </v-card-text>
         <v-table density="comfortable">
           <tbody>
             <tr v-for="car in onStage" :key="car.run.id">
@@ -1539,15 +1499,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.rg-attention {
-  background: rgba(var(--v-theme-warning), 0.12);
-  border-bottom: 2px solid rgb(var(--v-theme-warning));
-}
-/* Fixed, not max-width: sized to its content, picking a driver would resize
-   the column and shift the whole table under the marshal's pointer. */
-.rg-passing-vehicle {
-  width: 280px;
-}
 /*
  * Gates as nodes on one track, like the stage itself. Every node gets the
  * same width, so the track runs from the first icon's centre to the last
