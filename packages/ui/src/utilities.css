@@ -41,6 +41,15 @@ input[type='time']::-webkit-calendar-picker-indicator {
 }
 
 /*
+ * v-divider draws in currentColor, faded only by --v-border-opacity. The
+ * theme sets that opacity to 1 because its borders carry their own colour
+ * (`border-color`), which left dividers solid white. Give them that colour.
+ */
+.v-divider {
+  color: rgb(var(--v-border-color));
+}
+
+/*
  * Printing (a posted start list). The dark theme's light text would land on
  * white paper, since browsers drop backgrounds, so flip the theme to black on
  * white. Vuetify re-applies the theme class on every themed component
