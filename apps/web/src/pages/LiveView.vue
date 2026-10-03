@@ -1061,19 +1061,23 @@ onUnmounted(() => {
           >
             Start now
           </v-btn>
-          <div v-if="dueToStart.length > 1" class="mt-4 text-medium-emphasis">
-            Then
-            <span
+          <template v-if="dueToStart.length > 1">
+            <v-divider class="mt-4 mb-2" />
+            <div class="text-overline text-medium-emphasis">Then</div>
+            <div
               v-for="row in dueToStart.slice(1, 3)"
               :key="row.entry.vehicleId"
-              class="ml-2"
+              class="d-flex align-baseline ga-3 py-1"
             >
-              <span class="rg-timing font-weight-bold"
-                >#{{ row.entry.startNumber }}</span
-              >
-              {{ row.entry.driverName }}
-            </span>
-          </div>
+              <span class="rg-timing rg-then-number">
+                #{{ row.entry.startNumber }}
+              </span>
+              <span class="rg-then-driver">{{ row.entry.driverName }}</span>
+              <span class="text-medium-emphasis">
+                {{ row.entry.mainClassName }}
+              </span>
+            </div>
+          </template>
         </v-card-text>
         <v-card-text v-else class="text-medium-emphasis">
           Everyone has started.
@@ -1470,6 +1474,16 @@ onUnmounted(() => {
   font-size: 3.5rem;
   font-weight: 700;
   line-height: 1;
+}
+
+.rg-then-number {
+  font-size: 1.25rem;
+  font-weight: 700;
+  min-width: 3.5ch;
+}
+.rg-then-driver {
+  font-size: 1.1rem;
+  font-weight: 500;
 }
 
 .rg-next-driver {
