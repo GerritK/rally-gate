@@ -19,8 +19,8 @@ What exists, with where its reasoning lives. History is in git.
   manual corrections, voiding and gate-timed re-runs, notional times
   (`event-model.md`).
 - **Light barrier:** `BeamAdapter` (E3Z-T61 via GPIO), unassigned passings
-  assigned by a marshal (`decoder-adapters.md`, `event-model.md`). The GPIO
-  path is verified on a Pi with a switch to GND; the sensor itself is not.
+  assigned by a marshal (`decoder-adapters.md`, `event-model.md`). Verified on
+  a Pi with the E3Z-T61, marshal assignment included.
 - **Stages and gates:** gate auto-discovery via heartbeat, gate assignments as a
   plan with per-stage activation, close as terminal (`architecture.md`).
   Optional expected stage time; Live Timing flags a `STARTED` run past it as
@@ -53,14 +53,10 @@ What exists, with where its reasoning lives. History is in git.
 
 ## Next
 
-1. **Verify the light barrier sensor** — the adapter already works on a Pi
-   with a switch between GPIO and GND. Left: the E3Z-T61 wiring and its edge
-   per `decoder-adapters.md`, then a stage timed end to end with marshal
-   assignment.
-2. **`OpenStintAdapter`**, then **beam + OpenStint** combined (designed in
+1. **`OpenStintAdapter`**, then **beam + OpenStint** combined (designed in
    `decoder-adapters.md`) — critical path, but waits on RF hardware validation
    (two ordered gates reading reliably); settle the `-t` question first.
-3. **Vehicle classes** with per-class classification — the one piece of
+2. **Vehicle classes** with per-class classification — the one piece of
    deferred work that needs no hardware and matters at a real event. Two
    constraints known up front: classes are organiser-defined **data**, not an
    enum; and a vehicle can be in **several classes at once** (many-to-many),
