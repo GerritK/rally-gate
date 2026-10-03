@@ -1,0 +1,7 @@
+root = true
+
+# New files in an editor on Windows otherwise start out CRLF; see .gitattributes.
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
