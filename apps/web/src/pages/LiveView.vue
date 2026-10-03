@@ -1046,7 +1046,10 @@ onUnmounted(() => {
     </div>
   </v-alert>
 
-  <v-card v-if="passingsByStage.here.length > 0" class="mb-4 d-print-none">
+  <v-card
+    v-if="passingsByStage.here.length > 0"
+    class="mb-4 d-print-none rg-attention"
+  >
     <v-card-item>
       <template #prepend>
         <v-icon icon="mdi-account-question" color="warning" />
@@ -1541,6 +1544,9 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.rg-attention {
+  border: 2px solid rgb(var(--v-theme-warning)) !important;
+}
 /* Fixed, not max-width: sized to its content, picking a driver would resize
    the column and shift the whole table under the marshal's pointer. */
 .rg-passing-vehicle {
