@@ -37,9 +37,9 @@ Values live in `theme.ts`. The rules:
 - **Red (`error`) means a race problem:** DNF, a gate offline, a penalty, an
   abort. On the page surface (table rows, cards) nothing else is red, so a
   marshal scanning for trouble isn't misled.
-  - Delete in a table row is neutral; the confirmation protects it.
-  - Delete behind a menu (the ⋮ on a run) or as a dialog's confirm button may
-    be red: nothing there competes with a DNF chip.
+  - Delete is never a visible button in a table row (see Tables), so it
+    never competes with a DNF chip there.
+  - Delete in a row's ⋮ menu or as a dialog's confirm button may be red.
   - Aborts stay red: Close stage, Shut down all gates.
 - **Colour is never the only signal.** Red-green colour blindness is common,
   so every status pairs colour with an icon and text, and timing highlights
@@ -94,16 +94,85 @@ Values live in `theme.ts`. The rules:
 - **Prefer an action to a typed time.** "Start now" / "Finish now" are
   stamped by the server. Typed times remain only for corrections.
 
+## Editing
+
+- **No inline editing.** A record is edited in a dialog when it is a few flat
+  fields that fit on a tablet without scrolling, and on its own detail page
+  when it has sub-lists (a stage and its gate assignments) or should be
+  linkable. A field in a table cell that saves on change is one stray scroll
+  wheel away from a changed result.
+- **Actions with a parameter are not edits.** Picking the vehicle for an
+  unassigned passing and pressing Assign stays in the row; a dialog there
+  would only add clicks mid-event.
+- **Creating works like editing**, with the same form component. A record
+  with sub-lists is created in a dialog with its required fields only, then
+  opens on its detail page: an empty "new" page whose lists can't be filled
+  before the first save is a dead end.
+- **Nothing saves on the fly.** A form saves on its Save button. The
+  exception is a lone switch that is itself the setting (auto-discover
+  gates): it applies at once, since one click puts it back.
+- **Unsaved changes are never lost silently.** Leaving a page with a dirty
+  form asks first (own dialog via the router guard). Closing or reloading
+  the tab uses `beforeunload`, the one place the browser's own dialog is
+  allowed: there is no other way to ask. A dialog with changes turns
+  `persistent`, so Esc or a click outside asks instead of discarding.
+- **Save shows `loading` and is disabled while the request runs**, so a
+  double click can't create two vehicles.
+- **After saving**, a dialog closes; a detail page stays open. Both confirm
+  with a short snackbar.
+- **Keyboard:** Enter saves, Esc cancels (asking first if there are changes).
+
+## Tables
+
+- **Actions sit in the last column**, kept to its minimum width
+  (`width="1%"`, `text-no-wrap`) so it really ends the row.
+- **At most one direct action and one ⋮ menu** per row, either alone is
+  fine. The direct action may depend on the row's state (Start now while
+  waiting, Finish now on stage), but there is only ever one.
+- **Delete is never the direct action**, it always goes in the menu: a lone
+  visible delete button per row invites a slip on a tablet.
+- **A menu has at least two entries**, otherwise its one entry becomes the
+  direct action. Delete is the exception: a menu holding only Delete is
+  fine, by the rule above.
+- **A row with a detail page opens it on click**, so it needs no Edit
+  button and the direct action stays free for the real one.
+- **Add sits top right in the table card's title** (`#append`): visible
+  without scrolling to the end of 80 vehicles, never moving as rows are
+  added, and clearly tied to the list it fills.
+  - Orange when adding is the page's main action (Vehicles, Stages), tonal
+    otherwise (Add Assignment on a stage).
+  - An empty table's note names it ("No vehicles yet. Add one with
+    + Add Vehicle."), no second button in the middle.
+
 ## Confirmations
 
-- **Destructive and irreversible actions ask first:** delete a run, close a
-  stage, unfreeze a published start list. Say what will be lost, with
-  numbers ("2 unassigned passings will be discarded").
+- **Ask when data is lost that can't be retyped from the screen or from
+  memory:** delete a run or a passing, close a stage, unfreeze a published
+  start list, anything that takes other records with it. Say what will be
+  lost, with numbers ("2 unassigned passings will be discarded"). Not every
+  save: a confirmation on everything gets clicked through, and then it
+  doesn't protect the delete either.
 - **Time-critical actions never ask:** Start now, Finish now. A dialog would
   add to the reaction time already in the hand time; a slip is fixed with
   Correct.
 - Cheap-to-redo plan edits may skip it (deleting a gate assignment of a stage
   that hasn't started).
+
+## Dialogs and feedback
+
+- **Only our own dialogs**, never `alert()`/`confirm()`/`prompt()`: they look
+  foreign and can't be styled or worded. `beforeunload` is the one exception
+  (see Editing).
+- **Shared dialogs wherever possible:** one confirmation dialog for both
+  apps (`useConfirm()`, hosted once in `App.vue`), not a hand-built
+  `v-dialog` per page.
+- **The confirm button names the action** ("Delete class", "Close stage"),
+  never "OK". Cancel on the left, the action on the right.
+- **Errors don't get a dialog.** An error from a form shows inside it
+  (`v-alert`) so the input survives; an error from an action shows as a
+  snackbar.
+- **Dialogs go fullscreen on phones** (`:fullscreen="smAndDown"`), which is
+  mostly `gate-config`.
 
 ## App bar
 

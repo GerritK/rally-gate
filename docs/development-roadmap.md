@@ -62,7 +62,17 @@ What exists, with where its reasoning lives. History is in git.
 
 ## Next
 
-Nothing queued; OpenStint (below) resumes when the hardware arrives.
+- **UI guidelines in the code** (`design-system.md` "Editing", "Tables",
+  "Confirmations", "Dialogs and feedback"): a shared `useConfirm()` dialog
+  and snackbar, replacing every `alert()`/`confirm()` in `apps/web`; inline
+  edits (run time corrections on Live Timing, gate rename on Hardware, class
+  name and switch on Setup → Classes) moved to dialogs; unsaved-changes
+  guard (router + `beforeunload`); action columns cut to one direct action
+  plus a menu, Delete in the menu; the add forms below tables (Vehicles,
+  Classes, Stages, Assignments) become dialogs opened from an Add button in
+  the card title.
+
+OpenStint (below) resumes when the hardware arrives.
 
 ## Deliberately deferred
 
