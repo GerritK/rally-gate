@@ -50,4 +50,10 @@ export class UpdateStageDto {
   @IsInt()
   @Min(1)
   expectedDurationMs?: number | null;
+
+  // null clears it (back to the default); omitted leaves it as stored.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  minDurationMs?: number | null;
 }

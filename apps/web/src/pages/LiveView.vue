@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  DEFAULT_MIN_STAGE_DURATION_MS,
   GateRole,
   StageRunStatus,
   StageStatus,
@@ -351,6 +352,32 @@ const vehicleOptions = computed(() =>
  * suggested once. Passings at another stage's gates get no suggestion; this
  * page only knows its stage.
  */
+/**
+ * A combined start/finish gate: a car on stage past the minimum stage time
+ * is finishing (longest out first); within it, the car that just started;
+ * with nobody on stage, the next car to start.
+ */
+function combinedCandidates(event: DetectionEventRecord) {
+  const minMs = stage.value?.minDurationMs ?? DEFAULT_MIN_STAGE_DURATION_MS;
+  const at = new Date(event.timestampGate).getTime();
+  const finishing = onStage.value
+    .filter((car) => at - new Date(car.run.startTime).getTime() >= minMs)
+    .sort(
+      (a, b) =>
+        new Date(a.run.startTime).getTime() -
+        new Date(b.run.startTime).getTime(),
+    )
+    .map((car) => car.row);
+  if (finishing.length > 0) return finishing;
+  // Right after a car started here, it's that car breaking the beam again
+  // (pulling away slowly from the line outlasts the gate's lockout), not the
+  // next start: no suggestion, so a marshal dismisses it.
+  const justStarted = onStage.value.some(
+    (car) => at - new Date(car.run.startTime).getTime() >= 0,
+  );
+  return justStarted ? [] : dueToStart.value;
+}
+
 const suggestedVehicleIds = computed(() => {
   const suggestions: Record<string, string> = {};
   const taken = new Set<string>();
@@ -370,7 +397,9 @@ const suggestedVehicleIds = computed(() => {
         : assignment.role === GateRole.STAGE_SPLIT ||
             assignment.role === GateRole.STAGE_FINISH
           ? running
-          : [];
+          : assignment.role === GateRole.STAGE_START_FINISH
+            ? combinedCandidates(event)
+            : [];
     const pick = candidates.find(
       (row) =>
         !taken.has(row.entry.vehicleId) &&
@@ -412,18 +441,13 @@ const passingsByStage = computed(() => {
     if (!stageId || stageId === props.stageId) here.push(event);
     else elsewhere.set(stageId, (elsewhere.get(stageId) ?? 0) + 1);
   }
-  const isStart = (gateId: string) =>
-    gateAssignments.value.some(
-      (a) =>
-        a.active &&
-        a.gateId === gateId &&
-        a.stageId === props.stageId &&
-        a.role === GateRole.STAGE_START,
-    );
+  // Oldest first: passings are assigned in time order, and so is the
+  // suggestion.
+  here.sort(
+    (a, b) =>
+      new Date(a.timestampGate).getTime() - new Date(b.timestampGate).getTime(),
+  );
   return {
-    // Shown where the car is: a start in Up next, the rest in On stage.
-    starts: here.filter((event) => isStart(event.gateId)),
-    onCourse: here.filter((event) => !isStart(event.gateId)),
     here,
     elsewhere: [...elsewhere].map(([stageId, count]) => ({ stageId, count })),
   };
@@ -492,7 +516,7 @@ async function onRetryPending() {
  */
 const gateFlow = computed(() => {
   const rank = (a: GateAssignment) =>
-    a.role === GateRole.STAGE_START
+    a.role === GateRole.STAGE_START || a.role === GateRole.STAGE_START_FINISH
       ? -1
       : a.role === GateRole.STAGE_FINISH
         ? Number.MAX_SAFE_INTEGER
@@ -1169,22 +1193,6 @@ onUnmounted(() => {
             }}
           </v-card-title>
         </v-card-item>
-        <v-card-text v-if="passingsByStage.starts.length > 0" class="pb-0">
-          <PassingBlock
-            v-for="[event, ...queued] in [passingsByStage.starts]"
-            :key="event.eventId"
-            :passing="event"
-            :queued="queued"
-            :role="gateRole(event.gateId)"
-            :gate-name="gateName(event.gateId)"
-            :vehicle-id="vehicleFor(event)"
-            :vehicle-options="vehicleOptions"
-            @pick="(id) => (pickedVehicleIds[event.eventId] = id)"
-            @assign="onAssign(event)"
-            @dismiss="onDismiss(event)"
-            @dismiss-all="onDismissAll([event, ...queued])"
-          />
-        </v-card-text>
         <v-card-text v-if="dueToStart.length > 0">
           <div class="d-flex align-center ga-4">
             <div class="rg-timing rg-next-number">
@@ -1250,9 +1258,12 @@ onUnmounted(() => {
           </v-card-title>
           <v-card-subtitle>Expected order at the next gate</v-card-subtitle>
         </v-card-item>
-        <v-card-text v-if="passingsByStage.onCourse.length > 0" class="pb-0">
+        <!-- Every unidentified passing, a start included: a car that crossed
+             the start line is on stage, and Up next stays still while the
+             start marshal aims at Start now. -->
+        <v-card-text v-if="passingsByStage.here.length > 0" class="pb-0">
           <PassingBlock
-            v-for="[event, ...queued] in [passingsByStage.onCourse]"
+            v-for="[event, ...queued] in [passingsByStage.here]"
             :key="event.eventId"
             :passing="event"
             :queued="queued"

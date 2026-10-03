@@ -217,6 +217,8 @@ export function gateRoleLabel(
       return 'Start';
     case GateRole.STAGE_FINISH:
       return 'Finish';
+    case GateRole.STAGE_START_FINISH:
+      return 'Start/Finish';
     case GateRole.STAGE_SPLIT:
       return `Split ${assignment.splitIndex ?? ''}`;
     default:

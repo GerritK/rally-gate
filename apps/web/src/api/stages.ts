@@ -13,6 +13,7 @@ export interface Stage {
   stageNumber: number;
   status: StageStatus;
   expectedDurationMs: number | null;
+  minDurationMs: number | null;
 }
 
 export function fetchStages(): Promise<Stage[]> {
@@ -50,6 +51,7 @@ export function upsertStage(
     name: string;
     stageNumber: number;
     expectedDurationMs: number | null;
+    minDurationMs: number | null;
   },
 ): Promise<Stage> {
   return putJson(`/stages/${id}`, input);

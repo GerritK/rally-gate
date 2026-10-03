@@ -15,7 +15,8 @@ What exists, with where its reasoning lives. History is in git.
 - **Pipeline:** gate-agent → embedded MQTT → ingest → rule engine → stage runs →
   SSE → dashboard; QoS 1 persistent sessions, idempotent rules, failed
   detections retried and surfaced (`CLAUDE.md`, `event-model.md`).
-- **Timing:** start/finish/split roles, stage/split/overall classification, DNF/DNS,
+- **Timing:** start/finish/split roles, a combined start/finish gate with an
+  optional minimum stage time (`event-model.md`), stage/split/overall classification, DNF/DNS,
   manual corrections (a time of day or a stage time), a missed start
   entered from finish and stage time, voiding and gate-timed re-runs, notional times,
   vehicle classes as filtered rankings, splits as columns of the stage
@@ -116,14 +117,6 @@ OpenStint (below) resumes when the hardware arrives.
   car in start order and a split/finish one the first car on stage
   (`LiveView.vue` `suggestedVehicleIds`). Planned start times could narrow it
   by time window.
-- **Combined start/finish gate** — one gate as both start and finish of a
-  stage: on a detection, finish the vehicle's open run if it has one, otherwise
-  start one. Not needed for the first functional test; to be thought through
-  before building. Known points so far: a finished car passing again must still
-  be ignored (as `startRun` already does); a detection right after the start
-  would finish the run, so it needs a minimum stage time or similar; and the
-  stage config needs a sanity check (e.g. a combined gate excludes separate
-  start/finish gates on the same stage).
 - **Auth** on broker, API and dashboard — the closed rally network is the
   boundary until the timing pipeline is solid. Gates would authenticate against
   rally-server itself.

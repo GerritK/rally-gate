@@ -436,6 +436,63 @@ describe('StageRunsService.finishNow', () => {
   });
 });
 
+describe('StageRunsService.startOrFinishRun', () => {
+  const start = new Date('2026-10-04T10:00:00Z');
+  const after = (ms: number) => new Date(start.getTime() + ms);
+
+  function makeCombinedService(open: StageRun | null) {
+    const service = new StageRunsService(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    const internals = service as unknown as {
+      findActive: () => Promise<StageRun | null>;
+    };
+    internals.findActive = jest.fn().mockResolvedValue(open);
+    const startRun = jest
+      .spyOn(service, 'startRun')
+      .mockResolvedValue({ id: 'new' } as never);
+    const finishRun = jest
+      .spyOn(service, 'finishRun')
+      .mockResolvedValue({ id: 'r1' } as never);
+    return { service, startRun, finishRun };
+  }
+
+  it('starts a run when the car has none open', async () => {
+    const { service, startRun, finishRun } = makeCombinedService(null);
+
+    await service.startOrFinishRun('v1', 's1', start, 10_000);
+
+    expect(startRun).toHaveBeenCalledWith('v1', 's1', start);
+    expect(finishRun).not.toHaveBeenCalled();
+  });
+
+  it('finishes the open run once the minimum stage time has passed', async () => {
+    const { service, startRun, finishRun } = makeCombinedService({
+      startTime: start,
+    } as StageRun);
+
+    await service.startOrFinishRun('v1', 's1', after(95_000), 10_000);
+
+    expect(finishRun).toHaveBeenCalledWith('v1', 's1', after(95_000));
+    expect(startRun).not.toHaveBeenCalled();
+  });
+
+  it('ignores a passing within the minimum stage time as the same passing', async () => {
+    const { service, startRun, finishRun } = makeCombinedService({
+      startTime: start,
+    } as StageRun);
+
+    await expect(
+      service.startOrFinishRun('v1', 's1', after(3_000), 10_000),
+    ).resolves.toBeNull();
+    expect(finishRun).not.toHaveBeenCalled();
+    expect(startRun).not.toHaveBeenCalled();
+  });
+});
+
 describe('StageRunsService.finishRun', () => {
   const activeRun = {
     id: 'r1',

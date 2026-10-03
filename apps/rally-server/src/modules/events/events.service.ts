@@ -10,6 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { OnEvent } from '@nestjs/event-emitter';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
+  DEFAULT_MIN_STAGE_DURATION_MS,
   DetectionEvent,
   DETECTION_TOPIC_PREFIX,
   GateRole,
@@ -474,6 +475,23 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         this.emitter.emit('stage-run.updated', run);
       }
       return !!run;
+    }
+    if (assignment.role === GateRole.STAGE_START_FINISH) {
+      const run = await this.stageRunsService.startOrFinishRun(
+        vehicleId,
+        stageId,
+        at,
+        stage.minDurationMs ?? DEFAULT_MIN_STAGE_DURATION_MS,
+      );
+      if (run) {
+        this.emitter.emit('stage-run.updated', run);
+      }
+      // A duplicate start hands back the existing run, unchanged.
+      return (
+        !!run &&
+        (run.startTime.getTime() === at.getTime() ||
+          run.finishTime?.getTime() === at.getTime())
+      );
     }
     if (assignment.role === GateRole.STAGE_SPLIT) {
       const split = await this.stageRunsService.recordSplit(

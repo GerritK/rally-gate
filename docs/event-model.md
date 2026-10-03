@@ -74,6 +74,31 @@ One row per **attempt**. Created by a `stage_start` detection, finished by the
 matching `stage_finish`; `durationMs = finishTime - startTime`, and must be
 positive (classification sorts ascending, so a zero or negative time would win).
 
+### Combined start/finish gate
+
+A stage either starts and finishes at separate gates or at one gate in the
+`stage_start_finish` role, never both (refused with a 409 on assignment). A
+passing there finishes the car's open run, or starts one if it has none; a
+finished car passing again is ignored like any restart. Within the stage's
+`minDurationMs` of the start (optional, default
+`DEFAULT_MIN_STAGE_DURATION_MS`, 10 s) a passing is ignored: the same
+passing reported twice, or the car pulling away after Start now. That also
+makes a marshal's re-run work: the next passing past the minimum finishes it.
+
+Start and finish come from one gate clock, so no offset between two gates
+enters the duration. The cost: start or finish is decided by **arrival
+order**, not by time. A passing that arrives after a later one (a retried
+detection, a beam passing assigned late) is misread; a marshal fixes it with
+Correct. A separate role was chosen over assigning one gate twice, which
+would break "exactly one active assignment per gate" that the rule engine
+and the activation conflict check rely on.
+
+Live Timing suggests a combined gate's beam passing for the car longest on
+stage past the minimum, else the next car to start. A passing within the
+minimum of a car's start gets no suggestion: it is that car breaking the beam
+again, typically pulling away slowly enough to outlast the gate's
+`BEAM_LOCKOUT_MS`, and is dismissed.
+
 **At most one non-voided attempt per vehicle+stage**, enforced by a partial
 unique index (`where "voided" = false`). The invariant is *not voided means it
 counts*: if several attempts could survive, a superseded run would show

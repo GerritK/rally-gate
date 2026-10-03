@@ -92,9 +92,10 @@ Values live in `theme.ts`. The rules:
   (`ROW_STATE_DISPLAY`) drive the table, the On stage card and the counters
   in the stage header.
 - **Something waiting on a marshal shows where it happened**, not in a card
-  of its own: an unidentified start passing in Up next, a split or finish in
-  On stage (`PassingBlock`: warning stripe on the left, lightly tinted, the
-  fields neutral). A card that appears and disappears pushes everything
+  of its own: every unidentified passing in On stage, a start included,
+  since a car that crossed the start line is on stage, and Up next must not
+  move while the start marshal aims at Start now (`PassingBlock`: warning
+  stripe on the left, lightly tinted, the fields neutral). A card that appears and disappears pushes everything
   below it around mid-event; tinting a whole card made its fields hard to
   read.
 - **Counts, not filters**, for a status overview: "2 On stage · 3 Waiting"
@@ -295,7 +296,7 @@ Extract a component once it is actually used twice, not before.
 - `ManualMark`: the hand-timed icon.
 - `TableLegend`: the icons a table shows, explained under it (see Tables).
 - `PassingBlock`: the oldest unidentified passing with its vehicle picker,
-  Assign and a ⋮ for Not a car, in Up next and On stage; later ones wait
+  Assign and a ⋮ for Not a car, in On stage; later ones wait
   below it as a count; "Dismiss all" (confirmed) discards it and them.
 - `GateClockChips`: a gate's measured offset (tooltip says whether it is
   being corrected) and chrony state, on Hardware and the gate's page.

@@ -299,6 +299,32 @@ export class StageRunsService {
     return this.withStatus(await this.stageRuns.save(run));
   }
 
+  /**
+   * A combined start/finish gate: the passing finishes the open run, or
+   * starts one. Within `minDurationMs` of the start it is ignored: the same
+   * passing reported twice, or the car pulling away after Start now. Decided
+   * by arrival order, so a passing that arrives after a later one (a retry,
+   * a passing assigned late) is misread; a marshal corrects that.
+   */
+  async startOrFinishRun(
+    vehicleId: string,
+    stageId: string,
+    at: Date,
+    minDurationMs: number,
+  ): Promise<StageRunWithStatus | null> {
+    const open = await this.findActive(vehicleId, stageId);
+    if (!open) {
+      return this.startRun(vehicleId, stageId, at);
+    }
+    if (at.getTime() - open.startTime.getTime() < minDurationMs) {
+      this.logger.warn(
+        `Passing for vehicle ${vehicleId} on ${stageId} is within ${minDurationMs} ms of its start, ignoring it as the same passing`,
+      );
+      return null;
+    }
+    return this.finishRun(vehicleId, stageId, at);
+  }
+
   async recordSplit(
     vehicleId: string,
     stageId: string,

@@ -74,6 +74,7 @@ export class GateAssignmentsService {
     splitIndex?: number;
   }): Promise<GateAssignment> {
     await this.assertStageEditable(data.stageId);
+    await this.assertStartFinishFits(data.stageId, data.role);
     const assignment = this.assignments.create({ ...data, active: false });
     return this.assignments.save(assignment);
   }
@@ -167,5 +168,32 @@ export class GateAssignmentsService {
       });
     }
     await this.assignments.delete({ gateId });
+  }
+
+  /**
+   * A stage starts and finishes either at separate gates or at one combined
+   * gate, never both: with both, a passing would mean two things at once.
+   */
+  private async assertStartFinishFits(
+    stageId: string,
+    role: GateRole,
+  ): Promise<void> {
+    const ends = [
+      GateRole.STAGE_START,
+      GateRole.STAGE_FINISH,
+      GateRole.STAGE_START_FINISH,
+    ];
+    if (!ends.includes(role)) return;
+    const clash = (await this.findByStage(stageId)).find(
+      (a) =>
+        ends.includes(a.role) &&
+        (role === GateRole.STAGE_START_FINISH ||
+          a.role === GateRole.STAGE_START_FINISH),
+    );
+    if (clash) {
+      throw new ConflictException(
+        `Stage ${stageId} already has a ${clash.role} gate; a combined start/finish gate replaces separate start and finish gates`,
+      );
+    }
   }
 }

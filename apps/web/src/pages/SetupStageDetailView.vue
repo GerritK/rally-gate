@@ -11,7 +11,12 @@ import { fetchGates, type Gate } from '../api/gates';
 import { fetchStage, upsertStage, type Stage } from '../api/stages';
 import FormDialog from '../components/FormDialog.vue';
 import { required, STAGE_STATUS_DISPLAY } from '../format';
-import { notify } from '@rally-gate/ui';
+import {
+  formatStageDuration,
+  notify,
+  parseStageDuration,
+} from '@rally-gate/ui';
+import { DEFAULT_MIN_STAGE_DURATION_MS } from '@rally-gate/shared';
 import { useUnsavedChanges } from '../unsaved-changes';
 
 const props = defineProps<{ stageId: string }>();
@@ -20,12 +25,18 @@ const stage = ref<Stage | null>(null);
 const gates = ref<Gate[]>([]);
 const gateAssignments = ref<GateAssignment[]>([]);
 const savingStage = ref(false);
+/** Durations are typed like a stopwatch reading ("5:00", "0:10"), the same
+ * as a corrected stage time; blank means none (expected) or the default
+ * (minimum). */
+const expectedText = ref('');
+const minText = ref('');
 const { markSaved } = useUnsavedChanges(() =>
   stage.value
     ? [
         stage.value.name,
         stage.value.stageNumber,
-        stage.value.expectedDurationMs,
+        expectedText.value,
+        minText.value,
       ]
     : null,
 );
@@ -45,18 +56,22 @@ const assignmentsForStage = computed(() =>
   gateAssignments.value.filter((a) => a.stageId === props.stageId),
 );
 
-/** Entered in minutes, stored in ms; blank means no expectation. */
-const expectedMinutes = computed({
-  get: () =>
-    stage.value?.expectedDurationMs
-      ? stage.value.expectedDurationMs / 60_000
-      : '',
-  set: (value: number | string | null) => {
-    if (!stage.value) return;
-    stage.value.expectedDurationMs =
-      !value || Number(value) <= 0 ? null : Math.round(Number(value) * 60_000);
-  },
-});
+function toText(ms: number | null): string {
+  return ms ? formatStageDuration(ms) : '';
+}
+
+function durationRule(value: string | null) {
+  return !value?.trim() || parseStageDuration(value) !== null
+    ? true
+    : 'A time like 5:00';
+}
+
+function showStage(loaded: Stage) {
+  stage.value = loaded;
+  expectedText.value = toText(loaded.expectedDurationMs);
+  minText.value = toText(loaded.minDurationMs);
+  markSaved();
+}
 
 const stageEditable = computed(() => stage.value?.status === 'NOT_STARTED');
 
@@ -65,22 +80,25 @@ async function refreshAssignments() {
 }
 
 async function load() {
-  stage.value = await fetchStage(props.stageId);
-  markSaved();
+  showStage(await fetchStage(props.stageId));
   gates.value = await fetchGates();
   await refreshAssignments();
 }
 
 async function onSaveStage() {
   if (!stage.value || savingStage.value) return;
+  if (durationRule(expectedText.value) !== true) return;
+  if (durationRule(minText.value) !== true) return;
   savingStage.value = true;
   try {
-    stage.value = await upsertStage(stage.value.id, {
-      name: stage.value.name,
-      stageNumber: stage.value.stageNumber,
-      expectedDurationMs: stage.value.expectedDurationMs,
-    });
-    markSaved();
+    showStage(
+      await upsertStage(stage.value.id, {
+        name: stage.value.name,
+        stageNumber: stage.value.stageNumber,
+        expectedDurationMs: parseStageDuration(expectedText.value ?? ''),
+        minDurationMs: parseStageDuration(minText.value ?? ''),
+      }),
+    );
     notify('Stage saved');
   } finally {
     savingStage.value = false;
@@ -148,14 +166,27 @@ onMounted(load);
           style="min-width: 220px"
         />
         <v-text-field
-          v-model="expectedMinutes"
-          type="number"
-          min="0"
-          step="0.5"
-          label="Expected time (min)"
+          v-model="expectedText"
+          label="Expected time"
+          placeholder="5:00"
+          class="rg-timing"
           density="comfortable"
-          hide-details
+          hide-details="auto"
           clearable
+          :rules="[durationRule]"
+          :disabled="!stageEditable"
+          style="max-width: 200px"
+        />
+        <v-text-field
+          v-model="minText"
+          label="Minimum time"
+          :placeholder="formatStageDuration(DEFAULT_MIN_STAGE_DURATION_MS)"
+          persistent-placeholder
+          class="rg-timing"
+          density="comfortable"
+          hide-details="auto"
+          clearable
+          :rules="[durationRule]"
           :disabled="!stageEditable"
           style="max-width: 200px"
         />
@@ -175,6 +206,10 @@ onMounted(load);
           Save
         </v-btn>
       </form>
+      <div class="text-caption text-medium-emphasis mt-2">
+        Minimum time only matters at a combined start/finish gate: a passing
+        sooner after the start is ignored as the same passing.
+      </div>
     </v-card-text>
   </v-card>
 
