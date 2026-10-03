@@ -1053,7 +1053,7 @@ onUnmounted(() => {
       </template>
       <v-card-title class="d-flex align-center ga-2">
         Unassigned passings
-        <v-chip size="small" color="warning">
+        <v-chip size="small" color="warning" variant="flat">
           {{ passingsByStage.here.length }}
         </v-chip>
       </v-card-title>
@@ -1068,8 +1068,7 @@ onUnmounted(() => {
         <tr>
           <th>Gate</th>
           <th>Gate time</th>
-          <th>Vehicle</th>
-          <th width="1%"></th>
+          <th width="1%">Vehicle</th>
         </tr>
       </thead>
       <tbody>
@@ -1084,50 +1083,49 @@ onUnmounted(() => {
             {{ formatClockTime(event.timestampGate) }}
           </td>
           <td>
-            <v-select
-              :model-value="vehicleFor(event)"
-              :items="vehicleOptions"
-              item-title="title"
-              item-value="id"
-              placeholder="Pick a vehicle"
-              density="compact"
-              variant="outlined"
-              hide-details
-              class="rg-passing-vehicle"
-              @update:model-value="
-                (id: string) => (pickedVehicleIds[event.eventId] = id)
-              "
-            />
-          </td>
-          <td class="text-no-wrap">
-            <v-btn
-              size="small"
-              variant="tonal"
-              prepend-icon="mdi-check"
-              :disabled="!vehicleFor(event)"
-              @click="onAssign(event)"
-            >
-              Assign
-            </v-btn>
-            <v-menu>
-              <template #activator="{ props: menu }">
-                <v-btn
-                  v-bind="menu"
-                  size="small"
-                  variant="text"
-                  icon="mdi-dots-vertical"
-                  aria-label="More actions"
-                />
-              </template>
-              <v-list density="compact">
-                <v-list-item
-                  prepend-icon="mdi-close"
-                  title="Not a car"
-                  subtitle="Dismiss this passing"
-                  @click="onDismiss(event)"
-                />
-              </v-list>
-            </v-menu>
+            <div class="d-flex align-center ga-2">
+              <v-select
+                :model-value="vehicleFor(event)"
+                :items="vehicleOptions"
+                item-title="title"
+                item-value="id"
+                placeholder="Pick a vehicle"
+                density="compact"
+                variant="outlined"
+                hide-details
+                class="rg-passing-vehicle"
+                @update:model-value="
+                  (id: string) => (pickedVehicleIds[event.eventId] = id)
+                "
+              />
+              <v-btn
+                variant="tonal"
+                prepend-icon="mdi-check"
+                :disabled="!vehicleFor(event)"
+                @click="onAssign(event)"
+              >
+                Assign
+              </v-btn>
+              <v-menu>
+                <template #activator="{ props: menu }">
+                  <v-btn
+                    v-bind="menu"
+                    size="small"
+                    variant="text"
+                    icon="mdi-dots-vertical"
+                    aria-label="More actions"
+                  />
+                </template>
+                <v-list density="compact">
+                  <v-list-item
+                    prepend-icon="mdi-close"
+                    title="Not a car"
+                    subtitle="Dismiss this passing"
+                    @click="onDismiss(event)"
+                  />
+                </v-list>
+              </v-menu>
+            </div>
           </td>
         </tr>
       </tbody>
