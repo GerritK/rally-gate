@@ -1064,18 +1064,22 @@ onUnmounted(() => {
           <template v-if="dueToStart.length > 1">
             <v-divider class="mt-4 mb-2" />
             <div class="text-overline text-medium-emphasis">Then</div>
-            <div
-              v-for="row in dueToStart.slice(1, 3)"
-              :key="row.entry.vehicleId"
-              class="d-flex align-baseline ga-3 py-1"
-            >
-              <span class="rg-timing rg-then-number">
-                #{{ row.entry.startNumber }}
-              </span>
-              <span class="rg-then-driver">{{ row.entry.driverName }}</span>
-              <span class="text-medium-emphasis">
-                {{ row.entry.mainClassName }}
-              </span>
+            <div class="rg-then-grid">
+              <div
+                v-for="row in dueToStart.slice(1, 3)"
+                :key="row.entry.vehicleId"
+                class="d-flex align-center ga-3"
+              >
+                <span class="rg-timing rg-then-number">
+                  #{{ row.entry.startNumber }}
+                </span>
+                <div>
+                  <div class="rg-then-driver">{{ row.entry.driverName }}</div>
+                  <div class="text-medium-emphasis">
+                    {{ row.entry.mainClassName }}
+                  </div>
+                </div>
+              </div>
             </div>
           </template>
         </v-card-text>
@@ -1476,14 +1480,20 @@ onUnmounted(() => {
   line-height: 1;
 }
 
+.rg-then-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
 .rg-then-number {
-  font-size: 1.25rem;
+  font-size: 2rem;
   font-weight: 700;
-  min-width: 3.5ch;
+  line-height: 1;
 }
 .rg-then-driver {
   font-size: 1.1rem;
-  font-weight: 500;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .rg-next-driver {
