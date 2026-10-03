@@ -373,12 +373,15 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       }
       throw err;
     }
-    this.emitter.emit('detection.created', record);
     if (awaitingVehicle) {
       await this.emitAwaitingChanged();
     }
 
     await this.applyRulesForRecord(record);
+    // After the rules, not before: the payload carries `processed`, and
+    // emitted earlier it is always false, so every live detection would read
+    // as a rule failure.
+    this.emitter.emit('detection.created', record);
   }
 
   /**

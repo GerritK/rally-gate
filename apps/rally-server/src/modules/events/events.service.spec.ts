@@ -182,6 +182,42 @@ describe('EventsService detection failures', () => {
   );
 });
 
+describe('EventsService live detection payload', () => {
+  // The live stream serialises the record when it is emitted; a payload sent
+  // before the rules ran read as a rule failure on every gate page.
+  function emittedDetection(emitter: { emit: jest.Mock }) {
+    const sent: DetectionEventRecord[] = [];
+    emitter.emit.mockImplementation((name: string, payload: unknown) => {
+      if (name === 'detection.created') {
+        sent.push({ ...(payload as DetectionEventRecord) });
+      }
+    });
+    return sent;
+  }
+
+  it('is sent processed once the rules have run', async () => {
+    const { service, emitter } = makeService({});
+    const sent = emittedDetection(emitter);
+
+    await service.handleMqttMessage(detection());
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].processed).toBe(true);
+  });
+
+  it('is still sent, unprocessed, when the rules fail', async () => {
+    const { service, emitter } = makeService({
+      startRun: jest.fn().mockRejectedValue(new Error('db down')),
+    });
+    const sent = emittedDetection(emitter);
+
+    await service.handleMqttMessage(detection());
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].processed).toBe(false);
+  });
+});
+
 describe('EventsService redelivered detections', () => {
   // QoS 1 is at-least-once: a lost PUBACK makes the gate publish again.
   it('leaves an already stored detection untouched', async () => {

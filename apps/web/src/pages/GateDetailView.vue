@@ -106,11 +106,19 @@ async function onRename() {
   });
 }
 
+/** Same cap as the server's list, so the page doesn't grow while open. */
+const DETECTION_LIMIT = 100;
+
 function upsertDetection(event: DetectionEventRecord) {
   if (event.gateId !== props.gateId) return;
   const idx = detections.value.findIndex((d) => d.eventId === event.eventId);
-  if (idx === -1) detections.value.unshift(event);
-  else detections.value[idx] = event;
+  if (idx === -1) {
+    detections.value = [event, ...detections.value].slice(0, DETECTION_LIMIT);
+  } else detections.value[idx] = event;
+}
+
+async function refreshDetections() {
+  detections.value = await fetchRecentEvents(props.gateId);
 }
 
 async function load() {
@@ -142,11 +150,13 @@ onMounted(async () => {
         if (updated.id === props.gateId) gate.value = updated;
       },
       detection: upsertDetection,
+      // A retry or a marshal's assignment changes a stored detection, which
+      // the stream announces only as these lists changing.
+      'pending-detections': refreshDetections,
+      'awaiting-detections': refreshDetections,
     },
     // A reconnect may have missed detections.
-    () => {
-      void fetchRecentEvents(props.gateId).then((d) => (detections.value = d));
-    },
+    refreshDetections,
   );
 });
 
