@@ -46,8 +46,9 @@ The vehicle is **pre-selected from the start order, never assigned
 automatically**: a wrong assignment is a wrong time nobody notices in the
 results. Passings are matched in time order. At a start gate the suggestion is
 the next car after the last one that started, so a no-show is skipped; at a
-split or finish gate it is the first car on stage in start order (at a split,
-one without that split yet). An overtake is just a suggestion the marshal
+split or finish gate it is the first car on stage in expected arrival order —
+most splits passed, then the earlier start (at a split, one without that split
+yet). An overtake is just a suggestion the marshal
 corrects.
 
 **Assign refuses when the rules would do nothing** — a finish or split for a car

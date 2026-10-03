@@ -58,6 +58,7 @@ import {
 import {
   combineDateAndTime,
   formatDuration,
+  formatGap,
   gateStatusColor,
   gateStatusIcon,
   isOnline,
@@ -228,6 +229,66 @@ function formatSplits(runId: string): string {
     .join(', ');
 }
 
+// ---- On stage: running cars in expected arrival order -------------------
+
+/** The stage's split points, from its gate plan. */
+const splitIndices = computed(() =>
+  [
+    ...new Set(
+      gateAssignments.value
+        .filter(
+          (a) => a.stageId === props.stageId && a.role === GateRole.STAGE_SPLIT,
+        )
+        .map((a) => a.splitIndex ?? 0),
+    ),
+  ].sort((a, b) => a - b),
+);
+
+/** Fastest time to each split among the attempts that count. */
+const bestSplitMs = computed(() => {
+  const best = new Map<number, number>();
+  for (const run of stageRuns.value) {
+    if (run.voided) continue;
+    for (const split of splitsByRun.value[run.id] ?? []) {
+      best.set(
+        split.splitIndex,
+        Math.min(best.get(split.splitIndex) ?? Infinity, split.elapsedMs),
+      );
+    }
+  }
+  return best;
+});
+
+/**
+ * Furthest along first, then the earlier start: the order cars should reach
+ * the next gate, so the finish marshal reads who comes next from the top. A
+ * missed split detection puts a car too far back; it's a guide, not a fact.
+ */
+const onStage = computed(() =>
+  rows.value
+    .filter((row) => row.state === 'ON_STAGE')
+    .map((row) => {
+      const run = row.run!;
+      const splits = splitsByRun.value[run.id] ?? [];
+      const last = splits.at(-1);
+      return {
+        row,
+        run,
+        passed: new Set(splits.map((s) => s.splitIndex)),
+        last,
+        gapMs: last
+          ? last.elapsedMs - (bestSplitMs.value.get(last.splitIndex) ?? 0)
+          : undefined,
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.passed.size - a.passed.size ||
+        new Date(a.run.startTime).getTime() -
+          new Date(b.run.startTime).getTime(),
+    ),
+);
+
 // ---- Unassigned passings, with a suggested vehicle -----------------------
 
 const vehicleOptions = computed(() =>
@@ -240,9 +301,10 @@ const vehicleOptions = computed(() =>
 /**
  * A suggestion only pre-selects, it never assigns: a wrong assignment is a
  * wrong time nobody notices in the results. Passings are matched in time
- * order to cars in start order — at a start gate the cars due to start, at a
- * split or finish the cars on stage — each car suggested once. Passings at
- * another stage's gates get no suggestion; this page only knows its stage.
+ * order — at a start gate to the cars due to start in start order, at a split
+ * or finish to the cars on stage in expected arrival order — each car
+ * suggested once. Passings at another stage's gates get no suggestion; this
+ * page only knows its stage.
  */
 const suggestedVehicleIds = computed(() => {
   const suggestions: Record<string, string> = {};
@@ -251,7 +313,7 @@ const suggestedVehicleIds = computed(() => {
   const dueToStart = rows.value
     .slice(Math.max(nextIndex, 0))
     .filter((row) => row.state === 'NEXT' || row.state === 'WAITING');
-  const onStage = rows.value.filter((row) => row.state === 'ON_STAGE');
+  const running = onStage.value.map((car) => car.row);
   const byTime = [...awaitingDetections.value].sort(
     (a, b) =>
       new Date(a.timestampGate).getTime() - new Date(b.timestampGate).getTime(),
@@ -266,7 +328,7 @@ const suggestedVehicleIds = computed(() => {
         ? dueToStart
         : assignment.role === GateRole.STAGE_SPLIT ||
             assignment.role === GateRole.STAGE_FINISH
-          ? onStage
+          ? running
           : [];
     const pick = candidates.find(
       (row) =>
@@ -875,6 +937,69 @@ onUnmounted(() => {
         </tbody>
       </v-table>
     </v-card-text>
+  </v-card>
+
+  <v-card v-if="onStage.length > 0" class="mb-4 d-print-none">
+    <v-card-item>
+      <v-card-title class="d-flex align-center ga-2">
+        On stage
+        <v-chip size="small" :color="runStatusColor('STARTED')">
+          {{ onStage.length }}
+        </v-chip>
+      </v-card-title>
+      <v-card-subtitle>Expected order at the next gate</v-card-subtitle>
+    </v-card-item>
+    <v-table density="comfortable">
+      <tbody>
+        <tr v-for="car in onStage" :key="car.run.id">
+          <td class="rg-timing font-weight-bold" style="width: 72px">
+            #{{ car.row.entry.startNumber }}
+          </td>
+          <td>{{ car.row.entry.driverName }}</td>
+          <td class="text-no-wrap">
+            <v-icon
+              v-for="index in splitIndices"
+              :key="index"
+              :icon="
+                car.passed.has(index) ? 'mdi-circle' : 'mdi-circle-outline'
+              "
+              :color="car.passed.has(index) ? 'success' : undefined"
+              :title="`Split ${index}`"
+              size="x-small"
+              class="mr-1"
+            />
+            <v-icon
+              icon="mdi-flag-checkered"
+              size="x-small"
+              title="Finish"
+              class="text-medium-emphasis"
+            />
+          </td>
+          <td class="rg-timing text-no-wrap">
+            <template v-if="car.last">
+              S{{ car.last.splitIndex }}
+              {{ formatStageDuration(car.last.elapsedMs) }}
+              <span class="text-medium-emphasis">
+                {{ car.gapMs ? formatGap(car.gapMs) : 'best' }}
+              </span>
+            </template>
+          </td>
+          <td class="rg-timing text-right text-h6">
+            {{ runDurationDisplay(car.run) }}
+          </td>
+          <td style="width: 120px">
+            <v-chip
+              v-if="isOverdue(car.run)"
+              size="small"
+              color="warning"
+              prepend-icon="mdi-timer-alert-outline"
+            >
+              Overdue
+            </v-chip>
+          </td>
+        </tr>
+      </tbody>
+    </v-table>
   </v-card>
 
   <v-card v-if="stage && startOrder" class="mb-4">
