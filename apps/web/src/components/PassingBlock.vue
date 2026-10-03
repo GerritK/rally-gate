@@ -17,7 +17,8 @@ defineEmits<{
   pick: [vehicleId: string];
   assign: [];
   dismiss: [];
-  dismissQueued: [];
+  /** This one and every queued one. */
+  dismissAll: [];
 }>();
 </script>
 
@@ -97,9 +98,9 @@ defineEmits<{
         size="small"
         variant="text"
         prepend-icon="mdi-close"
-        @click="$emit('dismissQueued')"
+        @click="$emit('dismissAll')"
       >
-        Dismiss {{ queued.length === 1 ? 'it' : `all ${queued.length}` }}
+        Dismiss all {{ queued.length + 1 }}
       </v-btn>
     </div>
   </div>

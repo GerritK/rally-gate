@@ -1102,7 +1102,7 @@ onUnmounted(() => {
             @pick="(id) => (pickedVehicleIds[event.eventId] = id)"
             @assign="onAssign(event)"
             @dismiss="onDismiss(event)"
-            @dismiss-queued="onDismissAll(queued)"
+            @dismiss-all="onDismissAll([event, ...queued])"
           />
         </v-card-text>
         <v-card-text v-if="dueToStart.length > 0">
@@ -1183,7 +1183,7 @@ onUnmounted(() => {
             @pick="(id) => (pickedVehicleIds[event.eventId] = id)"
             @assign="onAssign(event)"
             @dismiss="onDismiss(event)"
-            @dismiss-queued="onDismissAll(queued)"
+            @dismiss-all="onDismissAll([event, ...queued])"
           />
         </v-card-text>
         <v-table density="comfortable">
