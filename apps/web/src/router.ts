@@ -28,6 +28,10 @@ export const router = createRouter({
       component: () => import('./pages/SetupStagesView.vue'),
     },
     {
+      path: '/setup/classes',
+      component: () => import('./pages/SetupClassesView.vue'),
+    },
+    {
       path: '/setup/scoring',
       component: () => import('./pages/SetupScoringView.vue'),
     },
