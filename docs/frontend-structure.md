@@ -27,6 +27,12 @@ sharing `client.ts`). Audience is marshals and organisers only.
   `packages/ui/src/utilities.css`) cut it down to the start list (position,
   number, driver, co-driver), so the posted copy and the marshal's screen are
   one page. No PDF library. Its rules are configured under Setup.
+- **The app bar** shows the open event (rally name, else the event file), the
+  server clock (`GET /time`, measured once at start, since gates sync to the
+  server and a marshal reads times off it) and, on a page with a live
+  stream, its state: Live / Connecting / Offline. That state comes from the
+  page's own stream (`liveStatus` in `api/live.ts`), never a second
+  connection. Dark, not primary orange, like gate-config's.
 - **Live Timing loads its data directly, not only when the live stream opens.**
   A browser allows six connections per host, and each dashboard tab holds one
   stream, so with enough tabs open the stream sits pending; waiting for it

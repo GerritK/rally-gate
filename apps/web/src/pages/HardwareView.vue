@@ -19,7 +19,7 @@ import {
   type Gate,
   type GatePowerOffResult,
 } from '../api/gates';
-import { openLiveStream } from '../api/live';
+import { closeLiveStream, openLiveStream } from '../api/live';
 import { serverVersion } from '../api/version';
 import { fetchSetting, saveSetting } from '../api/settings';
 import { fetchStages, type Stage } from '../api/stages';
@@ -198,7 +198,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  gatesSource?.close();
+  if (gatesSource) closeLiveStream(gatesSource);
   clearInterval(nowTimer);
 });
 </script>

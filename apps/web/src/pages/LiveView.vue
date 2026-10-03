@@ -23,7 +23,7 @@ import {
   type GateAssignment,
 } from '../api/gate-assignments';
 import { fetchGates, type Gate } from '../api/gates';
-import { openLiveStream } from '../api/live';
+import { closeLiveStream, openLiveStream } from '../api/live';
 import { rallyName } from '../api/rally-info';
 import {
   activateStage,
@@ -49,7 +49,6 @@ import {
   unfreezeStartOrder,
   type StartOrder,
 } from '../api/start-order';
-import { measureServerOffsetMs } from '../api/time';
 import { fetchVehicles, type Vehicle } from '../api/vehicles';
 import ManualMark from '../components/ManualMark.vue';
 import StagePicker from '../components/StagePicker.vue';
@@ -75,14 +74,6 @@ const props = defineProps<{ stageId?: string }>();
 const router = useRouter();
 
 const now = ref(Date.now());
-const serverOffsetMs = ref(0);
-const serverClock = computed(() =>
-  new Date(now.value + serverOffsetMs.value).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }),
-);
 let nowTimer: ReturnType<typeof setInterval>;
 let liveSource: EventSource;
 
@@ -769,17 +760,13 @@ onMounted(async () => {
   );
   void loadLive();
 
-  measureServerOffsetMs()
-    .then((offset) => (serverOffsetMs.value = offset))
-    .catch(() => undefined);
-
   nowTimer = setInterval(() => {
     now.value = Date.now();
   }, 1000);
 });
 
 onUnmounted(() => {
-  liveSource?.close();
+  if (liveSource) closeLiveStream(liveSource);
   clearInterval(nowTimer);
 });
 </script>
@@ -915,13 +902,6 @@ onUnmounted(() => {
         >
           {{ count }} {{ ROW_STATE_DISPLAY[state].label }}
         </v-chip>
-        <v-spacer />
-        <span
-          class="rg-timing text-h5"
-          title="Server time — the clock the gates are synced to"
-        >
-          {{ serverClock }}
-        </span>
       </div>
       <div class="d-flex flex-wrap align-center ga-2">
         <span v-if="stageGates.length > 0" class="text-medium-emphasis">

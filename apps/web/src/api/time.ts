@@ -1,4 +1,12 @@
+import { ref } from 'vue';
 import { apiFetch } from './client';
+
+/** Server clock minus this device's, measured once at app start. */
+export const serverOffsetMs = ref(0);
+
+export async function syncServerClock(): Promise<void> {
+  serverOffsetMs.value = await measureServerOffsetMs();
+}
 
 /**
  * Server clock minus this device's, in ms. Gates sync to the server, so a
