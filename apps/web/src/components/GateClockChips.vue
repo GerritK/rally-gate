@@ -37,7 +37,7 @@ defineProps<{ gate: Gate; correctionThresholdMs: number }>();
     class="rg-timing ml-1"
     :color="gate.chronySynced ? 'success' : 'error'"
     :prepend-icon="gate.chronySynced ? 'mdi-sync' : 'mdi-sync-alert'"
-    :title="
+    v-tooltip:top="
       gate.chronySynced
         ? 'chrony on the gate is synced'
         : 'chrony on the gate is not synced — its times are not comparable with other gates'

@@ -5,7 +5,7 @@
     icon="mdi-hand-back-right-outline"
     color="warning"
     size="small"
-    title="Hand-timed (set by a marshal, not a gate)"
+    v-tooltip:top="'Hand-timed (set by a marshal, not a gate)'"
     aria-label="Hand-timed"
   />
 </template>

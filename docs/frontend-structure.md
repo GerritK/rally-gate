@@ -8,8 +8,8 @@ sharing `client.ts`). Audience is marshals and organisers only.
 |---|---|---|
 | `/` | — | redirect to `/live` |
 | `/live/:stageId?` | Live Timing | the marshal view, laid out like the stage: its gates on a line in the order a car meets them, each with its health; "Up next" (next car large with Start now, the two after it) beside cars on stage in expected arrival order, each with Finish now (split progress, last split with gap to the best); every vehicle in start order with its run state, times and corrections (a stage time derives the finish), and Enter time for a car with no run (a missed start: finish and stage time give the start); unidentified passings where the car is (a start in Up next, a split or finish in On stage) with a suggested vehicle; Activate / Close; freeze and print the start list; raw detections collapsed. No stage picks the active one, else the next |
-| `/results/overall` | Results | overall classification, each stage column the fastest time marked and the rest as gap to it, filterable by class |
-| `/results/stages/:stageId` | Results | stage classification with a column per split (fastest as its time and marked, the rest as gap to it, each with its rank), DNF/DNS, filterable by class |
+| `/results/overall` | Results | overall classification, each stage column the time driven, the fastest marked, the gap to it in the tooltip, filterable by class, printable |
+| `/results/stages/:stageId` | Results | stage classification with a column per split (the time and its rank, the fastest marked, the gap to it in the tooltip), DNF/DNS, filterable by class, printable |
 | `/vehicles` | Vehicles | registration, editing in a dialog, status, classes |
 | `/hardware` | Hardware | gate roster: online, heartbeat, clock offset, version, add/delete, auto-discovery toggle, shut down all gates; a row opens the gate. Gates known to this computer: add to this event, forget (standalone only) |
 | `/hardware/gates/:gateId` | Hardware | one gate: status, clock, address with a link to its gate-config, version, rename; its assignments on every stage; its last 100 detections, live, with clock correction and what became of each |

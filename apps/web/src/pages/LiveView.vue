@@ -1085,7 +1085,7 @@ onUnmounted(() => {
               v-for="node in gateFlow"
               :key="node.gate.id"
               class="rg-gate-node"
-              :title="`${node.gate.name}: ${gateStatusText(node.gate)}`"
+              v-tooltip:top="`${node.gate.name}: ${gateStatusText(node.gate)}`"
             >
               <span
                 class="rg-gate-icon"
@@ -1272,18 +1272,18 @@ onUnmounted(() => {
                     car.passed.has(index) ? 'mdi-circle' : 'mdi-circle-outline'
                   "
                   :color="car.passed.has(index) ? 'success' : undefined"
-                  :title="`Split ${index}`"
+                  v-tooltip:top="`Split ${index}`"
                   size="x-small"
                   class="mr-1"
                 />
                 <v-icon
                   icon="mdi-flag-checkered"
                   size="x-small"
-                  title="Finish"
+                  v-tooltip:top="'Finish'"
                   class="text-medium-emphasis"
                 />
               </td>
-              <td class="rg-timing text-no-wrap">
+              <td class="rg-timing rg-time text-no-wrap">
                 <template v-if="car.last">
                   S{{ car.last.splitIndex }}
                   {{ formatStageDuration(car.last.elapsedMs) }}
@@ -1340,10 +1340,10 @@ onUnmounted(() => {
           <th class="d-none d-print-table-cell">Co-driver</th>
           <th v-if="!startOrder.grouped">Class</th>
           <th class="d-print-none">Status</th>
-          <th class="d-print-none">Start</th>
-          <th class="d-print-none">Splits</th>
-          <th class="d-print-none">Finish</th>
-          <th class="d-print-none">Time</th>
+          <th class="d-print-none rg-time">Start</th>
+          <th class="d-print-none rg-time">Splits</th>
+          <th class="d-print-none rg-time">Finish</th>
+          <th class="d-print-none rg-time">Time</th>
           <th class="d-print-none"></th>
         </tr>
       </thead>
@@ -1386,22 +1386,26 @@ onUnmounted(() => {
                 attempt {{ row.run.attempt }}
               </span>
             </td>
-            <td class="d-print-none">
+            <td class="d-print-none rg-time">
               <span v-if="row.run" class="rg-timing text-no-wrap">
-                {{ formatClockTime(row.run.startTime) }}
-                <ManualMark v-if="row.run.startManual" />
+                {{ formatClockTime(row.run.startTime)
+                }}<span class="rg-time-mark"
+                  ><ManualMark v-if="row.run.startManual"
+                /></span>
               </span>
             </td>
-            <td class="d-print-none rg-timing text-no-wrap">
+            <td class="d-print-none rg-timing rg-time text-no-wrap">
               {{ row.run ? formatSplits(row.run.id) : '' }}
             </td>
-            <td class="d-print-none">
+            <td class="d-print-none rg-time">
               <span v-if="row.run?.finishTime" class="rg-timing text-no-wrap">
-                {{ formatClockTime(row.run.finishTime) }}
-                <ManualMark v-if="row.run.finishManual" />
+                {{ formatClockTime(row.run.finishTime)
+                }}<span class="rg-time-mark"
+                  ><ManualMark v-if="row.run.finishManual"
+                /></span>
               </span>
             </td>
-            <td class="d-print-none rg-timing">
+            <td class="d-print-none rg-timing rg-time">
               {{ row.run ? runDurationDisplay(row.run) : '' }}
             </td>
             <td class="d-print-none text-no-wrap text-right">
@@ -1485,16 +1489,24 @@ onUnmounted(() => {
                 >attempt {{ voided.attempt }}</span
               >
             </td>
-            <td class="rg-timing text-no-wrap">
-              {{ formatClockTime(voided.startTime) }}
-              <ManualMark v-if="voided.startManual" />
+            <td class="rg-timing rg-time text-no-wrap">
+              {{ formatClockTime(voided.startTime)
+              }}<span class="rg-time-mark"
+                ><ManualMark v-if="voided.startManual"
+              /></span>
             </td>
-            <td class="rg-timing">{{ formatSplits(voided.id) }}</td>
-            <td class="rg-timing">
-              {{ voided.finishTime ? formatClockTime(voided.finishTime) : '' }}
-              <ManualMark v-if="voided.finishTime && voided.finishManual" />
+            <td class="rg-timing rg-time">{{ formatSplits(voided.id) }}</td>
+            <td class="rg-timing rg-time text-no-wrap">
+              <template v-if="voided.finishTime">
+                {{ formatClockTime(voided.finishTime)
+                }}<span class="rg-time-mark"
+                  ><ManualMark v-if="voided.finishManual"
+                /></span>
+              </template>
             </td>
-            <td class="rg-timing">{{ formatDuration(voided.durationMs) }}</td>
+            <td class="rg-timing rg-time">
+              {{ formatDuration(voided.durationMs) }}
+            </td>
             <td class="text-no-wrap text-right">
               <v-btn
                 size="small"
@@ -1547,7 +1559,7 @@ onUnmounted(() => {
               <th>Gate</th>
               <th>Transponder</th>
               <th>Vehicle</th>
-              <th>Gate Time</th>
+              <th class="rg-time">Gate Time</th>
             </tr>
           </thead>
           <tbody>
@@ -1561,7 +1573,7 @@ onUnmounted(() => {
                     : 'unknown'
                 }}
               </td>
-              <td class="rg-timing">
+              <td class="rg-timing rg-time">
                 {{ formatClockTime(event.timestampGate) }}
               </td>
             </tr>

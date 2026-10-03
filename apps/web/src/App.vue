@@ -73,8 +73,8 @@ onMounted(async () => {
         </v-chip>
         <v-divider v-if="liveStatus" vertical inset class="mx-4" />
         <div
+          v-tooltip:bottom="'Server time — the clock the gates are synced to'"
           class="text-center"
-          title="Server time — the clock the gates are synced to"
         >
           <div class="rg-timing app-bar-clock">
             {{
@@ -102,8 +102,8 @@ onMounted(async () => {
           to="/setup"
           :active="false"
           icon="mdi-cog-outline"
+          v-tooltip:bottom="'Setup'"
           aria-label="Setup"
-          title="Setup"
         />
       </template>
     </v-app-bar>

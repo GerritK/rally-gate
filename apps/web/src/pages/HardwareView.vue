@@ -235,10 +235,10 @@ onUnmounted(() => {
               </v-chip>
             </td>
             <td
-              :title="
+              v-tooltip:top="
                 gate.lastHeartbeatAt
                   ? formatClockTime(gate.lastHeartbeatAt)
-                  : undefined
+                  : ''
               "
             >
               {{
@@ -266,7 +266,7 @@ onUnmounted(() => {
                 size="small"
                 color="warning"
                 prepend-icon="mdi-alert"
-                :title="`Server runs ${serverVersion}`"
+                v-tooltip:top="`Server runs ${serverVersion}`"
               >
                 {{ gate.version }}
               </v-chip>

@@ -211,12 +211,12 @@ onUnmounted(() => {
                 {{ online ? 'online' : 'offline' }}
               </v-chip>
               <span
-                class="text-medium-emphasis ml-2"
-                :title="
+                v-tooltip:top="
                   gate.lastHeartbeatAt
                     ? formatClockTime(gate.lastHeartbeatAt)
-                    : undefined
+                    : ''
                 "
+                class="text-medium-emphasis ml-2"
               >
                 {{
                   gate.lastHeartbeatAt
@@ -329,9 +329,9 @@ onUnmounted(() => {
       <v-table density="compact">
         <thead>
           <tr>
-            <th>Gate time</th>
-            <th>Correction</th>
-            <th>Received</th>
+            <th class="rg-time">Gate time</th>
+            <th class="rg-time">Correction</th>
+            <th class="rg-time">Received</th>
             <th>Transponder</th>
             <th>Vehicle</th>
             <th>State</th>
@@ -339,17 +339,17 @@ onUnmounted(() => {
         </thead>
         <tbody>
           <tr v-for="event in detections" :key="event.eventId">
-            <td class="rg-timing">
+            <td class="rg-timing rg-time">
               {{ formatClockTime(event.timestampGate) }}
             </td>
-            <td class="rg-timing">
+            <td class="rg-timing rg-time">
               {{
                 event.clockCorrectionMs
                   ? formatClockOffset(event.clockCorrectionMs)
                   : '-'
               }}
             </td>
-            <td class="rg-timing">
+            <td class="rg-timing rg-time">
               {{ formatClockTime(event.timestampServer) }}
             </td>
             <td class="rg-timing">{{ event.transponderId ?? '-' }}</td>
@@ -363,7 +363,7 @@ onUnmounted(() => {
                 size="small"
                 :color="detectionState(event).color"
                 :prepend-icon="detectionState(event).icon"
-                :title="detectionState(event).hint"
+                v-tooltip:top="detectionState(event).hint"
               >
                 {{ detectionState(event).label }}
               </v-chip>

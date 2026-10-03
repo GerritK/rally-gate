@@ -44,6 +44,14 @@ Values live in `theme.ts`. The rules:
 - **Colour is never the only signal.** Red-green colour blindness is common,
   so every status pairs colour with an icon and text, and timing highlights
   (`timing-best`/`timing-personal`) get a second cue too.
+- **Tooltips are Vuetify's, never the browser's `title`**: one look and
+  one delay everywhere. `v-tooltip:top="'…'"` on the element (the
+  directive), `:bottom` in the app bar; a conditional one passes `''`, not
+  `undefined`, which shows the element's own text. `title` stays only where
+  it is a component's label prop (`v-list-item`, `FormDialog`).
+- **Results show the time driven**, the gap to the fastest in its tooltip:
+  a posted result and a protest go by the time, and a crew checks it
+  against their stopwatch. The Gap column covers the comparison.
 - **Semantic colours over hex:** `timing-*` and `flag-*` in the theme, so
   components say what they mean ("timing-idle"), not what they look like.
 - **Borders** use the theme's `border-color` at full opacity. That's why
@@ -132,6 +140,11 @@ Values live in `theme.ts`. The rules:
 
 ## Tables
 
+- **Times are right-aligned**, header and cell (`.rg-time` in
+  `utilities.css`), so digits line up down a column. An icon qualifying a
+  time (best, hand-set, notional) sits right after it in an `.rg-time-mark`
+  slot. Every time in that column gets the slot, empty where there is no
+  icon, so the times stay in line either way.
 - **Actions sit in the last column**, kept to its minimum width
   (`width="1%"`, `text-no-wrap`) so it really ends the row.
 - **At most one direct action and one ⋮ menu** per row, either alone is
@@ -236,6 +249,14 @@ inconsistencies the first draft had:
   needs its own `@media print` rule.
 - Live Timing prints as the posted start list: position, number, driver,
   co-driver, class header rows, the published time.
+- Results (Overall and a stage) print as the posted result: rally name,
+  class filter and the time printed (server clock, `usePrint` in
+  `apps/web/src/print.ts`, Ctrl+P included), since results move while a
+  stage runs; a running stage is titled "Provisional". A table too wide for
+  portrait turns the page to landscape (more than three stage columns on
+  Overall, more than two splits on a stage).
+- Tables print compact (6px cell padding) and unclipped, from
+  `utilities.css`.
 
 ## Shared components (`apps/web/src/components`)
 

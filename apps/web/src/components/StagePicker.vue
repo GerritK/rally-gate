@@ -45,7 +45,7 @@ function display(stage: Stage): {
         class="rg-stage-node"
         :class="{ 'rg-stage-node--selected': stage.id === modelValue }"
         :aria-current="stage.id === modelValue ? 'page' : undefined"
-        :title="`${stage.id} · ${stage.name}: ${display(stage).label}`"
+        v-tooltip:top="`${stage.id} · ${stage.name}: ${display(stage).label}`"
         @click="emit('update:modelValue', stage.id)"
       >
         <span class="rg-stage-dot">
@@ -63,7 +63,7 @@ function display(stage: Stage): {
         class="rg-stage-node"
         :class="{ 'rg-stage-node--selected': !modelValue }"
         :aria-current="!modelValue ? 'page' : undefined"
-        title="Overall classification"
+        v-tooltip:top="'Overall classification'"
         @click="emit('overall')"
       >
         <span class="rg-stage-dot">

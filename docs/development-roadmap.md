@@ -42,6 +42,9 @@ What exists, with where its reasoning lives. History is in git.
   table of every vehicle in start order with run state, corrections and
   Start now per row, and unassigned passings pre-selected from the start order (never
   auto-assigned). Prints as the posted start list (`frontend-structure.md`).
+- **Printed results:** Overall and each stage's results print as the posted
+  result, with the print time and "Provisional" while a stage runs
+  (`design-system.md` "Print").
 - **Dashboard:** multi-page `apps/web` — Live Timing, Results, Setup, Hardware,
   Vehicles (`frontend-structure.md`).
 - **UI guidelines** (`design-system.md`): shared confirm dialog and
@@ -68,14 +71,6 @@ What exists, with where its reasoning lives. History is in git.
 
 ## Next
 
-- **Print results** like the start list (`design-system.md` "Print"): a
-  Print button on Overall and on a stage's results, printing the table as
-  the posted result. Rally name (no app bar on paper), title, class filter
-  from the subtitle, and the time it was printed, since results move while
-  a stage runs; a stage still running prints as "Provisional". The stage
-  page prints its classification, split columns included, plus DNF/DNS.
-  Overall
-  goes landscape (`@page`) once its stage columns no longer fit portrait.
 - **Stage column headers on Overall link to that stage's results.** Header
   only: a row click is kept free for a vehicle detail page (`design-system.md`
   "Tables").

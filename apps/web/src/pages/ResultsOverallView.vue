@@ -13,7 +13,9 @@ import { fetchStages, type Stage } from '../api/stages';
 import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
 import { fetchVehicles, type Vehicle } from '../api/vehicles';
 import { StageStatus } from '@rally-gate/shared';
+import { rallyName } from '../api/rally-info';
 import { formatDuration, formatGap, VEHICLE_STATUS_DISPLAY } from '../format';
+import { usePrint } from '../print';
 
 const route = useRoute();
 const router = useRouter();
@@ -79,6 +81,11 @@ const classLabel = computed(() =>
   classFilterLabel(classes.value, selectedClassIds.value),
 );
 
+// Past three stage columns the table no longer fits a portrait page.
+const { printedAt, print } = usePrint(
+  computed(() => countedStages.value.length > 3),
+);
+
 function goToStage(stageId: string) {
   router.push({ path: `/results/stages/${stageId}`, query: route.query });
 }
@@ -101,25 +108,43 @@ onMounted(async () => {
 
 <template>
   <StagePicker
-    class="mb-4"
+    class="mb-4 d-print-none"
     :stages="stages"
     overall
     @update:model-value="goToStage"
   />
-  <div class="d-flex flex-wrap align-center ga-4 mb-6">
+  <div class="d-flex flex-wrap align-center ga-4 mb-6 d-print-none">
     <ClassFilter v-model="selectedClassIds" :classes="classes" />
   </div>
 
   <v-card>
-    <v-card-title> Overall Classification </v-card-title>
-    <v-card-subtitle>{{ classLabel }}</v-card-subtitle>
+    <v-card-item>
+      <v-card-title>Overall Classification</v-card-title>
+      <v-card-subtitle>
+        <span v-if="rallyName" class="d-none d-print-inline"
+          >{{ rallyName }} ·
+        </span>
+        {{ classLabel }}
+        <span class="d-none d-print-inline"> · Printed {{ printedAt }}</span>
+      </v-card-subtitle>
+      <template #append>
+        <v-btn
+          variant="tonal"
+          prepend-icon="mdi-printer"
+          class="d-print-none"
+          @click="print"
+        >
+          Print
+        </v-btn>
+      </template>
+    </v-card-item>
     <v-card-text>
       <v-alert
         v-if="runningStages.length > 0"
         type="warning"
         variant="tonal"
         density="compact"
-        class="mb-4"
+        class="mb-4 d-print-none"
       >
         {{ runningStages.map((s) => `${s.id} · ${s.name}`).join(', ') }}
         {{ runningStages.length === 1 ? 'is' : 'are' }} still running and not
@@ -136,12 +161,13 @@ onMounted(async () => {
             <th
               v-for="stage in countedStages"
               :key="stage.id"
-              :title="stage.name"
+              v-tooltip:top="stage.name"
+              class="rg-time"
             >
               {{ stage.id }}
             </th>
-            <th>Total Time</th>
-            <th>Gap</th>
+            <th class="rg-time">Total Time</th>
+            <th class="rg-time">Gap</th>
             <th>Stages</th>
           </tr>
         </thead>
@@ -154,36 +180,42 @@ onMounted(async () => {
             <td
               v-for="time in entry.stageTimes"
               :key="time.stageId"
-              class="rg-timing text-no-wrap"
+              class="rg-timing rg-time text-no-wrap"
             >
-              <v-tooltip
+              <span
                 v-if="time.notional"
-                :text="`Notional time ${formatDuration(time.durationMs)}: stage not completed, charged the slowest time plus a penalty.`"
-                location="top"
+                v-tooltip:top="
+                  `Notional time, ${formatGap(stageGapMs(time))} to the fastest: stage not completed, charged the slowest time plus a penalty.`
+                "
+                class="text-medium-emphasis"
               >
-                <template #activator="{ props }">
-                  <span v-bind="props" class="text-medium-emphasis">
-                    {{ formatGap(stageGapMs(time)) }}
-                    <v-icon size="x-small" icon="mdi-timer-off-outline" />
-                  </span>
-                </template>
-              </v-tooltip>
+                {{ formatDuration(time.durationMs)
+                }}<span class="rg-time-mark"
+                  ><v-icon size="x-small" icon="mdi-timer-off-outline"
+                /></span>
+              </span>
               <span
                 v-else-if="stageGapMs(time) === 0"
+                v-tooltip:top="'Fastest on this stage'"
                 class="text-timing-best font-weight-bold"
-                title="Fastest on this stage"
               >
-                {{ formatDuration(time.durationMs) }}
-                <v-icon size="x-small" icon="mdi-star" />
+                {{ formatDuration(time.durationMs)
+                }}<span class="rg-time-mark"
+                  ><v-icon size="x-small" icon="mdi-star"
+                /></span>
               </span>
-              <span v-else :title="formatDuration(time.durationMs)">
-                {{ formatGap(stageGapMs(time)) }}
+              <span
+                v-else
+                v-tooltip:top="`${formatGap(stageGapMs(time))} to the fastest`"
+              >
+                {{ formatDuration(time.durationMs)
+                }}<span class="rg-time-mark" />
               </span>
             </td>
-            <td class="rg-timing font-weight-bold">
+            <td class="rg-timing rg-time font-weight-bold">
               {{ formatDuration(entry.durationMs) }}
             </td>
-            <td class="rg-timing">{{ formatGap(entry.gapMs) }}</td>
+            <td class="rg-timing rg-time">{{ formatGap(entry.gapMs) }}</td>
             <td>
               <v-tooltip
                 v-if="entry.stagesCompleted < stagesCounted"

@@ -87,6 +87,34 @@ input[type='time']::-webkit-calendar-picker-indicator {
   .v-main > .v-container {
     padding: 0 !important;
   }
+  /* The wrapper scrolls on screen; on paper that just cuts columns off. The
+   * screen's 16px cell padding costs a column or two at A4 width. */
+  .v-table > .v-table__wrapper {
+    overflow: visible !important;
+  }
+  .v-table > .v-table__wrapper > table > thead > tr > th,
+  .v-table > .v-table__wrapper > table > tbody > tr > td {
+    padding: 4px 6px !important;
+    height: auto !important;
+  }
+}
+
+/*
+ * Times sit flush right in a table, so digits line up down a column; put
+ * .rg-time on the header and the cell. An icon qualifying a time (best,
+ * hand-set, notional) goes in an .rg-time-mark slot right after it. Every
+ * time in that column gets the slot, empty or not, so the times stay
+ * aligned whether a row has an icon or not.
+ */
+.v-table > .v-table__wrapper > table > thead > tr > th.rg-time,
+.v-table > .v-table__wrapper > table > tbody > tr > td.rg-time {
+  text-align: right;
+}
+.rg-time-mark {
+  display: inline-block;
+  width: 24px;
+  text-align: center;
+  vertical-align: middle;
 }
 
 /*
