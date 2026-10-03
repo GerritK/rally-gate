@@ -23,6 +23,7 @@ import {
   type GateAssignment,
 } from '../api/gate-assignments';
 import { fetchGates, type Gate } from '../api/gates';
+import { serverOffsetMs } from '../api/time';
 import { closeLiveStream, openLiveStream } from '../api/live';
 import { rallyName } from '../api/rally-info';
 import {
@@ -73,7 +74,8 @@ import {
 const props = defineProps<{ stageId?: string }>();
 const router = useRouter();
 
-const now = ref(Date.now());
+// Server time: run start times come from gate clocks synced to it.
+const now = ref(Date.now() + serverOffsetMs.value);
 let nowTimer: ReturnType<typeof setInterval>;
 let liveSource: EventSource;
 
@@ -230,7 +232,11 @@ const stateCounts = computed(() => {
 
 function runDurationDisplay(run: StageRun): string {
   if (run.status === StageRunStatus.STARTED) {
-    return formatStageDuration(now.value - new Date(run.startTime).getTime());
+    // Clamped: `now` ticks once a second, so a run started since the last
+    // tick would otherwise read as negative.
+    return formatStageDuration(
+      Math.max(0, now.value - new Date(run.startTime).getTime()),
+    );
   }
   return formatDuration(run.durationMs);
 }
@@ -818,7 +824,7 @@ onMounted(async () => {
   void loadLive();
 
   nowTimer = setInterval(() => {
-    now.value = Date.now();
+    now.value = Date.now() + serverOffsetMs.value;
   }, 1000);
 });
 
