@@ -23,11 +23,13 @@ import {
   gateRoleLabel,
   isOnline,
   required,
-  stageName,
+  STAGE_STATUS_DISPLAY,
   vehicleName,
 } from '../format';
+import { useRouter } from 'vue-router';
 
 const props = defineProps<{ gateId: string }>();
+const router = useRouter();
 
 /** One mapping for a detection's fate, so the column reads at a glance. */
 const DETECTION_STATE_DISPLAY = {
@@ -78,14 +80,16 @@ let liveSource: EventSource | undefined;
 
 const online = computed(() => !!gate.value && isOnline(gate.value, now.value));
 
+/** Status comes from the stage: an assignment is active exactly while its
+ *  stage runs, so the stage also tells planned from done. */
 const gateAssignments = computed(() =>
   assignments.value
     .filter((a) => a.gateId === props.gateId)
-    .sort((a, b) => {
-      const number = (id: string) =>
-        stages.value.find((s) => s.id === id)?.stageNumber ?? 0;
-      return number(a.stageId) - number(b.stageId);
-    }),
+    .map((assignment) => ({
+      assignment,
+      stage: stages.value.find((s) => s.id === assignment.stageId),
+    }))
+    .sort((a, b) => (a.stage?.stageNumber ?? 0) - (b.stage?.stageNumber ?? 0)),
 );
 
 const renameOpen = ref(false);
@@ -264,33 +268,37 @@ onUnmounted(() => {
 
       <v-card>
         <v-card-title>Assignments</v-card-title>
-        <v-card-subtitle>Planned on each stage's page.</v-card-subtitle>
-        <v-table density="comfortable">
+        <v-card-subtitle
+          >Planned on each stage's page; a row opens it.</v-card-subtitle
+        >
+        <v-table density="comfortable" hover>
           <thead>
             <tr>
               <th>Stage</th>
               <th>Role</th>
-              <th>State</th>
+              <th>Stage status</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="a in gateAssignments" :key="a.id">
+            <tr
+              v-for="{ assignment, stage } in gateAssignments"
+              :key="assignment.id"
+              class="cursor-pointer"
+              @click="router.push(`/setup/stages/${assignment.stageId}`)"
+            >
               <td>
-                <router-link :to="`/setup/stages/${a.stageId}`">
-                  {{ a.stageId }}
-                </router-link>
-                <span class="text-medium-emphasis ml-1">
-                  {{ stageName(stages, a.stageId) }}
-                </span>
+                {{ assignment.stageId }}
+                <template v-if="stage">· {{ stage.name }}</template>
               </td>
-              <td>{{ gateRoleLabel(a) }}</td>
+              <td>{{ gateRoleLabel(assignment) }}</td>
               <td>
                 <v-chip
+                  v-if="stage"
                   size="small"
-                  :color="a.active ? 'success' : 'timing-idle'"
-                  :prepend-icon="a.active ? 'mdi-circle' : 'mdi-circle-outline'"
+                  :color="STAGE_STATUS_DISPLAY[stage.status].color"
+                  :prepend-icon="STAGE_STATUS_DISPLAY[stage.status].icon"
                 >
-                  {{ a.active ? 'Timing' : 'Planned' }}
+                  {{ STAGE_STATUS_DISPLAY[stage.status].label }}
                 </v-chip>
               </td>
             </tr>
