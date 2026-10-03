@@ -91,6 +91,15 @@ What exists, with where its reasoning lives. History is in git.
   undesigned; don't grow Setup UI for them speculatively. When checkpoint
   interval times land, give them their own formatter rather than reusing
   `formatStageDuration` (see `packages/ui/src/format.ts`).
+- **Start order suggestions** for unassigned passings — once a start order
+  exists, pre-select a vehicle, never assign it: a wrong assignment is a wrong
+  time nobody notices in the classification, so the marshal always confirms.
+  At a start gate, suggest the next car in the order after the last one
+  started that has no run on the stage yet, so a no-show is skipped
+  implicitly and nothing gets stuck behind them. Skipped cars stay selectable
+  (late starter) until marked DNS. At a finish gate, suggest open runs in
+  start order; an overtake is just a suggestion the marshal corrects. Planned
+  start times (above) could later narrow it by time window.
 - **Combined start/finish gate** — one gate as both start and finish of a
   stage: on a detection, finish the vehicle's open run if it has one, otherwise
   start one. Not needed for the first functional test; to be thought through
