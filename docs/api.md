@@ -7,6 +7,7 @@ Anything outside `/api` that isn't a file returns `index.html`.
 | Endpoint | Methods | Notes |
 |---|---|---|
 | `/version` | GET | `{ version }`, the server's build — see "Gate discovery & heartbeat" in `architecture.md` |
+| `/time` | GET | `{ now }`, the server clock; the dashboard shows it instead of the device's, since gates sync to the server |
 | `/gates` | GET, `/:id` GET/PUT/DELETE | hardware identity only (PUT sets the name). Auto-created from a first heartbeat unless `autoDiscoverGates` is off |
 | `/gates/power-off` | POST | shuts down every online gate through its gate-config; one `{ gateId, ok, message? }` per gate. 409 while a stage is active |
 | `/gate-assignments` | GET, POST, `/:id` DELETE | the (gate, stage, role, splitIndex) plan. `active` is not settable — activation is per stage |
