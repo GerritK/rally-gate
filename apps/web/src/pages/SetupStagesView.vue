@@ -1,27 +1,46 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { StageStatus } from '@rally-gate/shared';
 import {
   createStage,
   deleteStage,
   fetchStages,
   type Stage,
 } from '../api/stages';
-import { useConfirm } from '@rally-gate/ui';
+import FormDialog from '../components/FormDialog.vue';
+import { required, STAGE_STATUS_DISPLAY } from '../format';
+import { notify, useConfirm } from '@rally-gate/ui';
 
 const confirm = useConfirm();
+const router = useRouter();
 
 const stages = ref<Stage[]>([]);
-const newStage = ref({ id: '', name: '', stageNumber: 1 });
-const creating = ref(false);
-const deletingId = ref<string | null>(null);
-
-function nextStageNumber(): number {
-  return Math.max(0, ...stages.value.map((s) => s.stageNumber)) + 1;
-}
+const dialogOpen = ref(false);
+const draft = ref({ id: '', name: '', stageNumber: 1 });
 
 async function refresh() {
   stages.value = await fetchStages();
-  newStage.value.stageNumber = nextStageNumber();
+}
+
+function openCreate() {
+  draft.value = {
+    id: '',
+    name: '',
+    stageNumber: Math.max(0, ...stages.value.map((s) => s.stageNumber)) + 1,
+  };
+  dialogOpen.value = true;
+}
+
+/** Only the required fields here; the rest, gates included, is set on the
+ *  detail page it opens. */
+async function onCreate() {
+  const stage = await createStage({
+    id: draft.value.id.trim(),
+    name: draft.value.name.trim(),
+    stageNumber: Number(draft.value.stageNumber),
+  });
+  await router.push(`/setup/stages/${stage.id}`);
 }
 
 async function onDeleteStage(stage: Stage) {
@@ -34,30 +53,9 @@ async function onDeleteStage(stage: Stage) {
     }))
   )
     return;
-  deletingId.value = stage.id;
-  try {
-    await deleteStage(stage.id);
-    await refresh();
-  } finally {
-    deletingId.value = null;
-  }
-}
-
-async function onCreateStage() {
-  if (!newStage.value.id || !newStage.value.name || creating.value) return;
-  creating.value = true;
-  try {
-    await createStage({
-      id: newStage.value.id,
-      name: newStage.value.name,
-      stageNumber: newStage.value.stageNumber,
-    });
-    newStage.value.id = '';
-    newStage.value.name = '';
-    await refresh();
-  } finally {
-    creating.value = false;
-  }
+  await deleteStage(stage.id);
+  await refresh();
+  notify('Stage deleted');
 }
 
 onMounted(refresh);
@@ -69,90 +67,97 @@ onMounted(refresh);
   </v-btn>
 
   <v-card>
-    <v-card-title>Stages</v-card-title>
+    <v-card-title class="d-flex align-center">
+      Stages
+      <v-spacer />
+      <v-btn color="primary" prepend-icon="mdi-plus" @click="openCreate">
+        Add Stage
+      </v-btn>
+    </v-card-title>
     <v-card-text>
-      <v-table density="comfortable">
+      <v-table v-if="stages.length > 0" density="comfortable" hover>
         <thead>
           <tr>
             <th>#</th>
             <th>ID</th>
             <th>Name</th>
             <th>Status</th>
-            <th></th>
+            <th width="1%"></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="stage in stages" :key="stage.id">
+          <tr
+            v-for="stage in stages"
+            :key="stage.id"
+            class="cursor-pointer"
+            @click="router.push(`/setup/stages/${stage.id}`)"
+          >
             <td>{{ stage.stageNumber }}</td>
             <td>{{ stage.id }}</td>
             <td>{{ stage.name }}</td>
             <td>
               <v-chip
                 size="small"
-                :color="stage.status === 'CLOSED' ? 'timing-idle' : 'success'"
+                :color="STAGE_STATUS_DISPLAY[stage.status].color"
+                :prepend-icon="STAGE_STATUS_DISPLAY[stage.status].icon"
               >
-                {{ stage.status }}
+                {{ STAGE_STATUS_DISPLAY[stage.status].label }}
               </v-chip>
             </td>
-            <td>
-              <v-btn
-                size="small"
-                variant="text"
-                prepend-icon="mdi-pencil"
-                :to="`/setup/stages/${stage.id}`"
-              >
-                Edit / Gates
-              </v-btn>
-              <v-btn
-                v-if="stage.status === 'NOT_STARTED'"
-                size="small"
-                variant="text"
-                prepend-icon="mdi-delete"
-                :loading="deletingId === stage.id"
-                @click="onDeleteStage(stage)"
-              >
-                Delete
-              </v-btn>
+            <td class="text-no-wrap">
+              <v-menu v-if="stage.status === StageStatus.NOT_STARTED">
+                <template #activator="{ props: menu }">
+                  <v-btn
+                    v-bind="menu"
+                    icon="mdi-dots-vertical"
+                    size="small"
+                    variant="text"
+                    :aria-label="`More for ${stage.id}`"
+                    @click.stop
+                  />
+                </template>
+                <v-list density="compact">
+                  <v-list-item
+                    prepend-icon="mdi-delete-outline"
+                    title="Delete"
+                    base-color="error"
+                    @click="onDeleteStage(stage)"
+                  />
+                </v-list>
+              </v-menu>
             </td>
           </tr>
         </tbody>
       </v-table>
-      <form
-        class="d-flex flex-wrap align-center ga-3 mt-4"
-        @submit.prevent="onCreateStage"
-      >
-        <v-text-field
-          v-model.number="newStage.stageNumber"
-          type="number"
-          min="1"
-          label="Stage #"
-          density="comfortable"
-          hide-details
-          style="max-width: 140px"
-        />
-        <v-text-field
-          v-model="newStage.id"
-          label="ID (e.g. SS2)"
-          density="comfortable"
-          hide-details
-          style="max-width: 160px"
-        />
-        <v-text-field
-          v-model="newStage.name"
-          label="Name"
-          density="comfortable"
-          hide-details
-          style="min-width: 220px"
-        />
-        <v-btn
-          type="submit"
-          color="primary"
-          :loading="creating"
-          prepend-icon="mdi-plus"
-        >
-          Create Stage
-        </v-btn>
-      </form>
+      <v-alert v-else type="info" variant="tonal">
+        No stages yet. Add one with + Add Stage.
+      </v-alert>
     </v-card-text>
   </v-card>
+
+  <FormDialog
+    v-model="dialogOpen"
+    title="Add stage"
+    :form="draft"
+    :save="onCreate"
+    saved="Stage added"
+    save-text="Add stage"
+  >
+    <v-text-field
+      v-model.number="draft.stageNumber"
+      type="number"
+      min="1"
+      label="Stage #"
+      :rules="[required]"
+    />
+    <v-text-field
+      v-model="draft.id"
+      label="ID"
+      hint="The organiser's own code, e.g. WP3. Can't be changed later."
+      persistent-hint
+      :rules="[required]"
+      autofocus
+    />
+    <v-text-field v-model="draft.name" label="Name" :rules="[required]" />
+  </FormDialog>
 </template>

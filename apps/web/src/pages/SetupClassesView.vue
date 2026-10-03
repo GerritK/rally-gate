@@ -8,13 +8,18 @@ import {
   type VehicleClass,
 } from '../api/vehicle-classes';
 import { fetchVehicles, type Vehicle } from '../api/vehicles';
-import { useConfirm } from '@rally-gate/ui';
+import FormDialog from '../components/FormDialog.vue';
+import { required } from '../format';
+import { notify, useConfirm } from '@rally-gate/ui';
 
 const confirm = useConfirm();
 
 const classes = ref<VehicleClass[]>([]);
 const vehicles = ref<Vehicle[]>([]);
-const newClass = ref({ name: '', main: false });
+
+const dialogOpen = ref(false);
+const editing = ref<VehicleClass | null>(null);
+const draft = ref({ name: '', main: false });
 
 const vehicleCounts = computed(() => {
   const counts = new Map<string, number>();
@@ -33,35 +38,20 @@ async function refresh() {
   vehicles.value = await fetchVehicles();
 }
 
-async function guarded(action: () => Promise<unknown>) {
-  try {
-    await action();
-  } finally {
-    await refresh();
-  }
+function openDialog(vehicleClass: VehicleClass | null) {
+  editing.value = vehicleClass;
+  draft.value = {
+    name: vehicleClass?.name ?? '',
+    main: vehicleClass?.main ?? false,
+  };
+  dialogOpen.value = true;
 }
 
-function onCreateClass() {
-  const name = newClass.value.name.trim();
-  if (!name) return;
-  return guarded(async () => {
-    await createVehicleClass({ name, main: newClass.value.main });
-    newClass.value = { name: '', main: false };
-  });
-}
-
-function onUpdateClass(
-  vehicleClass: VehicleClass,
-  patch: { name?: string; main?: boolean },
-) {
-  const name = (patch.name ?? vehicleClass.name).trim();
-  if (!name) return;
-  return guarded(() =>
-    updateVehicleClass(vehicleClass.id, {
-      name,
-      main: patch.main ?? vehicleClass.main,
-    }),
-  );
+async function onSave() {
+  const input = { name: draft.value.name.trim(), main: draft.value.main };
+  if (editing.value) await updateVehicleClass(editing.value.id, input);
+  else await createVehicleClass(input);
+  await refresh();
 }
 
 async function onDeleteClass(vehicleClass: VehicleClass) {
@@ -78,7 +68,9 @@ async function onDeleteClass(vehicleClass: VehicleClass) {
     }))
   )
     return;
-  await guarded(() => deleteVehicleClass(vehicleClass.id));
+  await deleteVehicleClass(vehicleClass.id);
+  await refresh();
+  notify('Class deleted');
 }
 
 onMounted(refresh);
@@ -90,7 +82,13 @@ onMounted(refresh);
   </v-btn>
 
   <v-card>
-    <v-card-title>Classes</v-card-title>
+    <v-card-title class="d-flex align-center">
+      Classes
+      <v-spacer />
+      <v-btn variant="tonal" prepend-icon="mdi-plus" @click="openDialog(null)">
+        Add Class
+      </v-btn>
+    </v-card-title>
     <v-card-text>
       <p class="mb-4">
         <strong>Main classes</strong> (4WD, 2WD) split the field — a vehicle has
@@ -104,77 +102,82 @@ onMounted(refresh);
         <thead>
           <tr>
             <th>Name</th>
-            <th>Main class</th>
+            <th>Kind</th>
             <th>Vehicles</th>
-            <th></th>
+            <th width="1%"></th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="vehicleClass in classes" :key="vehicleClass.id">
+            <td>{{ vehicleClass.name }}</td>
             <td>
-              <v-text-field
-                :model-value="vehicleClass.name"
-                :prepend-inner-icon="vehicleClass.main ? 'mdi-star' : undefined"
-                density="compact"
-                hide-details
-                style="max-width: 260px"
-                @change="
-                  onUpdateClass(vehicleClass, {
-                    name: ($event.target as HTMLInputElement).value,
-                  })
-                "
-              />
-            </td>
-            <td>
-              <v-switch
-                :model-value="vehicleClass.main"
-                color="secondary"
-                density="compact"
-                hide-details
-                :aria-label="`${vehicleClass.name} is a main class`"
-                @update:model-value="
-                  onUpdateClass(vehicleClass, { main: !!$event })
-                "
-              />
+              <v-chip
+                size="small"
+                :color="vehicleClass.main ? 'secondary' : undefined"
+                :prepend-icon="vehicleClass.main ? 'mdi-star' : 'mdi-tag'"
+              >
+                {{ vehicleClass.main ? 'Main class' : 'Category' }}
+              </v-chip>
             </td>
             <td>{{ countOf(vehicleClass) }}</td>
-            <td>
+            <td class="text-no-wrap">
               <v-btn
-                icon="mdi-delete-outline"
-                variant="text"
                 size="small"
-                :aria-label="`Delete class ${vehicleClass.name}`"
-                @click="onDeleteClass(vehicleClass)"
-              />
+                variant="text"
+                prepend-icon="mdi-pencil"
+                @click="openDialog(vehicleClass)"
+              >
+                Edit
+              </v-btn>
+              <v-menu>
+                <template #activator="{ props: menu }">
+                  <v-btn
+                    v-bind="menu"
+                    icon="mdi-dots-vertical"
+                    size="small"
+                    variant="text"
+                    :aria-label="`More for ${vehicleClass.name}`"
+                  />
+                </template>
+                <v-list density="compact">
+                  <v-list-item
+                    prepend-icon="mdi-delete-outline"
+                    title="Delete"
+                    base-color="error"
+                    @click="onDeleteClass(vehicleClass)"
+                  />
+                </v-list>
+              </v-menu>
             </td>
           </tr>
         </tbody>
       </v-table>
       <v-alert v-else type="info" variant="tonal">
-        No classes yet. Without any, results are one overall ranking.
+        No classes yet. Without any, results are one overall ranking. Add one
+        with + Add Class.
       </v-alert>
-      <form
-        class="d-flex flex-wrap align-center ga-3 mt-4"
-        @submit.prevent="onCreateClass"
-      >
-        <v-text-field
-          v-model="newClass.name"
-          label="New class"
-          density="comfortable"
-          hide-details
-          style="max-width: 260px"
-        />
-        <v-switch
-          v-model="newClass.main"
-          label="Main class"
-          color="secondary"
-          density="compact"
-          hide-details
-        />
-        <v-btn type="submit" variant="tonal" prepend-icon="mdi-plus">
-          Add Class
-        </v-btn>
-      </form>
     </v-card-text>
   </v-card>
+
+  <FormDialog
+    v-model="dialogOpen"
+    :title="editing ? `Edit class ${editing.name}` : 'Add class'"
+    :form="draft"
+    :save="onSave"
+    :saved="editing ? 'Class saved' : 'Class added'"
+    :save-text="editing ? 'Save' : 'Add class'"
+  >
+    <v-text-field
+      v-model="draft.name"
+      label="Name"
+      :rules="[required]"
+      autofocus
+    />
+    <v-switch
+      v-model="draft.main"
+      label="Main class (a vehicle has one)"
+      color="secondary"
+      hide-details
+    />
+  </FormDialog>
 </template>

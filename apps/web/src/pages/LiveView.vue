@@ -51,6 +51,7 @@ import {
   type StartOrder,
 } from '../api/start-order';
 import { fetchVehicles, type Vehicle } from '../api/vehicles';
+import FormDialog from '../components/FormDialog.vue';
 import ManualMark from '../components/ManualMark.vue';
 import StagePicker from '../components/StagePicker.vue';
 import {
@@ -68,6 +69,7 @@ import {
   isOnline,
   isReady,
   runStatusColor,
+  required,
   toLocalTimeValue,
   vehicleName,
 } from '../format';
@@ -93,7 +95,6 @@ const awaitingDetections = ref<DetectionEventRecord[]>([]);
 /** Only what a marshal picked by hand; otherwise the suggestion applies. */
 const pickedVehicleIds = ref<Record<string, string>>({});
 const flashingGateIds = ref<Record<string, boolean>>({});
-const editingVehicleId = ref<string | null>(null);
 const retryingPending = ref(false);
 const activatingStage = ref(false);
 const closingStage = ref(false);
@@ -523,11 +524,6 @@ function upsertSplit(split: StageSplit) {
   ].sort((a, b) => a.splitIndex - b.splitIndex);
 }
 
-function toggleEdit(vehicleId: string) {
-  editingVehicleId.value =
-    editingVehicleId.value === vehicleId ? null : vehicleId;
-}
-
 const startingVehicleId = ref<string | null>(null);
 
 const finishingRunId = ref<string | null>(null);
@@ -561,23 +557,40 @@ async function onStartNow(vehicleId: string) {
   }
 }
 
-async function onCorrectStart(run: StageRun, value: string) {
-  if (!value) return;
-  upsertStageRun(
-    await correctStageRun(run.id, {
-      startTime: combineDateAndTime(run.startTime, value),
-    }),
-  );
+const correctDialogOpen = ref(false);
+const correcting = ref<StageRun | null>(null);
+const correction = ref({ start: '', finish: '' });
+
+function openCorrect(run: StageRun) {
+  correcting.value = run;
+  correction.value = {
+    start: toLocalTimeValue(run.startTime),
+    finish: toLocalTimeValue(run.finishTime),
+  };
+  correctDialogOpen.value = true;
 }
 
-async function onCorrectFinish(run: StageRun, value: string) {
-  upsertStageRun(
-    await correctStageRun(run.id, {
-      finishTime: value
-        ? combineDateAndTime(run.finishTime ?? run.startTime, value)
-        : null,
-    }),
-  );
+/**
+ * Sends only the times that changed: the fields hold whole seconds, so
+ * resending an untouched time would drop its milliseconds and mark a gate's
+ * time as hand-set.
+ */
+async function onSaveCorrection() {
+  const run = correcting.value;
+  if (!run) return;
+  const { start } = correction.value;
+  const finish = correction.value.finish || '';
+  const patch: { startTime?: string; finishTime?: string | null } = {};
+  if (start !== toLocalTimeValue(run.startTime)) {
+    patch.startTime = combineDateAndTime(run.startTime, start);
+  }
+  if (finish !== toLocalTimeValue(run.finishTime)) {
+    patch.finishTime = finish
+      ? combineDateAndTime(run.finishTime ?? run.startTime, finish)
+      : null;
+  }
+  if (Object.keys(patch).length === 0) return;
+  upsertStageRun(await correctStageRun(run.id, patch));
 }
 
 async function onVoidRun(run: StageRun) {
@@ -743,7 +756,7 @@ function onSelectStage(stageId: string) {
 // ---- Loading -------------------------------------------------------------
 
 async function loadStage() {
-  editingVehicleId.value = null;
+  correctDialogOpen.value = false;
   if (!props.stageId) {
     startOrder.value = null;
     stageRuns.value = [];
@@ -1292,23 +1305,7 @@ onUnmounted(() => {
               </span>
             </td>
             <td class="d-print-none">
-              <v-text-field
-                v-if="editingVehicleId === row.entry.vehicleId && row.run"
-                type="time"
-                step="1"
-                density="compact"
-                hide-details
-                append-inner-icon="mdi-clock-outline"
-                :model-value="toLocalTimeValue(row.run.startTime)"
-                @click:append-inner="openTimePicker"
-                @change="
-                  onCorrectStart(
-                    row.run!,
-                    ($event.target as HTMLInputElement).value,
-                  )
-                "
-              />
-              <span v-else-if="row.run" class="rg-timing text-no-wrap">
+              <span v-if="row.run" class="rg-timing text-no-wrap">
                 {{ formatClockTime(row.run.startTime) }}
                 <ManualMark v-if="row.run.startManual" />
               </span>
@@ -1317,26 +1314,7 @@ onUnmounted(() => {
               {{ row.run ? formatSplits(row.run.id) : '' }}
             </td>
             <td class="d-print-none">
-              <v-text-field
-                v-if="editingVehicleId === row.entry.vehicleId && row.run"
-                type="time"
-                step="1"
-                density="compact"
-                hide-details
-                append-inner-icon="mdi-clock-outline"
-                :model-value="toLocalTimeValue(row.run.finishTime)"
-                @click:append-inner="openTimePicker"
-                @change="
-                  onCorrectFinish(
-                    row.run!,
-                    ($event.target as HTMLInputElement).value,
-                  )
-                "
-              />
-              <span
-                v-else-if="row.run?.finishTime"
-                class="rg-timing text-no-wrap"
-              >
+              <span v-if="row.run?.finishTime" class="rg-timing text-no-wrap">
                 {{ formatClockTime(row.run.finishTime) }}
                 <ManualMark v-if="row.run.finishManual" />
               </span>
@@ -1349,16 +1327,10 @@ onUnmounted(() => {
                 v-if="row.run"
                 size="small"
                 variant="text"
-                :prepend-icon="
-                  editingVehicleId === row.entry.vehicleId
-                    ? 'mdi-check'
-                    : 'mdi-pencil'
-                "
-                @click="toggleEdit(row.entry.vehicleId)"
+                prepend-icon="mdi-pencil"
+                @click="openCorrect(row.run)"
               >
-                {{
-                  editingVehicleId === row.entry.vehicleId ? 'Done' : 'Correct'
-                }}
+                Correct
               </v-btn>
               <v-btn
                 v-else-if="canStart(row)"
@@ -1430,13 +1402,25 @@ onUnmounted(() => {
               >
                 Restore
               </v-btn>
-              <v-btn
-                size="small"
-                variant="text"
-                icon="mdi-delete"
-                aria-label="Delete attempt"
-                @click="onDeleteRun(voided)"
-              />
+              <v-menu>
+                <template #activator="{ props: menu }">
+                  <v-btn
+                    v-bind="menu"
+                    size="small"
+                    variant="text"
+                    icon="mdi-dots-vertical"
+                    aria-label="More actions"
+                  />
+                </template>
+                <v-list density="compact">
+                  <v-list-item
+                    prepend-icon="mdi-delete"
+                    title="Delete attempt"
+                    base-color="error"
+                    @click="onDeleteRun(voided)"
+                  />
+                </v-list>
+              </v-menu>
             </td>
           </tr>
         </template>
@@ -1479,6 +1463,44 @@ onUnmounted(() => {
       </v-expansion-panel-text>
     </v-expansion-panel>
   </v-expansion-panels>
+
+  <FormDialog
+    v-model="correctDialogOpen"
+    :title="
+      correcting
+        ? `Correct ${vehicleName(vehicles, correcting.vehicleId)}, attempt ${correcting.attempt}`
+        : ''
+    "
+    :form="correction"
+    :save="onSaveCorrection"
+    saved="Times corrected"
+  >
+    <p class="text-body-2 text-medium-emphasis">
+      Time of day, to the second. A corrected time is marked as hand-set.
+    </p>
+    <v-text-field
+      v-model="correction.start"
+      type="time"
+      step="1"
+      label="Start"
+      class="rg-timing"
+      append-inner-icon="mdi-clock-outline"
+      :rules="[required]"
+      @click:append-inner="openTimePicker"
+    />
+    <v-text-field
+      v-model="correction.finish"
+      type="time"
+      step="1"
+      label="Finish"
+      class="rg-timing"
+      hint="Empty while the car is still on stage"
+      persistent-hint
+      clearable
+      append-inner-icon="mdi-clock-outline"
+      @click:append-inner="openTimePicker"
+    />
+  </FormDialog>
 </template>
 
 <style scoped>

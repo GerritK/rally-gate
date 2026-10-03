@@ -253,3 +253,8 @@ Extract a component once it is actually used twice, not before.
   Every results card names it as its subtitle, "All classes" included, so
   a printout always says which ranking it is.
 - `ManualMark`: the hand-timed icon.
+- `FormDialog`: every add/edit dialog. Saves on its submit (Enter), shows
+  `loading` while saving, keeps a server error inside the dialog, asks
+  before Esc/outside/Cancel throws away changes, confirms with the snackbar
+  and goes fullscreen on phones. The page passes the draft and a `save`
+  function that throws on failure.

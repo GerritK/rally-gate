@@ -6,76 +6,57 @@ import {
   updateVehicle,
   VehicleStatus,
   type Vehicle,
-  type VehiclePatch,
 } from '../api/vehicles';
 import ClassPicker from '../components/ClassPicker.vue';
+import FormDialog from '../components/FormDialog.vue';
 import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
+import { required, VEHICLE_STATUS_DISPLAY } from '../format';
 
-const STATUS_OPTIONS = Object.values(VehicleStatus);
+const STATUS_OPTIONS = Object.values(VehicleStatus).map((value) => ({
+  value,
+  title: VEHICLE_STATUS_DISPLAY[value].label,
+}));
 
 const vehicles = ref<Vehicle[]>([]);
 const classes = ref<VehicleClass[]>([]);
-const emptyVehicle = () => ({
-  startNumber: '',
-  driverName: '',
-  coDriverName: '',
-  transponderId: '',
-  classIds: [] as string[],
-});
-const newVehicle = ref(emptyVehicle());
-const editingVehicleId = ref<string | null>(null);
+
+const dialogOpen = ref(false);
+const editing = ref<Vehicle | null>(null);
+const draft = ref(toDraft(null));
+
+function toDraft(vehicle: Vehicle | null) {
+  return {
+    startNumber: vehicle?.startNumber ?? null,
+    driverName: vehicle?.driverName ?? '',
+    coDriverName: vehicle?.coDriverName ?? '',
+    transponderId: vehicle?.transponderId ?? '',
+    status: vehicle?.status ?? VehicleStatus.REGISTERED,
+    classIds: vehicle?.classes.map((c) => c.id) ?? [],
+  };
+}
+
+function openDialog(vehicle: Vehicle | null) {
+  editing.value = vehicle;
+  draft.value = toDraft(vehicle);
+  dialogOpen.value = true;
+}
 
 async function refresh() {
   vehicles.value = await fetchVehicles();
   classes.value = await fetchVehicleClasses();
 }
 
-function toggleEditVehicle(id: string) {
-  editingVehicleId.value = editingVehicleId.value === id ? null : id;
-}
-
-async function onUpdateVehicle(vehicle: Vehicle, patch: VehiclePatch) {
-  const updated = await updateVehicle(vehicle.id, patch);
-  const idx = vehicles.value.findIndex((v) => v.id === vehicle.id);
-  if (idx !== -1) vehicles.value[idx] = updated;
-}
-
-function onUpdateStartNumber(vehicle: Vehicle, value: string) {
-  if (!value) return;
-  return onUpdateVehicle(vehicle, { startNumber: Number(value) });
-}
-
-function onUpdateDriverName(vehicle: Vehicle, value: string) {
-  if (!value) return;
-  return onUpdateVehicle(vehicle, { driverName: value });
-}
-
-function onUpdateCoDriverName(vehicle: Vehicle, value: string) {
-  return onUpdateVehicle(vehicle, { coDriverName: value || null });
-}
-
-function onUpdateTransponderId(vehicle: Vehicle, value: string) {
-  return onUpdateVehicle(vehicle, { transponderId: value || null });
-}
-
-function onUpdateStatus(vehicle: Vehicle, status: VehicleStatus) {
-  return onUpdateVehicle(vehicle, { status });
-}
-
-function onUpdateClasses(vehicle: Vehicle, classIds: string[]) {
-  return onUpdateVehicle(vehicle, { classIds });
-}
-
-async function onCreateVehicle() {
-  if (!newVehicle.value.startNumber || !newVehicle.value.driverName) return;
-  await createVehicle({
-    startNumber: Number(newVehicle.value.startNumber),
-    driverName: newVehicle.value.driverName,
-    coDriverName: newVehicle.value.coDriverName || undefined,
-    transponderId: newVehicle.value.transponderId || undefined,
-    classIds: newVehicle.value.classIds,
-  });
-  newVehicle.value = emptyVehicle();
+async function onSave() {
+  const input = {
+    ...draft.value,
+    startNumber: Number(draft.value.startNumber),
+    driverName: draft.value.driverName.trim(),
+    // null, not undefined: only null clears the column (CLAUDE.md).
+    coDriverName: draft.value.coDriverName.trim() || null,
+    transponderId: draft.value.transponderId.trim() || null,
+  };
+  if (editing.value) await updateVehicle(editing.value.id, input);
+  else await createVehicle(input);
   await refresh();
 }
 
@@ -84,9 +65,15 @@ onMounted(refresh);
 
 <template>
   <v-card>
-    <v-card-title>Vehicles</v-card-title>
+    <v-card-title class="d-flex align-center">
+      Vehicles
+      <v-spacer />
+      <v-btn color="primary" prepend-icon="mdi-plus" @click="openDialog(null)">
+        Add Vehicle
+      </v-btn>
+    </v-card-title>
     <v-card-text>
-      <v-table density="comfortable">
+      <v-table v-if="vehicles.length > 0" density="comfortable">
         <thead>
           <tr>
             <th>#</th>
@@ -95,148 +82,86 @@ onMounted(refresh);
             <th>Transponder</th>
             <th v-if="classes.length > 0">Classes</th>
             <th>Status</th>
-            <th></th>
+            <th width="1%"></th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="vehicle in vehicles" :key="vehicle.id">
-            <template v-if="editingVehicleId === vehicle.id">
-              <td>
-                <v-text-field
-                  :model-value="vehicle.startNumber"
-                  type="number"
-                  min="1"
-                  density="compact"
-                  hide-details
-                  @change="
-                    onUpdateStartNumber(
-                      vehicle,
-                      ($event.target as HTMLInputElement).value,
-                    )
-                  "
-                />
-              </td>
-              <td>
-                <v-text-field
-                  :model-value="vehicle.driverName"
-                  density="compact"
-                  hide-details
-                  @change="
-                    onUpdateDriverName(
-                      vehicle,
-                      ($event.target as HTMLInputElement).value,
-                    )
-                  "
-                />
-              </td>
-              <td>
-                <v-text-field
-                  :model-value="vehicle.coDriverName"
-                  density="compact"
-                  hide-details
-                  @change="
-                    onUpdateCoDriverName(
-                      vehicle,
-                      ($event.target as HTMLInputElement).value,
-                    )
-                  "
-                />
-              </td>
-              <td>
-                <v-text-field
-                  :model-value="vehicle.transponderId"
-                  density="compact"
-                  hide-details
-                  @change="
-                    onUpdateTransponderId(
-                      vehicle,
-                      ($event.target as HTMLInputElement).value,
-                    )
-                  "
-                />
-              </td>
-            </template>
-            <template v-else>
-              <td>{{ vehicle.startNumber }}</td>
-              <td>{{ vehicle.driverName }}</td>
-              <td>{{ vehicle.coDriverName ?? '-' }}</td>
-              <td>{{ vehicle.transponderId ?? '-' }}</td>
-            </template>
+            <td class="rg-timing">{{ vehicle.startNumber }}</td>
+            <td>{{ vehicle.driverName }}</td>
+            <td>{{ vehicle.coDriverName ?? '-' }}</td>
+            <td class="rg-timing">{{ vehicle.transponderId ?? '-' }}</td>
             <td v-if="classes.length > 0">
-              <ClassPicker
-                :model-value="vehicle.classes.map((c) => c.id)"
-                :classes="classes"
-                density="compact"
-                @update:model-value="onUpdateClasses(vehicle, $event)"
-              />
+              <v-chip
+                v-for="c in vehicle.classes"
+                :key="c.id"
+                size="small"
+                :color="c.main ? 'secondary' : undefined"
+                :prepend-icon="c.main ? 'mdi-star' : undefined"
+                class="me-1"
+              >
+                {{ c.name }}
+              </v-chip>
             </td>
             <td>
-              <v-select
-                :model-value="vehicle.status"
-                :items="STATUS_OPTIONS"
-                density="compact"
-                hide-details
-                style="min-width: 160px"
-                @update:model-value="onUpdateStatus(vehicle, $event)"
-              />
+              <v-chip
+                size="small"
+                :color="VEHICLE_STATUS_DISPLAY[vehicle.status].color"
+                :prepend-icon="VEHICLE_STATUS_DISPLAY[vehicle.status].icon"
+              >
+                {{ VEHICLE_STATUS_DISPLAY[vehicle.status].label }}
+              </v-chip>
             </td>
-            <td>
+            <td class="text-no-wrap">
               <v-btn
                 size="small"
                 variant="text"
-                :prepend-icon="
-                  editingVehicleId === vehicle.id ? 'mdi-check' : 'mdi-pencil'
-                "
-                @click="toggleEditVehicle(vehicle.id)"
+                prepend-icon="mdi-pencil"
+                @click="openDialog(vehicle)"
               >
-                {{ editingVehicleId === vehicle.id ? 'Done' : 'Edit' }}
+                Edit
               </v-btn>
             </td>
           </tr>
         </tbody>
       </v-table>
-      <v-alert v-if="vehicles.length === 0" type="info" variant="tonal">
-        No vehicles registered yet.
+      <v-alert v-else type="info" variant="tonal">
+        No vehicles yet. Add one with + Add Vehicle.
       </v-alert>
-      <form
-        class="d-flex flex-wrap align-center ga-3 mt-4"
-        @submit.prevent="onCreateVehicle"
-      >
-        <v-text-field
-          v-model="newVehicle.startNumber"
-          label="Start #"
-          type="number"
-          min="1"
-          density="comfortable"
-          hide-details
-          style="max-width: 140px"
-        />
-        <v-text-field
-          v-model="newVehicle.driverName"
-          label="Driver"
-          density="comfortable"
-          hide-details
-          style="min-width: 220px"
-        />
-        <v-text-field
-          v-model="newVehicle.coDriverName"
-          label="Co-Driver (optional)"
-          density="comfortable"
-          hide-details
-          style="min-width: 220px"
-        />
-        <v-text-field
-          v-model="newVehicle.transponderId"
-          label="Transponder ID (optional)"
-          density="comfortable"
-          hide-details
-          style="min-width: 200px"
-        />
-        <ClassPicker v-model="newVehicle.classIds" :classes="classes" />
-        <v-btn type="submit" color="primary" prepend-icon="mdi-plus">
-          Add Vehicle
-        </v-btn>
-      </form>
     </v-card-text>
   </v-card>
+
+  <FormDialog
+    v-model="dialogOpen"
+    :title="editing ? `Edit vehicle ${editing.startNumber}` : 'Add vehicle'"
+    :form="draft"
+    :save="onSave"
+    :saved="editing ? 'Vehicle saved' : 'Vehicle added'"
+    :save-text="editing ? 'Save' : 'Add vehicle'"
+  >
+    <v-text-field
+      v-model.number="draft.startNumber"
+      label="Start #"
+      type="number"
+      min="1"
+      :rules="[required]"
+      autofocus
+    />
+    <v-text-field
+      v-model="draft.driverName"
+      label="Driver"
+      :rules="[required]"
+    />
+    <v-text-field v-model="draft.coDriverName" label="Co-Driver (optional)" />
+    <v-text-field
+      v-model="draft.transponderId"
+      label="Transponder ID (optional)"
+    />
+    <ClassPicker
+      v-if="classes.length > 0"
+      v-model="draft.classIds"
+      :classes="classes"
+    />
+    <v-select v-model="draft.status" :items="STATUS_OPTIONS" label="Status" />
+  </FormDialog>
 </template>

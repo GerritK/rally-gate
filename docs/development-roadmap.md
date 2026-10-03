@@ -64,13 +64,10 @@ What exists, with where its reasoning lives. History is in git.
 
 - **UI guidelines in the code** (`design-system.md` "Editing", "Tables",
   "Confirmations", "Dialogs and feedback"): the shared `useConfirm()` dialog
-  and snackbar are built and used everywhere; still open: inline
-  edits (run time corrections on Live Timing, gate rename on Hardware, class
-  name and switch on Setup → Classes) moved to dialogs; unsaved-changes
-  guard (router + `beforeunload`); action columns cut to one direct action
-  plus a menu, Delete in the menu; the add forms below tables (Vehicles,
-  Classes, Stages, Assignments) become dialogs opened from an Add button in
-  the card title.
+  and snackbar, `FormDialog` for every add/edit form, action columns cut to
+  one direct action plus a menu are built. Still open: unsaved-changes guard
+  on the page forms (Rally details, Stage details, Scoring, Start order:
+  router + `beforeunload`), each confirming its save with the snackbar.
 - **Every vehicle in the overall classification**: crews without a
   completed stage listed below the ranking as "Not classified", no
   position, no total. They stay out of the ranking itself: an invented total

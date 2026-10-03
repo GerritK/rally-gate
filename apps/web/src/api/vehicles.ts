@@ -23,13 +23,9 @@ export function fetchVehicles(): Promise<Vehicle[]> {
   return apiFetch('/vehicles');
 }
 
-export function createVehicle(input: {
-  startNumber: number;
-  driverName: string;
-  coDriverName?: string;
-  transponderId?: string;
-  classIds?: string[];
-}): Promise<Vehicle> {
+export function createVehicle(
+  input: VehiclePatch & { startNumber: number; driverName: string },
+): Promise<Vehicle> {
   return postJson('/vehicles', input);
 }
 

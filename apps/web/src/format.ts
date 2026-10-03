@@ -1,4 +1,8 @@
-import { HEARTBEAT_ONLINE_THRESHOLD_MS } from '@rally-gate/shared';
+import {
+  HEARTBEAT_ONLINE_THRESHOLD_MS,
+  StageStatus,
+  VehicleStatus,
+} from '@rally-gate/shared';
 import { formatStageDuration } from '@rally-gate/ui';
 import type { Gate } from './api/gates';
 import type { Stage } from './api/stages';
@@ -73,6 +77,61 @@ export function runStatusColor(status: string): string {
   }
 }
 
+/** The same shapes as `StagePicker`: closed ✓, running ●, upcoming ○. */
+export const STAGE_STATUS_DISPLAY: Record<
+  StageStatus,
+  { label: string; color: string; icon: string }
+> = {
+  [StageStatus.NOT_STARTED]: {
+    label: 'Not started',
+    color: 'timing-idle',
+    icon: 'mdi-circle-outline',
+  },
+  [StageStatus.ACTIVE]: {
+    label: 'Running',
+    color: 'success',
+    icon: 'mdi-circle',
+  },
+  [StageStatus.CLOSED]: {
+    label: 'Closed',
+    color: 'timing-idle',
+    icon: 'mdi-check',
+  },
+};
+
+/** Withdrawn and disqualified are race problems (red); the rest is entry
+ *  paperwork. */
+export const VEHICLE_STATUS_DISPLAY: Record<
+  VehicleStatus,
+  { label: string; color: string; icon: string }
+> = {
+  [VehicleStatus.REGISTERED]: {
+    label: 'Registered',
+    color: 'timing-idle',
+    icon: 'mdi-clipboard-text-outline',
+  },
+  [VehicleStatus.CHECKED_IN]: {
+    label: 'Checked in',
+    color: 'info',
+    icon: 'mdi-clipboard-check-outline',
+  },
+  [VehicleStatus.SCRUTINEERED]: {
+    label: 'Scrutineered',
+    color: 'success',
+    icon: 'mdi-check-decagram',
+  },
+  [VehicleStatus.WITHDRAWN]: {
+    label: 'Withdrawn',
+    color: 'error',
+    icon: 'mdi-flag-remove',
+  },
+  [VehicleStatus.DISQUALIFIED]: {
+    label: 'Disqualified',
+    color: 'error',
+    icon: 'mdi-cancel',
+  },
+};
+
 export function outcomeColor(outcome: string): string {
   return outcome === 'DNF' ? 'error' : 'warning';
 }
@@ -138,3 +197,7 @@ export function gateStatusColor(gate: Gate, nowMs: number): string {
 export function eventName(file: string): string {
   return file.replace(/\.sqlite$/, '');
 }
+
+/** Vuetify field rule for a field the form can't save without. */
+export const required = (value: unknown) =>
+  (value !== '' && value != null) || 'Required';

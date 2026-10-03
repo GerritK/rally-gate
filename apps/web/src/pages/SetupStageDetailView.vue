@@ -9,6 +9,9 @@ import {
 } from '../api/gate-assignments';
 import { fetchGates, type Gate } from '../api/gates';
 import { fetchStage, upsertStage, type Stage } from '../api/stages';
+import FormDialog from '../components/FormDialog.vue';
+import { required, STAGE_STATUS_DISPLAY } from '../format';
+import { notify } from '@rally-gate/ui';
 
 const props = defineProps<{ stageId: string }>();
 
@@ -16,11 +19,17 @@ const stage = ref<Stage | null>(null);
 const gates = ref<Gate[]>([]);
 const gateAssignments = ref<GateAssignment[]>([]);
 const savingStage = ref(false);
+const assignmentDialogOpen = ref(false);
 const newAssignment = ref<{
   gateId: string;
   role: (typeof GATE_ROLES)[number];
   splitIndex?: number;
 }>({ gateId: '', role: GATE_ROLES[0] });
+
+function openAssignmentDialog() {
+  newAssignment.value = { gateId: '', role: GATE_ROLES[0] };
+  assignmentDialogOpen.value = true;
+}
 
 const assignmentsForStage = computed(() =>
   gateAssignments.value.filter((a) => a.stageId === props.stageId),
@@ -66,18 +75,20 @@ async function onSaveStage() {
 }
 
 async function onCreateAssignment() {
-  if (!newAssignment.value.gateId) return;
+  const { splitIndex, ...rest } = newAssignment.value;
   await createGateAssignment({
-    ...newAssignment.value,
+    ...rest,
+    ...(rest.role === 'stage_split' ? { splitIndex } : {}),
     stageId: props.stageId,
   });
-  newAssignment.value = { gateId: '', role: GATE_ROLES[0] };
   await refreshAssignments();
 }
 
+/** No confirmation: a plan edit on a stage that hasn't started, cheap to redo. */
 async function onDeleteAssignment(assignment: GateAssignment) {
   await deleteGateAssignment(assignment.id);
   await refreshAssignments();
+  notify('Assignment deleted');
 }
 
 watch(() => props.stageId, load);
@@ -135,8 +146,11 @@ onMounted(load);
           :disabled="!stageEditable"
           style="max-width: 200px"
         />
-        <v-chip :color="stage.status === 'ACTIVE' ? 'success' : 'timing-idle'">
-          {{ stage.status }}
+        <v-chip
+          :color="STAGE_STATUS_DISPLAY[stage.status].color"
+          :prepend-icon="STAGE_STATUS_DISPLAY[stage.status].icon"
+        >
+          {{ STAGE_STATUS_DISPLAY[stage.status].label }}
         </v-chip>
         <v-btn
           type="submit"
@@ -152,7 +166,18 @@ onMounted(load);
   </v-card>
 
   <v-card>
-    <v-card-title>Gate Assignments</v-card-title>
+    <v-card-title class="d-flex align-center">
+      Gate Assignments
+      <v-spacer />
+      <v-btn
+        v-if="stageEditable"
+        variant="tonal"
+        prepend-icon="mdi-plus"
+        @click="openAssignmentDialog"
+      >
+        Add Assignment
+      </v-btn>
+    </v-card-title>
     <v-card-text>
       <v-alert
         v-if="stage && !stageEditable"
@@ -170,7 +195,7 @@ onMounted(load);
             <th>Role</th>
             <th>Split #</th>
             <th>Active</th>
-            <th></th>
+            <th width="1%"></th>
           </tr>
         </thead>
         <tbody>
@@ -186,57 +211,68 @@ onMounted(load);
                 {{ assignment.active ? 'active' : 'inactive' }}
               </v-chip>
             </td>
-            <td>
-              <v-btn
-                v-if="stageEditable"
-                size="small"
-                variant="text"
-                prepend-icon="mdi-delete"
-                @click="onDeleteAssignment(assignment)"
-              >
-                Delete
-              </v-btn>
+            <td class="text-no-wrap">
+              <v-menu v-if="stageEditable">
+                <template #activator="{ props: menu }">
+                  <v-btn
+                    v-bind="menu"
+                    icon="mdi-dots-vertical"
+                    size="small"
+                    variant="text"
+                    :aria-label="`More for ${assignment.gateId}`"
+                  />
+                </template>
+                <v-list density="compact">
+                  <v-list-item
+                    prepend-icon="mdi-delete-outline"
+                    title="Delete"
+                    base-color="error"
+                    @click="onDeleteAssignment(assignment)"
+                  />
+                </v-list>
+              </v-menu>
+            </td>
+          </tr>
+          <tr v-if="assignmentsForStage.length === 0">
+            <td colspan="5" class="text-center text-medium-emphasis">
+              No gates assigned yet.{{
+                stageEditable ? ' Add one with + Add Assignment.' : ''
+              }}
             </td>
           </tr>
         </tbody>
       </v-table>
-      <form
-        v-if="stageEditable"
-        class="d-flex flex-wrap align-center ga-3 mt-4"
-        @submit.prevent="onCreateAssignment"
-      >
-        <v-select
-          v-model="newAssignment.gateId"
-          :items="gates"
-          item-title="name"
-          item-value="id"
-          label="Gate"
-          density="comfortable"
-          hide-details
-          style="min-width: 200px"
-        />
-        <v-select
-          v-model="newAssignment.role"
-          :items="[...GATE_ROLES]"
-          label="Role"
-          density="comfortable"
-          hide-details
-          style="min-width: 200px"
-        />
-        <v-text-field
-          v-if="newAssignment.role === 'stage_split'"
-          v-model.number="newAssignment.splitIndex"
-          type="number"
-          min="0"
-          label="Split #"
-          density="comfortable"
-          hide-details
-          style="max-width: 140px"
-        />
-        <v-btn type="submit" color="primary" prepend-icon="mdi-plus">
-          Add Assignment
-        </v-btn>
-      </form>
     </v-card-text>
   </v-card>
+
+  <FormDialog
+    v-model="assignmentDialogOpen"
+    title="Add assignment"
+    :form="newAssignment"
+    :save="onCreateAssignment"
+    saved="Assignment added"
+    save-text="Add assignment"
+  >
+    <v-select
+      v-model="newAssignment.gateId"
+      :items="gates"
+      item-title="name"
+      item-value="id"
+      label="Gate"
+      :rules="[required]"
+    />
+    <v-select
+      v-model="newAssignment.role"
+      :items="[...GATE_ROLES]"
+      label="Role"
+    />
+    <v-text-field
+      v-if="newAssignment.role === 'stage_split'"
+      v-model.number="newAssignment.splitIndex"
+      type="number"
+      min="0"
+      label="Split #"
+      :rules="[required]"
+    />
+  </FormDialog>
 </template>

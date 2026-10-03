@@ -27,13 +27,16 @@ import { GATE_CONFIG_PORT, StageStatus } from '@rally-gate/shared';
 import {
   formatClockTime,
   formatRelativeTime,
+  notify,
   useConfirm,
 } from '@rally-gate/ui';
+import FormDialog from '../components/FormDialog.vue';
 import {
   clockOffsetColor,
   clockOffsetHint,
   formatClockOffset,
   isOnline,
+  required,
 } from '../format';
 
 const AUTO_DISCOVER_KEY = 'autoDiscoverGates';
@@ -51,9 +54,9 @@ const gateAssignments = ref<GateAssignment[]>([]);
 const stages = ref<Stage[]>([]);
 const autoDiscover = ref(true);
 const clockCorrectionThresholdMs = ref(CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS);
-const newGate = ref({ id: '', name: '' });
-const creatingGate = ref(false);
-const editingGateId = ref<string | null>(null);
+const gateDialogOpen = ref(false);
+const editingGate = ref<Gate | null>(null);
+const gateDraft = ref({ id: '', name: '' });
 const confirm = useConfirm();
 /** Null when this server keeps no per-computer list (DB_PATH, Postgres). */
 const knownGates = ref<KnownGate[] | null>(null);
@@ -107,13 +110,15 @@ async function refreshGates() {
   stages.value = await fetchStages();
 }
 
-function toggleEditGate(gateId: string) {
-  editingGateId.value = editingGateId.value === gateId ? null : gateId;
+function openGateDialog(gate: Gate | null) {
+  editingGate.value = gate;
+  gateDraft.value = { id: gate?.id ?? '', name: gate?.name ?? '' };
+  gateDialogOpen.value = true;
 }
 
-async function onRenameGate(gate: Gate, name: string) {
-  if (!name || name === gate.name) return;
-  await upsertGate(gate.id, { name });
+async function onSaveGate() {
+  const id = gateDraft.value.id.trim();
+  await upsertGate(id, { name: gateDraft.value.name.trim() || id });
   await refreshGates();
 }
 
@@ -121,6 +126,7 @@ async function onDeleteGate(gate: Gate, force = false) {
   try {
     await deleteGate(gate.id, force);
     gates.value = gates.value.filter((g) => g.id !== gate.id);
+    notify('Gate deleted');
   } catch (err) {
     const conflict = err instanceof ApiError && err.status === 409 ? err : null;
     const assignmentCount = (
@@ -152,20 +158,6 @@ async function onForgetKnownGate(id: string) {
 async function onToggleAutoDiscover(value: boolean | null) {
   autoDiscover.value = value ?? true;
   await saveSetting(AUTO_DISCOVER_KEY, String(autoDiscover.value));
-}
-
-async function onCreateGate() {
-  if (!newGate.value.id || creatingGate.value) return;
-  creatingGate.value = true;
-  try {
-    await upsertGate(newGate.value.id, {
-      name: newGate.value.name || newGate.value.id,
-    });
-    newGate.value = { id: '', name: '' };
-    await refreshGates();
-  } finally {
-    creatingGate.value = false;
-  }
 }
 
 onMounted(async () => {
@@ -205,6 +197,14 @@ onUnmounted(() => {
     <v-card-title class="d-flex align-center">
       Gates
       <v-spacer />
+      <v-btn
+        variant="tonal"
+        prepend-icon="mdi-plus"
+        class="mr-2"
+        @click="openGateDialog(null)"
+      >
+        Add Gate
+      </v-btn>
       <v-tooltip
         :disabled="!stageActive"
         text="A stage is active — close it first"
@@ -245,7 +245,7 @@ onUnmounted(() => {
             <th>Clock</th>
             <th>Capabilities</th>
             <th>Version</th>
-            <th></th>
+            <th width="1%"></th>
           </tr>
         </thead>
         <tbody>
@@ -262,22 +262,14 @@ onUnmounted(() => {
                 :title="`Open gate config (${gate.address})`"
               />
             </td>
-            <td>
-              <v-text-field
-                v-if="editingGateId === gate.id"
-                :model-value="gate.name"
-                density="compact"
-                hide-details
-                @change="
-                  onRenameGate(gate, ($event.target as HTMLInputElement).value)
-                "
-              />
-              <span v-else>{{ gate.name }}</span>
-            </td>
+            <td>{{ gate.name }}</td>
             <td>
               <v-chip
                 size="small"
                 :color="isOnline(gate, now) ? 'success' : 'error'"
+                :prepend-icon="
+                  isOnline(gate, now) ? 'mdi-lan-connect' : 'mdi-lan-disconnect'
+                "
               >
                 {{ isOnline(gate, now) ? 'online' : 'offline' }}
               </v-chip>
@@ -367,35 +359,40 @@ onUnmounted(() => {
               </v-chip>
               <span v-else>{{ gate.version ?? '-' }}</span>
             </td>
-            <td>
+            <td class="text-no-wrap">
               <v-btn
                 size="small"
                 variant="text"
-                :prepend-icon="
-                  editingGateId === gate.id ? 'mdi-check' : 'mdi-pencil'
-                "
-                @click="toggleEditGate(gate.id)"
+                prepend-icon="mdi-pencil"
+                @click="openGateDialog(gate)"
               >
-                {{ editingGateId === gate.id ? 'Done' : 'Rename' }}
+                Rename
               </v-btn>
-              <v-tooltip
-                :disabled="!lockedGateIds.has(gate.id)"
-                text="Referenced by an active/closed stage — can't be deleted"
-              >
-                <template #activator="{ props: tooltipProps }">
-                  <span v-bind="tooltipProps">
-                    <v-btn
-                      size="small"
-                      variant="text"
-                      prepend-icon="mdi-delete"
-                      :disabled="lockedGateIds.has(gate.id)"
-                      @click="onDeleteGate(gate)"
-                    >
-                      Delete
-                    </v-btn>
-                  </span>
+              <v-menu>
+                <template #activator="{ props: menu }">
+                  <v-btn
+                    v-bind="menu"
+                    icon="mdi-dots-vertical"
+                    size="small"
+                    variant="text"
+                    :aria-label="`More for ${gate.id}`"
+                  />
                 </template>
-              </v-tooltip>
+                <v-list density="compact">
+                  <v-list-item
+                    prepend-icon="mdi-delete-outline"
+                    title="Delete"
+                    :subtitle="
+                      lockedGateIds.has(gate.id)
+                        ? 'Used by a running or closed stage'
+                        : undefined
+                    "
+                    base-color="error"
+                    :disabled="lockedGateIds.has(gate.id)"
+                    @click="onDeleteGate(gate)"
+                  />
+                </v-list>
+              </v-menu>
             </td>
           </tr>
         </tbody>
@@ -405,35 +402,8 @@ onUnmounted(() => {
       </v-alert>
       <v-alert v-if="!autoDiscover" type="warning" variant="tonal" class="mt-4">
         Auto-discovery is off — heartbeats from gates not listed here are
-        ignored until you add them below.
+        ignored until you add them with + Add Gate.
       </v-alert>
-      <form
-        class="d-flex flex-wrap align-center ga-3 mt-4"
-        @submit.prevent="onCreateGate"
-      >
-        <v-text-field
-          v-model="newGate.id"
-          label="Gate ID (e.g. START_WP2)"
-          density="comfortable"
-          hide-details
-          style="min-width: 220px"
-        />
-        <v-text-field
-          v-model="newGate.name"
-          label="Name (optional)"
-          density="comfortable"
-          hide-details
-          style="min-width: 220px"
-        />
-        <v-btn
-          type="submit"
-          color="primary"
-          :loading="creatingGate"
-          prepend-icon="mdi-plus"
-        >
-          Add Gate
-        </v-btn>
-      </form>
     </v-card-text>
   </v-card>
 
@@ -448,15 +418,15 @@ onUnmounted(() => {
         <tr>
           <th>ID</th>
           <th>Name</th>
-          <th></th>
+          <th width="1%"></th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="gate in knownGates" :key="gate.id">
           <td>{{ gate.id }}</td>
           <td>{{ gate.name }}</td>
-          <td class="text-right">
-            <v-chip v-if="gateIds.has(gate.id)" size="small">
+          <td class="text-no-wrap text-right">
+            <v-chip v-if="gateIds.has(gate.id)" size="small" class="mr-2">
               in this event
             </v-chip>
             <v-btn
@@ -468,14 +438,24 @@ onUnmounted(() => {
             >
               Add
             </v-btn>
-            <v-btn
-              size="small"
-              variant="text"
-              prepend-icon="mdi-close"
-              @click="onForgetKnownGate(gate.id)"
-            >
-              Forget
-            </v-btn>
+            <v-menu>
+              <template #activator="{ props: menu }">
+                <v-btn
+                  v-bind="menu"
+                  icon="mdi-dots-vertical"
+                  size="small"
+                  variant="text"
+                  :aria-label="`More for ${gate.id}`"
+                />
+              </template>
+              <v-list density="compact">
+                <v-list-item
+                  prepend-icon="mdi-close"
+                  title="Forget on this computer"
+                  @click="onForgetKnownGate(gate.id)"
+                />
+              </v-list>
+            </v-menu>
           </td>
         </tr>
         <tr v-if="knownGates.length === 0">
@@ -518,4 +498,28 @@ onUnmounted(() => {
       </v-card-actions>
     </v-card>
   </v-dialog>
+
+  <FormDialog
+    v-model="gateDialogOpen"
+    :title="editingGate ? `Rename gate ${editingGate.id}` : 'Add gate'"
+    :form="gateDraft"
+    :save="onSaveGate"
+    :saved="editingGate ? 'Gate renamed' : 'Gate added'"
+    :save-text="editingGate ? 'Rename' : 'Add gate'"
+  >
+    <v-text-field
+      v-if="!editingGate"
+      v-model="gateDraft.id"
+      label="Gate ID"
+      hint="Its GATE_ID, e.g. START_WP2"
+      persistent-hint
+      :rules="[required]"
+      autofocus
+    />
+    <v-text-field
+      v-model="gateDraft.name"
+      :label="editingGate ? 'Name' : 'Name (optional)'"
+      :autofocus="!!editingGate"
+    />
+  </FormDialog>
 </template>
