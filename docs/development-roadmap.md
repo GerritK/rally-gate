@@ -53,10 +53,7 @@ What exists, with where its reasoning lives. History is in git.
 
 ## Next
 
-1. **`OpenStintAdapter`**, then **beam + OpenStint** combined (designed in
-   `decoder-adapters.md`) — critical path, but waits on RF hardware validation
-   (two ordered gates reading reliably); settle the `-t` question first.
-2. **Vehicle classes** with per-class classification — the one piece of
+1. **Vehicle classes** with per-class classification — the one piece of
    deferred work that needs no hardware and matters at a real event. Two
    constraints known up front: classes are organiser-defined **data**, not an
    enum; and a vehicle can be in **several classes at once** (many-to-many),
@@ -65,6 +62,10 @@ What exists, with where its reasoning lives. History is in git.
 
 ## Deliberately deferred
 
+- **`OpenStintAdapter`**, then **beam + OpenStint** combined (designed in
+  `decoder-adapters.md`) — on hold on branch `feature/openstint-adapter`
+  until working RTL-SDR hardware arrives; merge only once a real car is timed
+  through a loop. Settle the `-t` question first.
 - **GPS/PPS per gate** — waiting on hardware (`decoder-adapters.md` "Hardware
   notes").
 - **Gate updates from the server** — rally WiFi is closed, so gates can't reach
