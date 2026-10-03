@@ -9,10 +9,9 @@ no timing company, and hardware a club can build and own. Everything runs on
 the rally's own closed Wi-Fi.
 
 > **Status: early development.** Timing works end to end with simulated gates
-> and with a switch on a gate's GPIO pin; the light barrier sensor itself is
-> still being tested, and RC transponders aren't supported yet (see
-> [What works today](#what-works-today)). Don't time a real event without a
-> paper backup.
+> and with a light barrier on a gate's GPIO pin; RC transponders aren't
+> supported yet (see [What works today](#what-works-today)). Don't time a real
+> event without a paper backup.
 
 ## How it works
 
@@ -32,9 +31,10 @@ the rally's own closed Wi-Fi.
 - **Gates find the server by themselves** and take their time from it, so
   setting up on the day means switching things on — no IP addresses, no
   configuring gates per event.
-- **Marshals keep control.** Live Timing shows every passing; a marshal can
-  correct a time, add a missed one, mark a car DNF/DNS or void a run for a
-  re-run. Results and stage classifications update as times come in.
+- **Marshals keep control.** Live Timing follows the stage in start order:
+  who's up next, who's on stage, every passing. A marshal can start or finish
+  a car by hand when a gate misses it (marked as hand-timed), correct a time
+  or void a run for a re-run. Results update as times come in.
 - **One event, one file.** An event is a single file on the server machine:
   copy it to back it up or hand it on. Gates you use regularly are remembered
   and can be picked into the next event.
@@ -43,18 +43,21 @@ the rally's own closed Wi-Fi.
 
 - Stages with start, finish and split gates; stage, split and overall
   classification; DNF/DNS, manual corrections, voided runs and re-runs.
+- Vehicle classes, with rankings per class or combination of classes.
+- Start lists per stage, ordered by class and start number or by times so
+  far, frozen and printed for posting.
 - **Light barrier gates**: a Raspberry Pi with a light barrier on a GPIO pin.
-  A light barrier can't tell cars apart, so a marshal assigns each passing to
-  a car on Live Timing. Verified on a Pi with a switch in place of the sensor;
-  the sensor itself is next.
+  A light barrier can't tell cars apart, so a marshal confirms each passing's
+  car on Live Timing, which suggests it from the start order. Verified on a Pi
+  with an Omron E3Z-T61.
 - Gate clock sync against the server, with offsets shown on the Hardware page.
 - A config page on every gate (name, sensor, Wi-Fi); a gate that finds no
   known Wi-Fi opens its own hotspot so you can reach that page.
 - Creating and switching events from the dashboard.
 
 Not yet: **RC transponder decoding** (RC3/RC4, via OpenStint and an SDR —
-next on the list, waiting on hardware tests), time controls, Parc Fermé,
-penalties, vehicle classes, and any login. See
+waiting on working SDR hardware), time controls, Parc Fermé, penalties, and
+any login. See
 [docs/development-roadmap.md](docs/development-roadmap.md).
 
 ## What you need
@@ -62,7 +65,7 @@ penalties, vehicle classes, and any login. See
 - **A server:** a laptop (Windows, macOS on Apple Silicon, or Linux), or a
   Raspberry Pi. The dashboard runs in any browser on the same network.
 - **Per gate:** a Raspberry Pi with Raspberry Pi OS Lite and a light barrier
-  (planned: Omron E3Z-T61, wiring in
+  (Omron E3Z-T61, wiring in
   [docs/decoder-adapters.md](docs/decoder-adapters.md)). A DS3231 RTC module is
   optional and keeps the clock across power cuts.
 - **A Wi-Fi network** that the server and all gates join. It does not need
@@ -128,11 +131,12 @@ gate need the server's IP address entered there.
 
 1. Start the server and join the rally Wi-Fi with every gate.
 2. **Setup** → create the event, then the stages; assign gates as start,
-   finish or split.
+   finish or split. Set how start lists are ordered.
 3. **Vehicles** → register the cars.
 4. **Hardware** → check every gate is online and its clock is in sync.
-5. **Live Timing** → activate a stage when it starts, close it when the last
-   car is through.
+5. **Live Timing** → freeze and print a stage's start list when you post it,
+   activate the stage when it starts, close it when the last car is
+   through.
 
 ## For developers
 
@@ -145,7 +149,7 @@ npm workspaces monorepo, TypeScript throughout:
 | `apps/gate-agent` | runs on a gate; turns sensor readings into detections over MQTT |
 | `apps/gate-config` | runs on a gate; its config page |
 | `packages/shared` | types shared by all apps |
-| `packages/ui` | the shared Vuetify theme |
+| `packages/ui` | the shared Vuetify theme and styles |
 
 Development needs no hardware:
 
@@ -168,7 +172,8 @@ Before changing an area, read its note in `docs/` — much of the "why" lives
 there: [architecture](docs/architecture.md), [event model](docs/event-model.md),
 [API](docs/api.md), [deployment modes](docs/deployment-modes.md),
 [decoder adapters](docs/decoder-adapters.md),
-[frontend](docs/frontend-structure.md), [gate config](docs/gate-config-ui.md),
+[frontend](docs/frontend-structure.md), [design system](docs/design-system.md),
+[gate config](docs/gate-config-ui.md),
 [roadmap](docs/development-roadmap.md). [CLAUDE.md](CLAUDE.md) has the
 commands, checks CI runs, and the codebase's standing rules. The original
 vision document is in [ideas/](ideas/RC_Rally_Timing_Project_Documentation.md).

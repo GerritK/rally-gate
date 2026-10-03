@@ -122,7 +122,6 @@ fixes was seconds. Confirm the `-t` timestamp format against real output.
 
 ## Other adapter ideas
 
-- `ManualEntryAdapter` — a marshal keying in a passing.
 - **ESP32 checkpoint gates** for Parc Fermé / pre-start, where presence matters
   and timing doesn't (RFID reader or a button). A gate is anything that
   publishes the right JSON to `rally/gates/<gateId>/detections` — no gate-agent

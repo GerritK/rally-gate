@@ -163,8 +163,9 @@ always includes everyone.
 ## Start order
 
 The official start list per stage: what the announcer reads out and what gets
-posted. It is also the reference for later work: unassigned-passing
-suggestions, planned start times, and penalties for starting out of order.
+posted. Unassigned-passing suggestions and Live Timing's Up next follow it,
+and it will be the reference for planned start times and penalties for
+starting out of order.
 
 **Computed**, per stage, from three event-wide settings that are independent of
 each other:

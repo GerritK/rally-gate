@@ -98,7 +98,7 @@ Nothing queued; OpenStint (below) resumes when the hardware arrives.
   `formatStageDuration` (see `packages/ui/src/format.ts`).
 - **Manual start-order edits** on the frozen snapshot (late entry, car moved
   to the back after a repair, swaps). Until then, change start numbers before
-  activation.
+  the start list is frozen.
 - **Out-of-order start penalties**, measured against the frozen start order.
   They depend on penalties as a whole (Rally controls, above).
 - **Manual times as durations, not clock times** — get rid of typed
