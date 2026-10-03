@@ -205,6 +205,27 @@ const rows = computed<Row[]>(() => {
   }));
 });
 
+/** Non-zero states only, NEXT counted as waiting. */
+const stateCounts = computed(() => {
+  const counts = new Map<RowState, number>();
+  for (const row of rows.value) {
+    const state = row.state === 'NEXT' ? 'WAITING' : row.state;
+    counts.set(state, (counts.get(state) ?? 0) + 1);
+  }
+  const order: RowState[] = [
+    'ON_STAGE',
+    'WAITING',
+    'FINISHED',
+    'DNF',
+    'DNS',
+    'RERUN',
+    'OUT',
+  ];
+  return order
+    .filter((state) => counts.has(state))
+    .map((state) => ({ state, count: counts.get(state)! }));
+});
+
 function runDurationDisplay(run: StageRun): string {
   if (run.status === StageRunStatus.STARTED) {
     return formatStageDuration(now.value - new Date(run.startTime).getTime());
@@ -838,6 +859,17 @@ onUnmounted(() => {
     </v-card-item>
 
     <v-card-text class="d-print-none">
+      <div class="d-flex flex-wrap align-center ga-2 mb-3">
+        <v-chip
+          v-for="{ state, count } in stateCounts"
+          :key="state"
+          :color="ROW_STATE_DISPLAY[state].color"
+          :prepend-icon="ROW_STATE_DISPLAY[state].icon"
+          variant="tonal"
+        >
+          {{ count }} {{ ROW_STATE_DISPLAY[state].label }}
+        </v-chip>
+      </div>
       <div class="d-flex flex-wrap align-center ga-2">
         <span v-if="stageGates.length > 0" class="text-medium-emphasis">
           Gates ready
