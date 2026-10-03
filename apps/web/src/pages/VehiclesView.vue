@@ -20,6 +20,14 @@ const STATUS_OPTIONS = Object.values(VehicleStatus).map((value) => ({
 const vehicles = ref<Vehicle[]>([]);
 const classes = ref<VehicleClass[]>([]);
 
+/** In the order of the class list (main first, then by name), which the
+ * server sorts; a vehicle's own classes come back in no particular order. */
+function classesOf(vehicle: Vehicle): VehicleClass[] {
+  return classes.value.filter((c) =>
+    vehicle.classes.some((own) => own.id === c.id),
+  );
+}
+
 const dialogOpen = ref(false);
 const editing = ref<Vehicle | null>(null);
 const draft = ref(toDraft(null));
@@ -93,7 +101,7 @@ onMounted(refresh);
             <td class="rg-timing">{{ vehicle.transponderId ?? '-' }}</td>
             <td v-if="classes.length > 0">
               <v-chip
-                v-for="c in vehicle.classes"
+                v-for="c in classesOf(vehicle)"
                 :key="c.id"
                 size="small"
                 :color="c.main ? 'secondary' : undefined"
