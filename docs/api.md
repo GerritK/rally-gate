@@ -10,7 +10,8 @@ Anything outside `/api` that isn't a file returns `index.html`.
 | `/gates` | GET, `/:id` GET/PUT/DELETE | hardware identity only (PUT sets the name). Auto-created from a first heartbeat unless `autoDiscoverGates` is off |
 | `/gates/power-off` | POST | shuts down every online gate through its gate-config; one `{ gateId, ok, message? }` per gate. 409 while a stage is active |
 | `/gate-assignments` | GET, POST, `/:id` DELETE | the (gate, stage, role, splitIndex) plan. `active` is not settable — activation is per stage |
-| `/vehicles` | GET, POST, `/:id` GET/PATCH | `startNumber` is unique, POST/PATCH 409 on a clash |
+| `/vehicles` | GET, POST, `/:id` GET/PATCH | `startNumber` is unique, POST/PATCH 409 on a clash. Classes are written as `classIds` (replaces the list, 400 on an unknown id) and read back as `classes` |
+| `/vehicle-classes` | GET, POST, `/:id` PUT/DELETE | `{ name, main? }`, name unique (409), main classes listed first. DELETE takes the class off its vehicles |
 | `/stages` | GET, POST, `/:id` GET/PUT/DELETE | sorted by `stageNumber`; `status` is server-owned |
 | `/stages/:id/activate` | POST | activates the stage's gate assignments. 409 `{ conflictingStageIds }` if a gate is active elsewhere (`?force=true` closes that stage), 409 if already `CLOSED` |
 | `/stages/:id/close` | POST | deactivates its gates, marks it `CLOSED`. Terminal |
@@ -23,6 +24,7 @@ Anything outside `/api` that isn't a file returns `index.html`.
 | `/events/:eventId/dismiss` | POST | the passing was no car |
 | `/events/pending` | GET, `/retry` POST | detections whose rules threw; retried every 30s, POST forces it and returns `{ recovered }` |
 | `/classification/overall` | GET | closed stages only, with notional times — see `event-model.md` |
+| `/classification/...` | `?classId=` | every endpoint below and above; repeat it to combine classes (vehicles in *all* of them). Positions and gaps within that group; 404 on an unknown class |
 | `/classification/stages/:stageId` | GET | ranked with gaps |
 | `/classification/stages/:stageId/split-gates` | GET | the stage's split points |
 | `/classification/stages/:stageId/splits/:splitIndex` | GET | live, includes `STARTED` runs, excludes `CANCELLED` |

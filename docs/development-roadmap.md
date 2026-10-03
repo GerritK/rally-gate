@@ -16,8 +16,8 @@ What exists, with where its reasoning lives. History is in git.
   SSE → dashboard; QoS 1 persistent sessions, idempotent rules, failed
   detections retried and surfaced (`CLAUDE.md`, `event-model.md`).
 - **Timing:** start/finish/split roles, stage/split/overall classification, DNF/DNS,
-  manual corrections, voiding and gate-timed re-runs, notional times
-  (`event-model.md`).
+  manual corrections, voiding and gate-timed re-runs, notional times,
+  vehicle classes as filtered rankings (`event-model.md`).
 - **Light barrier:** `BeamAdapter` (E3Z-T61 via GPIO), unassigned passings
   assigned by a marshal (`decoder-adapters.md`, `event-model.md`). Verified on
   a Pi with the E3Z-T61, marshal assignment included.
@@ -53,12 +53,7 @@ What exists, with where its reasoning lives. History is in git.
 
 ## Next
 
-1. **Vehicle classes** with per-class classification — the one piece of
-   deferred work that needs no hardware and matters at a real event. Two
-   constraints known up front: classes are organiser-defined **data**, not an
-   enum; and a vehicle can be in **several classes at once** (many-to-many),
-   each class ranking being a filtered view over the same runs, with the
-   overall ranking unchanged.
+Nothing queued; OpenStint (below) resumes when the hardware arrives.
 
 ## Deliberately deferred
 

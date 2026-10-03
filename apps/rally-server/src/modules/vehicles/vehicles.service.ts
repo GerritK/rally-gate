@@ -1,18 +1,27 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { isUniqueViolation } from '../../common/db-errors';
+import { VehicleClassDto } from './dto';
+import { VehicleClass } from './vehicle-class.entity';
 import { Vehicle } from './vehicle.entity';
+
+type VehicleInput = Partial<Omit<Vehicle, 'id' | 'classes'>> & {
+  classIds?: string[];
+};
 
 @Injectable()
 export class VehiclesService {
   constructor(
     @InjectRepository(Vehicle)
     private readonly vehicles: Repository<Vehicle>,
+    @InjectRepository(VehicleClass)
+    private readonly classes: Repository<VehicleClass>,
   ) {}
 
   findAll(): Promise<Vehicle[]> {
@@ -27,9 +36,11 @@ export class VehiclesService {
     return this.vehicles.findOneBy({ transponderId });
   }
 
-  async create(data: Partial<Vehicle>): Promise<Vehicle> {
+  async create({ classIds, ...data }: VehicleInput): Promise<Vehicle> {
+    const vehicle = this.vehicles.create(data);
+    vehicle.classes = (await this.resolveClasses(classIds)) ?? [];
     try {
-      return await this.vehicles.save(this.vehicles.create(data));
+      return await this.vehicles.save(vehicle);
     } catch (err) {
       if (isUniqueViolation(err)) {
         throw new ConflictException(
@@ -42,7 +53,7 @@ export class VehiclesService {
 
   async update(
     id: string,
-    patch: Partial<Omit<Vehicle, 'id'>>,
+    { classIds, ...patch }: VehicleInput,
   ): Promise<Vehicle> {
     const vehicle = await this.findOne(id);
     if (!vehicle) {
@@ -57,6 +68,10 @@ export class VehiclesService {
         Object.entries(patch).filter(([, value]) => value !== undefined),
       ),
     );
+    const classes = await this.resolveClasses(classIds);
+    if (classes) {
+      vehicle.classes = classes;
+    }
     try {
       return await this.vehicles.save(vehicle);
     } catch (err) {
@@ -67,5 +82,78 @@ export class VehiclesService {
       }
       throw err;
     }
+  }
+
+  /** Main classes first, then alphabetical — sorted here, not in SQL, so case
+   * and numbers ("2WD" before "10WD") sort alike on SQLite and Postgres. */
+  async findAllClasses(): Promise<VehicleClass[]> {
+    return (await this.classes.find()).sort(
+      (a, b) =>
+        Number(b.main) - Number(a.main) ||
+        a.name.localeCompare(b.name, undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        }),
+    );
+  }
+
+  findClass(id: string): Promise<VehicleClass | null> {
+    return this.classes.findOneBy({ id });
+  }
+
+  createClass({ name, main }: VehicleClassDto): Promise<VehicleClass> {
+    return this.saveClass(this.classes.create({ name, main: main ?? false }));
+  }
+
+  async updateClass(
+    id: string,
+    { name, main }: VehicleClassDto,
+  ): Promise<VehicleClass> {
+    const vehicleClass = await this.findClass(id);
+    if (!vehicleClass) {
+      throw new NotFoundException(`Class ${id} not found`);
+    }
+    vehicleClass.name = name;
+    if (main !== undefined) {
+      vehicleClass.main = main;
+    }
+    return this.saveClass(vehicleClass);
+  }
+
+  async removeClass(id: string): Promise<void> {
+    const { affected } = await this.classes.delete(id);
+    if (!affected) {
+      throw new NotFoundException(`Class ${id} not found`);
+    }
+  }
+
+  private async saveClass(vehicleClass: VehicleClass): Promise<VehicleClass> {
+    try {
+      return await this.classes.save(vehicleClass);
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        throw new ConflictException(
+          `Class ${vehicleClass.name} already exists`,
+        );
+      }
+      throw err;
+    }
+  }
+
+  private async resolveClasses(
+    classIds?: string[],
+  ): Promise<VehicleClass[] | undefined> {
+    if (classIds === undefined) {
+      return undefined;
+    }
+    const ids = [...new Set(classIds)];
+    if (ids.length === 0) {
+      return [];
+    }
+    const classes = await this.classes.findBy({ id: In(ids) });
+    if (classes.length !== ids.length) {
+      throw new BadRequestException('Unknown vehicle class');
+    }
+    return classes;
   }
 }

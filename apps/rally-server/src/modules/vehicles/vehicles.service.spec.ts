@@ -18,7 +18,7 @@ function makeService(saveImpl: (v: unknown) => Promise<unknown>) {
     create: jest.fn().mockImplementation((v: unknown) => v),
     save: jest.fn().mockImplementation(saveImpl),
   };
-  return new VehiclesService(vehicles as never);
+  return new VehiclesService(vehicles as never, {} as never);
 }
 
 describe('VehiclesService.create', () => {
@@ -48,6 +48,24 @@ describe('VehiclesService.create', () => {
   });
 });
 
+describe('VehiclesService.findAllClasses', () => {
+  it('lists main classes first, each group alphabetical regardless of case', async () => {
+    const classes = {
+      find: jest.fn().mockResolvedValue([
+        { name: 'stock', main: false },
+        { name: '10WD', main: true },
+        { name: 'Rookie', main: false },
+        { name: '2WD', main: true },
+      ]),
+    };
+    const service = new VehiclesService({} as never, classes as never);
+
+    const names = (await service.findAllClasses()).map((c) => c.name);
+
+    expect(names).toEqual(['2WD', '10WD', 'Rookie', 'stock']);
+  });
+});
+
 function makeServiceForUpdate(
   existingVehicle: unknown,
   saveImpl: (v: unknown) => Promise<unknown> = (v) => Promise.resolve(v),
@@ -56,7 +74,7 @@ function makeServiceForUpdate(
     findOneBy: jest.fn().mockResolvedValue(existingVehicle),
     save: jest.fn().mockImplementation(saveImpl),
   };
-  return new VehiclesService(vehicles as never);
+  return new VehiclesService(vehicles as never, {} as never);
 }
 
 describe('VehiclesService.update', () => {

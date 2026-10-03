@@ -6,31 +6,35 @@ import {
   updateVehicle,
   VehicleStatus,
   type Vehicle,
+  type VehiclePatch,
 } from '../api/vehicles';
+import ClassPicker from '../components/ClassPicker.vue';
+import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
 
 const STATUS_OPTIONS = Object.values(VehicleStatus);
 
 const vehicles = ref<Vehicle[]>([]);
-const newVehicle = ref({
+const classes = ref<VehicleClass[]>([]);
+const emptyVehicle = () => ({
   startNumber: '',
   driverName: '',
   coDriverName: '',
   transponderId: '',
+  classIds: [] as string[],
 });
+const newVehicle = ref(emptyVehicle());
 const editingVehicleId = ref<string | null>(null);
 
 async function refresh() {
   vehicles.value = await fetchVehicles();
+  classes.value = await fetchVehicleClasses();
 }
 
 function toggleEditVehicle(id: string) {
   editingVehicleId.value = editingVehicleId.value === id ? null : id;
 }
 
-async function onUpdateVehicle(
-  vehicle: Vehicle,
-  patch: Partial<Omit<Vehicle, 'id'>>,
-) {
+async function onUpdateVehicle(vehicle: Vehicle, patch: VehiclePatch) {
   try {
     const updated = await updateVehicle(vehicle.id, patch);
     const idx = vehicles.value.findIndex((v) => v.id === vehicle.id);
@@ -62,6 +66,10 @@ function onUpdateStatus(vehicle: Vehicle, status: VehicleStatus) {
   onUpdateVehicle(vehicle, { status });
 }
 
+function onUpdateClasses(vehicle: Vehicle, classIds: string[]) {
+  onUpdateVehicle(vehicle, { classIds });
+}
+
 async function onCreateVehicle() {
   if (!newVehicle.value.startNumber || !newVehicle.value.driverName) return;
   try {
@@ -70,13 +78,9 @@ async function onCreateVehicle() {
       driverName: newVehicle.value.driverName,
       coDriverName: newVehicle.value.coDriverName || undefined,
       transponderId: newVehicle.value.transponderId || undefined,
+      classIds: newVehicle.value.classIds,
     });
-    newVehicle.value = {
-      startNumber: '',
-      driverName: '',
-      coDriverName: '',
-      transponderId: '',
-    };
+    newVehicle.value = emptyVehicle();
     await refresh();
   } catch (err) {
     alert(err instanceof Error ? err.message : 'Failed to add vehicle');
@@ -97,6 +101,7 @@ onMounted(refresh);
             <th>Driver</th>
             <th>Co-Driver</th>
             <th>Transponder</th>
+            <th v-if="classes.length > 0">Classes</th>
             <th>Status</th>
             <th></th>
           </tr>
@@ -163,6 +168,14 @@ onMounted(refresh);
               <td>{{ vehicle.coDriverName ?? '-' }}</td>
               <td>{{ vehicle.transponderId ?? '-' }}</td>
             </template>
+            <td v-if="classes.length > 0">
+              <ClassPicker
+                :model-value="vehicle.classes.map((c) => c.id)"
+                :classes="classes"
+                density="compact"
+                @update:model-value="onUpdateClasses(vehicle, $event)"
+              />
+            </td>
             <td>
               <v-select
                 :model-value="vehicle.status"
@@ -223,6 +236,7 @@ onMounted(refresh);
           hide-details
           style="min-width: 200px"
         />
+        <ClassPicker v-model="newVehicle.classIds" :classes="classes" />
         <v-btn type="submit" color="primary" prepend-icon="mdi-plus">
           Add Vehicle
         </v-btn>

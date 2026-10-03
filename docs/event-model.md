@@ -114,5 +114,20 @@ penalty is the knob; roughly one stage duration is a sensible start.
 - A closed stage nobody finished is dropped — a notional with no anchor would
   add the same constant to everyone.
 - Lowest total wins; `stagesCompleted` is display-only.
-- Notionals are computed per ranking and never stored, because a future class
+- Notionals are computed per ranking and never stored, because a class
   ranking has a different slowest time than the overall one.
+
+## Classes
+
+Organiser-defined data (`VehicleClass`: a name and a `main` flag), not an
+enum. **Main classes** (4WD, 2WD) split the field; **categories** (Rookie,
+Stock) cut across them. A vehicle can be in any number of either — the flag
+only makes the UI offer one main class per vehicle, the server doesn't
+enforce it, and rankings treat both alike.
+
+A ranking takes any set of classes and narrows to vehicles in **all** of them
+(Stock + Rookie + 2WD), then runs the same calculation as the unfiltered one —
+so who is classified, which stages count and every notional come from within
+that group. No hierarchy (Rookie *under* 2WD): categories exist in every main
+class, and "all Rookies" must stay a ranking of its own. The overall ranking
+always includes everyone.

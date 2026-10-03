@@ -137,7 +137,9 @@ onMounted(async () => {
     <v-col cols="12" sm="4">
       <v-card to="/setup/scoring" prepend-icon="mdi-calculator-variant-outline">
         <v-card-title>Scoring</v-card-title>
-        <v-card-text> How a stage a crew didn't finish is scored. </v-card-text>
+        <v-card-text>
+          Vehicle classes, and how a stage a crew didn't finish is scored.
+        </v-card-text>
       </v-card>
     </v-col>
   </v-row>

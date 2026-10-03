@@ -14,6 +14,7 @@ import { Setting } from '../modules/settings/setting.entity';
 import { StageRun } from '../modules/stage-runs/stage-run.entity';
 import { StageSplit } from '../modules/stage-runs/stage-split.entity';
 import { Stage } from '../modules/stages/stage.entity';
+import { VehicleClass } from '../modules/vehicles/vehicle-class.entity';
 import { Vehicle } from '../modules/vehicles/vehicle.entity';
 
 const ENTITIES = [
@@ -26,6 +27,7 @@ const ENTITIES = [
   StageRun,
   StageSplit,
   Vehicle,
+  VehicleClass,
 ];
 
 /**

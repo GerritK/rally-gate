@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { StageRun } from '../modules/stage-runs/stage-run.entity';
 import { Vehicle } from '../modules/vehicles/vehicle.entity';
+import { VehicleClass } from '../modules/vehicles/vehicle-class.entity';
 import { isUniqueViolation } from './db-errors';
 
 /**
@@ -20,7 +21,7 @@ describe('isUniqueViolation', () => {
     dataSource = new DataSource({
       type: 'better-sqlite3',
       database: ':memory:',
-      entities: [Vehicle, StageRun],
+      entities: [Vehicle, VehicleClass, StageRun],
       synchronize: true,
     });
     await dataSource.initialize();

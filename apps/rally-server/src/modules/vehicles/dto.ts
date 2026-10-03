@@ -1,5 +1,7 @@
 import { VehicleStatus } from '@rally-gate/shared';
 import {
+  IsArray,
+  IsBoolean,
   IsEnum,
   IsNotEmpty,
   IsOptional,
@@ -36,6 +38,12 @@ export class CreateVehicleDto {
   @IsOptional()
   @IsEnum(VehicleStatus)
   status?: VehicleStatus;
+
+  /** Replaces the vehicle's class list; 400 if any id is unknown. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  classIds?: string[];
 }
 
 export class UpdateVehicleDto {
@@ -62,4 +70,20 @@ export class UpdateVehicleDto {
   @IsOptional()
   @IsEnum(VehicleStatus)
   status?: VehicleStatus;
+
+  /** Replaces the vehicle's class list; 400 if any id is unknown. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  classIds?: string[];
+}
+
+export class VehicleClassDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsOptional()
+  @IsBoolean()
+  main?: boolean;
 }

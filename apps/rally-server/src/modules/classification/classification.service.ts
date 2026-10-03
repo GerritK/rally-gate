@@ -49,17 +49,21 @@ export class ClassificationService {
 
   async getStageClassification(
     stageId: string,
+    classIds: string[] = [],
   ): Promise<ClassificationEntry[]> {
     const stage = await this.stagesService.findOne(stageId);
     if (!stage) {
       throw new NotFoundException(`Stage ${stageId} not found`);
     }
+    const inClass = await this.classFilter(classIds);
     const runs = await this.stageRunsService.findFinishedByStage(stageId);
     return this.rank(
-      runs.map((run) => ({
-        vehicleId: run.vehicleId,
-        durationMs: run.durationMs as number,
-      })),
+      runs
+        .filter((run) => inClass(run.vehicleId))
+        .map((run) => ({
+          vehicleId: run.vehicleId,
+          durationMs: run.durationMs as number,
+        })),
     );
   }
 
@@ -73,8 +77,16 @@ export class ClassificationService {
    * Only **CLOSED** stages count, the same trigger `getNonFinishers` uses: a
    * stage still running has no result to penalise anyone against. So the
    * overall table moves when a stage closes, not continuously during one.
+   *
+   * With `classIds`, runs are narrowed to vehicles in *all* of those classes
+   * (Stock + Rookie + 2WD) *before* anything else, so who is classified,
+   * which stages count and every notional are all taken from within that
+   * group, not borrowed from the overall field.
    */
-  async getOverallClassification(): Promise<OverallClassificationEntry[]> {
+  async getOverallClassification(
+    classIds: string[] = [],
+  ): Promise<OverallClassificationEntry[]> {
+    const inClass = await this.classFilter(classIds);
     const stages = await this.stagesService.findAll();
     const closedStageIds = new Set(
       stages
@@ -86,13 +98,13 @@ export class ClassificationService {
     }
 
     const finished = (await this.stageRunsService.findAllFinished()).filter(
-      (run) => closedStageIds.has(run.stageId),
+      (run) => closedStageIds.has(run.stageId) && inClass(run.vehicleId),
     );
     // Classified = drove at least one closed stage. Without this a registered
     // car that never turned up would collect notional times for the whole
     // rally and appear in the results on an invented total. This set is also
-    // the notional's population, which is what a future per-class ranking
-    // narrows — hence notionals are computed per view, never stored on a run.
+    // the notional's population, which a class ranking narrows — hence
+    // notionals are computed per view, never stored on a run.
     const classified = [...new Set(finished.map((run) => run.vehicleId))];
     if (classified.length === 0) {
       return [];
@@ -162,15 +174,16 @@ export class ClassificationService {
   async getSplitClassification(
     stageId: string,
     splitIndex: number,
+    classIds: string[] = [],
   ): Promise<SplitClassificationEntry[]> {
     const stage = await this.stagesService.findOne(stageId);
     if (!stage) {
       throw new NotFoundException(`Stage ${stageId} not found`);
     }
-    const pairs = await this.stageRunsService.findSplitsForStageAtIndex(
-      stageId,
-      splitIndex,
-    );
+    const inClass = await this.classFilter(classIds);
+    const pairs = (
+      await this.stageRunsService.findSplitsForStageAtIndex(stageId, splitIndex)
+    ).filter((pair) => inClass(pair.run.vehicleId));
     const vehicles = await this.vehiclesService.findAll();
     const vehicleById = new Map<string, Vehicle>(
       vehicles.map((vehicle) => [vehicle.id, vehicle]),
@@ -196,11 +209,15 @@ export class ClassificationService {
     });
   }
 
-  async getNonFinishers(stageId: string): Promise<StageOutcomeEntry[]> {
+  async getNonFinishers(
+    stageId: string,
+    classIds: string[] = [],
+  ): Promise<StageOutcomeEntry[]> {
     const stage = await this.stagesService.findOne(stageId);
     if (!stage) {
       throw new NotFoundException(`Stage ${stageId} not found`);
     }
+    const inClass = await this.classFilter(classIds);
     const runs = await this.stageRunsService.findByStage(stageId);
     const vehicles = await this.vehiclesService.findAll();
     const vehicleById = new Map<string, Vehicle>(
@@ -240,7 +257,32 @@ export class ClassificationService {
           vehicle.status !== VehicleStatus.DISQUALIFIED,
       )
       .map((vehicle) => toEntry(vehicle.id, 'DNS'));
-    return [...dnf, ...dns];
+    return [...dnf, ...dns].filter((entry) => inClass(entry.vehicleId));
+  }
+
+  /**
+   * An unknown class is a 404, not an empty table — empty would read as
+   * "nobody in this class has finished yet".
+   */
+  private async classFilter(
+    classIds: string[],
+  ): Promise<(vehicleId: string) => boolean> {
+    if (classIds.length === 0) {
+      return () => true;
+    }
+    for (const classId of classIds) {
+      if (!(await this.vehiclesService.findClass(classId))) {
+        throw new NotFoundException(`Class ${classId} not found`);
+      }
+    }
+    const members = new Set(
+      (await this.vehiclesService.findAll())
+        .filter((vehicle) =>
+          classIds.every((id) => vehicle.classes.some((c) => c.id === id)),
+        )
+        .map((vehicle) => vehicle.id),
+    );
+    return (vehicleId) => members.has(vehicleId);
   }
 
   /**

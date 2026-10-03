@@ -8,14 +8,14 @@ sharing `client.ts`). Audience is marshals and organisers only.
 |---|---|---|
 | `/` | — | redirect to `/live` |
 | `/live` | Live Timing | unassigned passings (assign a vehicle), detections feed, stage runs with corrections, Activate / Close Stage |
-| `/results/overall` | Results | overall classification |
-| `/results/stages/:stageId` | Results | stage, split and DNF/DNS classification |
-| `/vehicles` | Vehicles | registration, inline editing, status |
+| `/results/overall` | Results | overall classification, filterable by class |
+| `/results/stages/:stageId` | Results | stage, split and DNF/DNS classification, filterable by class |
+| `/vehicles` | Vehicles | registration, inline editing, status, classes |
 | `/hardware` | Hardware | gate roster: online, heartbeat, clock offset, active assignment, add/rename/delete, auto-discovery toggle; gates known to this computer: add to this event, forget (standalone only) |
 | `/setup` | Setup | the event: rally details, file name, New / Open Event dialogs (standalone only); tiles to Stages and Scoring. The app bar shows the open event and links here |
 | `/setup/stages` | Setup | stage list, create |
 | `/setup/stages/:stageId` | Setup | edit stage, its gate assignments (active state read-only) |
-| `/setup/scoring` | Setup | notional time penalty; later classes/penalties |
+| `/setup/scoring` | Setup | vehicle classes (add/rename/delete, main class or category), notional time penalty; later penalties |
 
 ## Decisions
 
@@ -34,7 +34,9 @@ sharing `client.ts`). Audience is marshals and organisers only.
 - **Drawer, not tabs**, so more sections don't need a nav rework.
 - **No store, no speculative components.** Each page fetches what it needs in
   `onMounted`; data volumes are tiny. Extract a component once it is actually
-  duplicated. Shared pure helpers are in `src/format.ts`.
+  duplicated (`src/components/ClassPicker.vue`, one classes field
+  with the main class first and exclusive, used on Vehicles and both Results
+  pages). Shared pure helpers are in `src/format.ts`.
 - **New / Open Event live in Setup**, on the rally details card: the details
   are the event, and switching is a before-the-event action (refused while a
   stage is active), so it has no nav entry. Known gates are on Hardware,

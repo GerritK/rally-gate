@@ -10,7 +10,11 @@ import {
   CreateStageRunDto,
 } from '../modules/stage-runs/dto';
 import { CreateStageDto, UpdateStageDto } from '../modules/stages/dto';
-import { CreateVehicleDto, UpdateVehicleDto } from '../modules/vehicles/dto';
+import {
+  CreateVehicleDto,
+  UpdateVehicleDto,
+  VehicleClassDto,
+} from '../modules/vehicles/dto';
 
 /**
  * The DTOs are declarative, so what's worth testing isn't each decorator —
@@ -123,6 +127,15 @@ describe('server-owned fields are not settable through the API', () => {
       { gateId: 'g1', stageId: 'WP1', role: 'stage_start', active: true },
       'active',
     ],
+    // Classes are assigned by id only; a nested object would bypass the
+    // unknown-id check in VehiclesService.resolveClasses.
+    [
+      'Vehicle.classes',
+      UpdateVehicleDto,
+      { classes: [{ id: 'c1', name: 'Pro' }] },
+      'classes',
+    ],
+    ['VehicleClass.id', VehicleClassDto, { name: 'Pro', id: 'other' }, 'id'],
     // Singleton pinned to RALLY_INFO_ID; an id could only make a stray row.
     ['RallyInfo.id', UpsertRallyInfoDto, { name: 'Rally', id: 'other' }, 'id'],
   ];

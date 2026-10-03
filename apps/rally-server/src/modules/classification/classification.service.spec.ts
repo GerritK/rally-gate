@@ -57,6 +57,11 @@ function makeOverallService(
   } as unknown as StagesService;
   const vehiclesService = {
     findAll: jest.fn().mockResolvedValue(vehicles),
+    findClass: jest
+      .fn()
+      .mockImplementation((id: string) =>
+        Promise.resolve(id === 'unknown' ? null : { id }),
+      ),
   } as unknown as VehiclesService;
   const settingsService = {
     getNumber: jest.fn().mockResolvedValue(notionalPenaltyMs),
@@ -210,6 +215,76 @@ describe('ClassificationService.getOverallClassification', () => {
     );
 
     await expect(service.getOverallClassification()).resolves.toEqual([]);
+  });
+});
+
+describe('ClassificationService.getOverallClassification by class', () => {
+  const twoClosed = [
+    { id: 'SS1', status: StageStatus.CLOSED },
+    { id: 'SS2', status: StageStatus.CLOSED },
+  ];
+  const vehicles = [
+    { id: 'v1', startNumber: '1', driverName: 'A', classes: [{ id: '2WD' }] },
+    { id: 'v2', startNumber: '2', driverName: 'B', classes: [{ id: '2WD' }] },
+    { id: 'v3', startNumber: '3', driverName: 'C', classes: [{ id: '4WD' }] },
+  ];
+  // v3 is far slower on SS2; overall, that drags v2's SS2 notional up to it.
+  const runs = [
+    { vehicleId: 'v1', stageId: 'SS1', durationMs: 100_000 },
+    { vehicleId: 'v1', stageId: 'SS2', durationMs: 100_000 },
+    { vehicleId: 'v2', stageId: 'SS1', durationMs: 60_000 },
+    { vehicleId: 'v3', stageId: 'SS1', durationMs: 200_000 },
+    { vehicleId: 'v3', stageId: 'SS2', durationMs: 300_000 },
+  ];
+
+  it('anchors notionals on the slowest time within the class, not overall', async () => {
+    const service = makeOverallService(twoClosed, runs, vehicles);
+
+    const overall = await service.getOverallClassification();
+    const inClass = await service.getOverallClassification(['2WD']);
+
+    // Overall v2's SS2 notional is 300s + 30s; within 2WD it is 100s + 30s.
+    expect(overall.find((e) => e.vehicleId === 'v2')!.durationMs).toBe(390_000);
+    expect(inClass.map((e) => [e.vehicleId, e.position, e.durationMs])).toEqual(
+      [
+        ['v2', 1, 190_000],
+        ['v1', 2, 200_000],
+      ],
+    );
+  });
+
+  it('puts a vehicle in every class it belongs to', async () => {
+    const service = makeOverallService(twoClosed, runs, [
+      ...vehicles.slice(0, 2),
+      { ...vehicles[2], classes: [{ id: '4WD' }, { id: '2WD' }] },
+    ]);
+
+    const inClass = await service.getOverallClassification(['2WD']);
+
+    expect(inClass.map((e) => e.vehicleId)).toEqual(['v1', 'v2', 'v3']);
+  });
+
+  it('combines classes as an intersection', async () => {
+    const service = makeOverallService(twoClosed, runs, [
+      { ...vehicles[0], classes: [{ id: '2WD' }, { id: 'Rookie' }] },
+      vehicles[1],
+      { ...vehicles[2], classes: [{ id: '4WD' }, { id: 'Rookie' }] },
+    ]);
+
+    const rookies2wd = await service.getOverallClassification([
+      '2WD',
+      'Rookie',
+    ]);
+
+    expect(rookies2wd.map((e) => e.vehicleId)).toEqual(['v1']);
+  });
+
+  it('404s an unknown class instead of returning an empty table', async () => {
+    const service = makeOverallService(twoClosed, runs, vehicles);
+
+    await expect(
+      service.getOverallClassification(['2WD', 'unknown']),
+    ).rejects.toThrow('Class unknown not found');
   });
 });
 

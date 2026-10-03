@@ -11,7 +11,9 @@ import {
   type SplitGateInfo,
   type StageOutcomeEntry,
 } from '../api/classification';
+import ClassPicker from '../components/ClassPicker.vue';
 import { fetchStages, type Stage } from '../api/stages';
+import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
 import {
   formatDuration,
   formatGap,
@@ -23,6 +25,8 @@ const props = defineProps<{ stageId: string }>();
 const router = useRouter();
 
 const stages = ref<Stage[]>([]);
+const classes = ref<VehicleClass[]>([]);
+const selectedClassIds = ref<string[]>([]);
 const stageClassification = ref<ClassificationEntry[]>([]);
 const splitGates = ref<SplitGateInfo[]>([]);
 const selectedSplitIndex = ref<number | null>(null);
@@ -45,16 +49,27 @@ async function refreshSplitClassification() {
     splitClassification.value = await fetchSplitClassification(
       props.stageId,
       selectedSplitIndex.value,
+      selectedClassIds.value,
     );
   } else {
     splitClassification.value = [];
   }
 }
 
+async function refreshStageClassification() {
+  stageClassification.value = await fetchStageClassification(
+    props.stageId,
+    selectedClassIds.value,
+  );
+  nonFinishers.value = await fetchNonFinishers(
+    props.stageId,
+    selectedClassIds.value,
+  );
+}
+
 async function loadStage() {
   if (!props.stageId) return;
-  stageClassification.value = await fetchStageClassification(props.stageId);
-  nonFinishers.value = await fetchNonFinishers(props.stageId);
+  await refreshStageClassification();
   splitGates.value = await fetchSplitGatesForStage(props.stageId);
   selectedSplitIndex.value =
     splitGates.value.length > 0 ? splitGates.value[0].splitIndex! : null;
@@ -63,9 +78,15 @@ async function loadStage() {
 
 watch(() => props.stageId, loadStage);
 watch(selectedSplitIndex, refreshSplitClassification);
+watch(selectedClassIds, async () => {
+  if (!props.stageId) return;
+  await refreshStageClassification();
+  await refreshSplitClassification();
+});
 
 onMounted(async () => {
   stages.value = await fetchStages();
+  classes.value = await fetchVehicleClasses();
   await loadStage();
 });
 
@@ -87,6 +108,7 @@ function onStageChange(stageId: string) {
       style="max-width: 320px"
       @update:model-value="onStageChange"
     />
+    <ClassPicker v-model="selectedClassIds" :classes="classes" />
     <v-btn variant="text" prepend-icon="mdi-podium" to="/results/overall">
       Overall Classification
     </v-btn>
