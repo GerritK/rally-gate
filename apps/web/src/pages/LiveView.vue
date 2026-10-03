@@ -415,6 +415,11 @@ const passingsByStage = computed(() => {
   };
 });
 
+/** Its role on this stage, so a marshal sees whether it was a start. */
+function gateRole(gateId: string): string | undefined {
+  return gateFlow.value.find((node) => node.gate.id === gateId)?.label;
+}
+
 function gateName(gateId: string): string {
   return gates.value.find((g) => g.id === gateId)?.name ?? gateId;
 }
@@ -1041,61 +1046,92 @@ onUnmounted(() => {
     </div>
   </v-alert>
 
-  <v-card
-    v-if="passingsByStage.here.length > 0"
-    class="mb-4 d-print-none"
-    color="warning"
-    variant="tonal"
-  >
-    <v-card-title>Unassigned passings</v-card-title>
-    <v-card-text>
-      A gate saw these cars but couldn't identify them. Nothing is timed until
-      you confirm the vehicle — the suggestion follows the start order, so check
-      it. Assign a car's start before its finish.
-      <v-table density="compact" class="mt-3 bg-transparent">
-        <tbody>
-          <tr v-for="event in passingsByStage.here" :key="event.eventId">
-            <td>{{ gateName(event.gateId) }}</td>
-            <td class="rg-timing">
-              {{ formatClockTime(event.timestampGate) }}
-            </td>
-            <td style="min-width: 240px">
-              <v-select
-                :model-value="vehicleFor(event)"
-                :items="vehicleOptions"
-                item-title="title"
-                item-value="id"
-                label="Vehicle"
-                density="compact"
-                hide-details
-                @update:model-value="
-                  (id: string) => (pickedVehicleIds[event.eventId] = id)
-                "
-              />
-            </td>
-            <td class="text-no-wrap">
-              <v-btn
-                size="small"
-                variant="text"
-                prepend-icon="mdi-check"
-                :disabled="!vehicleFor(event)"
-                @click="onAssign(event)"
-              >
-                Assign
-              </v-btn>
-              <v-btn
-                size="small"
-                variant="text"
-                prepend-icon="mdi-close"
-                @click="onDismiss(event)"
-              >
-                Not a car
-              </v-btn>
-            </td>
-          </tr>
-        </tbody>
-      </v-table>
-    </v-card-text>
+  <v-card v-if="passingsByStage.here.length > 0" class="mb-4 d-print-none">
+    <v-card-item>
+      <template #prepend>
+        <v-icon icon="mdi-account-question" color="warning" />
+      </template>
+      <v-card-title class="d-flex align-center ga-2">
+        Unassigned passings
+        <v-chip size="small" color="warning">
+          {{ passingsByStage.here.length }}
+        </v-chip>
+      </v-card-title>
+      <v-card-subtitle class="text-wrap">
+        A gate saw a car it couldn't identify. Nothing is timed until you
+        confirm the vehicle; the suggestion follows the start order. Assign a
+        car's start before its finish.
+      </v-card-subtitle>
+    </v-card-item>
+    <v-table density="comfortable">
+      <thead>
+        <tr>
+          <th>Gate</th>
+          <th>Gate time</th>
+          <th>Vehicle</th>
+          <th width="1%"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="event in passingsByStage.here" :key="event.eventId">
+          <td class="text-no-wrap">
+            <template v-if="gateRole(event.gateId)">
+              {{ gateRole(event.gateId) }} ·
+            </template>
+            {{ gateName(event.gateId) }}
+          </td>
+          <td class="rg-timing">
+            {{ formatClockTime(event.timestampGate) }}
+          </td>
+          <td>
+            <v-select
+              :model-value="vehicleFor(event)"
+              :items="vehicleOptions"
+              item-title="title"
+              item-value="id"
+              placeholder="Pick a vehicle"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="max-width: 320px"
+              @update:model-value="
+                (id: string) => (pickedVehicleIds[event.eventId] = id)
+              "
+            />
+          </td>
+          <td class="text-no-wrap">
+            <v-btn
+              size="small"
+              variant="tonal"
+              prepend-icon="mdi-check"
+              :disabled="!vehicleFor(event)"
+              @click="onAssign(event)"
+            >
+              Assign
+            </v-btn>
+            <v-menu>
+              <template #activator="{ props: menu }">
+                <v-btn
+                  v-bind="menu"
+                  size="small"
+                  variant="text"
+                  icon="mdi-dots-vertical"
+                  aria-label="More actions"
+                />
+              </template>
+              <v-list density="compact">
+                <v-list-item
+                  prepend-icon="mdi-close"
+                  title="Not a car"
+                  subtitle="Dismiss this passing"
+                  @click="onDismiss(event)"
+                />
+              </v-list>
+            </v-menu>
+          </td>
+        </tr>
+      </tbody>
+    </v-table>
   </v-card>
 
   <div
