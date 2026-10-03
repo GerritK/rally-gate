@@ -132,7 +132,8 @@ Extract a component once it is actually used twice, not before.
 
 - `StagePicker`: the rally's progress as a track of stages, the same
   picture as the gate line one level up (closed ✓, running ●, start list
-  published 🔒, upcoming ○, each with its label). Progress first, selection
+  published 🔒, upcoming ○; the shapes differ, so the status is a tooltip,
+  not a label). Progress first, selection
   second: a neutral ring marks the stage shown, a click switches. It sits
   above every card, since the stage scopes the whole page. Live Timing and
   stage Results.

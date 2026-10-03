@@ -7,8 +7,9 @@ const emit = defineEmits<{ 'update:modelValue': [stageId: string] }>();
 
 /**
  * Progress first, selection second: a marshal rarely switches stage, but
- * everyone wants to see where the rally stands. Icon and text carry the
- * status, never colour alone.
+ * everyone wants to see where the rally stands. The icon shapes differ, so
+ * colour is never the only signal; the label is the tooltip, since only the
+ * lock needs explaining.
  */
 function display(stage: Stage): {
   icon: string;
@@ -16,15 +17,15 @@ function display(stage: Stage): {
   label: string;
 } {
   if (stage.status === StageStatus.ACTIVE) {
-    return { icon: 'mdi-circle', color: 'success', label: 'Running' };
+    return { icon: 'mdi-circle', color: 'success', label: 'running' };
   }
   if (stage.status === StageStatus.CLOSED) {
-    return { icon: 'mdi-check-circle-outline', label: 'Closed' };
+    return { icon: 'mdi-check-circle-outline', label: 'closed' };
   }
   if (stage.startOrderFrozenAt) {
-    return { icon: 'mdi-lock-outline', label: 'Published' };
+    return { icon: 'mdi-lock-outline', label: 'start list published' };
   }
-  return { icon: 'mdi-circle-outline', label: 'Upcoming' };
+  return { icon: 'mdi-circle-outline', label: 'upcoming' };
 }
 </script>
 
@@ -38,6 +39,7 @@ function display(stage: Stage): {
         class="rg-stage-node"
         :class="{ 'rg-stage-node--selected': stage.id === modelValue }"
         :aria-current="stage.id === modelValue ? 'page' : undefined"
+        :title="`${stage.stageNumber}. ${stage.name}: ${display(stage).label}`"
         @click="emit('update:modelValue', stage.id)"
       >
         <span class="rg-stage-dot">
@@ -49,9 +51,6 @@ function display(stage: Stage): {
         </span>
         <span class="rg-stage-name">
           {{ stage.stageNumber }}. {{ stage.name }}
-        </span>
-        <span class="text-caption text-medium-emphasis">
-          {{ display(stage).label }}
         </span>
       </button>
     </div>
