@@ -1046,11 +1046,8 @@ onUnmounted(() => {
     </div>
   </v-alert>
 
-  <v-card
-    v-if="passingsByStage.here.length > 0"
-    class="mb-4 d-print-none rg-attention"
-  >
-    <v-card-item>
+  <v-card v-if="passingsByStage.here.length > 0" class="mb-4 d-print-none">
+    <v-card-item class="rg-attention">
       <template #prepend>
         <v-icon icon="mdi-account-question" color="warning" />
       </template>
@@ -1545,7 +1542,8 @@ onUnmounted(() => {
 
 <style scoped>
 .rg-attention {
-  border: 2px solid rgb(var(--v-theme-warning)) !important;
+  background: rgba(var(--v-theme-warning), 0.12);
+  border-bottom: 2px solid rgb(var(--v-theme-warning));
 }
 /* Fixed, not max-width: sized to its content, picking a driver would resize
    the column and shift the whole table under the marshal's pointer. */

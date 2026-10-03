@@ -78,8 +78,9 @@ Values live in `theme.ts`. The rules:
   (`ROW_STATE_DISPLAY`) drive the table, the On stage card and the counters
   in the stage header.
 - **A card that only appears when something needs a marshal** (unassigned
-  passings) gets a 2px warning border, its contents stay neutral: the frame
-  says "not normal", a tinted card would make every field in it hard to read.
+  passings) gets a warning-tinted header band with a warning underline; the
+  table and fields below stay neutral. Tinting the whole card made every
+  field in it hard to read, a warning frame around it looked crude.
 - **Counts, not filters**, for a status overview: "2 On stage · 3 Waiting"
   as chips. The table stays complete and in start order.
 - **The live connection** shows in the app bar: Live / Connecting / Offline,
