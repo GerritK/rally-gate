@@ -24,63 +24,65 @@ defineEmits<{
 
 <template>
   <div class="rg-passing">
-    <div class="rg-passing-main">
-      <v-icon icon="mdi-account-question" color="warning" />
-      <div class="rg-passing-what">
-        <div class="font-weight-bold">
-          Unidentified {{ role?.toLowerCase() ?? 'passing' }}
-          <span class="rg-timing ml-1">
-            {{ formatClockTime(passing.timestampGate) }}
-          </span>
-        </div>
-        <div class="text-caption text-medium-emphasis text-truncate">
-          {{ gateName }}
+    <div class="rg-passing-row">
+      <div class="rg-passing-main">
+        <v-icon icon="mdi-account-question" color="warning" />
+        <div class="rg-passing-what">
+          <div class="font-weight-bold">
+            Unidentified {{ role?.toLowerCase() ?? 'passing' }}
+            <span class="rg-timing ml-1">
+              {{ formatClockTime(passing.timestampGate) }}
+            </span>
+          </div>
+          <div class="text-caption text-medium-emphasis text-truncate">
+            {{ gateName }}
+          </div>
         </div>
       </div>
-    </div>
-    <!-- Its own row, the select filling it: sized to its content, picking a
-         driver would resize it and shift the buttons under the marshal's
-         pointer, and sharing the first row it wrapped apart in a narrow card. -->
-    <div class="rg-passing-actions">
-      <v-select
-        :model-value="vehicleId"
-        :items="vehicleOptions"
-        item-title="title"
-        item-value="id"
-        placeholder="Pick a vehicle"
-        density="compact"
-        variant="outlined"
-        hide-details
-        class="rg-passing-vehicle"
-        @update:model-value="$emit('pick', $event)"
-      />
-      <v-btn
-        variant="tonal"
-        prepend-icon="mdi-check"
-        :disabled="!vehicleId"
-        @click="$emit('assign')"
-      >
-        Assign
-      </v-btn>
-      <v-menu>
-        <template #activator="{ props: menu }">
-          <v-btn
-            v-bind="menu"
-            size="small"
-            variant="text"
-            icon="mdi-dots-vertical"
-            aria-label="More actions"
-          />
-        </template>
-        <v-list density="compact">
-          <v-list-item
-            prepend-icon="mdi-close"
-            title="Not a car"
-            subtitle="Dismiss this passing"
-            @click="$emit('dismiss')"
-          />
-        </v-list>
-      </v-menu>
+      <!-- Wraps as one group, never button by button, and the select is sized
+         by the layout, not its content: picking a driver must not shift the
+         buttons under the marshal's pointer. -->
+      <div class="rg-passing-actions">
+        <v-select
+          :model-value="vehicleId"
+          :items="vehicleOptions"
+          item-title="title"
+          item-value="id"
+          placeholder="Pick a vehicle"
+          density="compact"
+          variant="outlined"
+          hide-details
+          class="rg-passing-vehicle"
+          @update:model-value="$emit('pick', $event)"
+        />
+        <v-btn
+          variant="tonal"
+          prepend-icon="mdi-check"
+          :disabled="!vehicleId"
+          @click="$emit('assign')"
+        >
+          Assign
+        </v-btn>
+        <v-menu>
+          <template #activator="{ props: menu }">
+            <v-btn
+              v-bind="menu"
+              size="small"
+              variant="text"
+              icon="mdi-dots-vertical"
+              aria-label="More actions"
+            />
+          </template>
+          <v-list density="compact">
+            <v-list-item
+              prepend-icon="mdi-close"
+              title="Not a car"
+              subtitle="Dismiss this passing"
+              @click="$emit('dismiss')"
+            />
+          </v-list>
+        </v-menu>
+      </div>
     </div>
     <div
       v-if="queued.length > 0"
@@ -116,14 +118,27 @@ defineEmits<{
   background: rgba(var(--v-theme-warning), 0.1);
   border-radius: 4px;
 }
+/* One row while it fits, else the actions drop below as a whole. The info
+ * side soaks up spare room in a row (grow 999), so the actions keep their
+ * basis there and only fill the width once they're on a line of their own. */
+.rg-passing-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
 .rg-passing-main,
 .rg-passing-actions {
   display: flex;
   align-items: center;
   gap: 8px 12px;
 }
+.rg-passing-main {
+  flex: 999 1 200px;
+  min-width: 0;
+}
 .rg-passing-actions {
-  margin-top: 8px;
+  flex: 1 1 380px;
 }
 .rg-passing-queued {
   margin-top: 8px;
