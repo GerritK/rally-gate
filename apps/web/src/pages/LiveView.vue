@@ -1102,7 +1102,8 @@ onUnmounted(() => {
         </v-card-text>
       </v-card>
     </div>
-    <div v-if="stage.status === StageStatus.ACTIVE">
+    <!-- Shown before activation too, so activating doesn't reflow the page. -->
+    <div>
       <v-card class="h-100">
         <v-card-item>
           <v-card-title class="d-flex align-center ga-2">
@@ -1176,7 +1177,11 @@ onUnmounted(() => {
           </tbody>
         </v-table>
         <v-card-text v-if="onStage.length === 0" class="text-medium-emphasis">
-          No car on stage.
+          {{
+            stage.status === StageStatus.ACTIVE
+              ? 'No car on stage.'
+              : 'Stage not active yet — cars appear here once they start.'
+          }}
         </v-card-text>
       </v-card>
     </div>
