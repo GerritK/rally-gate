@@ -62,12 +62,12 @@ onMounted(async () => {
           :prepend-icon="LIVE_DISPLAY[liveStatus].icon"
           size="small"
           variant="tonal"
-          class="mr-4"
         >
           {{ LIVE_DISPLAY[liveStatus].label }}
         </v-chip>
+        <v-divider v-if="liveStatus" vertical inset class="mx-4" />
         <div
-          class="text-right mr-2"
+          class="text-center"
           title="Server time — the clock the gates are synced to"
         >
           <div class="rg-timing app-bar-clock">
@@ -89,6 +89,7 @@ onMounted(async () => {
             }}
           </div>
         </div>
+        <v-divider vertical inset class="mx-4" />
         <v-btn
           to="/setup"
           icon="mdi-cog-outline"
