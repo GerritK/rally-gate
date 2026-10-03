@@ -961,12 +961,6 @@ onUnmounted(() => {
         </v-chip>
       </div>
       <template v-if="gateFlow.length > 0">
-        <div class="text-caption text-medium-emphasis mb-1">
-          Gates ready
-          {{ gateFlow.filter((n) => isReady(n.gate, now)).length }}/{{
-            gateFlow.length
-          }}
-        </div>
         <div class="rg-gate-scroll">
           <div class="rg-gate-flow" :style="{ '--gates': gateFlow.length }">
             <div

@@ -43,8 +43,8 @@ What exists, with where its reasoning lives. History is in git.
   Vehicles (`frontend-structure.md`).
 - **Gate config UI:** settings, status, Wi-Fi, hotspot fallback, Wi-Fi reset;
   verified on a Pi. Shutdown built, not yet tried on a Pi (`gate-config-ui.md`).
-- **Gate health:** chrony state in the heartbeat, "Gates ready X/Y" in Live
-  Timing, "Shut down all gates" on the Hardware page via gate-config
+- **Gate health:** chrony state in the heartbeat, each gate's state on Live
+  Timing's gate line, "Shut down all gates" on the Hardware page via gate-config
   (`architecture.md`). Not yet tried on a Pi.
 - **Versions:** git build stamped into `packages/shared`, reported by gates in
   the heartbeat, shown in gate-config and the dashboard, mismatch flagged

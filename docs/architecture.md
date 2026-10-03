@@ -27,7 +27,8 @@ mode has nothing external to install.
   off. Gates can also be added by hand on the Hardware page.
 - Online/offline is `now - lastHeartbeatAt > 30s`
   (`HEARTBEAT_ONLINE_THRESHOLD_MS`). *Ready* is online and chrony not reported
-  unsynced; Live Timing shows "Gates ready X/Y" for the selected stage.
+  unsynced; Live Timing shows each gate of the selected stage on a line in
+  course order with its state.
 - **No decoder status in the heartbeat.** `BeamAdapter` exits the process when
   gpiomon fails, so a dead decoder already reads as an offline gate. Revisit
   with `OpenStintAdapter`, where a lost serial link wouldn't kill the process.
