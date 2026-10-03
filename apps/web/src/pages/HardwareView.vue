@@ -200,30 +200,10 @@ onUnmounted(() => {
       <v-btn
         variant="tonal"
         prepend-icon="mdi-plus"
-        class="mr-2"
         @click="openGateDialog(null)"
       >
         Add Gate
       </v-btn>
-      <v-tooltip
-        :disabled="!stageActive"
-        text="A stage is active — close it first"
-      >
-        <template #activator="{ props: tooltipProps }">
-          <span v-bind="tooltipProps">
-            <v-btn
-              size="small"
-              variant="outlined"
-              color="error"
-              prepend-icon="mdi-power"
-              :disabled="stageActive"
-              @click="confirmingPowerOff = true"
-            >
-              Shut down all gates
-            </v-btn>
-          </span>
-        </template>
-      </v-tooltip>
     </v-card-title>
     <v-card-text>
       <v-switch
@@ -405,6 +385,26 @@ onUnmounted(() => {
         ignored until you add them with + Add Gate.
       </v-alert>
     </v-card-text>
+    <v-card-actions>
+      <v-tooltip
+        :disabled="!stageActive"
+        text="A stage is active — close it first"
+      >
+        <template #activator="{ props: tooltipProps }">
+          <span v-bind="tooltipProps">
+            <v-btn
+              variant="text"
+              color="error"
+              prepend-icon="mdi-power"
+              :disabled="stageActive"
+              @click="confirmingPowerOff = true"
+            >
+              Shut down all gates
+            </v-btn>
+          </span>
+        </template>
+      </v-tooltip>
+    </v-card-actions>
   </v-card>
 
   <v-card v-if="knownGates">
