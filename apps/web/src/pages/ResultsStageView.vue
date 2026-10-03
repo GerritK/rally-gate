@@ -148,16 +148,21 @@ function onStageChange(stageId: string) {
             >
               <template v-if="splits.get(entry.vehicleId)">
                 <span
-                  v-if="splits.get(entry.vehicleId)!.position === 1"
+                  v-if="splits.get(entry.vehicleId)!.gapMs === 0"
                   class="text-timing-best font-weight-bold"
                   title="Fastest at this split"
                 >
                   {{ formatDuration(splits.get(entry.vehicleId)!.elapsedMs) }}
                   <v-icon size="x-small" icon="mdi-star" />
                 </span>
-                <template v-else>
-                  {{ formatDuration(splits.get(entry.vehicleId)!.elapsedMs) }}
-                </template>
+                <span
+                  v-else
+                  :title="
+                    formatDuration(splits.get(entry.vehicleId)!.elapsedMs)
+                  "
+                >
+                  {{ formatGap(splits.get(entry.vehicleId)!.gapMs) }}
+                </span>
                 <span class="text-medium-emphasis">
                   ({{ splits.get(entry.vehicleId)!.position }})
                 </span>

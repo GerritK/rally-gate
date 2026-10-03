@@ -5,6 +5,7 @@ import {
   fetchOverallClassification,
   type OverallClassificationEntry,
 } from '../api/classification';
+import type { OverallStageTime } from '@rally-gate/shared';
 import { classFilterLabel, useClassQuery } from '../class-query';
 import ClassFilter from '../components/ClassFilter.vue';
 import StagePicker from '../components/StagePicker.vue';
@@ -35,6 +36,24 @@ const countedStages = computed(() =>
     name: stages.value.find((s) => s.id === stageId)?.name,
   })),
 );
+
+/** Fastest real time per counted stage, within this ranking. A notional is
+ * slower than every real time by construction, so it never is one. */
+const bestByStage = computed(() => {
+  const best = new Map<string, number>();
+  for (const entry of overallClassification.value) {
+    for (const t of entry.stageTimes) {
+      if (!t.notional && t.durationMs < (best.get(t.stageId) ?? Infinity)) {
+        best.set(t.stageId, t.durationMs);
+      }
+    }
+  }
+  return best;
+});
+
+function stageGapMs(time: OverallStageTime): number {
+  return time.durationMs - (bestByStage.value.get(time.stageId) ?? 0);
+}
 
 // No completed closed stage yet. Listed without a total: one made of
 // notionals alone is what event-model.md "Notional times" rules out.
@@ -139,17 +158,27 @@ onMounted(async () => {
             >
               <v-tooltip
                 v-if="time.notional"
-                text="Notional time: stage not completed, charged the slowest time plus a penalty."
+                :text="`Notional time ${formatDuration(time.durationMs)}: stage not completed, charged the slowest time plus a penalty.`"
                 location="top"
               >
                 <template #activator="{ props }">
-                  <span v-bind="props" class="text-warning">
-                    {{ formatDuration(time.durationMs) }}
-                    <v-icon size="x-small" icon="mdi-asterisk" />
+                  <span v-bind="props" class="text-medium-emphasis">
+                    {{ formatGap(stageGapMs(time)) }}
+                    <v-icon size="x-small" icon="mdi-timer-off-outline" />
                   </span>
                 </template>
               </v-tooltip>
-              <template v-else>{{ formatDuration(time.durationMs) }}</template>
+              <span
+                v-else-if="stageGapMs(time) === 0"
+                class="text-timing-best font-weight-bold"
+                title="Fastest on this stage"
+              >
+                {{ formatDuration(time.durationMs) }}
+                <v-icon size="x-small" icon="mdi-star" />
+              </span>
+              <span v-else :title="formatDuration(time.durationMs)">
+                {{ formatGap(stageGapMs(time)) }}
+              </span>
             </td>
             <td class="rg-timing font-weight-bold">
               {{ formatDuration(entry.durationMs) }}
@@ -162,9 +191,9 @@ onMounted(async () => {
                 location="top"
               >
                 <template #activator="{ props }">
-                  <span v-bind="props" class="text-warning">
+                  <span v-bind="props" class="text-medium-emphasis">
                     {{ entry.stagesCompleted }}
-                    <v-icon size="x-small" icon="mdi-asterisk" />
+                    <v-icon size="x-small" icon="mdi-timer-off-outline" />
                   </span>
                 </template>
               </v-tooltip>
