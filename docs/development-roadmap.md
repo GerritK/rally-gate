@@ -32,9 +32,12 @@ What exists, with where its reasoning lives. History is in git.
   (`architecture.md` "Server discovery").
 - **Start order:** integer start numbers, per-stage start list grouped by main
   class and sorted by start number, overall or last stage time in either
-  direction, one card per main class, frozen by hand when posted or on first
-  activation, printable with an "as of" time (`event-model.md`
+  direction, frozen by hand when posted or on first activation (`event-model.md`
   "Start order").
+- **Marshal view:** Live Timing is one table of every vehicle in start order
+  with run state, the next car highlighted, corrections and "enter start" per
+  row, and unassigned passings pre-selected from the start order (never
+  auto-assigned). Prints as the posted start list (`frontend-structure.md`).
 - **Dashboard:** multi-page `apps/web` — Live Timing, Results, Setup, Hardware,
   Vehicles (`frontend-structure.md`).
 - **Gate config UI:** settings, status, Wi-Fi, hotspot fallback, Wi-Fi reset;
@@ -58,16 +61,7 @@ What exists, with where its reasoning lives. History is in git.
 
 ## Next
 
-- **Marshal view on the start list**: Live Timing rebuilt around one table,
-  every vehicle in start order with its run status (waiting, on stage,
-  finished, DNF, voided), times and corrections, and the next car highlighted.
-  Unassigned passings pre-select that car. The manual-run form becomes a row
-  action on a waiting car, the raw detections feed moves out of the way
-  (Hardware, or collapsed), and the Start List page merges into it, with
-  printing kept as a print stylesheet. Stage choice becomes one
-  `StagePicker.vue` (a chip row, one tap, status icon per stage incl. a frozen
-  start list) used there, on the Start List and on stage Results, replacing
-  the three dropdowns.
+Nothing queued; OpenStint (below) resumes when the hardware arrives.
 
 ## Deliberately deferred
 
@@ -106,15 +100,11 @@ What exists, with where its reasoning lives. History is in git.
   activation.
 - **Out-of-order start penalties**, measured against the frozen start order.
   They depend on penalties as a whole (Rally controls, above).
-- **Start order suggestions** for unassigned passings — once a start order
-  exists, pre-select a vehicle, never assign it: a wrong assignment is a wrong
-  time nobody notices in the classification, so the marshal always confirms.
-  At a start gate, suggest the next car in the order after the last one
-  started that has no run on the stage yet, so a no-show is skipped
-  implicitly and nothing gets stuck behind them. Skipped cars stay selectable
-  (late starter) until marked DNS. At a finish gate, suggest open runs in
-  start order; an overtake is just a suggestion the marshal corrects. Planned
-  start times (above) could later narrow it by time window.
+- **Smarter passing suggestions** — today a start passing suggests the next
+  car in start order and a split/finish one the first car on stage
+  (`LiveView.vue` `suggestedVehicleIds`). Planned start times could narrow it
+  by time window. Passings at another active stage's gates get no suggestion,
+  since the page only knows the selected stage.
 - **Combined start/finish gate** — one gate as both start and finish of a
   stage: on a detection, finish the vehicle's open run if it has one, otherwise
   start one. Not needed for the first functional test; to be thought through

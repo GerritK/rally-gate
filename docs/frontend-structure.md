@@ -7,8 +7,7 @@ sharing `client.ts`). Audience is marshals and organisers only.
 | Route | Nav | Contents |
 |---|---|---|
 | `/` | — | redirect to `/live` |
-| `/live` | Live Timing | unassigned passings (assign a vehicle), detections feed, stage runs with corrections, Activate / Close Stage |
-| `/start-list/:stageId?` | Start List | a stage's start list, frozen or provisional, printable; no stage picks the active one, else the next |
+| `/live/:stageId?` | Live Timing | the marshal view: every vehicle in start order with its run state, times and corrections; unassigned passings with a suggested vehicle; Activate / Close; freeze and print the start list; raw detections collapsed. No stage picks the active one, else the next |
 | `/results/overall` | Results | overall classification, filterable by class |
 | `/results/stages/:stageId` | Results | stage, split and DNF/DNS classification, filterable by class |
 | `/vehicles` | Vehicles | registration, inline editing, status, classes |
@@ -22,11 +21,16 @@ sharing `client.ts`). Audience is marshals and organisers only.
 
 ## Decisions
 
-- **Start List is top-level**, not under Setup or Results: the announcer reads
-  it mid-event, and it says who drives next, not who won. Its rules are
-  configured under Setup. Printing is `window.print()` with the print styles in
-  `packages/ui/src/utilities.css`, no PDF library. It is meant to become the
-  backbone of a new marshal view (see the roadmap) and be absorbed into it.
+- **The start list is Live Timing's backbone**, not a page of its own: one row
+  per vehicle in start order, runs merged in, main classes as header rows.
+  Printing it is `window.print()`; print styles (`d-print-none`,
+  `packages/ui/src/utilities.css`) cut it down to the start list (position,
+  number, driver, co-driver), so the posted copy and the marshal's screen are
+  one page. No PDF library. Its rules are configured under Setup.
+- **Live Timing loads its data directly, not only when the live stream opens.**
+  A browser allows six connections per host, and each dashboard tab holds one
+  stream, so with enough tabs open the stream sits pending; waiting for it
+  would leave the page empty.
 - **Split classification is under Results**, although it ranks running cars: it
   answers "who's winning", Live Timing answers "what's happening at the gates".
 - **Gate assignments live under their stage**; the gate-centric view of "what
@@ -42,7 +46,9 @@ sharing `client.ts`). Audience is marshals and organisers only.
 - **Drawer, not tabs**, so more sections don't need a nav rework.
 - **No store, no speculative components.** Each page fetches what it needs in
   `onMounted`; data volumes are tiny. Extract a component once it is actually
-  duplicated (`src/components/ClassPicker.vue`, one classes field
+  duplicated (`src/components/StagePicker.vue`, a chip row with a status icon
+  per stage, on Live Timing and stage Results;
+  `src/components/ClassPicker.vue`, one classes field
   with the main class first and exclusive, used on Vehicles and both Results
   pages). Shared pure helpers are in `src/format.ts`.
 - **New / Open Event live in Setup**, on the rally details card: the details

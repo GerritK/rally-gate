@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { CorrectStageRunDto, CreateStageRunDto } from './dto';
 import { StageRunsService } from './stage-runs.service';
@@ -14,9 +15,16 @@ import { StageRunsService } from './stage-runs.service';
 export class StageRunsController {
   constructor(private readonly stageRunsService: StageRunsService) {}
 
+  /** Every attempt, voided ones included; `?stageId=` narrows to one stage. */
   @Get()
-  findAll() {
-    return this.stageRunsService.findAll();
+  findAll(@Query('stageId') stageId?: string) {
+    return this.stageRunsService.findAll(stageId);
+  }
+
+  /** All splits of every attempt on a stage, so a page needs one request. */
+  @Get('splits')
+  findSplitsForStage(@Query('stageId') stageId: string) {
+    return this.stageRunsService.findSplitsForStage(stageId);
   }
 
   @Get(':id/splits')

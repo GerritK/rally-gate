@@ -65,7 +65,7 @@ onMounted(async () => {
     <v-card-text>
       <v-alert type="info" variant="tonal" density="comfortable" class="mb-4">
         Applies to every stage. A stage's list is <strong>frozen</strong> when
-        it is frozen on the Start List or the stage is first activated — changes
+        it is frozen on Live Timing or the stage is first activated — changes
         here only affect lists not yet frozen. Crews without a time start at the
         end of their group, and ties go by start number, so "Last stage time" on
         the first stage is simply start-number order.

@@ -138,8 +138,11 @@ export class StageRunsService {
     return deriveStageRunStatus(run, await this.isStageClosed(run.stageId));
   }
 
-  async findAll(): Promise<StageRunWithStatus[]> {
-    const runs = await this.stageRuns.find({ order: { startTime: 'DESC' } });
+  async findAll(stageId?: string): Promise<StageRunWithStatus[]> {
+    const runs = await this.stageRuns.find({
+      where: stageId ? { stageId } : {},
+      order: { startTime: 'DESC' },
+    });
     const stages = await this.stagesService.findAll();
     const closedStageIds = new Set(
       stages.filter((s) => s.status === StageStatus.CLOSED).map((s) => s.id),
@@ -465,6 +468,20 @@ export class StageRunsService {
   findSplitsForRun(stageRunId: string): Promise<StageSplit[]> {
     return this.stageSplits.find({
       where: { stageRunId },
+      order: { splitIndex: 'ASC' },
+    });
+  }
+
+  async findSplitsForStage(stageId: string): Promise<StageSplit[]> {
+    const runs = await this.stageRuns.find({
+      where: { stageId },
+      select: { id: true },
+    });
+    if (runs.length === 0) {
+      return [];
+    }
+    return this.stageSplits.find({
+      where: { stageRunId: In(runs.map((run) => run.id)) },
       order: { splitIndex: 'ASC' },
     });
   }

@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import {
+  GateRole,
+  StageRunStatus,
+  StageStatus,
+  VehicleStatus,
+  type StartOrderEntry,
+} from '@rally-gate/shared';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { ApiError } from '../api/client';
 import {
   assignVehicleToEvent,
@@ -15,6 +23,8 @@ import {
   type GateAssignment,
 } from '../api/gate-assignments';
 import { fetchGates, type Gate } from '../api/gates';
+import { openLiveStream } from '../api/live';
+import { rallyName } from '../api/rally-info';
 import {
   activateStage,
   closeStage,
@@ -25,15 +35,21 @@ import {
   correctStageRun,
   createStageRun,
   deleteStageRun,
-  fetchSplitsForRun,
+  fetchSplitsForStage,
   fetchStageRuns,
   unvoidStageRun,
   voidStageRun,
   type StageRun,
   type StageSplit,
 } from '../api/stage-runs';
-import { openLiveStream } from '../api/live';
+import {
+  fetchStartOrder,
+  freezeStartOrder,
+  unfreezeStartOrder,
+  type StartOrder,
+} from '../api/start-order';
 import { fetchVehicles, type Vehicle } from '../api/vehicles';
+import StagePicker from '../components/StagePicker.vue';
 import {
   formatClockTime,
   formatStageDuration,
@@ -47,147 +63,161 @@ import {
   isOnline,
   isReady,
   runStatusColor,
-  stageName,
   toLocalTimeValue,
   vehicleName,
 } from '../format';
 
+const props = defineProps<{ stageId?: string }>();
+const router = useRouter();
+
 const now = ref(Date.now());
 let nowTimer: ReturnType<typeof setInterval>;
+let liveSource: EventSource;
 
-const pendingDetections = ref<DetectionEventRecord[]>([]);
-const retryingPending = ref(false);
-
-async function refreshPending() {
-  pendingDetections.value = await fetchPendingEvents();
-}
-
-const awaitingDetections = ref<DetectionEventRecord[]>([]);
-const assignVehicleIds = ref<Record<string, string>>({});
-
-async function refreshAwaiting() {
-  awaitingDetections.value = await fetchAwaitingEvents();
-}
-
-/** The live stream refreshes the list for every marshal; this is just faster
- *  feedback for the one who clicked. */
-async function onAssign(event: DetectionEventRecord) {
-  const vehicleId = assignVehicleIds.value[event.eventId];
-  if (!vehicleId) return;
-  try {
-    await assignVehicleToEvent(event.eventId, vehicleId);
-    await refreshAwaiting();
-  } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to assign vehicle');
-  }
-}
-
-async function onDismiss(event: DetectionEventRecord) {
-  await dismissEvent(event.eventId);
-  await refreshAwaiting();
-}
-
-async function refreshDetections() {
-  detections.value = await fetchRecentEvents();
-}
-
-async function refreshGates() {
-  gates.value = await fetchGates();
-}
-
-async function refreshSplits() {
-  const splits = await Promise.all(
-    stageRuns.value.map(async (run) => [
-      run.id,
-      await fetchSplitsForRun(run.id),
-    ]),
-  );
-  splitsByRun.value = Object.fromEntries(splits) as Record<
-    string,
-    StageSplit[]
-  >;
-}
-
-async function refreshStageRunsAndSplits() {
-  stageRuns.value = await fetchStageRuns();
-  await refreshSplits();
-}
-
-async function onRetryPending() {
-  if (retryingPending.value) return;
-  retryingPending.value = true;
-  try {
-    await retryPendingEvents();
-    await refreshPending();
-  } finally {
-    retryingPending.value = false;
-  }
-}
-
-const detections = ref<DetectionEventRecord[]>([]);
-const stageRuns = ref<StageRun[]>([]);
 const stages = ref<Stage[]>([]);
 const vehicles = ref<Vehicle[]>([]);
 const gates = ref<Gate[]>([]);
 const gateAssignments = ref<GateAssignment[]>([]);
+const startOrder = ref<StartOrder | null>(null);
+const stageRuns = ref<StageRun[]>([]);
 const splitsByRun = ref<Record<string, StageSplit[]>>({});
+const detections = ref<DetectionEventRecord[]>([]);
+const pendingDetections = ref<DetectionEventRecord[]>([]);
+const awaitingDetections = ref<DetectionEventRecord[]>([]);
+/** Only what a marshal picked by hand; otherwise the suggestion applies. */
+const pickedVehicleIds = ref<Record<string, string>>({});
 const flashingGateIds = ref<Record<string, boolean>>({});
-const selectedStageId = ref<string>('');
-const closingStage = ref(false);
+const editingVehicleId = ref<string | null>(null);
+const retryingPending = ref(false);
 const activatingStage = ref(false);
+const closingStage = ref(false);
 const conflictDialog = ref(false);
 const conflictingStageNames = ref<string[]>([]);
-const editingRunId = ref<string | null>(null);
-const newRun = ref<{ vehicleId: string; startTime: string }>({
-  vehicleId: '',
-  startTime: '',
-});
-
-let liveSource: EventSource;
+const stagesLoaded = ref(false);
 
 const FLASH_DURATION_MS = 600;
+const OUT_OF_EVENT = [VehicleStatus.WITHDRAWN, VehicleStatus.DISQUALIFIED];
 
-function flashGate(gateId: string) {
-  flashingGateIds.value[gateId] = true;
-  setTimeout(() => {
-    flashingGateIds.value[gateId] = false;
-  }, FLASH_DURATION_MS);
+const stage = computed(() => stages.value.find((s) => s.id === props.stageId));
+const vehicleById = computed(
+  () => new Map(vehicles.value.map((v) => [v.id, v])),
+);
+
+// ---- Rows: every vehicle in start order, with its run --------------------
+
+type RowState =
+  | 'WAITING'
+  | 'NEXT'
+  | 'ON_STAGE'
+  | 'FINISHED'
+  | 'DNF'
+  | 'DNS'
+  | 'RERUN'
+  | 'OUT';
+
+interface Row {
+  entry: StartOrderEntry;
+  /** The attempt that counts — a vehicle has at most one non-voided one. */
+  run?: StageRun;
+  voidedRuns: StageRun[];
+  state: RowState;
+  /** Set on the first row of a main-class block. */
+  classHeader: string | null;
 }
 
-function upsertGateStatus(gate: Gate) {
-  const idx = gates.value.findIndex((g) => g.id === gate.id);
-  if (idx === -1) {
-    gates.value.push(gate);
-  } else {
-    gates.value[idx] = gate;
+const ROW_STATE_DISPLAY: Record<
+  RowState,
+  { label: string; color: string; icon: string }
+> = {
+  WAITING: {
+    label: 'Waiting',
+    color: 'timing-idle',
+    icon: 'mdi-clock-outline',
+  },
+  NEXT: { label: 'Next', color: 'info', icon: 'mdi-arrow-right-bold' },
+  ON_STAGE: {
+    label: 'On stage',
+    color: runStatusColor('STARTED'),
+    icon: 'mdi-car-sports',
+  },
+  FINISHED: {
+    label: 'Finished',
+    color: runStatusColor('FINISHED'),
+    icon: 'mdi-flag-checkered',
+  },
+  DNF: { label: 'DNF', color: runStatusColor('CANCELLED'), icon: 'mdi-close' },
+  DNS: { label: 'DNS', color: 'warning', icon: 'mdi-minus-circle-outline' },
+  RERUN: {
+    label: 'Voided — re-run',
+    color: runStatusColor('VOIDED'),
+    icon: 'mdi-cancel',
+  },
+  OUT: { label: 'Withdrawn', color: 'timing-idle', icon: 'mdi-account-off' },
+};
+
+const rows = computed<Row[]>(() => {
+  const order = startOrder.value;
+  if (!order) return [];
+  const closed = stage.value?.status === StageStatus.CLOSED;
+  const runsByVehicle = new Map<string, StageRun[]>();
+  for (const run of stageRuns.value) {
+    runsByVehicle.set(run.vehicleId, [
+      ...(runsByVehicle.get(run.vehicleId) ?? []),
+      run,
+    ]);
   }
-  flashGate(gate.id);
-}
 
-function toggleEditRun(runId: string) {
-  editingRunId.value = editingRunId.value === runId ? null : runId;
-}
+  const base = order.entries.map((entry): Omit<Row, 'classHeader'> => {
+    const runs = runsByVehicle.get(entry.vehicleId) ?? [];
+    const run = runs.find((r) => !r.voided);
+    const voidedRuns = runs
+      .filter((r) => r.voided)
+      .sort((a, b) => a.attempt - b.attempt);
+    const vehicle = vehicleById.value.get(entry.vehicleId);
+    let state: RowState;
+    if (run?.status === StageRunStatus.STARTED) state = 'ON_STAGE';
+    else if (run?.status === StageRunStatus.FINISHED) state = 'FINISHED';
+    else if (run?.status === StageRunStatus.CANCELLED) state = 'DNF';
+    else if (vehicle && OUT_OF_EVENT.includes(vehicle.status)) state = 'OUT';
+    else if (voidedRuns.length > 0 && !closed) state = 'RERUN';
+    else state = closed ? 'DNS' : 'WAITING';
+    return { entry, run, voidedRuns, state };
+  });
 
-function upsertStageRun(run: StageRun) {
-  const idx = stageRuns.value.findIndex((r) => r.id === run.id);
-  if (idx === -1) {
-    stageRuns.value.unshift(run);
-  } else {
-    stageRuns.value[idx] = run;
-  }
-}
-
-function upsertSplit(split: StageSplit) {
-  const splits = splitsByRun.value[split.stageRunId] ?? [];
-  const idx = splits.findIndex((s) => s.id === split.id);
-  if (idx === -1) {
-    splitsByRun.value[split.stageRunId] = [...splits, split].sort(
-      (a, b) => a.splitIndex - b.splitIndex,
+  // Next = the first waiting car after the last one that started, so a
+  // no-show is skipped rather than holding up everyone behind it.
+  if (stage.value?.status === StageStatus.ACTIVE) {
+    const lastStarted = base.reduce((last, row, i) => (row.run ? i : last), -1);
+    const next = base.findIndex(
+      (row, i) => i > lastStarted && row.state === 'WAITING',
     );
-  } else {
-    splits[idx] = split;
-    splitsByRun.value[split.stageRunId] = [...splits];
+    if (next !== -1) base[next].state = 'NEXT';
   }
+
+  return base.map((row, i) => ({
+    ...row,
+    classHeader:
+      order.grouped &&
+      (i === 0 || base[i - 1].entry.mainClassName !== row.entry.mainClassName)
+        ? (row.entry.mainClassName ?? 'No main class')
+        : null,
+  }));
+});
+
+function runDurationDisplay(run: StageRun): string {
+  if (run.status === StageRunStatus.STARTED) {
+    return formatStageDuration(now.value - new Date(run.startTime).getTime());
+  }
+  return formatDuration(run.durationMs);
+}
+
+function isOverdue(run?: StageRun): boolean {
+  const expected = stage.value?.expectedDurationMs;
+  return (
+    run?.status === StageRunStatus.STARTED &&
+    !!expected &&
+    now.value - new Date(run.startTime).getTime() > expected
+  );
 }
 
 function formatSplits(runId: string): string {
@@ -198,67 +228,7 @@ function formatSplits(runId: string): string {
     .join(', ');
 }
 
-/** A STARTED run has no durationMs yet — tick it live off the `now` ref. */
-function runDurationDisplay(run: StageRun): string {
-  if (run.status === 'STARTED') {
-    return formatStageDuration(now.value - new Date(run.startTime).getTime());
-  }
-  return formatDuration(run.durationMs);
-}
-
-function isOverdue(run: StageRun): boolean {
-  const expected = stages.value.find(
-    (s) => s.id === run.stageId,
-  )?.expectedDurationMs;
-  return (
-    run.status === 'STARTED' &&
-    !!expected &&
-    now.value - new Date(run.startTime).getTime() > expected
-  );
-}
-
-const selectedStage = computed(() =>
-  stages.value.find((stage) => stage.id === selectedStageId.value),
-);
-
-const stageOptions = computed(() =>
-  stages.value.map((s) => ({ id: s.id, title: `${s.stageNumber}. ${s.name}` })),
-);
-
-const selectedStageGateIds = computed(
-  () =>
-    new Set(
-      gateAssignments.value
-        .filter((a) => a.active && a.stageId === selectedStageId.value)
-        .map((a) => a.gateId),
-    ),
-);
-
-/** All gates assigned to the selected stage, active or not — lets a marshal
- * check gate status before activating, not just once it's live. */
-const selectedStageGates = computed(() => {
-  const gateIds = new Set(
-    gateAssignments.value
-      .filter((a) => a.stageId === selectedStageId.value)
-      .map((a) => a.gateId),
-  );
-  return gates.value.filter((g) => gateIds.has(g.id));
-});
-
-const filteredStageRuns = computed(() =>
-  stageRuns.value.filter((run) => run.stageId === selectedStageId.value),
-);
-
-const filteredDetections = computed(() =>
-  detections.value.filter((event) =>
-    selectedStageGateIds.value.has(event.gateId),
-  ),
-);
-
-function stageTitle(stageId: string): string {
-  const stage = stages.value.find((s) => s.id === stageId);
-  return stage ? `${stage.stageNumber}. ${stage.name}` : stageId;
-}
+// ---- Unassigned passings, with a suggested vehicle -----------------------
 
 const vehicleOptions = computed(() =>
   vehicles.value.map((v) => ({
@@ -266,6 +236,167 @@ const vehicleOptions = computed(() =>
     title: `#${v.startNumber} ${v.driverName}`,
   })),
 );
+
+/**
+ * A suggestion only pre-selects, it never assigns: a wrong assignment is a
+ * wrong time nobody notices in the results. Passings are matched in time
+ * order to cars in start order — at a start gate the cars due to start, at a
+ * split or finish the cars on stage — each car suggested once. Passings at
+ * another stage's gates get no suggestion; this page only knows its stage.
+ */
+const suggestedVehicleIds = computed(() => {
+  const suggestions: Record<string, string> = {};
+  const taken = new Set<string>();
+  const nextIndex = rows.value.findIndex((row) => row.state === 'NEXT');
+  const dueToStart = rows.value
+    .slice(Math.max(nextIndex, 0))
+    .filter((row) => row.state === 'NEXT' || row.state === 'WAITING');
+  const onStage = rows.value.filter((row) => row.state === 'ON_STAGE');
+  const byTime = [...awaitingDetections.value].sort(
+    (a, b) =>
+      new Date(a.timestampGate).getTime() - new Date(b.timestampGate).getTime(),
+  );
+  for (const event of byTime) {
+    const assignment = gateAssignments.value.find(
+      (a) => a.active && a.gateId === event.gateId,
+    );
+    if (!assignment || assignment.stageId !== props.stageId) continue;
+    const candidates =
+      assignment.role === GateRole.STAGE_START
+        ? dueToStart
+        : assignment.role === GateRole.STAGE_SPLIT ||
+            assignment.role === GateRole.STAGE_FINISH
+          ? onStage
+          : [];
+    const pick = candidates.find(
+      (row) =>
+        !taken.has(row.entry.vehicleId) &&
+        (assignment.role !== GateRole.STAGE_SPLIT ||
+          !splitsByRun.value[row.run?.id ?? '']?.some(
+            (s) => s.splitIndex === assignment.splitIndex,
+          )),
+    );
+    if (pick) {
+      suggestions[event.eventId] = pick.entry.vehicleId;
+      taken.add(pick.entry.vehicleId);
+    }
+  }
+  return suggestions;
+});
+
+function vehicleFor(event: DetectionEventRecord): string | undefined {
+  return (
+    pickedVehicleIds.value[event.eventId] ??
+    suggestedVehicleIds.value[event.eventId]
+  );
+}
+
+function gateName(gateId: string): string {
+  return gates.value.find((g) => g.id === gateId)?.name ?? gateId;
+}
+
+/** The live stream refreshes the list for every marshal; this is just faster
+ *  feedback for the one who clicked. */
+async function onAssign(event: DetectionEventRecord) {
+  const vehicleId = vehicleFor(event);
+  if (!vehicleId) return;
+  try {
+    await assignVehicleToEvent(event.eventId, vehicleId);
+    delete pickedVehicleIds.value[event.eventId];
+    awaitingDetections.value = await fetchAwaitingEvents();
+  } catch (err) {
+    alert(err instanceof Error ? err.message : 'Failed to assign vehicle');
+  }
+}
+
+async function onDismiss(event: DetectionEventRecord) {
+  await dismissEvent(event.eventId);
+  awaitingDetections.value = await fetchAwaitingEvents();
+}
+
+async function onRetryPending() {
+  if (retryingPending.value) return;
+  retryingPending.value = true;
+  try {
+    await retryPendingEvents();
+    pendingDetections.value = await fetchPendingEvents();
+  } finally {
+    retryingPending.value = false;
+  }
+}
+
+// ---- Gates ---------------------------------------------------------------
+
+/** All gates assigned to the stage, active or not — so a marshal can check
+ * them before activating, not just once it's live. */
+const stageGates = computed(() => {
+  const gateIds = new Set(
+    gateAssignments.value
+      .filter((a) => a.stageId === props.stageId)
+      .map((a) => a.gateId),
+  );
+  return gates.value.filter((g) => gateIds.has(g.id));
+});
+
+const stageDetections = computed(() => {
+  const gateIds = new Set(
+    gateAssignments.value
+      .filter((a) => a.active && a.stageId === props.stageId)
+      .map((a) => a.gateId),
+  );
+  return detections.value.filter((event) => gateIds.has(event.gateId));
+});
+
+function flashGate(gateId: string) {
+  flashingGateIds.value[gateId] = true;
+  setTimeout(() => {
+    flashingGateIds.value[gateId] = false;
+  }, FLASH_DURATION_MS);
+}
+
+function upsertGate(gate: Gate) {
+  const idx = gates.value.findIndex((g) => g.id === gate.id);
+  if (idx === -1) gates.value.push(gate);
+  else gates.value[idx] = gate;
+  flashGate(gate.id);
+}
+
+// ---- Runs and corrections ------------------------------------------------
+
+function upsertStageRun(run: StageRun) {
+  if (run.stageId !== props.stageId) return;
+  const idx = stageRuns.value.findIndex((r) => r.id === run.id);
+  if (idx === -1) stageRuns.value.unshift(run);
+  else stageRuns.value[idx] = run;
+}
+
+function upsertSplit(split: StageSplit) {
+  const splits = splitsByRun.value[split.stageRunId] ?? [];
+  splitsByRun.value[split.stageRunId] = [
+    ...splits.filter((s) => s.id !== split.id),
+    split,
+  ].sort((a, b) => a.splitIndex - b.splitIndex);
+}
+
+function toggleEdit(vehicleId: string) {
+  editingVehicleId.value =
+    editingVehicleId.value === vehicleId ? null : vehicleId;
+}
+
+async function onEnterStart(row: Row, value: string) {
+  if (!value || !props.stageId) return;
+  try {
+    upsertStageRun(
+      await createStageRun({
+        vehicleId: row.entry.vehicleId,
+        stageId: props.stageId,
+        startTime: combineDateAndTime(new Date(), value),
+      }),
+    );
+  } catch (err) {
+    alert(err instanceof Error ? err.message : 'Failed to add run');
+  }
+}
 
 async function onCorrectStart(run: StageRun, value: string) {
   if (!value) return;
@@ -308,37 +439,53 @@ async function onUnvoidRun(run: StageRun) {
 }
 
 async function onDeleteRun(run: StageRun) {
+  if (
+    !confirm(
+      `Delete ${vehicleName(vehicles.value, run.vehicleId)}'s attempt ${run.attempt} for good?\n\n` +
+        `Unlike voiding, this leaves no record. Use it for a run that never happened.`,
+    )
+  )
+    return;
   await deleteStageRun(run.id);
   stageRuns.value = stageRuns.value.filter((r) => r.id !== run.id);
   delete splitsByRun.value[run.id];
 }
 
-async function onCreateRun() {
-  if (
-    !newRun.value.vehicleId ||
-    !selectedStageId.value ||
-    !newRun.value.startTime
-  )
-    return;
-  try {
-    const created = await createStageRun({
-      vehicleId: newRun.value.vehicleId,
-      stageId: selectedStageId.value,
-      startTime: combineDateAndTime(new Date(), newRun.value.startTime),
-    });
-    upsertStageRun(created);
-    splitsByRun.value[created.id] = [];
-    newRun.value = { vehicleId: '', startTime: '' };
-  } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to add run');
-  }
+// ---- Stage lifecycle and start list --------------------------------------
+
+/** With the day: a list is often posted the evening before. */
+const frozenAt = computed(() =>
+  startOrder.value?.frozenAt
+    ? new Date(startOrder.value.frozenAt).toLocaleString([], {
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : null,
+);
+
+const subtitle = computed(() =>
+  [
+    rallyName.value,
+    startOrder.value &&
+      (startOrder.value.frozen
+        ? `Start list published ${frozenAt.value}`
+        : 'Start list provisional'),
+  ]
+    .filter(Boolean)
+    .join(' · '),
+);
+
+function stageTitle(stageId: string): string {
+  const s = stages.value.find((st) => st.id === stageId);
+  return s ? `${s.stageNumber}. ${s.name}` : stageId;
 }
 
 /**
  * Refetches every stage rather than patching just the one — a forced
- * activate can bump another stage's status back down too (see
- * `docs/architecture.md`), and rally stage counts are small enough that
- * refetching all of them is simpler than tracking which ones changed.
+ * activate can close another stage too (see `docs/architecture.md`).
  */
 async function refreshStages() {
   stages.value = await fetchStages();
@@ -346,12 +493,13 @@ async function refreshStages() {
 }
 
 async function onActivateStage(force = false) {
-  if (!selectedStageId.value || activatingStage.value) return;
+  if (!props.stageId || activatingStage.value) return;
   activatingStage.value = true;
   try {
-    await activateStage(selectedStageId.value, force);
-    await refreshStages();
+    await activateStage(props.stageId, force);
     conflictDialog.value = false;
+    await refreshStages();
+    startOrder.value = await fetchStartOrder(props.stageId);
   } catch (err) {
     const conflictingStageIds =
       err instanceof ApiError && err.status === 409
@@ -370,35 +518,125 @@ async function onActivateStage(force = false) {
 }
 
 async function onCloseStage() {
-  if (!selectedStageId.value || closingStage.value) return;
+  if (!props.stageId || closingStage.value) return;
+  if (
+    !confirm(
+      'Close this stage? Its gates stop timing, cars still on stage become DNF and cars that never started DNS. Closing cannot be undone.',
+    )
+  )
+    return;
   closingStage.value = true;
   try {
-    await closeStage(selectedStageId.value);
+    await closeStage(props.stageId);
     await refreshStages();
+    stageRuns.value = await fetchStageRuns(props.stageId);
   } finally {
     closingStage.value = false;
   }
 }
 
-onMounted(async () => {
-  // Stage/vehicle/assignment lists aren't pushed over SSE at all, so they are
-  // loaded once here and refreshed explicitly when an action changes them.
-  stages.value = await fetchStages();
-  vehicles.value = await fetchVehicles();
-  gateAssignments.value = await fetchGateAssignments();
-  const openStage = stages.value.find((s) => s.status !== 'CLOSED');
-  selectedStageId.value = (openStage ?? stages.value[0])?.id ?? '';
+async function onFreeze() {
+  if (!props.stageId) return;
+  try {
+    startOrder.value = await freezeStartOrder(props.stageId);
+    stages.value = await fetchStages();
+  } catch (err) {
+    alert(err instanceof Error ? err.message : 'Failed to freeze');
+  }
+}
 
-  // `onOpen` is both the initial load and the recovery after a reconnect, so a
-  // dropped connection doesn't leave the page quietly stale. Runs carry their
-  // splits, so refreshStageRunsAndSplits covers both.
+async function onUnfreeze() {
+  if (!props.stageId) return;
+  if (
+    !confirm(
+      'Unfreeze this start list? It is computed live again, so a posted copy may stop matching it.',
+    )
+  )
+    return;
+  try {
+    startOrder.value = await unfreezeStartOrder(props.stageId);
+    stages.value = await fetchStages();
+  } catch (err) {
+    alert(err instanceof Error ? err.message : 'Failed to unfreeze');
+  }
+}
+
+function print() {
+  window.print();
+}
+
+function onSelectStage(stageId: string) {
+  router.push(`/live/${stageId}`);
+}
+
+// ---- Loading -------------------------------------------------------------
+
+async function loadStage() {
+  editingVehicleId.value = null;
+  if (!props.stageId) {
+    startOrder.value = null;
+    stageRuns.value = [];
+    splitsByRun.value = {};
+    return;
+  }
+  const [order, runs, splits] = await Promise.all([
+    fetchStartOrder(props.stageId),
+    fetchStageRuns(props.stageId),
+    fetchSplitsForStage(props.stageId),
+  ]);
+  startOrder.value = order;
+  stageRuns.value = runs;
+  const byRun: Record<string, StageSplit[]> = {};
+  for (const split of splits) {
+    (byRun[split.stageRunId] ??= []).push(split);
+  }
+  splitsByRun.value = byRun;
+}
+
+watch(() => props.stageId, loadStage);
+
+/** The stage a marshal most likely wants: running, else next up. */
+function defaultStage(): Stage | undefined {
+  return (
+    stages.value.find((s) => s.status === StageStatus.ACTIVE) ??
+    stages.value.find((s) => s.status === StageStatus.NOT_STARTED) ??
+    stages.value.at(-1)
+  );
+}
+
+onMounted(async () => {
+  // Stages, vehicles and assignments aren't pushed over SSE, so they're
+  // loaded here and refreshed explicitly when an action changes them.
+  [stages.value, vehicles.value, gateAssignments.value] = await Promise.all([
+    fetchStages(),
+    fetchVehicles(),
+    fetchGateAssignments(),
+  ]);
+  stagesLoaded.value = true;
+  if (!props.stageId) {
+    const fallback = defaultStage();
+    if (fallback) router.replace(`/live/${fallback.id}`);
+  }
+
+  // Loaded directly too, not only once the stream opens: a browser allows six
+  // connections per host, so with enough dashboard tabs open the stream can
+  // sit pending, and the page would stay empty. `onOpen` reloads after a
+  // reconnect, so a dropped connection doesn't leave the page quietly stale.
+  const loadLive = () =>
+    Promise.all([
+      fetchRecentEvents().then((d) => (detections.value = d)),
+      fetchGates().then((g) => (gates.value = g)),
+      fetchPendingEvents().then((p) => (pendingDetections.value = p)),
+      fetchAwaitingEvents().then((a) => (awaitingDetections.value = a)),
+      loadStage(),
+    ]);
   liveSource = openLiveStream(
     {
       detection: (event) => {
         detections.value.unshift(event);
         flashGate(event.gateId);
       },
-      gate: upsertGateStatus,
+      gate: upsertGate,
       'stage-run': upsertStageRun,
       'stage-run-split': upsertSplit,
       'pending-detections': ({ pending }) => {
@@ -408,15 +646,9 @@ onMounted(async () => {
         awaitingDetections.value = awaiting;
       },
     },
-    () =>
-      void Promise.all([
-        refreshDetections(),
-        refreshGates(),
-        refreshStageRunsAndSplits(),
-        refreshPending(),
-        refreshAwaiting(),
-      ]),
+    () => void loadLive(),
   );
+  void loadLive();
 
   nowTimer = setInterval(() => {
     now.value = Date.now();
@@ -434,7 +666,7 @@ onUnmounted(() => {
     v-if="pendingDetections.length > 0"
     type="error"
     variant="tonal"
-    class="mb-6"
+    class="mb-4 d-print-none"
     icon="mdi-alert-circle-outline"
   >
     <div class="d-flex flex-wrap align-center ga-4">
@@ -465,75 +697,167 @@ onUnmounted(() => {
     </div>
   </v-alert>
 
-  <div class="d-flex flex-wrap justify-center align-center ga-2 mb-6">
-    <span v-if="selectedStageGates.length > 0" class="text-medium-emphasis">
-      Gates ready
-      {{ selectedStageGates.filter((g) => isReady(g, now)).length }}/{{
-        selectedStageGates.length
-      }}
-    </span>
-    <v-chip
-      v-for="gate in selectedStageGates"
-      :key="gate.id"
-      :class="{ 'gate-flash': flashingGateIds[gate.id] }"
-      :color="gateStatusColor(gate, now)"
-      :prepend-icon="gateStatusIcon(gate, now)"
-      :title="
-        !isOnline(gate, now)
-          ? 'Offline'
-          : isReady(gate, now)
-            ? 'Ready'
-            : 'Online, but its clock is not synced'
-      "
-      size="small"
-    >
-      {{ gate.name }}
-    </v-chip>
-    <span v-if="selectedStageGates.length === 0" class="text-medium-emphasis">
-      No gates assigned to this stage yet.
-    </span>
-  </div>
+  <StagePicker
+    class="mb-2 d-print-none"
+    :stages="stages"
+    :model-value="props.stageId"
+    @update:model-value="onSelectStage"
+  />
 
-  <v-card v-if="awaitingDetections.length > 0" class="mb-6">
+  <v-alert
+    v-if="stagesLoaded && stages.length === 0"
+    type="info"
+    variant="tonal"
+    density="comfortable"
+  >
+    No stages yet — create them under
+    <router-link to="/setup/stages">Setup → Stages</router-link>.
+  </v-alert>
+
+  <v-card v-if="stage" class="mb-4">
+    <v-card-item>
+      <v-card-title>
+        <span class="d-none d-print-inline">Start list — </span
+        >{{ stage.stageNumber }}. {{ stage.name }}
+      </v-card-title>
+      <v-card-subtitle>{{ subtitle }}</v-card-subtitle>
+      <template #append>
+        <div class="d-flex flex-wrap justify-end ga-2 d-print-none">
+          <v-btn
+            v-if="
+              stage.status === StageStatus.NOT_STARTED && !startOrder?.frozen
+            "
+            color="primary"
+            prepend-icon="mdi-lock"
+            @click="onFreeze"
+          >
+            Freeze start list
+          </v-btn>
+          <v-btn
+            v-if="
+              stage.status === StageStatus.NOT_STARTED && startOrder?.frozen
+            "
+            variant="text"
+            prepend-icon="mdi-lock-open-variant"
+            @click="onUnfreeze"
+          >
+            Unfreeze
+          </v-btn>
+          <v-btn
+            variant="tonal"
+            prepend-icon="mdi-printer"
+            :disabled="!startOrder"
+            @click="print"
+          >
+            Print start list
+          </v-btn>
+          <v-btn
+            v-if="stage.status === StageStatus.NOT_STARTED"
+            :loading="activatingStage"
+            color="success"
+            variant="outlined"
+            prepend-icon="mdi-play"
+            @click="onActivateStage()"
+          >
+            Activate stage
+          </v-btn>
+          <v-btn
+            v-if="stage.status === StageStatus.ACTIVE"
+            :loading="closingStage"
+            color="error"
+            variant="outlined"
+            prepend-icon="mdi-flag-checkered"
+            @click="onCloseStage"
+          >
+            Close stage
+          </v-btn>
+        </div>
+      </template>
+    </v-card-item>
+
+    <v-card-text class="d-print-none">
+      <div class="d-flex flex-wrap align-center ga-2">
+        <span v-if="stageGates.length > 0" class="text-medium-emphasis">
+          Gates ready
+          {{ stageGates.filter((g) => isReady(g, now)).length }}/{{
+            stageGates.length
+          }}
+        </span>
+        <v-chip
+          v-for="gate in stageGates"
+          :key="gate.id"
+          :class="{ 'gate-flash': flashingGateIds[gate.id] }"
+          :color="gateStatusColor(gate, now)"
+          :prepend-icon="gateStatusIcon(gate, now)"
+          :title="
+            !isOnline(gate, now)
+              ? 'Offline'
+              : isReady(gate, now)
+                ? 'Ready'
+                : 'Online, but its clock is not synced'
+          "
+          size="small"
+        >
+          {{ gate.name }}
+        </v-chip>
+        <span v-if="stageGates.length === 0" class="text-medium-emphasis">
+          No gates assigned to this stage yet.
+        </span>
+      </div>
+      <v-alert
+        v-if="startOrder && !startOrder.frozen"
+        type="info"
+        variant="tonal"
+        density="compact"
+        class="mt-4"
+      >
+        The start list is computed live, so a time correction on an earlier
+        stage can still move it.
+        <strong>Freeze it when you post or announce it</strong> — activating the
+        stage freezes it otherwise. Order rules are under
+        <router-link to="/setup/start-order">Setup → Start order</router-link>.
+      </v-alert>
+    </v-card-text>
+  </v-card>
+
+  <v-card
+    v-if="awaitingDetections.length > 0"
+    class="mb-4 d-print-none"
+    color="warning"
+    variant="tonal"
+  >
     <v-card-title>Unassigned passings</v-card-title>
     <v-card-text>
-      <v-alert type="warning" variant="tonal" class="mb-4">
-        A gate saw these cars but couldn't identify them. Nothing is timed until
-        you pick the vehicle — assign a car's start before its finish.
-      </v-alert>
-      <v-table density="comfortable">
-        <thead>
-          <tr>
-            <th>Gate</th>
-            <th>Gate Time</th>
-            <th>Vehicle</th>
-            <th></th>
-          </tr>
-        </thead>
+      A gate saw these cars but couldn't identify them. Nothing is timed until
+      you confirm the vehicle — the suggestion follows the start order, so check
+      it. Assign a car's start before its finish.
+      <v-table density="compact" class="mt-3 bg-transparent">
         <tbody>
           <tr v-for="event in awaitingDetections" :key="event.eventId">
-            <td>{{ event.gateId }}</td>
+            <td>{{ gateName(event.gateId) }}</td>
             <td class="rg-timing">
               {{ formatClockTime(event.timestampGate) }}
             </td>
-            <td>
+            <td style="min-width: 240px">
               <v-select
-                v-model="assignVehicleIds[event.eventId]"
+                :model-value="vehicleFor(event)"
                 :items="vehicleOptions"
                 item-title="title"
                 item-value="id"
                 label="Vehicle"
                 density="compact"
                 hide-details
-                style="min-width: 220px"
+                @update:model-value="
+                  (id: string) => (pickedVehicleIds[event.eventId] = id)
+                "
               />
             </td>
-            <td>
+            <td class="text-no-wrap">
               <v-btn
                 size="small"
                 variant="text"
                 prepend-icon="mdi-check"
-                :disabled="!assignVehicleIds[event.eventId]"
+                :disabled="!vehicleFor(event)"
                 @click="onAssign(event)"
               >
                 Assign
@@ -553,250 +877,238 @@ onUnmounted(() => {
     </v-card-text>
   </v-card>
 
-  <v-card class="mb-6">
-    <v-card-title>Stage Runs</v-card-title>
-    <v-card-text>
-      <div class="d-flex flex-wrap align-center ga-4 mb-4">
-        <v-select
-          v-model="selectedStageId"
-          :items="stageOptions"
-          item-title="title"
-          item-value="id"
-          label="Current stage"
-          density="comfortable"
-          hide-details
-          style="max-width: 320px"
-        />
-        <v-chip
-          v-if="selectedStage"
-          :color="selectedStage.status === 'ACTIVE' ? 'success' : 'timing-idle'"
-        >
-          {{ selectedStage.status }}
-        </v-chip>
-        <v-btn
-          v-if="selectedStage && selectedStage.status === 'NOT_STARTED'"
-          :loading="activatingStage"
-          :disabled="activatingStage"
-          color="success"
-          variant="outlined"
-          prepend-icon="mdi-play"
-          @click="onActivateStage()"
-        >
-          Activate Stage
-        </v-btn>
-        <v-btn
-          v-if="selectedStage && selectedStage.status === 'ACTIVE'"
-          :loading="closingStage"
-          :disabled="closingStage"
-          color="error"
-          variant="outlined"
-          prepend-icon="mdi-flag-checkered"
-          @click="onCloseStage"
-        >
-          Close Stage (deactivates gates, marks DNF/DNS)
-        </v-btn>
-      </div>
-
-      <v-alert type="info" variant="tonal" class="mb-4">
-        Corrections apply immediately — use for missed or bad gate detections.
-      </v-alert>
-      <v-table density="comfortable">
-        <thead>
-          <tr>
-            <th>Vehicle</th>
-            <th>Stage</th>
-            <th>Start</th>
-            <th>Splits</th>
-            <th>Finish</th>
-            <th>Duration</th>
-            <th>Status</th>
-            <th></th>
+  <v-card v-if="stage && startOrder" class="mb-4">
+    <v-table density="comfortable" class="rg-marshal-table">
+      <thead>
+        <tr>
+          <th style="width: 56px">Pos</th>
+          <th style="width: 72px">#</th>
+          <th>Driver</th>
+          <th class="d-none d-print-table-cell">Co-driver</th>
+          <th v-if="!startOrder.grouped">Class</th>
+          <th class="d-print-none">Status</th>
+          <th class="d-print-none">Start</th>
+          <th class="d-print-none">Splits</th>
+          <th class="d-print-none">Finish</th>
+          <th class="d-print-none">Time</th>
+          <th class="d-print-none"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template v-for="row in rows" :key="row.entry.vehicleId">
+          <tr v-if="row.classHeader" class="rg-class-row">
+            <td colspan="11">{{ row.classHeader }}</td>
           </tr>
-        </thead>
-        <tbody>
-          <tr v-for="run in filteredStageRuns" :key="run.id">
-            <td>{{ vehicleName(vehicles, run.vehicleId) }}</td>
-            <td>{{ stageName(stages, run.stageId) }}</td>
-            <td>
-              <v-text-field
-                v-if="editingRunId === run.id"
-                type="time"
-                step="1"
-                density="compact"
-                hide-details
-                append-inner-icon="mdi-clock-outline"
-                :model-value="toLocalTimeValue(run.startTime)"
-                @click:append-inner="openTimePicker"
-                @change="
-                  onCorrectStart(run, ($event.target as HTMLInputElement).value)
-                "
-              />
-              <span v-else class="rg-timing">
-                {{ formatClockTime(run.startTime) }}
-              </span>
+          <tr :class="{ 'rg-next-row': row.state === 'NEXT' }">
+            <td class="rg-timing">{{ row.entry.position }}</td>
+            <td class="rg-timing font-weight-bold">
+              {{ row.entry.startNumber }}
             </td>
-            <td class="rg-timing">{{ formatSplits(run.id) }}</td>
-            <td>
-              <v-text-field
-                v-if="editingRunId === run.id"
-                type="time"
-                step="1"
-                density="compact"
-                hide-details
-                append-inner-icon="mdi-clock-outline"
-                :model-value="toLocalTimeValue(run.finishTime)"
-                @click:append-inner="openTimePicker"
-                @change="
-                  onCorrectFinish(
-                    run,
-                    ($event.target as HTMLInputElement).value,
-                  )
-                "
-              />
-              <span v-else class="rg-timing">
-                {{ run.finishTime ? formatClockTime(run.finishTime) : '-' }}
-              </span>
+            <td>{{ row.entry.driverName }}</td>
+            <td class="d-none d-print-table-cell">
+              {{ row.entry.coDriverName }}
             </td>
-            <td class="rg-timing">
-              {{ runDurationDisplay(run) }}
-            </td>
-            <td>
+            <td v-if="!startOrder.grouped">{{ row.entry.mainClassName }}</td>
+            <td class="d-print-none text-no-wrap">
               <v-chip
                 size="small"
-                :color="runStatusColor(run.status)"
-                :prepend-icon="
-                  run.status === 'VOIDED' ? 'mdi-cancel' : undefined
-                "
+                :color="ROW_STATE_DISPLAY[row.state].color"
+                :prepend-icon="ROW_STATE_DISPLAY[row.state].icon"
               >
-                {{ run.status }}
+                {{ ROW_STATE_DISPLAY[row.state].label }}
               </v-chip>
               <v-chip
-                v-if="isOverdue(run)"
+                v-if="isOverdue(row.run)"
                 size="small"
                 color="warning"
                 prepend-icon="mdi-timer-alert-outline"
                 class="ml-1"
               >
-                OVERDUE
+                Overdue
               </v-chip>
               <span
-                v-if="run.attempt > 1"
+                v-if="row.run && row.run.attempt > 1"
                 class="text-caption text-medium-emphasis ml-1"
               >
-                attempt {{ run.attempt }}
+                attempt {{ row.run.attempt }}
               </span>
             </td>
-            <td>
+            <td class="d-print-none">
+              <v-text-field
+                v-if="editingVehicleId === row.entry.vehicleId"
+                type="time"
+                step="1"
+                density="compact"
+                hide-details
+                append-inner-icon="mdi-clock-outline"
+                :model-value="toLocalTimeValue(row.run?.startTime)"
+                @click:append-inner="openTimePicker"
+                @change="
+                  (e: Event) => {
+                    const value = (e.target as HTMLInputElement).value;
+                    if (row.run) onCorrectStart(row.run, value);
+                    else onEnterStart(row, value);
+                  }
+                "
+              />
+              <span v-else-if="row.run" class="rg-timing">
+                {{ formatClockTime(row.run.startTime) }}
+              </span>
+            </td>
+            <td class="d-print-none rg-timing">
+              {{ row.run ? formatSplits(row.run.id) : '' }}
+            </td>
+            <td class="d-print-none">
+              <v-text-field
+                v-if="editingVehicleId === row.entry.vehicleId && row.run"
+                type="time"
+                step="1"
+                density="compact"
+                hide-details
+                append-inner-icon="mdi-clock-outline"
+                :model-value="toLocalTimeValue(row.run.finishTime)"
+                @click:append-inner="openTimePicker"
+                @change="
+                  onCorrectFinish(
+                    row.run!,
+                    ($event.target as HTMLInputElement).value,
+                  )
+                "
+              />
+              <span v-else-if="row.run?.finishTime" class="rg-timing">
+                {{ formatClockTime(row.run.finishTime) }}
+              </span>
+            </td>
+            <td class="d-print-none rg-timing">
+              {{ row.run ? runDurationDisplay(row.run) : '' }}
+            </td>
+            <td class="d-print-none text-no-wrap text-right">
               <v-btn
                 size="small"
                 variant="text"
                 :prepend-icon="
-                  editingRunId === run.id ? 'mdi-check' : 'mdi-pencil'
+                  editingVehicleId === row.entry.vehicleId
+                    ? 'mdi-check'
+                    : row.run
+                      ? 'mdi-pencil'
+                      : 'mdi-clock-plus-outline'
                 "
-                @click="toggleEditRun(run.id)"
+                @click="toggleEdit(row.entry.vehicleId)"
               >
-                {{ editingRunId === run.id ? 'Done' : 'Correct' }}
+                {{
+                  editingVehicleId === row.entry.vehicleId
+                    ? 'Done'
+                    : row.run
+                      ? 'Correct'
+                      : 'Enter start'
+                }}
               </v-btn>
-              <v-btn
-                v-if="!run.voided"
-                size="small"
-                variant="text"
-                prepend-icon="mdi-cancel"
-                @click="onVoidRun(run)"
+              <v-menu v-if="row.run">
+                <template #activator="{ props: menu }">
+                  <v-btn
+                    v-bind="menu"
+                    size="small"
+                    variant="text"
+                    icon="mdi-dots-vertical"
+                    aria-label="More actions"
+                  />
+                </template>
+                <v-list density="compact">
+                  <v-list-item
+                    prepend-icon="mdi-cancel"
+                    title="Void attempt (red flag)"
+                    @click="onVoidRun(row.run!)"
+                  />
+                  <v-list-item
+                    prepend-icon="mdi-delete"
+                    title="Delete attempt"
+                    base-color="error"
+                    @click="onDeleteRun(row.run!)"
+                  />
+                </v-list>
+              </v-menu>
+            </td>
+          </tr>
+          <tr
+            v-for="voided in row.voidedRuns"
+            :key="voided.id"
+            class="rg-voided-row d-print-none"
+          >
+            <td colspan="3"></td>
+            <td v-if="!startOrder.grouped"></td>
+            <td class="text-no-wrap">
+              <v-chip size="small" variant="outlined" prepend-icon="mdi-cancel">
+                Voided
+              </v-chip>
+              <span class="text-caption ml-1"
+                >attempt {{ voided.attempt }}</span
               >
-                Void
-              </v-btn>
+            </td>
+            <td class="rg-timing">{{ formatClockTime(voided.startTime) }}</td>
+            <td class="rg-timing">{{ formatSplits(voided.id) }}</td>
+            <td class="rg-timing">
+              {{ voided.finishTime ? formatClockTime(voided.finishTime) : '' }}
+            </td>
+            <td class="rg-timing">{{ formatDuration(voided.durationMs) }}</td>
+            <td class="text-no-wrap text-right">
               <v-btn
-                v-else
                 size="small"
                 variant="text"
                 prepend-icon="mdi-restore"
-                @click="onUnvoidRun(run)"
+                @click="onUnvoidRun(voided)"
               >
                 Restore
               </v-btn>
               <v-btn
                 size="small"
                 variant="text"
+                icon="mdi-delete"
                 color="error"
-                prepend-icon="mdi-delete"
-                @click="onDeleteRun(run)"
-              >
-                Delete
-              </v-btn>
+                aria-label="Delete attempt"
+                @click="onDeleteRun(voided)"
+              />
             </td>
           </tr>
-        </tbody>
-      </v-table>
-      <form
-        class="d-flex flex-wrap align-center ga-3 mt-4"
-        @submit.prevent="onCreateRun"
-      >
-        <v-select
-          v-model="newRun.vehicleId"
-          :items="vehicleOptions"
-          item-title="title"
-          item-value="id"
-          label="Vehicle"
-          density="comfortable"
-          hide-details
-          style="min-width: 220px"
-        />
-        <v-text-field
-          v-model="newRun.startTime"
-          type="time"
-          step="1"
-          label="Start time (today)"
-          density="comfortable"
-          hide-details
-          append-inner-icon="mdi-clock-outline"
-          style="min-width: 220px"
-          @click:append-inner="openTimePicker"
-        />
-        <v-btn
-          type="submit"
-          color="primary"
-          prepend-icon="mdi-plus"
-          :disabled="!selectedStageId"
-        >
-          Add Missing Run to
-          {{ selectedStageId ? stageTitle(selectedStageId) : 'stage' }}
-        </v-btn>
-      </form>
-    </v-card-text>
+        </template>
+      </tbody>
+    </v-table>
   </v-card>
 
-  <v-card>
-    <v-card-title>Live Detections</v-card-title>
-    <v-card-text>
-      <v-table density="comfortable">
-        <thead>
-          <tr>
-            <th>Gate</th>
-            <th>Transponder</th>
-            <th>Vehicle</th>
-            <th>Gate Time</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="event in filteredDetections" :key="event.eventId">
-            <td>{{ event.gateId }}</td>
-            <td>{{ event.transponderId ?? '-' }}</td>
-            <td>
-              {{
-                event.vehicleId
-                  ? vehicleName(vehicles, event.vehicleId)
-                  : 'unknown'
-              }}
-            </td>
-            <td class="rg-timing">
-              {{ formatClockTime(event.timestampGate) }}
-            </td>
-          </tr>
-        </tbody>
-      </v-table>
-    </v-card-text>
-  </v-card>
+  <v-expansion-panels v-if="stage" class="d-print-none">
+    <v-expansion-panel>
+      <v-expansion-panel-title>
+        Raw detections ({{ stageDetections.length }})
+      </v-expansion-panel-title>
+      <v-expansion-panel-text>
+        <v-table density="compact">
+          <thead>
+            <tr>
+              <th>Gate</th>
+              <th>Transponder</th>
+              <th>Vehicle</th>
+              <th>Gate Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="event in stageDetections" :key="event.eventId">
+              <td>{{ gateName(event.gateId) }}</td>
+              <td>{{ event.transponderId ?? '-' }}</td>
+              <td>
+                {{
+                  event.vehicleId
+                    ? vehicleName(vehicles, event.vehicleId)
+                    : 'unknown'
+                }}
+              </td>
+              <td class="rg-timing">
+                {{ formatClockTime(event.timestampGate) }}
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
+      </v-expansion-panel-text>
+    </v-expansion-panel>
+  </v-expansion-panels>
 
   <v-dialog v-model="conflictDialog" max-width="480">
     <v-card>
@@ -835,6 +1147,35 @@ onUnmounted(() => {
   }
   100% {
     box-shadow: 0 0 0 8px rgba(var(--v-theme-primary), 0);
+  }
+}
+
+.rg-class-row td {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+  font-size: 1.05rem;
+  background: rgba(var(--v-theme-on-surface), 0.06);
+}
+
+/* The next car is a marshal's main cue, so it gets more than the chip. */
+.rg-next-row td {
+  background: rgba(var(--v-theme-info), 0.12);
+}
+.rg-next-row td:first-child {
+  box-shadow: inset 3px 0 0 rgb(var(--v-theme-info));
+}
+
+.rg-voided-row td {
+  opacity: 0.6;
+}
+
+@media print {
+  .rg-next-row td {
+    background: none;
+    box-shadow: none !important;
+  }
+  .rg-class-row {
+    break-after: avoid;
   }
 }
 </style>

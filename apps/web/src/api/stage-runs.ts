@@ -30,8 +30,13 @@ export interface StageSplit {
   elapsedMs: number;
 }
 
-export function fetchStageRuns(): Promise<StageRun[]> {
-  return apiFetch('/stage-runs');
+/** Every attempt, voided ones included. */
+export function fetchStageRuns(stageId: string): Promise<StageRun[]> {
+  return apiFetch(`/stage-runs?stageId=${encodeURIComponent(stageId)}`);
+}
+
+export function fetchSplitsForStage(stageId: string): Promise<StageSplit[]> {
+  return apiFetch(`/stage-runs/splits?stageId=${encodeURIComponent(stageId)}`);
 }
 
 export function createStageRun(input: {
@@ -70,8 +75,4 @@ export function voidStageRun(id: string): Promise<StageRun> {
  */
 export function unvoidStageRun(id: string): Promise<StageRun> {
   return postRequest(`/stage-runs/${id}/unvoid`);
-}
-
-export function fetchSplitsForRun(stageRunId: string): Promise<StageSplit[]> {
-  return apiFetch(`/stage-runs/${stageRunId}/splits`);
 }

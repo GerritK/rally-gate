@@ -12,6 +12,7 @@ import {
   type StageOutcomeEntry,
 } from '../api/classification';
 import ClassPicker from '../components/ClassPicker.vue';
+import StagePicker from '../components/StagePicker.vue';
 import { fetchStages, type Stage } from '../api/stages';
 import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
 import {
@@ -32,10 +33,6 @@ const splitGates = ref<SplitGateInfo[]>([]);
 const selectedSplitIndex = ref<number | null>(null);
 const splitClassification = ref<SplitClassificationEntry[]>([]);
 const nonFinishers = ref<StageOutcomeEntry[]>([]);
-
-const stageOptions = computed(() =>
-  stages.value.map((s) => ({ id: s.id, title: `${s.stageNumber}. ${s.name}` })),
-);
 
 const splitGateOptions = computed(() =>
   splitGates.value.map((g) => ({
@@ -96,18 +93,13 @@ function onStageChange(stageId: string) {
 </script>
 
 <template>
+  <StagePicker
+    class="mb-2"
+    :stages="stages"
+    :model-value="stageId"
+    @update:model-value="onStageChange"
+  />
   <div class="d-flex flex-wrap align-center ga-4 mb-6">
-    <v-select
-      :model-value="stageId"
-      :items="stageOptions"
-      item-title="title"
-      item-value="id"
-      label="Stage"
-      density="comfortable"
-      hide-details
-      style="max-width: 320px"
-      @update:model-value="onStageChange"
-    />
     <ClassPicker v-model="selectedClassIds" :classes="classes" />
     <v-btn variant="text" prepend-icon="mdi-podium" to="/results/overall">
       Overall Classification

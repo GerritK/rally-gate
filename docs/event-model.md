@@ -42,6 +42,14 @@ which runs the rules with the stored clock correction, or dismisses one that was
 no car (`POST /events/:id/dismiss`). At an idle gate such a passing is just
 stored.
 
+The vehicle is **pre-selected from the start order, never assigned
+automatically**: a wrong assignment is a wrong time nobody notices in the
+results. Passings are matched in time order. At a start gate the suggestion is
+the next car after the last one that started, so a no-show is skipped; at a
+split or finish gate it is the first car on stage in start order (at a split,
+one without that split yet). An overtake is just a suggestion the marshal
+corrects.
+
 **Assign refuses when the rules would do nothing** — a finish or split for a car
 with no running start, a duplicate start, a stage no longer active — with a 409,
 leaving the passing listed. Silently consuming it would lose the time. So a
