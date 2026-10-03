@@ -930,33 +930,36 @@ onUnmounted(() => {
           {{ count }} {{ ROW_STATE_DISPLAY[state].label }}
         </v-chip>
       </div>
-      <div v-if="gateFlow.length > 0" class="d-flex align-center ga-4">
-        <div class="rg-gate-flow flex-grow-1">
-          <template v-for="(node, i) in gateFlow" :key="node.gate.id">
-            <div v-if="i > 0" class="rg-gate-line" />
+      <template v-if="gateFlow.length > 0">
+        <div class="text-caption text-medium-emphasis mb-1">
+          Gates ready
+          {{ gateFlow.filter((n) => isReady(n.gate, now)).length }}/{{
+            gateFlow.length
+          }}
+        </div>
+        <div class="rg-gate-scroll">
+          <div class="rg-gate-flow" :style="{ '--gates': gateFlow.length }">
             <div
+              v-for="node in gateFlow"
+              :key="node.gate.id"
               class="rg-gate-node"
               :title="`${node.gate.name}: ${gateStatusText(node.gate)}`"
             >
-              <v-icon
-                :class="{ 'gate-flash': flashingGateIds[node.gate.id] }"
-                :icon="gateStatusIcon(node.gate, now)"
-                :color="gateStatusColor(node.gate, now)"
-              />
+              <span class="rg-gate-icon">
+                <v-icon
+                  :class="{ 'gate-flash': flashingGateIds[node.gate.id] }"
+                  :icon="gateStatusIcon(node.gate, now)"
+                  :color="gateStatusColor(node.gate, now)"
+                />
+              </span>
               <div class="text-caption font-weight-bold">{{ node.label }}</div>
               <div class="text-caption text-medium-emphasis rg-gate-name">
                 {{ node.gate.name }}
               </div>
             </div>
-          </template>
+          </div>
         </div>
-        <span class="text-medium-emphasis text-no-wrap">
-          Gates ready
-          {{ gateFlow.filter((n) => isReady(n.gate, now)).length }}/{{
-            gateFlow.length
-          }}
-        </span>
-      </div>
+      </template>
       <div v-else class="text-medium-emphasis">
         No gates assigned to this stage yet.
       </div>
@@ -1452,29 +1455,50 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* Nodes on a line, like the stage itself; the line sits at icon height. */
+/*
+ * Gates as nodes on one track, like the stage itself. Every node gets the
+ * same width, so the track runs from the first icon's centre to the last
+ * one's: half a node in from each side. Too many for the width scrolls
+ * sideways rather than squeezing gates out.
+ */
+.rg-gate-scroll {
+  overflow-x: auto;
+}
 .rg-gate-flow {
+  position: relative;
   display: flex;
-  align-items: flex-start;
+  min-width: calc(var(--gates) * 80px);
+}
+.rg-gate-flow::before {
+  content: '';
+  position: absolute;
+  top: 11px;
+  left: calc(50% / var(--gates));
+  right: calc(50% / var(--gates));
+  height: 2px;
+  background: rgb(var(--v-border-color));
 }
 .rg-gate-node {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  max-width: 120px;
+  padding: 0 4px;
+}
+/* Cuts the track behind the icon so the icon reads as a node on it. */
+.rg-gate-icon {
+  background: rgb(var(--v-theme-surface));
+  padding: 0 6px;
+  line-height: 0;
 }
 .rg-gate-name {
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 120px;
-}
-.rg-gate-line {
-  flex: 1;
-  height: 2px;
-  margin: 11px 8px 0;
-  background: rgb(var(--v-border-color));
 }
 
 .gate-flash {
