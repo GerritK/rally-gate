@@ -94,7 +94,7 @@ function onStageChange(stageId: string) {
 
 <template>
   <StagePicker
-    class="mb-2"
+    class="mb-4"
     :stages="stages"
     :model-value="stageId"
     @update:model-value="onStageChange"

@@ -52,8 +52,8 @@ sharing `client.ts`). Audience is marshals and organisers only.
 - **Drawer, not tabs**, so more sections don't need a nav rework.
 - **No store, no speculative components.** Each page fetches what it needs in
   `onMounted`; data volumes are tiny. Extract a component once it is actually
-  duplicated (`src/components/StagePicker.vue`, a chip row with a status icon
-  per stage, on Live Timing and stage Results;
+  duplicated (`src/components/StagePicker.vue`, the rally's stages as a progress
+  track that doubles as the stage switch, on Live Timing and stage Results;
   `src/components/ClassPicker.vue`, one classes field
   with the main class first and exclusive, used on Vehicles and both Results
   pages). Shared pure helpers are in `src/format.ts`.

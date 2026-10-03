@@ -5,40 +5,126 @@ import type { Stage } from '../api/stages';
 defineProps<{ stages: Stage[]; modelValue?: string }>();
 const emit = defineEmits<{ 'update:modelValue': [stageId: string] }>();
 
-/** Icon as the second signal next to color, for colorblind marshals. */
-function statusIcon(stage: Stage): string {
-  if (stage.status === StageStatus.ACTIVE) return 'mdi-play-circle';
-  if (stage.status === StageStatus.CLOSED) return 'mdi-flag-checkered';
-  return 'mdi-circle-outline';
+/**
+ * Progress first, selection second: a marshal rarely switches stage, but
+ * everyone wants to see where the rally stands. Icon and text carry the
+ * status, never colour alone.
+ */
+function display(stage: Stage): {
+  icon: string;
+  color?: string;
+  label: string;
+} {
+  if (stage.status === StageStatus.ACTIVE) {
+    return { icon: 'mdi-circle', color: 'success', label: 'Running' };
+  }
+  if (stage.status === StageStatus.CLOSED) {
+    return { icon: 'mdi-check-circle-outline', label: 'Closed' };
+  }
+  if (stage.startOrderFrozenAt) {
+    return { icon: 'mdi-lock-outline', label: 'Published' };
+  }
+  return { icon: 'mdi-circle-outline', label: 'Upcoming' };
 }
 </script>
 
 <template>
-  <v-chip-group
-    :model-value="modelValue"
-    mandatory
-    selected-class="text-primary"
-    @update:model-value="(id: string) => emit('update:modelValue', id)"
-  >
-    <v-chip
-      v-for="stage in stages"
-      :key="stage.id"
-      :value="stage.id"
-      :prepend-icon="statusIcon(stage)"
-      :color="stage.status === StageStatus.ACTIVE ? 'success' : undefined"
-      variant="outlined"
-      filter
-    >
-      {{ stage.stageNumber }}. {{ stage.name }}
-      <v-icon
-        v-if="
-          stage.startOrderFrozenAt && stage.status === StageStatus.NOT_STARTED
-        "
-        icon="mdi-lock"
-        size="x-small"
-        class="ml-1"
-        title="Start list published"
-      />
-    </v-chip>
-  </v-chip-group>
+  <nav class="rg-stage-track-scroll" aria-label="Stages">
+    <div class="rg-stage-track" :style="{ '--stages': stages.length }">
+      <button
+        v-for="stage in stages"
+        :key="stage.id"
+        type="button"
+        class="rg-stage-node"
+        :class="{ 'rg-stage-node--selected': stage.id === modelValue }"
+        :aria-current="stage.id === modelValue ? 'page' : undefined"
+        @click="emit('update:modelValue', stage.id)"
+      >
+        <span class="rg-stage-dot">
+          <v-icon
+            :icon="display(stage).icon"
+            :color="display(stage).color"
+            size="small"
+          />
+        </span>
+        <span class="rg-stage-name">
+          {{ stage.stageNumber }}. {{ stage.name }}
+        </span>
+        <span class="text-caption text-medium-emphasis">
+          {{ display(stage).label }}
+        </span>
+      </button>
+    </div>
+  </nav>
 </template>
+
+<style scoped>
+/* Same track as Live Timing's gate line, one level up: stages along the rally. */
+.rg-stage-track-scroll {
+  overflow-x: auto;
+  padding: 4px 0;
+}
+.rg-stage-track {
+  position: relative;
+  display: flex;
+  min-width: calc(var(--stages) * 110px);
+}
+.rg-stage-track::before {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: calc(50% / var(--stages));
+  right: calc(50% / var(--stages));
+  height: 2px;
+  background: rgb(var(--v-border-color));
+}
+.rg-stage-node {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.rg-stage-node:hover .rg-stage-dot,
+.rg-stage-node:focus-visible .rg-stage-dot {
+  box-shadow: 0 0 0 2px rgba(var(--v-theme-on-surface), 0.3);
+}
+.rg-stage-node:focus-visible {
+  outline: none;
+}
+/* Neutral ring, not orange: orange is the page's one main action. */
+.rg-stage-node--selected .rg-stage-dot {
+  box-shadow: 0 0 0 2px rgb(var(--v-theme-on-surface));
+}
+.rg-stage-node--selected .rg-stage-name {
+  font-weight: 700;
+}
+.rg-stage-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgb(var(--v-theme-background));
+}
+.rg-stage-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media print {
+  .rg-stage-track-scroll {
+    display: none;
+  }
+}
+</style>

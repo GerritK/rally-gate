@@ -130,8 +130,12 @@ clock with date, a cog to Setup.
 
 Extract a component once it is actually used twice, not before.
 
-- `StagePicker`: stages as a chip row, status icon per stage, a lock on a
-  published start list. Live Timing and stage Results.
+- `StagePicker`: the rally's progress as a track of stages, the same
+  picture as the gate line one level up (closed ✓, running ●, start list
+  published 🔒, upcoming ○, each with its label). Progress first, selection
+  second: a neutral ring marks the stage shown, a click switches. It sits
+  above every card, since the stage scopes the whole page. Live Timing and
+  stage Results.
 - `ClassPicker`: one classes field, main class first and exclusive. Vehicles
   and both Results pages.
 - `ManualMark`: the hand-timed icon.

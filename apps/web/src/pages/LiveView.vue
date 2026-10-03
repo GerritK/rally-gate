@@ -865,7 +865,7 @@ onUnmounted(() => {
   </v-alert>
 
   <StagePicker
-    class="mb-2 d-print-none"
+    class="mb-4"
     :stages="stages"
     :model-value="props.stageId"
     @update:model-value="onSelectStage"
