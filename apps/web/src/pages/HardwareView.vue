@@ -221,19 +221,7 @@ onUnmounted(() => {
             class="cursor-pointer"
             @click="router.push(`/hardware/gates/${gate.id}`)"
           >
-            <td class="text-no-wrap">
-              {{ gate.id }}
-              <v-btn
-                v-if="gate.address && isOnline(gate, now)"
-                :href="gateConfigUrl(gate.address)"
-                target="_blank"
-                icon="mdi-open-in-new"
-                size="x-small"
-                variant="text"
-                :title="`Open gate config (${gate.address})`"
-                @click.stop
-              />
-            </td>
+            <td class="text-no-wrap">{{ gate.id }}</td>
             <td>{{ gate.name }}</td>
             <td>
               <v-chip
@@ -297,6 +285,22 @@ onUnmounted(() => {
                   />
                 </template>
                 <v-list density="compact">
+                  <v-list-item
+                    prepend-icon="mdi-open-in-new"
+                    title="Open gate config"
+                    :subtitle="
+                      gate.address && isOnline(gate, now)
+                        ? gate.address
+                        : 'Gate offline'
+                    "
+                    :href="
+                      gate.address && isOnline(gate, now)
+                        ? gateConfigUrl(gate.address)
+                        : undefined
+                    "
+                    target="_blank"
+                    :disabled="!gate.address || !isOnline(gate, now)"
+                  />
                   <v-list-item
                     prepend-icon="mdi-delete-outline"
                     title="Delete"
