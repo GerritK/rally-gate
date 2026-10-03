@@ -41,22 +41,17 @@ onMounted(async () => {
 <template>
   <v-app>
     <!-- Dark, not primary: orange is kept for the one main action on a page
-         (packages/ui/theme.ts). Two-line title as in gate-config, the event
-         first: which event is open matters, the product name doesn't. -->
+         (packages/ui/theme.ts). The logo names the product, so the title is
+         just the open event. -->
     <v-app-bar flat>
       <template #prepend>
         <v-app-bar-nav-icon @click="drawer = !drawer" />
       </template>
       <v-app-bar-title>
         <div class="d-flex align-center ga-3">
-          <img :src="logoUrl" alt="" class="app-bar-logo" />
-          <div class="app-bar-text">
-            <div class="text-caption text-medium-emphasis app-bar-label">
-              Rally Gate
-            </div>
-            <div class="text-subtitle-1 font-weight-medium app-bar-event">
-              {{ rallyName || fileName }}
-            </div>
+          <img :src="logoUrl" alt="Rally Gate" class="app-bar-logo" />
+          <div class="app-bar-event">
+            {{ rallyName || fileName }}
           </div>
         </div>
       </v-app-bar-title>
@@ -149,15 +144,15 @@ onMounted(async () => {
   height: 22px;
   flex-shrink: 0;
 }
-.app-bar-text {
-  min-width: 0;
-}
 .app-bar-clock {
   font-size: 1.15rem;
   font-weight: 600;
   line-height: 1.2;
 }
 .app-bar-event {
+  min-width: 0;
+  font-size: 1.3rem;
+  font-weight: 600;
   line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;

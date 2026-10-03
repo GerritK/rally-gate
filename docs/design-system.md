@@ -107,10 +107,15 @@ Values live in `theme.ts`. The rules:
 
 ## App bar
 
-Same in both apps: dark and flat, the logo, a two-line title with the product name
-small above the context that matters (the open event in `apps/web`, the gate
-in `gate-config`), status on the right. In `apps/web`: live chip, server
-clock with date, a cog to Setup.
+Same in both apps: dark and flat, the logo, then the context that matters,
+status on the right.
+
+- `apps/web`: the open event's name alone; the logo names the product (its
+  alt text is "Rally Gate"). Right: live chip, server clock with date, a cog
+  to Setup, separated by vertical dividers.
+- `gate-config`: "Gate Config" small above the gate's name. That line names
+  the tool, not the product: the two apps look alike on purpose, and a
+  marshal switching between them on a phone needs to see which one is open.
 
 ## Logo
 
