@@ -53,6 +53,7 @@ import {
 import { fetchVehicles, type Vehicle } from '../api/vehicles';
 import FormDialog from '../components/FormDialog.vue';
 import ManualMark from '../components/ManualMark.vue';
+import TableLegend from '../components/TableLegend.vue';
 import PassingBlock from '../components/PassingBlock.vue';
 import StagePicker from '../components/StagePicker.vue';
 import {
@@ -585,6 +586,14 @@ async function onStartNow(vehicleId: string) {
     startingVehicleId.value = null;
   }
 }
+
+const anyManual = computed(() =>
+  rows.value.some((row) =>
+    [row.run, ...row.voidedRuns].some(
+      (run) => run && (run.startManual || (run.finishTime && run.finishManual)),
+    ),
+  ),
+);
 
 const correctDialogOpen = ref(false);
 const correcting = ref<StageRun | null>(null);
@@ -1549,6 +1558,10 @@ onUnmounted(() => {
         </tr>
       </tbody>
     </v-table>
+    <!-- Wrapped: the legend's own d-flex would beat d-print-none. -->
+    <div class="d-print-none px-4 pb-3">
+      <TableLegend :marks="anyManual ? ['manual'] : []" />
+    </div>
   </v-card>
 
   <v-expansion-panels v-if="stage" class="d-print-none">

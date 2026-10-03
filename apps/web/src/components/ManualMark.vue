@@ -1,11 +1,15 @@
+<script setup lang="ts">
+import { TIMING_MARKS } from '../format';
+</script>
+
 <template>
   <!-- A hand time carries the marshal's reaction time; a protest asks which
        times were hand-set. Icon plus tooltip, not color alone. -->
   <v-icon
-    icon="mdi-hand-back-right-outline"
-    color="warning"
+    v-tooltip:top="TIMING_MARKS.manual.label"
+    :icon="TIMING_MARKS.manual.icon"
+    :color="TIMING_MARKS.manual.color"
     size="small"
-    v-tooltip:top="'Hand-timed (set by a marshal, not a gate)'"
-    aria-label="Hand-timed"
+    :aria-label="TIMING_MARKS.manual.label"
   />
 </template>

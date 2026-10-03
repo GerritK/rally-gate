@@ -49,6 +49,12 @@ Values live in `theme.ts`. The rules:
   directive), `:bottom` in the app bar; a conditional one passes `''`, not
   `undefined`, which shows the element's own text. `title` stays only where
   it is a component's label prop (`v-list-item`, `FormDialog`).
+- **A table with icons has a legend under it** (`TableLegend`), listing
+  only the icons that table currently shows. Tooltips don't work reliably
+  on touch and don't exist on paper, so the legend is what explains an
+  icon; a tooltip only adds a value (the gap to the fastest). Icon, colour
+  and label come from `TIMING_MARKS` (`format.ts`), for the cells and the
+  legend alike.
 - **Results show the time driven**, the gap to the fastest in its tooltip:
   a posted result and a protest go by the time, and a crew checks it
   against their stopwatch. The Gap column covers the comparison.
@@ -287,6 +293,7 @@ Extract a component once it is actually used twice, not before.
   Every results card names it as its subtitle, "All classes" included, so
   a printout always says which ranking it is.
 - `ManualMark`: the hand-timed icon.
+- `TableLegend`: the icons a table shows, explained under it (see Tables).
 - `PassingBlock`: the oldest unidentified passing with its vehicle picker,
   Assign and a ⋮ for Not a car, in Up next and On stage; later ones wait
   below it as a count; "Dismiss all" (confirmed) discards it and them.

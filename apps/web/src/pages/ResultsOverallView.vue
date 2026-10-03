@@ -14,7 +14,14 @@ import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
 import { fetchVehicles, type Vehicle } from '../api/vehicles';
 import { StageStatus } from '@rally-gate/shared';
 import { rallyName } from '../api/rally-info';
-import { formatDuration, formatGap, VEHICLE_STATUS_DISPLAY } from '../format';
+import TableLegend from '../components/TableLegend.vue';
+import {
+  formatDuration,
+  formatGap,
+  TIMING_MARKS,
+  type TimingMark,
+  VEHICLE_STATUS_DISPLAY,
+} from '../format';
 import { usePrint } from '../print';
 
 const route = useRoute();
@@ -51,6 +58,14 @@ const bestByStage = computed(() => {
     }
   }
   return best;
+});
+
+const legendMarks = computed<TimingMark[]>(() => {
+  const times = overallClassification.value.flatMap((e) => e.stageTimes);
+  return [
+    ...(times.some((t) => !t.notional) ? (['best'] as const) : []),
+    ...(times.some((t) => t.notional) ? (['notional'] as const) : []),
+  ];
 });
 
 function stageGapMs(time: OverallStageTime): number {
@@ -194,7 +209,7 @@ onMounted(async () => {
               >
                 {{ formatDuration(time.durationMs)
                 }}<span class="rg-time-mark"
-                  ><v-icon size="x-small" icon="mdi-timer-off-outline"
+                  ><v-icon size="x-small" :icon="TIMING_MARKS.notional.icon"
                 /></span>
               </span>
               <span
@@ -204,7 +219,7 @@ onMounted(async () => {
               >
                 {{ formatDuration(time.durationMs)
                 }}<span class="rg-time-mark"
-                  ><v-icon size="x-small" icon="mdi-star"
+                  ><v-icon size="x-small" :icon="TIMING_MARKS.best.icon"
                 /></span>
               </span>
               <span
@@ -228,7 +243,7 @@ onMounted(async () => {
                 <template #activator="{ props }">
                   <span v-bind="props" class="text-medium-emphasis">
                     {{ entry.stagesCompleted }}
-                    <v-icon size="x-small" icon="mdi-timer-off-outline" />
+                    <v-icon size="x-small" :icon="TIMING_MARKS.notional.icon" />
                   </span>
                 </template>
               </v-tooltip>
@@ -242,6 +257,7 @@ onMounted(async () => {
           </tr>
         </tbody>
       </v-table>
+      <TableLegend :marks="legendMarks" />
 
       <template v-if="notClassified.length > 0">
         <div class="text-subtitle-2 mt-6 mb-1">Not classified</div>

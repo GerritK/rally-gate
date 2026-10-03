@@ -223,3 +223,22 @@ export function gateRoleLabel(
       return assignment.role;
   }
 }
+
+/** Icons that qualify a time in a table. Cells and `TableLegend` both read
+ *  them from here, so the legend can't drift from what the table shows. */
+export const TIMING_MARKS = {
+  best: { icon: 'mdi-star', color: 'timing-best', label: 'Fastest' },
+  manual: {
+    icon: 'mdi-hand-back-right-outline',
+    color: 'warning',
+    label: 'Set by a marshal, not a gate',
+  },
+  notional: {
+    icon: 'mdi-timer-off-outline',
+    color: undefined,
+    label:
+      'Notional: stage not completed, charged the slowest time plus a penalty',
+  },
+} as const;
+
+export type TimingMark = keyof typeof TIMING_MARKS;

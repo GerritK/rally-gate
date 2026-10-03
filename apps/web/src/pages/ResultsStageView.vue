@@ -18,7 +18,14 @@ import StagePicker from '../components/StagePicker.vue';
 import { fetchStages, type Stage } from '../api/stages';
 import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
 import { rallyName } from '../api/rally-info';
-import { formatDuration, formatGap, outcomeColor } from '../format';
+import TableLegend from '../components/TableLegend.vue';
+import {
+  formatDuration,
+  formatGap,
+  outcomeColor,
+  TIMING_MARKS,
+  type TimingMark,
+} from '../format';
 import { usePrint } from '../print';
 
 const props = defineProps<{ stageId: string }>();
@@ -74,6 +81,16 @@ const classLabel = computed(() =>
 );
 
 const stage = computed(() => stages.value.find((s) => s.id === props.stageId));
+
+const legendMarks = computed<TimingMark[]>(() =>
+  stageClassification.value.some((entry) =>
+    splitsByGate.value.some(
+      (splits) => splits.get(entry.vehicleId)?.gapMs === 0,
+    ),
+  )
+    ? ['best']
+    : [],
+);
 
 // Past two split columns the table no longer fits a portrait page.
 const { printedAt, print } = usePrint(
@@ -191,8 +208,8 @@ function onStageChange(stageId: string) {
                   ><v-icon
                     v-if="splits.get(entry.vehicleId)!.gapMs === 0"
                     size="x-small"
-                    icon="mdi-star"
-                    color="timing-best" /></span
+                    :icon="TIMING_MARKS.best.icon"
+                    :color="TIMING_MARKS.best.color" /></span
                 ><span class="text-medium-emphasis"
                   >({{ splits.get(entry.vehicleId)!.position }})</span
                 >
@@ -211,6 +228,7 @@ function onStageChange(stageId: string) {
           </tr>
         </tbody>
       </v-table>
+      <TableLegend :marks="legendMarks" />
 
       <v-table
         v-if="nonFinishers.length > 0"
