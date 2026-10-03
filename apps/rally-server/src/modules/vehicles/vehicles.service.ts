@@ -48,7 +48,15 @@ export class VehiclesService {
     if (!vehicle) {
       throw new NotFoundException(`Vehicle ${id} not found`);
     }
-    Object.assign(vehicle, patch);
+    // The validated DTO carries every declared field as an own property, unset
+    // ones as `undefined` (ES2022+ class fields). Copied over, they'd blank the
+    // returned vehicle even though save() skips them — `null` still clears.
+    Object.assign(
+      vehicle,
+      Object.fromEntries(
+        Object.entries(patch).filter(([, value]) => value !== undefined),
+      ),
+    );
     try {
       return await this.vehicles.save(vehicle);
     } catch (err) {

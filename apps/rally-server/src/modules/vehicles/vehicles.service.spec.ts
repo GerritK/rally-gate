@@ -89,6 +89,29 @@ describe('VehiclesService.update', () => {
     });
   });
 
+  it('keeps fields the patch carries as undefined, as a validated DTO does', async () => {
+    const service = makeServiceForUpdate({
+      id: 'v1',
+      startNumber: '12',
+      driverName: 'Demo',
+      coDriverName: 'Co',
+    });
+
+    const updated = await service.update('v1', {
+      startNumber: undefined,
+      driverName: undefined,
+      coDriverName: null,
+      status: VehicleStatus.CHECKED_IN,
+    });
+
+    expect(updated).toMatchObject({
+      startNumber: '12',
+      driverName: 'Demo',
+      coDriverName: null,
+      status: VehicleStatus.CHECKED_IN,
+    });
+  });
+
   it('throws ConflictException when the new start number is already taken', async () => {
     const service = makeServiceForUpdate(
       { id: 'v1', startNumber: '12', driverName: 'Demo' },
