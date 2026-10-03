@@ -1022,11 +1022,11 @@ onUnmounted(() => {
     </v-card-text>
   </v-card>
 
-  <v-row
+  <div
     v-if="stage && stage.status !== StageStatus.CLOSED"
-    class="mb-1 d-print-none"
+    class="rg-stage-flow mb-4 d-print-none"
   >
-    <v-col cols="12" md="4">
+    <div>
       <v-card class="h-100">
         <v-card-item>
           <v-card-title>
@@ -1079,8 +1079,8 @@ onUnmounted(() => {
           Everyone has started.
         </v-card-text>
       </v-card>
-    </v-col>
-    <v-col v-if="stage.status === StageStatus.ACTIVE" cols="12" md="8">
+    </div>
+    <div v-if="stage.status === StageStatus.ACTIVE">
       <v-card class="h-100">
         <v-card-item>
           <v-card-title class="d-flex align-center ga-2">
@@ -1157,8 +1157,8 @@ onUnmounted(() => {
           No car on stage.
         </v-card-text>
       </v-card>
-    </v-col>
-  </v-row>
+    </div>
+  </div>
 
   <v-card v-if="stage && startOrder" class="mb-4">
     <v-table density="comfortable" class="rg-marshal-table">
@@ -1187,7 +1187,7 @@ onUnmounted(() => {
             <td class="rg-timing font-weight-bold">
               {{ row.entry.startNumber }}
             </td>
-            <td>{{ row.entry.driverName }}</td>
+            <td class="text-no-wrap">{{ row.entry.driverName }}</td>
             <td class="d-none d-print-table-cell">
               {{ row.entry.coDriverName }}
             </td>
@@ -1238,7 +1238,7 @@ onUnmounted(() => {
                 <ManualMark v-if="row.run.startManual" />
               </span>
             </td>
-            <td class="d-print-none rg-timing">
+            <td class="d-print-none rg-timing text-no-wrap">
               {{ row.run ? formatSplits(row.run.id) : '' }}
             </td>
             <td class="d-print-none">
@@ -1451,6 +1451,18 @@ onUnmounted(() => {
   font-weight: 600;
   font-size: 1.05rem;
   background: rgba(var(--v-theme-on-surface), 0.06);
+}
+
+/* Up next beside On stage; stacked below Vuetify's md breakpoint. */
+.rg-stage-flow {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 16px;
+}
+@media (max-width: 959px) {
+  .rg-stage-flow {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Readable from a tablet at arm's length or more. */
