@@ -49,7 +49,7 @@ onMounted(async () => {
     <!-- Dark, not primary: orange is kept for the one main action on a page
          (packages/ui/theme.ts). The logo names the product, so the title is
          just the open event. -->
-    <v-app-bar flat>
+    <v-app-bar>
       <template #prepend>
         <v-app-bar-nav-icon @click="drawer = !drawer" />
       </template>

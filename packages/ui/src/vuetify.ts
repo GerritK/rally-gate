@@ -27,6 +27,7 @@ export function createRallyVuetify() {
       themes: { rallyGateDark },
     },
     defaults: {
+      VAppBar: { flat: true, border: 'b' },
       VCard: { rounded: 'lg', flat: true, border: true },
       VBtn: { rounded: 'md', variant: 'flat' },
       VSheet: { rounded: 'lg' },

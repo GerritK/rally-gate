@@ -351,7 +351,7 @@ onUnmounted(() => clearInterval(statusTimer));
 
 <template>
   <v-app>
-    <v-app-bar flat>
+    <v-app-bar>
       <v-app-bar-title>
         <div class="d-flex align-center ga-3">
           <img :src="logoUrl" alt="" class="app-bar-logo" />
