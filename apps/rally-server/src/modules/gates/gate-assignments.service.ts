@@ -58,9 +58,11 @@ export class GateAssignmentsService {
     return this.assignments.findOneBy({ gateId, active: true });
   }
 
-  findActiveSplitGatesForStage(stageId: string): Promise<GateAssignment[]> {
+  // Not only active ones: closing a stage deactivates its assignments, and
+  // its results still need their split columns.
+  findSplitGatesForStage(stageId: string): Promise<GateAssignment[]> {
     return this.assignments.find({
-      where: { stageId, role: GateRole.STAGE_SPLIT, active: true },
+      where: { stageId, role: GateRole.STAGE_SPLIT },
       order: { splitIndex: 'ASC' },
     });
   }

@@ -17,7 +17,8 @@ What exists, with where its reasoning lives. History is in git.
   detections retried and surfaced (`CLAUDE.md`, `event-model.md`).
 - **Timing:** start/finish/split roles, stage/split/overall classification, DNF/DNS,
   manual corrections, voiding and gate-timed re-runs, notional times,
-  vehicle classes as filtered rankings, crews without a counted stage listed
+  vehicle classes as filtered rankings, splits as columns of the stage
+  classification, crews without a counted stage listed
   as "Not classified" below the overall (`event-model.md`).
 - **Light barrier:** `BeamAdapter` (E3Z-T61 via GPIO), unassigned passings
   assigned by a marshal (`decoder-adapters.md`, `event-model.md`). Verified on
@@ -66,13 +67,6 @@ What exists, with where its reasoning lives. History is in git.
 
 ## Next
 
-- **Splits as columns in the stage classification**, replacing the separate
-  Split Classification card and its picker: each cell the split time plus
-  that split's rank, the best one marked (`timing-best` and a second cue).
-  No rows for cars still on stage: mid-stage, Live Timing's On stage card
-  already shows each car's split against the best, and Results is read
-  after the stage. No server change, the per-split data exists. Update the
-  "Split classification is under Results" note in `frontend-structure.md`.
 - **Print results** like the start list (`design-system.md` "Print"): a
   Print button on Overall and on a stage's results, printing the table as
   the posted result. Rally name (no app bar on paper), title, class filter

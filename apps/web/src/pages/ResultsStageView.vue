@@ -17,12 +17,7 @@ import ClassFilter from '../components/ClassFilter.vue';
 import StagePicker from '../components/StagePicker.vue';
 import { fetchStages, type Stage } from '../api/stages';
 import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
-import {
-  formatDuration,
-  formatGap,
-  outcomeColor,
-  runStatusColor,
-} from '../format';
+import { formatDuration, formatGap, outcomeColor } from '../format';
 
 const props = defineProps<{ stageId: string }>();
 const route = useRoute();
@@ -33,64 +28,43 @@ const classes = ref<VehicleClass[]>([]);
 const selectedClassIds = useClassQuery();
 const stageClassification = ref<ClassificationEntry[]>([]);
 const splitGates = ref<SplitGateInfo[]>([]);
-const selectedSplitIndex = ref<number | null>(null);
-const splitClassification = ref<SplitClassificationEntry[]>([]);
+/** Per split gate (same order), each vehicle's split time and rank. While
+ * the stage runs, the rank includes cars still on stage; once it closes, a
+ * DNF's splits drop out server-side. */
+const splitsByGate = ref<Map<string, SplitClassificationEntry>[]>([]);
 const nonFinishers = ref<StageOutcomeEntry[]>([]);
 
-const splitGateOptions = computed(() =>
-  splitGates.value.map((g) => ({
-    value: g.splitIndex,
-    title: `Split ${g.splitIndex} (${g.name})`,
-  })),
-);
-
-async function refreshSplitClassification() {
-  if (props.stageId && selectedSplitIndex.value !== null) {
-    splitClassification.value = await fetchSplitClassification(
-      props.stageId,
-      selectedSplitIndex.value,
-      selectedClassIds.value,
-    );
-  } else {
-    splitClassification.value = [];
-  }
-}
-
-async function refreshStageClassification() {
-  stageClassification.value = await fetchStageClassification(
-    props.stageId,
-    selectedClassIds.value,
-  );
-  nonFinishers.value = await fetchNonFinishers(
-    props.stageId,
-    selectedClassIds.value,
-  );
-}
-
-async function loadStage() {
+async function refreshClassification() {
   if (!props.stageId) return;
-  await refreshStageClassification();
-  splitGates.value = await fetchSplitGatesForStage(props.stageId);
-  selectedSplitIndex.value =
-    splitGates.value.length > 0 ? splitGates.value[0].splitIndex! : null;
-  await refreshSplitClassification();
+  const [classification, outcomes, gates] = await Promise.all([
+    fetchStageClassification(props.stageId, selectedClassIds.value),
+    fetchNonFinishers(props.stageId, selectedClassIds.value),
+    fetchSplitGatesForStage(props.stageId),
+  ]);
+  const splits = await Promise.all(
+    gates.map((g) =>
+      fetchSplitClassification(
+        props.stageId,
+        g.splitIndex,
+        selectedClassIds.value,
+      ),
+    ),
+  );
+  stageClassification.value = classification;
+  nonFinishers.value = outcomes;
+  splitGates.value = gates;
+  splitsByGate.value = splits.map(
+    (entries) => new Map(entries.map((e) => [e.vehicleId, e])),
+  );
 }
 
-watch(() => props.stageId, loadStage);
-watch(selectedSplitIndex, refreshSplitClassification);
-watch(
-  () => route.query.classes,
-  async () => {
-    if (!props.stageId) return;
-    await refreshStageClassification();
-    await refreshSplitClassification();
-  },
-);
+watch(() => props.stageId, refreshClassification);
+watch(() => route.query.classes, refreshClassification);
 
 onMounted(async () => {
   stages.value = await fetchStages();
   classes.value = await fetchVehicleClasses();
-  await loadStage();
+  await refreshClassification();
 });
 
 const classLabel = computed(() =>
@@ -117,7 +91,7 @@ function onStageChange(stageId: string) {
     <ClassFilter v-model="selectedClassIds" :classes="classes" />
   </div>
 
-  <v-card class="mb-6">
+  <v-card>
     <v-card-title>
       Stage Classification
       <template v-if="stage"> — {{ stage.id }} · {{ stage.name }}</template>
@@ -150,6 +124,13 @@ function onStageChange(stageId: string) {
             <th>#</th>
             <th>Driver</th>
             <th>Co-Driver</th>
+            <th
+              v-for="gate in splitGates"
+              :key="gate.gateId"
+              :title="gate.name"
+            >
+              Split {{ gate.splitIndex }}
+            </th>
             <th>Time</th>
             <th>Gap</th>
           </tr>
@@ -160,6 +141,29 @@ function onStageChange(stageId: string) {
             <td>{{ entry.startNumber }}</td>
             <td>{{ entry.driverName }}</td>
             <td>{{ entry.coDriverName ?? '-' }}</td>
+            <td
+              v-for="(splits, i) in splitsByGate"
+              :key="splitGates[i].gateId"
+              class="rg-timing text-no-wrap"
+            >
+              <template v-if="splits.get(entry.vehicleId)">
+                <span
+                  v-if="splits.get(entry.vehicleId)!.position === 1"
+                  class="text-timing-best font-weight-bold"
+                  title="Fastest at this split"
+                >
+                  {{ formatDuration(splits.get(entry.vehicleId)!.elapsedMs) }}
+                  <v-icon size="x-small" icon="mdi-star" />
+                </span>
+                <template v-else>
+                  {{ formatDuration(splits.get(entry.vehicleId)!.elapsedMs) }}
+                </template>
+                <span class="text-medium-emphasis">
+                  ({{ splits.get(entry.vehicleId)!.position }})
+                </span>
+              </template>
+              <template v-else>-</template>
+            </td>
             <td class="rg-timing">{{ formatDuration(entry.durationMs) }}</td>
             <td class="rg-timing">{{ formatGap(entry.gapMs) }}</td>
           </tr>
@@ -187,59 +191,6 @@ function onStageChange(stageId: string) {
             <td>
               <v-chip size="small" :color="outcomeColor(entry.outcome)">
                 {{ entry.outcome }}
-              </v-chip>
-            </td>
-          </tr>
-        </tbody>
-      </v-table>
-    </v-card-text>
-  </v-card>
-
-  <v-card>
-    <v-card-title>Split Classification</v-card-title>
-    <v-card-subtitle>{{ classLabel }}</v-card-subtitle>
-    <v-card-text>
-      <v-select
-        v-if="splitGates.length > 0"
-        v-model="selectedSplitIndex"
-        :items="splitGateOptions"
-        item-title="title"
-        item-value="value"
-        label="Split"
-        density="comfortable"
-        hide-details
-        style="max-width: 320px"
-        class="mb-4"
-      />
-      <v-alert v-else type="info" variant="tonal" class="mb-4">
-        No split gates configured for this stage.
-      </v-alert>
-      <v-table v-if="splitGates.length > 0" density="comfortable">
-        <thead>
-          <tr>
-            <th>Pos</th>
-            <th>#</th>
-            <th>Driver</th>
-            <th>Co-Driver</th>
-            <th>Time</th>
-            <th>Gap</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="entry in splitClassification" :key="entry.vehicleId">
-            <td>{{ entry.position }}</td>
-            <td>{{ entry.startNumber }}</td>
-            <td>{{ entry.driverName }}</td>
-            <td>{{ entry.coDriverName ?? '-' }}</td>
-            <td class="rg-timing">{{ formatDuration(entry.elapsedMs) }}</td>
-            <td class="rg-timing">{{ formatGap(entry.gapMs) }}</td>
-            <td>
-              <v-chip
-                size="small"
-                :color="runStatusColor(entry.stageRunStatus)"
-              >
-                {{ entry.stageRunStatus }}
               </v-chip>
             </td>
           </tr>

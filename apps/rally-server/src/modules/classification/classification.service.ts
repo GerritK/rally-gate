@@ -175,7 +175,7 @@ export class ClassificationService {
       throw new NotFoundException(`Stage ${stageId} not found`);
     }
     const assignments =
-      await this.gateAssignmentsService.findActiveSplitGatesForStage(stageId);
+      await this.gateAssignmentsService.findSplitGatesForStage(stageId);
     const gates = await this.gatesService.findAll();
     const gateById = new Map(gates.map((gate) => [gate.id, gate]));
     return assignments.map((assignment) => ({
