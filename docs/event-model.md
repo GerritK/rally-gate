@@ -51,6 +51,11 @@ most splits passed, then the earlier start (at a split, one without that split
 yet). An overtake is just a suggestion the marshal
 corrects.
 
+Live Timing lists only the passings at the selected stage's gates, since
+only there do suggestions know the start order; passings on another active
+stage show as a link to it. A passing at a gate no stage owns any more stays
+listed wherever it is viewed, so it can still be dismissed.
+
 **Assign refuses when the rules would do nothing** — a finish or split for a car
 with no running start, a duplicate start, a stage no longer active — with a 409,
 leaving the passing listed. Silently consuming it would lose the time. So a

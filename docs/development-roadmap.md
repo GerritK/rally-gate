@@ -111,8 +111,7 @@ Nothing queued; OpenStint (below) resumes when the hardware arrives.
 - **Smarter passing suggestions** — today a start passing suggests the next
   car in start order and a split/finish one the first car on stage
   (`LiveView.vue` `suggestedVehicleIds`). Planned start times could narrow it
-  by time window. Passings at another active stage's gates get no suggestion,
-  since the page only knows the selected stage.
+  by time window.
 - **Combined start/finish gate** — one gate as both start and finish of a
   stage: on a detection, finish the vehicle's open run if it has one, otherwise
   start one. Not needed for the first functional test; to be thought through

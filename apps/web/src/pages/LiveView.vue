@@ -383,6 +383,30 @@ function vehicleFor(event: DetectionEventRecord): string | undefined {
   );
 }
 
+/**
+ * Passings are handled on their own stage's page, where the suggestions know
+ * the start order. One at a gate no stage owns any more stays listed here so
+ * it can still be dismissed.
+ */
+const passingsByStage = computed(() => {
+  const stageOfGate = new Map(
+    gateAssignments.value
+      .filter((a) => a.active)
+      .map((a) => [a.gateId, a.stageId]),
+  );
+  const here: DetectionEventRecord[] = [];
+  const elsewhere = new Map<string, number>();
+  for (const event of awaitingDetections.value) {
+    const stageId = stageOfGate.get(event.gateId);
+    if (!stageId || stageId === props.stageId) here.push(event);
+    else elsewhere.set(stageId, (elsewhere.get(stageId) ?? 0) + 1);
+  }
+  return {
+    here,
+    elsewhere: [...elsewhere].map(([stageId, count]) => ({ stageId, count })),
+  };
+});
+
 function gateName(gateId: string): string {
   return gates.value.find((g) => g.id === gateId)?.name ?? gateId;
 }
@@ -979,8 +1003,26 @@ onUnmounted(() => {
     </v-card-text>
   </v-card>
 
+  <v-alert
+    v-if="passingsByStage.elsewhere.length > 0"
+    type="warning"
+    variant="tonal"
+    density="compact"
+    class="mb-4 d-print-none"
+  >
+    Unassigned passings on other stages:
+    <router-link
+      v-for="{ stageId, count } in passingsByStage.elsewhere"
+      :key="stageId"
+      :to="`/live/${stageId}`"
+      class="ml-2"
+    >
+      {{ count }} on {{ stageTitle(stageId) }}
+    </router-link>
+  </v-alert>
+
   <v-card
-    v-if="awaitingDetections.length > 0"
+    v-if="passingsByStage.here.length > 0"
     class="mb-4 d-print-none"
     color="warning"
     variant="tonal"
@@ -992,7 +1034,7 @@ onUnmounted(() => {
       it. Assign a car's start before its finish.
       <v-table density="compact" class="mt-3 bg-transparent">
         <tbody>
-          <tr v-for="event in awaitingDetections" :key="event.eventId">
+          <tr v-for="event in passingsByStage.here" :key="event.eventId">
             <td>{{ gateName(event.gateId) }}</td>
             <td class="rg-timing">
               {{ formatClockTime(event.timestampGate) }}
