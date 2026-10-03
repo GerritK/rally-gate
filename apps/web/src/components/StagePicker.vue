@@ -7,9 +7,9 @@ const emit = defineEmits<{ 'update:modelValue': [stageId: string] }>();
 
 /**
  * Progress first, selection second: a marshal rarely switches stage, but
- * everyone wants to see where the rally stands. The icon shapes differ, so
- * colour is never the only signal; the label is the tooltip, since only the
- * lock needs explaining.
+ * everyone wants to see where the rally stands: done, running, to come.
+ * The icon shapes differ, so colour is never the only signal. Stage details
+ * (a published start list) belong in the stage's own header, not here.
  */
 function display(stage: Stage): {
   icon: string;
@@ -21,9 +21,6 @@ function display(stage: Stage): {
   }
   if (stage.status === StageStatus.CLOSED) {
     return { icon: 'mdi-check-circle-outline', label: 'closed' };
-  }
-  if (stage.startOrderFrozenAt) {
-    return { icon: 'mdi-lock-outline', label: 'start list published' };
   }
   return { icon: 'mdi-circle-outline', label: 'upcoming' };
 }

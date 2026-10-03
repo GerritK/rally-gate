@@ -13,8 +13,6 @@ export interface Stage {
   stageNumber: number;
   status: StageStatus;
   expectedDurationMs: number | null;
-  /** Set once the stage's start order is frozen (published). */
-  startOrderFrozenAt: string | null;
 }
 
 export function fetchStages(): Promise<Stage[]> {
