@@ -90,8 +90,11 @@ onMounted(async () => {
           </div>
         </div>
         <v-divider vertical inset class="mx-4" />
+        <!-- No active state: the drawer already marks Setup, and a lit cog
+             in the app bar reads as a pressed button. -->
         <v-btn
           to="/setup"
+          :active="false"
           icon="mdi-cog-outline"
           aria-label="Setup"
           title="Setup"
