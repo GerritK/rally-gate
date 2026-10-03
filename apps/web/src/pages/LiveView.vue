@@ -419,16 +419,43 @@ async function onRetryPending() {
 
 // ---- Gates ---------------------------------------------------------------
 
-/** All gates assigned to the stage, active or not — so a marshal can check
- * them before activating, not just once it's live. */
-const stageGates = computed(() => {
-  const gateIds = new Set(
-    gateAssignments.value
-      .filter((a) => a.stageId === props.stageId)
-      .map((a) => a.gateId),
-  );
-  return gates.value.filter((g) => gateIds.has(g.id));
+/**
+ * The stage's gates in the order a car meets them — start, splits by index,
+ * finish — so "split 2 is offline" reads off its place on the line. All
+ * assigned gates, active or not, so a marshal can check them before
+ * activating.
+ */
+const gateFlow = computed(() => {
+  const rank = (a: GateAssignment) =>
+    a.role === GateRole.STAGE_START
+      ? -1
+      : a.role === GateRole.STAGE_FINISH
+        ? Number.MAX_SAFE_INTEGER
+        : a.role === GateRole.STAGE_SPLIT
+          ? (a.splitIndex ?? 0)
+          : Number.MAX_SAFE_INTEGER - 1;
+  return gateAssignments.value
+    .filter((a) => a.stageId === props.stageId)
+    .sort((a, b) => rank(a) - rank(b))
+    .flatMap((a) => {
+      const gate = gates.value.find((g) => g.id === a.gateId);
+      if (!gate) return [];
+      const label =
+        a.role === GateRole.STAGE_START
+          ? 'Start'
+          : a.role === GateRole.STAGE_FINISH
+            ? 'Finish'
+            : a.role === GateRole.STAGE_SPLIT
+              ? `Split ${a.splitIndex ?? ''}`
+              : a.role;
+      return [{ gate, label }];
+    });
 });
+
+function gateStatusText(gate: Gate): string {
+  if (!isOnline(gate, now.value)) return 'Offline';
+  return isReady(gate, now.value) ? 'Ready' : 'Clock not synced';
+}
 
 const stageDetections = computed(() => {
   const gateIds = new Set(
@@ -903,33 +930,35 @@ onUnmounted(() => {
           {{ count }} {{ ROW_STATE_DISPLAY[state].label }}
         </v-chip>
       </div>
-      <div class="d-flex flex-wrap align-center ga-2">
-        <span v-if="stageGates.length > 0" class="text-medium-emphasis">
+      <div v-if="gateFlow.length > 0" class="d-flex align-center ga-4">
+        <div class="rg-gate-flow flex-grow-1">
+          <template v-for="(node, i) in gateFlow" :key="node.gate.id">
+            <div v-if="i > 0" class="rg-gate-line" />
+            <div
+              class="rg-gate-node"
+              :title="`${node.gate.name}: ${gateStatusText(node.gate)}`"
+            >
+              <v-icon
+                :class="{ 'gate-flash': flashingGateIds[node.gate.id] }"
+                :icon="gateStatusIcon(node.gate, now)"
+                :color="gateStatusColor(node.gate, now)"
+              />
+              <div class="text-caption font-weight-bold">{{ node.label }}</div>
+              <div class="text-caption text-medium-emphasis rg-gate-name">
+                {{ node.gate.name }}
+              </div>
+            </div>
+          </template>
+        </div>
+        <span class="text-medium-emphasis text-no-wrap">
           Gates ready
-          {{ stageGates.filter((g) => isReady(g, now)).length }}/{{
-            stageGates.length
+          {{ gateFlow.filter((n) => isReady(n.gate, now)).length }}/{{
+            gateFlow.length
           }}
         </span>
-        <v-chip
-          v-for="gate in stageGates"
-          :key="gate.id"
-          :class="{ 'gate-flash': flashingGateIds[gate.id] }"
-          :color="gateStatusColor(gate, now)"
-          :prepend-icon="gateStatusIcon(gate, now)"
-          :title="
-            !isOnline(gate, now)
-              ? 'Offline'
-              : isReady(gate, now)
-                ? 'Ready'
-                : 'Online, but its clock is not synced'
-          "
-          size="small"
-        >
-          {{ gate.name }}
-        </v-chip>
-        <span v-if="stageGates.length === 0" class="text-medium-emphasis">
-          No gates assigned to this stage yet.
-        </span>
+      </div>
+      <div v-else class="text-medium-emphasis">
+        No gates assigned to this stage yet.
       </div>
       <v-alert
         v-if="startOrder && !startOrder.frozen"
@@ -1423,6 +1452,31 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* Nodes on a line, like the stage itself; the line sits at icon height. */
+.rg-gate-flow {
+  display: flex;
+  align-items: flex-start;
+}
+.rg-gate-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 120px;
+}
+.rg-gate-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+.rg-gate-line {
+  flex: 1;
+  height: 2px;
+  margin: 11px 8px 0;
+  background: rgb(var(--v-border-color));
+}
+
 .gate-flash {
   animation: gate-flash-pulse 0.6s ease-out;
 }
