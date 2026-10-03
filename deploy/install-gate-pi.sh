@@ -164,6 +164,16 @@ if [ "$(dpkg --print-architecture)" = arm64 ]; then
   quiet sudo apt-get install -y openstint
   sudo systemctl disable --now openstint.service >/dev/null 2>&1 || true
   sudo usermod -aG plugdev,users "$USER"
+  # Our own rule rather than trusting the distro's: those may grant the SDR via
+  # TAG+="uaccess" only, i.e. to the logged-in seat user, which leaves a system
+  # service with usb_open error -3 (LIBUSB_ERROR_ACCESS). 0bda:2838 is the RTL-SDR
+  # Blog V4 and most RTL2832U dongles, 2832 the rest.
+  sudo tee /etc/udev/rules.d/60-rally-gate-rtlsdr.rules >/dev/null <<'EOF'
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2838", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2832", MODE="0660", GROUP="plugdev"
+EOF
+  sudo udevadm control --reload
+  sudo udevadm trigger --subsystem-match=usb
 else
   echo "   (not arm64: skipping OpenStint, ADAPTER=openstint won't run on this gate)"
 fi
@@ -233,6 +243,9 @@ WorkingDirectory=$INSTALL_DIR
 ExecStart=/usr/bin/node apps/gate-agent/dist/main.js
 EnvironmentFile=/etc/rally-gate/gate.env
 Restart=always
+# Without a delay, five failed starts in 10s make systemd give up for good — a
+# gate whose sensor or SDR was unplugged at boot would never come back.
+RestartSec=5
 User=$USER
 # Lets the openstint adapter run its decoder SCHED_FIFO (chrt) without root.
 LimitRTPRIO=70
