@@ -87,6 +87,8 @@ onMounted(async () => {
   await loadStage();
 });
 
+const stage = computed(() => stages.value.find((s) => s.id === props.stageId));
+
 function onStageChange(stageId: string) {
   router.push(`/results/stages/${stageId}`);
 }
@@ -97,17 +99,19 @@ function onStageChange(stageId: string) {
     class="mb-4"
     :stages="stages"
     :model-value="stageId"
+    overall
     @update:model-value="onStageChange"
+    @overall="router.push('/results/overall')"
   />
   <div class="d-flex flex-wrap align-center ga-4 mb-6">
     <ClassPicker v-model="selectedClassIds" :classes="classes" />
-    <v-btn variant="text" prepend-icon="mdi-podium" to="/results/overall">
-      Overall Classification
-    </v-btn>
   </div>
 
   <v-card class="mb-6">
-    <v-card-title>Stage Classification</v-card-title>
+    <v-card-title>
+      Stage Classification
+      <template v-if="stage"> — {{ stage.id }} · {{ stage.name }}</template>
+    </v-card-title>
     <v-card-text>
       <v-table density="comfortable">
         <thead>

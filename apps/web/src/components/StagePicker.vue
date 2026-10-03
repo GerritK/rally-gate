@@ -2,8 +2,13 @@
 import { StageStatus } from '@rally-gate/shared';
 import type { Stage } from '../api/stages';
 
-defineProps<{ stages: Stage[]; modelValue?: string }>();
-const emit = defineEmits<{ 'update:modelValue': [stageId: string] }>();
+// `overall` adds the overall result as the track's finish, selected when no
+// stage is.
+defineProps<{ stages: Stage[]; modelValue?: string; overall?: boolean }>();
+const emit = defineEmits<{
+  'update:modelValue': [stageId: string];
+  overall: [];
+}>();
 
 /**
  * Progress first, selection second: a marshal rarely switches stage, but
@@ -28,7 +33,11 @@ function display(stage: Stage): {
 
 <template>
   <nav class="rg-stage-track-scroll" aria-label="Stages">
-    <div class="rg-stage-track" :style="{ '--stages': stages.length }">
+    <div
+      class="rg-stage-track"
+      :class="{ 'rg-stage-track--overall': overall && stages.length > 0 }"
+      :style="{ '--stages': stages.length + (overall ? 1 : 0) }"
+    >
       <button
         v-for="stage in stages"
         :key="stage.id"
@@ -36,7 +45,7 @@ function display(stage: Stage): {
         class="rg-stage-node"
         :class="{ 'rg-stage-node--selected': stage.id === modelValue }"
         :aria-current="stage.id === modelValue ? 'page' : undefined"
-        :title="`${stage.stageNumber}. ${stage.name}: ${display(stage).label}`"
+        :title="`${stage.id} · ${stage.name}: ${display(stage).label}`"
         @click="emit('update:modelValue', stage.id)"
       >
         <span class="rg-stage-dot">
@@ -46,9 +55,21 @@ function display(stage: Stage): {
             size="small"
           />
         </span>
-        <span class="rg-stage-name">
-          {{ stage.stageNumber }}. {{ stage.name }}
+        <span class="rg-stage-name"> {{ stage.id }} </span>
+      </button>
+      <button
+        v-if="overall"
+        type="button"
+        class="rg-stage-node"
+        :class="{ 'rg-stage-node--selected': !modelValue }"
+        :aria-current="!modelValue ? 'page' : undefined"
+        title="Overall classification"
+        @click="emit('overall')"
+      >
+        <span class="rg-stage-dot">
+          <v-icon icon="mdi-flag-checkered" size="small" />
         </span>
+        <span class="rg-stage-name">Overall</span>
       </button>
     </div>
   </nav>
@@ -74,8 +95,23 @@ function display(stage: Stage): {
   height: 2px;
   background: rgb(var(--v-border-color));
 }
+/* The last leg, to the finish, is dashed: the overall is a result, not
+   another stage. */
+.rg-stage-track--overall::before {
+  right: calc(150% / var(--stages));
+}
+.rg-stage-track--overall::after {
+  content: '';
+  position: absolute;
+  top: 20px;
+  right: calc(50% / var(--stages));
+  width: calc(100% / var(--stages));
+  border-top: 2px dashed rgb(var(--v-border-color));
+}
 .rg-stage-node {
   position: relative;
+  /* Above the track lines, so each dot's background hides the line behind it. */
+  z-index: 1;
   flex: 1 1 0;
   min-width: 0;
   display: flex;

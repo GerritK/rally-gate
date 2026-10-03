@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   ClassificationEntry,
   OverallClassificationEntry,
+  OverallStageTime,
   SplitClassificationEntry,
   SplitGateInfo,
   StageOutcomeEntry,
@@ -126,12 +127,19 @@ export class ClassificationService {
     const totals = new Map(
       classified.map((vehicleId) => [
         vehicleId,
-        { durationMs: 0, stagesCompleted: 0 },
+        {
+          durationMs: 0,
+          stagesCompleted: 0,
+          stageTimes: [] as OverallStageTime[],
+        },
       ]),
     );
-    for (const stageTimes of timesByStage.values()) {
-      // A stage nobody finished never lands here: with no real time to
-      // anchor a notional, every crew would get the same figure anyway.
+    // `stages` is in stage order, so each crew's stageTimes are too. A stage
+    // nobody finished never lands in timesByStage: with no real time to
+    // anchor a notional, every crew would get the same figure anyway.
+    for (const stage of stages) {
+      const stageTimes = timesByStage.get(stage.id);
+      if (!stageTimes) continue;
       const notionalMs = Math.max(...stageTimes.values()) + notionalPenaltyMs;
       for (const vehicleId of classified) {
         const total = totals.get(vehicleId)!;
@@ -140,6 +148,11 @@ export class ClassificationService {
         if (realMs !== undefined) {
           total.stagesCompleted += 1;
         }
+        total.stageTimes.push({
+          stageId: stage.id,
+          durationMs: realMs ?? notionalMs,
+          notional: realMs === undefined,
+        });
       }
     }
 
@@ -152,6 +165,7 @@ export class ClassificationService {
     return ranked.map((entry) => ({
       ...entry,
       stagesCompleted: totals.get(entry.vehicleId)!.stagesCompleted,
+      stageTimes: totals.get(entry.vehicleId)!.stageTimes,
     }));
   }
 

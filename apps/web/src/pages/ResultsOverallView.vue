@@ -6,6 +6,7 @@ import {
   type OverallClassificationEntry,
 } from '../api/classification';
 import ClassPicker from '../components/ClassPicker.vue';
+import StagePicker from '../components/StagePicker.vue';
 import { fetchStages, type Stage } from '../api/stages';
 import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
 import { formatDuration, formatGap } from '../format';
@@ -22,8 +23,12 @@ const stagesCounted = computed(() =>
   Math.max(0, ...overallClassification.value.map((e) => e.stagesCompleted)),
 );
 
-const stageOptions = computed(() =>
-  stages.value.map((s) => ({ id: s.id, title: `${s.stageNumber}. ${s.name}` })),
+// Every entry carries the same counted stages, in stage order.
+const countedStages = computed(() =>
+  (overallClassification.value[0]?.stageTimes ?? []).map(({ stageId }) => ({
+    id: stageId,
+    name: stages.value.find((s) => s.id === stageId)?.name,
+  })),
 );
 
 const selectedClassNames = computed(() =>
@@ -53,18 +58,13 @@ onMounted(async () => {
 </script>
 
 <template>
+  <StagePicker
+    class="mb-4"
+    :stages="stages"
+    overall
+    @update:model-value="goToStage"
+  />
   <div class="d-flex flex-wrap align-center ga-4 mb-6">
-    <v-select
-      v-if="stageOptions.length > 0"
-      :items="stageOptions"
-      item-title="title"
-      item-value="id"
-      label="View a stage's results"
-      density="comfortable"
-      hide-details
-      style="max-width: 320px"
-      @update:model-value="goToStage"
-    />
     <ClassPicker v-model="selectedClassIds" :classes="classes" />
   </div>
 
@@ -81,6 +81,13 @@ onMounted(async () => {
             <th>#</th>
             <th>Driver</th>
             <th>Co-Driver</th>
+            <th
+              v-for="stage in countedStages"
+              :key="stage.id"
+              :title="stage.name"
+            >
+              {{ stage.id }}
+            </th>
             <th>Total Time</th>
             <th>Gap</th>
             <th>Stages</th>
@@ -92,7 +99,28 @@ onMounted(async () => {
             <td>{{ entry.startNumber }}</td>
             <td>{{ entry.driverName }}</td>
             <td>{{ entry.coDriverName ?? '-' }}</td>
-            <td class="rg-timing">{{ formatDuration(entry.durationMs) }}</td>
+            <td
+              v-for="time in entry.stageTimes"
+              :key="time.stageId"
+              class="rg-timing text-no-wrap"
+            >
+              <v-tooltip
+                v-if="time.notional"
+                text="Notional time: stage not completed, charged the slowest time plus a penalty."
+                location="top"
+              >
+                <template #activator="{ props }">
+                  <span v-bind="props" class="text-warning">
+                    {{ formatDuration(time.durationMs) }}
+                    <v-icon size="x-small" icon="mdi-asterisk" />
+                  </span>
+                </template>
+              </v-tooltip>
+              <template v-else>{{ formatDuration(time.durationMs) }}</template>
+            </td>
+            <td class="rg-timing font-weight-bold">
+              {{ formatDuration(entry.durationMs) }}
+            </td>
             <td class="rg-timing">{{ formatGap(entry.gapMs) }}</td>
             <td>
               <v-tooltip

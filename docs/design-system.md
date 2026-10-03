@@ -232,7 +232,15 @@ Extract a component once it is actually used twice, not before.
   first, selection second: a neutral ring marks the stage shown, a click
   switches. Stage details such as a published start list belong in the
   stage's own header, not on the track. It sits above every card, since the
-  stage scopes the whole page. Live Timing and stage Results.
+  stage scopes the whole page. Each stage is labelled by its id alone (the
+  organiser's own code, "WP3"), the same as the overall table's columns; a
+  name truncates at track width, so it goes in the tooltip and in the
+  stage's header as "WP3 · Waldweg Nord". Live Timing and both Results
+  pages. On
+  Results the track ends in **Overall** (`overall` prop): a checkered flag
+  behind a dashed last leg, since the overall is a result and not another
+  stage. It is ringed on the overall page, so the track is the one switch
+  between all results.
 - `ClassPicker`: one classes field, main class first and exclusive. Vehicles
   and both Results pages.
 - `ManualMark`: the hand-timed icon.

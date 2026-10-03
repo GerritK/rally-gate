@@ -148,6 +148,18 @@ describe('ClassificationService.getOverallClassification', () => {
     ]);
   });
 
+  it('lists each counted stage in order, marking notionals', async () => {
+    const service = makeOverallService(twoClosed, runs, vehicles);
+
+    const result = await service.getOverallClassification();
+    const retired = result.find((e) => e.vehicleId === 'v2')!;
+
+    expect(retired.stageTimes).toEqual([
+      { stageId: 'SS1', durationMs: 60_000, notional: false },
+      { stageId: 'SS2', durationMs: 130_000, notional: true },
+    ]);
+  });
+
   it('sinks a crew below a finisher once the penalty outweighs its pace', async () => {
     const service = makeOverallService(twoClosed, runs, vehicles, 60_000);
 

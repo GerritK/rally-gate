@@ -890,8 +890,8 @@ onUnmounted(() => {
   <v-card v-if="stage" class="mb-4">
     <v-card-item>
       <v-card-title>
-        <span class="d-none d-print-inline">Start list — </span
-        >{{ stage.stageNumber }}. {{ stage.name }}
+        <span class="d-none d-print-inline">Start list — </span>{{ stage.id }} ·
+        {{ stage.name }}
       </v-card-title>
       <v-card-subtitle>
         <!-- The app bar names the rally on screen; a print has no app bar. -->

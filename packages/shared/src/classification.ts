@@ -21,6 +21,15 @@ export interface OverallClassificationEntry extends ClassificationEntry {
    * `docs/event-model.md`.
    */
   stagesCompleted: number;
+  /** One per counted stage, in stage order; together they make `durationMs`. */
+  stageTimes: OverallStageTime[];
+}
+
+export interface OverallStageTime {
+  stageId: string;
+  durationMs: number;
+  /** Charged for a stage the crew didn't complete, not driven. */
+  notional: boolean;
 }
 
 export interface SplitClassificationEntry {
