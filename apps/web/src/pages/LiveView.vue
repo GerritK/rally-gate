@@ -1472,6 +1472,12 @@ onUnmounted(() => {
     grid-template-columns: 1fr;
   }
 }
+/* Its own display would override Vuetify's d-print-none. */
+@media print {
+  .rg-stage-flow {
+    display: none;
+  }
+}
 
 /* Readable from a tablet at arm's length or more. */
 .rg-next-number {
