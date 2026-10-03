@@ -80,6 +80,7 @@ async function main() {
   cpSync(join(root, 'deploy/standalone/start.js'), join(app, 'start.js'));
 
   cpSync(process.execPath, join(pkg, windows ? 'node.exe' : 'node'));
+  cpSync(join(root, 'LICENSE'), join(pkg, 'LICENSE'));
 
   if (windows) {
     cpSync(
