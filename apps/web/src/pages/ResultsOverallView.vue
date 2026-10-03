@@ -1,21 +1,23 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import {
   fetchOverallClassification,
   type OverallClassificationEntry,
 } from '../api/classification';
-import ClassPicker from '../components/ClassPicker.vue';
+import { classFilterLabel, useClassQuery } from '../class-query';
+import ClassFilter from '../components/ClassFilter.vue';
 import StagePicker from '../components/StagePicker.vue';
 import { fetchStages, type Stage } from '../api/stages';
 import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
 import { formatDuration, formatGap } from '../format';
 
+const route = useRoute();
 const router = useRouter();
 const overallClassification = ref<OverallClassificationEntry[]>([]);
 const stages = ref<Stage[]>([]);
 const classes = ref<VehicleClass[]>([]);
-const selectedClassIds = ref<string[]>([]);
+const selectedClassIds = useClassQuery();
 
 /** Stages counted toward the overall — every closed stage that anyone
  * finished. A crew below this has notional time inside its total. */
@@ -31,15 +33,12 @@ const countedStages = computed(() =>
   })),
 );
 
-const selectedClassNames = computed(() =>
-  classes.value
-    .filter((c) => selectedClassIds.value.includes(c.id))
-    .map((c) => c.name)
-    .join(' · '),
+const classLabel = computed(() =>
+  classFilterLabel(classes.value, selectedClassIds.value),
 );
 
 function goToStage(stageId: string) {
-  router.push(`/results/stages/${stageId}`);
+  router.push({ path: `/results/stages/${stageId}`, query: route.query });
 }
 
 async function refresh() {
@@ -48,7 +47,7 @@ async function refresh() {
   );
 }
 
-watch(selectedClassIds, refresh);
+watch(() => route.query.classes, refresh);
 
 onMounted(async () => {
   await refresh();
@@ -65,14 +64,12 @@ onMounted(async () => {
     @update:model-value="goToStage"
   />
   <div class="d-flex flex-wrap align-center ga-4 mb-6">
-    <ClassPicker v-model="selectedClassIds" :classes="classes" />
+    <ClassFilter v-model="selectedClassIds" :classes="classes" />
   </div>
 
   <v-card>
-    <v-card-title>
-      Overall Classification
-      <template v-if="selectedClassNames"> — {{ selectedClassNames }}</template>
-    </v-card-title>
+    <v-card-title> Overall Classification </v-card-title>
+    <v-card-subtitle>{{ classLabel }}</v-card-subtitle>
     <v-card-text>
       <v-table density="comfortable">
         <thead>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import {
   fetchNonFinishers,
   fetchSplitClassification,
@@ -11,7 +11,8 @@ import {
   type SplitGateInfo,
   type StageOutcomeEntry,
 } from '../api/classification';
-import ClassPicker from '../components/ClassPicker.vue';
+import { classFilterLabel, useClassQuery } from '../class-query';
+import ClassFilter from '../components/ClassFilter.vue';
 import StagePicker from '../components/StagePicker.vue';
 import { fetchStages, type Stage } from '../api/stages';
 import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
@@ -23,11 +24,12 @@ import {
 } from '../format';
 
 const props = defineProps<{ stageId: string }>();
+const route = useRoute();
 const router = useRouter();
 
 const stages = ref<Stage[]>([]);
 const classes = ref<VehicleClass[]>([]);
-const selectedClassIds = ref<string[]>([]);
+const selectedClassIds = useClassQuery();
 const stageClassification = ref<ClassificationEntry[]>([]);
 const splitGates = ref<SplitGateInfo[]>([]);
 const selectedSplitIndex = ref<number | null>(null);
@@ -75,11 +77,14 @@ async function loadStage() {
 
 watch(() => props.stageId, loadStage);
 watch(selectedSplitIndex, refreshSplitClassification);
-watch(selectedClassIds, async () => {
-  if (!props.stageId) return;
-  await refreshStageClassification();
-  await refreshSplitClassification();
-});
+watch(
+  () => route.query.classes,
+  async () => {
+    if (!props.stageId) return;
+    await refreshStageClassification();
+    await refreshSplitClassification();
+  },
+);
 
 onMounted(async () => {
   stages.value = await fetchStages();
@@ -87,10 +92,14 @@ onMounted(async () => {
   await loadStage();
 });
 
+const classLabel = computed(() =>
+  classFilterLabel(classes.value, selectedClassIds.value),
+);
+
 const stage = computed(() => stages.value.find((s) => s.id === props.stageId));
 
 function onStageChange(stageId: string) {
-  router.push(`/results/stages/${stageId}`);
+  router.push({ path: `/results/stages/${stageId}`, query: route.query });
 }
 </script>
 
@@ -101,10 +110,10 @@ function onStageChange(stageId: string) {
     :model-value="stageId"
     overall
     @update:model-value="onStageChange"
-    @overall="router.push('/results/overall')"
+    @overall="router.push({ path: '/results/overall', query: route.query })"
   />
   <div class="d-flex flex-wrap align-center ga-4 mb-6">
-    <ClassPicker v-model="selectedClassIds" :classes="classes" />
+    <ClassFilter v-model="selectedClassIds" :classes="classes" />
   </div>
 
   <v-card class="mb-6">
@@ -112,6 +121,7 @@ function onStageChange(stageId: string) {
       Stage Classification
       <template v-if="stage"> — {{ stage.id }} · {{ stage.name }}</template>
     </v-card-title>
+    <v-card-subtitle>{{ classLabel }}</v-card-subtitle>
     <v-card-text>
       <v-table density="comfortable">
         <thead>
@@ -167,6 +177,7 @@ function onStageChange(stageId: string) {
 
   <v-card>
     <v-card-title>Split Classification</v-card-title>
+    <v-card-subtitle>{{ classLabel }}</v-card-subtitle>
     <v-card-text>
       <v-select
         v-if="splitGates.length > 0"

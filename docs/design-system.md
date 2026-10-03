@@ -241,6 +241,12 @@ Extract a component once it is actually used twice, not before.
   behind a dashed last leg, since the overall is a result and not another
   stage. It is ringed on the overall page, so the track is the one switch
   between all results.
-- `ClassPicker`: one classes field, main class first and exclusive. Vehicles
-  and both Results pages.
+- `ClassPicker`: one classes field, main class first and exclusive, for
+  assigning classes on Vehicles.
+- `ClassFilter`: the Results filter, one click per choice. A row of main
+  classes (exactly one, "All" by default) and a row of categories (any
+  number), ANDed as the server filters. The selection lives in
+  `?classes=` (`useClassQuery`), so it carries between Overall and a stage.
+  Every results card names it as its subtitle, "All classes" included, so
+  a printout always says which ranking it is.
 - `ManualMark`: the hand-timed icon.
