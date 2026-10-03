@@ -680,9 +680,15 @@ async function onActivateStage(force = false) {
 
 async function onCloseStage() {
   if (!props.stageId || closingStage.value) return;
+  const unassigned = passingsByStage.value.here.length;
   if (
     !confirm(
-      'Close this stage? Its gates stop timing, cars still on stage become DNF and cars that never started DNS. Closing cannot be undone.',
+      'Close this stage? Its gates stop timing, cars still on stage become DNF and cars that never started DNS. Closing cannot be undone.' +
+        (unassigned > 0
+          ? `
+
+${unassigned} unassigned passing${unassigned === 1 ? '' : 's'} will be discarded: a car may be missing a time. Assign ${unassigned === 1 ? 'it' : 'them'} first.`
+          : ''),
     )
   )
     return;

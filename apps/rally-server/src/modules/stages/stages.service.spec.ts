@@ -50,16 +50,19 @@ function makeService(initialStages: StageRow[]) {
   };
   const gateAssignmentsService = {
     deactivateForStage: jest.fn().mockResolvedValue(undefined),
+    findByStage: jest.fn().mockResolvedValue([{ gateId: 'G1' }]),
     activateForStage: jest.fn().mockResolvedValue({ deactivatedStageIds: [] }),
     removeForStage: jest.fn().mockResolvedValue(undefined),
   };
+  const emitter = { emitAsync: jest.fn().mockResolvedValue([]) };
   return {
     service: new StagesService(
       stages as never,
       gateAssignmentsService as never,
-      { emitAsync: jest.fn().mockResolvedValue([]) } as never,
+      emitter as never,
     ),
     gateAssignmentsService,
+    emitter,
     state,
   };
 }
@@ -223,6 +226,32 @@ describe('StagesService.close', () => {
       'SS1',
     );
     expect(result.status).toBe(StageStatus.CLOSED);
+  });
+
+  it('announces the gates of a stage that ran, so their passings are discarded', async () => {
+    const { service, emitter } = makeService([
+      { id: 'SS1', status: StageStatus.ACTIVE },
+    ]);
+
+    await service.close('SS1');
+
+    expect(emitter.emitAsync).toHaveBeenCalledWith('stage.closed', {
+      stageId: 'SS1',
+      gateIds: ['G1'],
+    });
+  });
+
+  it('leaves passings alone for a stage that never ran', async () => {
+    const { service, emitter } = makeService([
+      { id: 'SS1', status: StageStatus.NOT_STARTED },
+    ]);
+
+    await service.close('SS1');
+
+    expect(emitter.emitAsync).not.toHaveBeenCalledWith(
+      'stage.closed',
+      expect.anything(),
+    );
   });
 });
 

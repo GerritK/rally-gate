@@ -53,8 +53,15 @@ corrects.
 
 Live Timing lists only the passings at the selected stage's gates, since
 only there do suggestions know the start order; passings on another active
-stage show as a link to it. A passing at a gate no stage owns any more stays
-listed wherever it is viewed, so it can still be dismissed.
+stage show as a link to it.
+
+**Closing a stage that ran discards its unassigned passings** (`stage.closed`
+→ `EventsService`): they can't be assigned to a closed stage any more, and
+once a gate is reused, by a forced activation for instance, they would be
+read as the new stage's passings. The records stay as evidence. Live Timing's
+close confirmation counts them, since each may be a car without a time. A
+passing at a gate no stage owns (one left from before this) stays listed
+wherever it is viewed, so it can still be dismissed.
 
 **Assign refuses when the rules would do nothing** — a finish or split for a car
 with no running start, a duplicate start, a stage no longer active — with a 409,

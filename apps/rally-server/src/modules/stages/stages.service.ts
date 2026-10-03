@@ -102,9 +102,19 @@ export class StagesService {
     if (!stage) {
       throw new NotFoundException(`Stage ${id} not found`);
     }
+    const wasActive = stage.status === StageStatus.ACTIVE;
     await this.gateAssignmentsService.deactivateForStage(id);
     stage.status = StageStatus.CLOSED;
-    return this.stages.save(stage);
+    const saved = await this.stages.save(stage);
+    // Only a stage that ran: a never-activated one's gates may be timing
+    // another stage right now, and their passings belong to that one.
+    if (wasActive) {
+      const gateIds = (await this.gateAssignmentsService.findByStage(id)).map(
+        (a) => a.gateId,
+      );
+      await this.emitter.emitAsync('stage.closed', { stageId: id, gateIds });
+    }
+    return saved;
   }
 
   /**

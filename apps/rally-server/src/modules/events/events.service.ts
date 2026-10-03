@@ -15,7 +15,7 @@ import {
   GateRole,
   StageStatus,
 } from '@rally-gate/shared';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { Gate } from '../gates/gate.entity';
 import { GatesService } from '../gates/gates.service';
@@ -165,6 +165,33 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     await this.events.save(record);
     await this.emitAwaitingChanged();
     return record;
+  }
+
+  /**
+   * A closed stage's unassigned passings can no longer be timed (assign 409s
+   * on a closed stage), and once a gate is reused by another stage they'd be
+   * read as that stage's. So they leave the list; the records stay as
+   * evidence. Live Timing's close confirmation says how many.
+   */
+  @OnEvent('stage.closed')
+  async discardPassingsOfClosedStage({
+    stageId,
+    gateIds,
+  }: {
+    stageId: string;
+    gateIds: string[];
+  }): Promise<void> {
+    if (gateIds.length === 0) return;
+    const { affected } = await this.events.update(
+      { awaitingVehicle: true, gateId: In(gateIds) },
+      { awaitingVehicle: false },
+    );
+    if (affected) {
+      this.logger.warn(
+        `Discarded ${affected} unassigned passing(s) on closed stage ${stageId}`,
+      );
+      await this.emitAwaitingChanged();
+    }
   }
 
   /** For a passing that was no car at all: a marshal, a dog, a double trigger. */

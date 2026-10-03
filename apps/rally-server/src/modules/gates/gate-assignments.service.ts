@@ -42,6 +42,10 @@ export class GateAssignmentsService {
     return this.assignments.find();
   }
 
+  findByStage(stageId: string): Promise<GateAssignment[]> {
+    return this.assignments.find({ where: { stageId } });
+  }
+
   findByGate(gateId: string): Promise<GateAssignment[]> {
     return this.assignments.find({ where: { gateId } });
   }
