@@ -35,56 +35,48 @@ function toggleEditVehicle(id: string) {
 }
 
 async function onUpdateVehicle(vehicle: Vehicle, patch: VehiclePatch) {
-  try {
-    const updated = await updateVehicle(vehicle.id, patch);
-    const idx = vehicles.value.findIndex((v) => v.id === vehicle.id);
-    if (idx !== -1) vehicles.value[idx] = updated;
-  } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to update vehicle');
-  }
+  const updated = await updateVehicle(vehicle.id, patch);
+  const idx = vehicles.value.findIndex((v) => v.id === vehicle.id);
+  if (idx !== -1) vehicles.value[idx] = updated;
 }
 
 function onUpdateStartNumber(vehicle: Vehicle, value: string) {
   if (!value) return;
-  onUpdateVehicle(vehicle, { startNumber: Number(value) });
+  return onUpdateVehicle(vehicle, { startNumber: Number(value) });
 }
 
 function onUpdateDriverName(vehicle: Vehicle, value: string) {
   if (!value) return;
-  onUpdateVehicle(vehicle, { driverName: value });
+  return onUpdateVehicle(vehicle, { driverName: value });
 }
 
 function onUpdateCoDriverName(vehicle: Vehicle, value: string) {
-  onUpdateVehicle(vehicle, { coDriverName: value || null });
+  return onUpdateVehicle(vehicle, { coDriverName: value || null });
 }
 
 function onUpdateTransponderId(vehicle: Vehicle, value: string) {
-  onUpdateVehicle(vehicle, { transponderId: value || null });
+  return onUpdateVehicle(vehicle, { transponderId: value || null });
 }
 
 function onUpdateStatus(vehicle: Vehicle, status: VehicleStatus) {
-  onUpdateVehicle(vehicle, { status });
+  return onUpdateVehicle(vehicle, { status });
 }
 
 function onUpdateClasses(vehicle: Vehicle, classIds: string[]) {
-  onUpdateVehicle(vehicle, { classIds });
+  return onUpdateVehicle(vehicle, { classIds });
 }
 
 async function onCreateVehicle() {
   if (!newVehicle.value.startNumber || !newVehicle.value.driverName) return;
-  try {
-    await createVehicle({
-      startNumber: Number(newVehicle.value.startNumber),
-      driverName: newVehicle.value.driverName,
-      coDriverName: newVehicle.value.coDriverName || undefined,
-      transponderId: newVehicle.value.transponderId || undefined,
-      classIds: newVehicle.value.classIds,
-    });
-    newVehicle.value = emptyVehicle();
-    await refresh();
-  } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to add vehicle');
-  }
+  await createVehicle({
+    startNumber: Number(newVehicle.value.startNumber),
+    driverName: newVehicle.value.driverName,
+    coDriverName: newVehicle.value.coDriverName || undefined,
+    transponderId: newVehicle.value.transponderId || undefined,
+    classIds: newVehicle.value.classIds,
+  });
+  newVehicle.value = emptyVehicle();
+  await refresh();
 }
 
 onMounted(refresh);

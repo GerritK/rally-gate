@@ -57,6 +57,7 @@ import {
   formatClockTime,
   formatStageDuration,
   openTimePicker,
+  useConfirm,
 } from '@rally-gate/ui';
 import {
   combineDateAndTime,
@@ -96,8 +97,7 @@ const editingVehicleId = ref<string | null>(null);
 const retryingPending = ref(false);
 const activatingStage = ref(false);
 const closingStage = ref(false);
-const conflictDialog = ref(false);
-const conflictingStageNames = ref<string[]>([]);
+const confirm = useConfirm();
 const stagesLoaded = ref(false);
 
 const FLASH_DURATION_MS = 600;
@@ -422,13 +422,9 @@ function gateName(gateId: string): string {
 async function onAssign(event: DetectionEventRecord) {
   const vehicleId = vehicleFor(event);
   if (!vehicleId) return;
-  try {
-    await assignVehicleToEvent(event.eventId, vehicleId);
-    delete pickedVehicleIds.value[event.eventId];
-    awaitingDetections.value = await fetchAwaitingEvents();
-  } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to assign vehicle');
-  }
+  await assignVehicleToEvent(event.eventId, vehicleId);
+  delete pickedVehicleIds.value[event.eventId];
+  awaitingDetections.value = await fetchAwaitingEvents();
 }
 
 async function onDismiss(event: DetectionEventRecord) {
@@ -542,8 +538,6 @@ async function onFinishNow(run: StageRun) {
   finishingRunId.value = run.id;
   try {
     upsertStageRun(await finishStageRunNow(run.id));
-  } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to finish');
   } finally {
     finishingRunId.value = null;
   }
@@ -562,8 +556,6 @@ async function onStartNow(vehicleId: string) {
   startingVehicleId.value = vehicleId;
   try {
     upsertStageRun(await createStageRun({ vehicleId, stageId: props.stageId }));
-  } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to start');
   } finally {
     startingVehicleId.value = null;
   }
@@ -590,11 +582,14 @@ async function onCorrectFinish(run: StageRun, value: string) {
 
 async function onVoidRun(run: StageRun) {
   if (
-    !confirm(
-      `Void ${vehicleName(vehicles.value, run.vehicleId)}'s attempt ${run.attempt}?\n\n` +
-        `It stays on record but stops counting, and the car can run this stage again — ` +
-        `the start gate will time the new attempt automatically.`,
-    )
+    !(await confirm({
+      title: `Void ${vehicleName(vehicles.value, run.vehicleId)}'s attempt ${run.attempt}?`,
+      text:
+        'It stays on record but stops counting, and the car can run this stage again — ' +
+        'the start gate will time the new attempt automatically.',
+      confirmText: 'Void attempt',
+      color: 'error',
+    }))
   )
     return;
   upsertStageRun(await voidStageRun(run.id));
@@ -602,19 +597,17 @@ async function onVoidRun(run: StageRun) {
 
 /** The server's 409 names the attempt to void first; surfaced as-is. */
 async function onUnvoidRun(run: StageRun) {
-  try {
-    upsertStageRun(await unvoidStageRun(run.id));
-  } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to restore run');
-  }
+  upsertStageRun(await unvoidStageRun(run.id));
 }
 
 async function onDeleteRun(run: StageRun) {
   if (
-    !confirm(
-      `Delete ${vehicleName(vehicles.value, run.vehicleId)}'s attempt ${run.attempt} for good?\n\n` +
-        `Unlike voiding, this leaves no record. Use it for a run that never happened.`,
-    )
+    !(await confirm({
+      title: `Delete ${vehicleName(vehicles.value, run.vehicleId)}'s attempt ${run.attempt}?`,
+      text: 'Unlike voiding, this leaves no record. Use it for a run that never happened.',
+      confirmText: 'Delete attempt',
+      color: 'error',
+    }))
   )
     return;
   await deleteStageRun(run.id);
@@ -662,40 +655,51 @@ async function refreshStages() {
 async function onActivateStage(force = false) {
   if (!props.stageId || activatingStage.value) return;
   activatingStage.value = true;
+  let conflictingStageIds: string[] | undefined;
   try {
     await activateStage(props.stageId, force);
-    conflictDialog.value = false;
     await refreshStages();
     startOrder.value = await fetchStartOrder(props.stageId);
   } catch (err) {
-    const conflictingStageIds =
+    conflictingStageIds =
       err instanceof ApiError && err.status === 409
         ? (err.body as { conflictingStageIds?: string[] } | null)
             ?.conflictingStageIds
         : undefined;
-    if (conflictingStageIds) {
-      conflictingStageNames.value = conflictingStageIds.map(stageTitle);
-      conflictDialog.value = true;
-    } else {
-      alert(err instanceof Error ? err.message : 'Failed to activate stage');
-    }
+    if (!conflictingStageIds) throw err;
   } finally {
     activatingStage.value = false;
   }
+  if (!conflictingStageIds) return;
+  const plural = conflictingStageIds.length > 1;
+  if (
+    await confirm({
+      title: 'Gates already active elsewhere',
+      text:
+        `This stage shares gates with the currently active ${plural ? 'stages' : 'stage'}: ` +
+        `${conflictingStageIds.map(stageTitle).join(', ')}. Activating anyway will close ` +
+        `${plural ? 'those stages' : 'that stage'} — any of its cars still on course will be marked DNF.`,
+      confirmText: 'Activate anyway',
+      color: 'error',
+    })
+  )
+    await onActivateStage(true);
 }
 
 async function onCloseStage() {
   if (!props.stageId || closingStage.value) return;
   const unassigned = passingsByStage.value.here.length;
   if (
-    !confirm(
-      'Close this stage? Its gates stop timing, cars still on stage become DNF and cars that never started DNS. Closing cannot be undone.' +
+    !(await confirm({
+      title: 'Close this stage?',
+      text:
+        'Its gates stop timing, cars still on stage become DNF and cars that never started DNS. Closing cannot be undone.' +
         (unassigned > 0
-          ? `
-
-${unassigned} unassigned passing${unassigned === 1 ? '' : 's'} will be discarded: a car may be missing a time. Assign ${unassigned === 1 ? 'it' : 'them'} first.`
+          ? `\n\n${unassigned} unassigned passing${unassigned === 1 ? '' : 's'} will be discarded: a car may be missing a time. Assign ${unassigned === 1 ? 'it' : 'them'} first.`
           : ''),
-    )
+      confirmText: 'Close stage',
+      color: 'error',
+    }))
   )
     return;
   closingStage.value = true;
@@ -710,28 +714,22 @@ ${unassigned} unassigned passing${unassigned === 1 ? '' : 's'} will be discarded
 
 async function onFreeze() {
   if (!props.stageId) return;
-  try {
-    startOrder.value = await freezeStartOrder(props.stageId);
-    stages.value = await fetchStages();
-  } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to freeze');
-  }
+  startOrder.value = await freezeStartOrder(props.stageId);
+  stages.value = await fetchStages();
 }
 
 async function onUnfreeze() {
   if (!props.stageId) return;
   if (
-    !confirm(
-      'Unfreeze this start list? It is computed live again, so a posted copy may stop matching it.',
-    )
+    !(await confirm({
+      title: 'Unfreeze this start list?',
+      text: 'It is computed live again, so a posted copy may stop matching it.',
+      confirmText: 'Unfreeze',
+    }))
   )
     return;
-  try {
-    startOrder.value = await unfreezeStartOrder(props.stageId);
-    stages.value = await fetchStages();
-  } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to unfreeze');
-  }
+  startOrder.value = await unfreezeStartOrder(props.stageId);
+  stages.value = await fetchStages();
 }
 
 function print() {
@@ -1481,31 +1479,6 @@ onUnmounted(() => {
       </v-expansion-panel-text>
     </v-expansion-panel>
   </v-expansion-panels>
-
-  <v-dialog v-model="conflictDialog" max-width="480">
-    <v-card>
-      <v-card-title>Gates already active elsewhere</v-card-title>
-      <v-card-text>
-        This stage shares gates with the currently active
-        {{ conflictingStageNames.length > 1 ? 'stages' : 'stage' }}:
-        <strong>{{ conflictingStageNames.join(', ') }}</strong
-        >. Activating anyway will close
-        {{ conflictingStageNames.length > 1 ? 'those stages' : 'that stage' }}
-        — any of its cars still on course will be marked DNF.
-      </v-card-text>
-      <v-card-actions>
-        <v-spacer />
-        <v-btn variant="text" @click="conflictDialog = false">Cancel</v-btn>
-        <v-btn
-          color="success"
-          :loading="activatingStage"
-          @click="onActivateStage(true)"
-        >
-          Activate anyway
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
 </template>
 
 <style scoped>

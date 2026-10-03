@@ -164,13 +164,16 @@ Values live in `theme.ts`. The rules:
   foreign and can't be styled or worded. `beforeunload` is the one exception
   (see Editing).
 - **Shared dialogs wherever possible:** one confirmation dialog for both
-  apps (`useConfirm()`, hosted once in `App.vue`), not a hand-built
-  `v-dialog` per page.
+  apps (`useConfirm()` from `packages/ui`, rendered by `RallyFeedback` once
+  in each `App.vue`), not a hand-built `v-dialog` per page.
 - **The confirm button names the action** ("Delete class", "Close stage"),
   never "OK". Cancel on the left, the action on the right.
 - **Errors don't get a dialog.** An error from a form shows inside it
   (`v-alert`) so the input survives; an error from an action shows as a
-  snackbar.
+  snackbar. That needs no `try`/`catch`: each app's `main.ts` sends every
+  error Vue sees to `notifyError()`, and Vue sees a rejected promise from an
+  event handler or lifecycle hook only if the handler returns it. A wrapper
+  that calls an async function without `return` loses the error.
 - **Dialogs go fullscreen on phones** (`:fullscreen="smAndDown"`), which is
   mostly `gate-config`.
 

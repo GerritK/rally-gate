@@ -6,6 +6,9 @@ import {
   fetchStages,
   type Stage,
 } from '../api/stages';
+import { useConfirm } from '@rally-gate/ui';
+
+const confirm = useConfirm();
 
 const stages = ref<Stage[]>([]);
 const newStage = ref({ id: '', name: '', stageNumber: 1 });
@@ -22,13 +25,19 @@ async function refresh() {
 }
 
 async function onDeleteStage(stage: Stage) {
-  if (!confirm(`Delete stage ${stage.id}?`)) return;
+  if (
+    !(await confirm({
+      title: `Delete stage ${stage.id}?`,
+      text: 'Its gate assignments go with it.',
+      confirmText: 'Delete stage',
+      color: 'error',
+    }))
+  )
+    return;
   deletingId.value = stage.id;
   try {
     await deleteStage(stage.id);
     await refresh();
-  } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to delete stage');
   } finally {
     deletingId.value = null;
   }
@@ -46,8 +55,6 @@ async function onCreateStage() {
     newStage.value.id = '';
     newStage.value.name = '';
     await refresh();
-  } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to create stage');
   } finally {
     creating.value = false;
   }

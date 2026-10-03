@@ -24,7 +24,11 @@ import { serverVersion } from '../api/version';
 import { fetchSetting, saveSetting } from '../api/settings';
 import { fetchStages, type Stage } from '../api/stages';
 import { GATE_CONFIG_PORT, StageStatus } from '@rally-gate/shared';
-import { formatClockTime, formatRelativeTime } from '@rally-gate/ui';
+import {
+  formatClockTime,
+  formatRelativeTime,
+  useConfirm,
+} from '@rally-gate/ui';
 import {
   clockOffsetColor,
   clockOffsetHint,
@@ -50,8 +54,7 @@ const clockCorrectionThresholdMs = ref(CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS);
 const newGate = ref({ id: '', name: '' });
 const creatingGate = ref(false);
 const editingGateId = ref<string | null>(null);
-const deleteConflictGate = ref<Gate | null>(null);
-const deleteConflictMessage = ref('');
+const confirm = useConfirm();
 /** Null when this server keeps no per-computer list (DB_PATH, Postgres). */
 const knownGates = ref<KnownGate[] | null>(null);
 
@@ -72,7 +75,7 @@ async function onPowerOffAll() {
     powerOffResults.value = await powerOffAllGates();
   } catch (err) {
     confirmingPowerOff.value = false;
-    alert(err instanceof Error ? err.message : 'Failed to shut down gates');
+    throw err;
   } finally {
     poweringOff.value = false;
   }
@@ -118,21 +121,21 @@ async function onDeleteGate(gate: Gate, force = false) {
   try {
     await deleteGate(gate.id, force);
     gates.value = gates.value.filter((g) => g.id !== gate.id);
-    deleteConflictGate.value = null;
   } catch (err) {
-    // Narrowed into a local so the type survives into the branch below —
-    // `err instanceof ApiError` inside the ternary doesn't carry past it,
-    // which is why `err.message` was an error on `unknown`.
     const conflict = err instanceof ApiError && err.status === 409 ? err : null;
     const assignmentCount = (
       conflict?.body as { assignmentCount?: number } | null
     )?.assignmentCount;
-    if (conflict && assignmentCount) {
-      deleteConflictGate.value = gate;
-      deleteConflictMessage.value = conflict.message;
-    } else {
-      alert(err instanceof Error ? err.message : 'Failed to delete gate');
-    }
+    if (!conflict || !assignmentCount) throw err;
+    if (
+      await confirm({
+        title: 'Delete gate and its assignments?',
+        text: conflict.message,
+        confirmText: 'Delete gate and assignments',
+        color: 'error',
+      })
+    )
+      await onDeleteGate(gate, true);
   }
 }
 
@@ -144,10 +147,6 @@ async function onAddKnownGate(gate: KnownGate) {
 async function onForgetKnownGate(id: string) {
   await forgetKnownGate(id);
   knownGates.value = knownGates.value?.filter((g) => g.id !== id) ?? null;
-}
-
-function onConfirmDeleteGate() {
-  if (deleteConflictGate.value) onDeleteGate(deleteConflictGate.value, true);
 }
 
 async function onToggleAutoDiscover(value: boolean | null) {
@@ -164,8 +163,6 @@ async function onCreateGate() {
     });
     newGate.value = { id: '', name: '' };
     await refreshGates();
-  } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to add gate');
   } finally {
     creatingGate.value = false;
   }
@@ -518,22 +515,6 @@ onUnmounted(() => {
           </v-btn>
         </template>
         <v-btn v-else variant="text" @click="closePowerOff">Close</v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
-
-  <v-dialog :model-value="!!deleteConflictGate" max-width="480">
-    <v-card>
-      <v-card-title>Delete gate and its assignments?</v-card-title>
-      <v-card-text>{{ deleteConflictMessage }}</v-card-text>
-      <v-card-actions>
-        <v-spacer />
-        <v-btn variant="text" @click="deleteConflictGate = null">
-          Cancel
-        </v-btn>
-        <v-btn color="error" @click="onConfirmDeleteGate">
-          Delete gate and assignments
-        </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

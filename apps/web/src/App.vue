@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue';
-import { logoUrl, REPO_URL, SUPPORT_URL } from '@rally-gate/ui';
+import { logoUrl, RallyFeedback, REPO_URL, SUPPORT_URL } from '@rally-gate/ui';
 import { fetchEventInfo } from './api/event';
 import { fetchRallyInfo, rallyName } from './api/rally-info';
 import { liveStatus } from './api/live';
@@ -133,6 +133,7 @@ onMounted(async () => {
         <router-view />
       </v-container>
     </v-main>
+    <RallyFeedback />
   </v-app>
 </template>
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue';
-import { logoUrl, REPO_URL } from '@rally-gate/ui';
+import { logoUrl, RallyFeedback, REPO_URL, useConfirm } from '@rally-gate/ui';
 
 // Mirrors FieldDescriptor in ../../src/config-file.ts, which is where the rules
 // are actually defined. Rebuilt here into input rules rather than restated, so
@@ -56,9 +56,9 @@ const network = ref<NetworkState | null>(null);
 const joinSsid = ref('');
 const joinPassword = ref('');
 const joining = ref(false);
-const confirmingReset = ref(false);
-const confirmingPowerOff = ref(false);
 const wifiErrors = ref<Record<string, string>>({});
+
+const confirm = useConfirm();
 
 let statusTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -227,7 +227,15 @@ async function join() {
 }
 
 async function resetWifi() {
-  confirmingReset.value = false;
+  if (
+    !(await confirm({
+      title: 'Reset Wi-Fi?',
+      text: 'The gate forgets every saved network and starts its own hotspot. Join that hotspot to reach this page again.',
+      confirmText: 'Forget networks, start hotspot',
+      color: 'error',
+    }))
+  )
+    return;
   notice.value = null;
   try {
     const result = await (
@@ -249,7 +257,15 @@ async function resetWifi() {
 }
 
 async function powerOff() {
-  confirmingPowerOff.value = false;
+  if (
+    !(await confirm({
+      title: 'Shut down this gate?',
+      text: 'It has to be switched back on by hand.',
+      confirmText: 'Shut down gate',
+      color: 'error',
+    }))
+  )
+    return;
   notice.value = null;
   const done = {
     type: 'success' as const,
@@ -522,26 +538,12 @@ onUnmounted(() => clearInterval(statusTimer));
           </v-card-text>
           <v-card-actions v-if="network?.available">
             <v-btn
-              v-if="!confirmingReset"
               variant="text"
               prepend-icon="mdi-wifi-remove"
-              @click="confirmingReset = true"
+              @click="resetWifi"
             >
               Reset Wi-Fi
             </v-btn>
-            <template v-else>
-              <v-btn variant="text" @click="confirmingReset = false">
-                Cancel
-              </v-btn>
-              <v-btn
-                color="error"
-                variant="text"
-                prepend-icon="mdi-access-point"
-                @click="resetWifi"
-              >
-                Forget networks, start hotspot
-              </v-btn>
-            </template>
             <v-spacer />
             <v-btn
               :loading="joining"
@@ -584,31 +586,14 @@ onUnmounted(() => clearInterval(statusTimer));
             }}</pre>
           </v-card-text>
           <v-card-actions>
-            <v-btn
-              v-if="!confirmingPowerOff"
-              variant="text"
-              prepend-icon="mdi-power"
-              @click="confirmingPowerOff = true"
-            >
+            <v-btn variant="text" prepend-icon="mdi-power" @click="powerOff">
               Shut down
             </v-btn>
-            <template v-else>
-              <v-btn variant="text" @click="confirmingPowerOff = false">
-                Cancel
-              </v-btn>
-              <v-btn
-                color="error"
-                variant="text"
-                prepend-icon="mdi-power"
-                @click="powerOff"
-              >
-                Shut down gate
-              </v-btn>
-            </template>
           </v-card-actions>
         </v-card>
       </v-container>
     </v-main>
+    <RallyFeedback />
   </v-app>
 </template>
 

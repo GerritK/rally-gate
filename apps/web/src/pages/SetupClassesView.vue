@@ -8,6 +8,9 @@ import {
   type VehicleClass,
 } from '../api/vehicle-classes';
 import { fetchVehicles, type Vehicle } from '../api/vehicles';
+import { useConfirm } from '@rally-gate/ui';
+
+const confirm = useConfirm();
 
 const classes = ref<VehicleClass[]>([]);
 const vehicles = ref<Vehicle[]>([]);
@@ -33,16 +36,15 @@ async function refresh() {
 async function guarded(action: () => Promise<unknown>) {
   try {
     await action();
-  } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to save class');
+  } finally {
+    await refresh();
   }
-  await refresh();
 }
 
 function onCreateClass() {
   const name = newClass.value.name.trim();
   if (!name) return;
-  guarded(async () => {
+  return guarded(async () => {
     await createVehicleClass({ name, main: newClass.value.main });
     newClass.value = { name: '', main: false };
   });
@@ -54,7 +56,7 @@ function onUpdateClass(
 ) {
   const name = (patch.name ?? vehicleClass.name).trim();
   if (!name) return;
-  guarded(() =>
+  return guarded(() =>
     updateVehicleClass(vehicleClass.id, {
       name,
       main: patch.main ?? vehicleClass.main,
@@ -62,14 +64,21 @@ function onUpdateClass(
   );
 }
 
-function onDeleteClass(vehicleClass: VehicleClass) {
+async function onDeleteClass(vehicleClass: VehicleClass) {
   const count = countOf(vehicleClass);
-  const effect =
-    count > 0
-      ? `${count} vehicle${count === 1 ? '' : 's'} will leave it; the vehicles themselves are kept.`
-      : 'No vehicle is in it.';
-  if (!confirm(`Delete class "${vehicleClass.name}"? ${effect}`)) return;
-  guarded(() => deleteVehicleClass(vehicleClass.id));
+  if (
+    !(await confirm({
+      title: `Delete class "${vehicleClass.name}"?`,
+      text:
+        count > 0
+          ? `${count} vehicle${count === 1 ? '' : 's'} will leave it; the vehicles themselves are kept.`
+          : 'No vehicle is in it.',
+      confirmText: 'Delete class',
+      color: 'error',
+    }))
+  )
+    return;
+  await guarded(() => deleteVehicleClass(vehicleClass.id));
 }
 
 onMounted(refresh);

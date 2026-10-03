@@ -63,8 +63,8 @@ What exists, with where its reasoning lives. History is in git.
 ## Next
 
 - **UI guidelines in the code** (`design-system.md` "Editing", "Tables",
-  "Confirmations", "Dialogs and feedback"): a shared `useConfirm()` dialog
-  and snackbar, replacing every `alert()`/`confirm()` in `apps/web`; inline
+  "Confirmations", "Dialogs and feedback"): the shared `useConfirm()` dialog
+  and snackbar are built and used everywhere; still open: inline
   edits (run time corrections on Live Timing, gate rename on Hardware, class
   name and switch on Setup → Classes) moved to dialogs; unsaved-changes
   guard (router + `beforeunload`); action columns cut to one direct action
