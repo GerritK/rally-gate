@@ -63,7 +63,6 @@ function display(stage: Stage): {
         class="rg-stage-node"
         :class="{ 'rg-stage-node--selected': !modelValue }"
         :aria-current="!modelValue ? 'page' : undefined"
-        v-tooltip:top="'Overall classification'"
         @click="emit('overall')"
       >
         <span class="rg-stage-dot">

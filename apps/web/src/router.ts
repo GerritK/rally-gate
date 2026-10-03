@@ -1,3 +1,4 @@
+import { clearNotice } from '@rally-gate/ui';
 import { createRouter, createWebHistory } from 'vue-router';
 
 export const NAV_ITEMS = [
@@ -56,4 +57,10 @@ export const router = createRouter({
     },
     { path: '/vehicles', component: () => import('./pages/VehiclesView.vue') },
   ],
+});
+
+// Path only: a filter writing to the query (?classes=) is the same page, and
+// a dialog's "Stage added" lands after the navigation it triggered.
+router.beforeEach((to, from) => {
+  if (to.path !== from.path) clearNotice();
 });

@@ -1108,7 +1108,6 @@ onUnmounted(() => {
               v-for="node in gateFlow"
               :key="node.gate.id"
               class="rg-gate-node"
-              v-tooltip:top="`${node.gate.name}: ${gateStatusText(node.gate)}`"
             >
               <span
                 class="rg-gate-icon"
@@ -1122,6 +1121,14 @@ onUnmounted(() => {
               <div class="text-caption font-weight-bold">{{ node.label }}</div>
               <div class="text-caption text-medium-emphasis rg-gate-name">
                 {{ node.gate.name }}
+              </div>
+              <!-- A problem in words, not a tooltip; the line is always there
+                   so a gate dropping out doesn't shift the page. -->
+              <div
+                class="text-caption rg-gate-name"
+                :class="`text-${gateStatusColor(node.gate, now)}`"
+              >
+                {{ isReady(node.gate, now) ? ' ' : gateStatusText(node.gate) }}
               </div>
             </div>
           </div>

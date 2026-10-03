@@ -194,7 +194,7 @@ function onStageChange(stageId: string) {
                 <span
                   v-tooltip:top="
                     splits.get(entry.vehicleId)!.gapMs === 0
-                      ? 'Fastest at this split'
+                      ? ''
                       : `${formatGap(splits.get(entry.vehicleId)!.gapMs)} to the fastest`
                   "
                   :class="{

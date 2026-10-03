@@ -44,6 +44,14 @@ Values live in `theme.ts`. The rules:
 - **Colour is never the only signal.** Red-green colour blindness is common,
   so every status pairs colour with an icon and text, and timing highlights
   (`timing-best`/`timing-personal`) get a second cue too.
+- **A tooltip only where it adds something**, and then only an
+  explanation (what an icon or state means) or an unimportant extra (the
+  gap to the fastest, a heartbeat's clock time). Never for anything a
+  marshal needs: a tooltip doesn't show on touch or on paper, and on a
+  disabled button not at all (see Confirmations). A gate's problem state is
+  a line of text under it. Never
+  a tooltip repeating what's already on screen (a gate's name under it, a
+  ★ the legend explains).
 - **Tooltips are Vuetify's, never the browser's `title`**: one look and
   one delay everywhere. `v-tooltip:top="'…'"` on the element (the
   directive), `:bottom` in the app bar; a conditional one passes `''`, not
@@ -179,6 +187,13 @@ Values live in `theme.ts`. The rules:
 
 ## Confirmations
 
+- **An action that can't run right now stays clickable and says why** when
+  pressed (`notifyError`, or in the dialog it opens anyway): Shut down all
+  gates during an active stage. A disabled button can't explain itself on
+  touch, and a permanent caption beside it is noise for an exception.
+  Disable only where the reason is already on screen beside it: Assign
+  with no vehicle picked, a stage's Save under "This stage is ACTIVE…", a
+  menu item with the reason as its subtitle.
 - **Ask when data is lost that can't be retyped from the screen or from
   memory:** delete a run or a passing, close a stage, unfreeze a published
   start list, anything that takes other records with it. Say what will be
@@ -207,6 +222,10 @@ Values live in `theme.ts`. The rules:
   error Vue sees to `notifyError()`, and Vue sees a rejected promise from an
   event handler or lifecycle hook only if the handler returns it. A wrapper
   that calls an async function without `return` loses the error.
+- **A snackbar belongs to the page it was raised on** and goes when the
+  path changes (`clearNotice()` in `apps/web`'s `router.ts`). A query change
+  such as the class filter keeps it, and so does a message raised after the
+  navigation its own action triggered ("Stage added" on the new stage).
 - **Dialogs go fullscreen on phones** (`:fullscreen="smAndDown"`), which is
   mostly `gate-config`.
 

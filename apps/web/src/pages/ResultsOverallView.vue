@@ -202,9 +202,7 @@ onMounted(async () => {
             >
               <span
                 v-if="time.notional"
-                v-tooltip:top="
-                  `Notional time, ${formatGap(stageGapMs(time))} to the fastest: stage not completed, charged the slowest time plus a penalty.`
-                "
+                v-tooltip:top="`${formatGap(stageGapMs(time))} to the fastest`"
                 class="text-medium-emphasis"
               >
                 {{ formatDuration(time.durationMs)
@@ -214,7 +212,6 @@ onMounted(async () => {
               </span>
               <span
                 v-else-if="stageGapMs(time) === 0"
-                v-tooltip:top="'Fastest on this stage'"
                 class="text-timing-best font-weight-bold"
               >
                 {{ formatDuration(time.durationMs)
@@ -235,18 +232,13 @@ onMounted(async () => {
             </td>
             <td class="rg-timing rg-time">{{ formatGap(entry.gapMs) }}</td>
             <td>
-              <v-tooltip
+              <span
                 v-if="entry.stagesCompleted < stagesCounted"
-                :text="`Did not complete ${stagesCounted - entry.stagesCompleted} of ${stagesCounted} stages — a notional time is included in this total.`"
-                location="top"
+                class="text-medium-emphasis"
               >
-                <template #activator="{ props }">
-                  <span v-bind="props" class="text-medium-emphasis">
-                    {{ entry.stagesCompleted }}
-                    <v-icon size="x-small" :icon="TIMING_MARKS.notional.icon" />
-                  </span>
-                </template>
-              </v-tooltip>
+                {{ entry.stagesCompleted }}
+                <v-icon size="x-small" :icon="TIMING_MARKS.notional.icon" />
+              </span>
               <span v-else>{{ entry.stagesCompleted }}</span>
             </td>
           </tr>

@@ -15,6 +15,7 @@ export {
   useConfirm,
   notify,
   notifyError,
+  clearNotice,
   type ConfirmOptions,
 } from './feedback';
 export { default as RallyFeedback } from './RallyFeedback.vue';

@@ -33,6 +33,11 @@ export function notify(text: string) {
   notice.value = { text, error: false };
 }
 
+/** A notice is about the page it was raised on; leaving it, it goes too. */
+export function clearNotice() {
+  notice.value = null;
+}
+
 export function notifyError(err: unknown) {
   notice.value = {
     text: err instanceof Error ? err.message : 'Something went wrong',

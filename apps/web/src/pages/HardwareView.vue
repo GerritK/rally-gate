@@ -33,6 +33,7 @@ import {
   formatClockTime,
   formatRelativeTime,
   notify,
+  notifyError,
   useConfirm,
 } from '@rally-gate/ui';
 import FormDialog from '../components/FormDialog.vue';
@@ -64,6 +65,15 @@ const powerOffResults = ref<GatePowerOffResult[] | null>(null);
 const stageActive = computed(() =>
   stages.value.some((s) => s.status === StageStatus.ACTIVE),
 );
+
+/** Never disabled: a disabled button can't say why, so it says it here. */
+function onShutDownAll() {
+  if (stageActive.value) {
+    notifyError(new Error('A stage is active — close it first'));
+    return;
+  }
+  confirmingPowerOff.value = true;
+}
 
 async function onPowerOffAll() {
   poweringOff.value = true;
@@ -330,24 +340,14 @@ onUnmounted(() => {
       </v-alert>
     </v-card-text>
     <v-card-actions>
-      <v-tooltip
-        :disabled="!stageActive"
-        text="A stage is active — close it first"
+      <v-btn
+        variant="text"
+        color="error"
+        prepend-icon="mdi-power"
+        @click="onShutDownAll"
       >
-        <template #activator="{ props: tooltipProps }">
-          <span v-bind="tooltipProps">
-            <v-btn
-              variant="text"
-              color="error"
-              prepend-icon="mdi-power"
-              :disabled="stageActive"
-              @click="confirmingPowerOff = true"
-            >
-              Shut down all gates
-            </v-btn>
-          </span>
-        </template>
-      </v-tooltip>
+        Shut down all gates
+      </v-btn>
     </v-card-actions>
   </v-card>
 
