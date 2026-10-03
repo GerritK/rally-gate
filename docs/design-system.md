@@ -259,8 +259,9 @@ Extract a component once it is actually used twice, not before.
   Every results card names it as its subtitle, "All classes" included, so
   a printout always says which ranking it is.
 - `ManualMark`: the hand-timed icon.
-- `PassingBlock`: one unidentified passing with its vehicle picker, Assign
-  and a ⋮ for Not a car, in Up next and On stage.
+- `PassingBlock`: the oldest unidentified passing with its vehicle picker,
+  Assign and a ⋮ for Not a car, in Up next and On stage; later ones wait
+  below it as a count with "Dismiss all" (confirmed).
 - `GateClockChips`: a gate's measured offset (tooltip says whether it is
   being corrected) and chrony state, on Hardware and the gate's page.
 - `FormDialog`: every add/edit dialog. Saves on its submit (Enter), shows

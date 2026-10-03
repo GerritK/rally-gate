@@ -451,6 +451,24 @@ async function onDismiss(event: DetectionEventRecord) {
   awaitingDetections.value = await fetchAwaitingEvents();
 }
 
+async function onDismissAll(events: DetectionEventRecord[]) {
+  const n = events.length;
+  if (
+    !(await confirm({
+      title: `Dismiss ${n} passing${n === 1 ? '' : 's'}?`,
+      text: `${n === 1 ? 'It is' : 'They are'} discarded as not a car and can't be assigned afterwards. Only do this when no car can have caused ${n === 1 ? 'it' : 'them'}.`,
+      confirmText: `Dismiss ${n}`,
+      color: 'error',
+    }))
+  )
+    return;
+  try {
+    for (const event of events) await dismissEvent(event.eventId);
+  } finally {
+    awaitingDetections.value = await fetchAwaitingEvents();
+  }
+}
+
 async function onRetryPending() {
   if (retryingPending.value) return;
   retryingPending.value = true;
@@ -1071,14 +1089,12 @@ onUnmounted(() => {
             }}
           </v-card-title>
         </v-card-item>
-        <v-card-text
-          v-if="passingsByStage.starts.length > 0"
-          class="d-flex flex-column ga-2 pb-0"
-        >
+        <v-card-text v-if="passingsByStage.starts.length > 0" class="pb-0">
           <PassingBlock
-            v-for="event in passingsByStage.starts"
+            v-for="[event, ...queued] in [passingsByStage.starts]"
             :key="event.eventId"
             :passing="event"
+            :queued="queued"
             :role="gateRole(event.gateId)"
             :gate-name="gateName(event.gateId)"
             :vehicle-id="vehicleFor(event)"
@@ -1086,6 +1102,7 @@ onUnmounted(() => {
             @pick="(id) => (pickedVehicleIds[event.eventId] = id)"
             @assign="onAssign(event)"
             @dismiss="onDismiss(event)"
+            @dismiss-queued="onDismissAll(queued)"
           />
         </v-card-text>
         <v-card-text v-if="dueToStart.length > 0">
@@ -1153,14 +1170,12 @@ onUnmounted(() => {
           </v-card-title>
           <v-card-subtitle>Expected order at the next gate</v-card-subtitle>
         </v-card-item>
-        <v-card-text
-          v-if="passingsByStage.onCourse.length > 0"
-          class="d-flex flex-column ga-2 pb-0"
-        >
+        <v-card-text v-if="passingsByStage.onCourse.length > 0" class="pb-0">
           <PassingBlock
-            v-for="event in passingsByStage.onCourse"
+            v-for="[event, ...queued] in [passingsByStage.onCourse]"
             :key="event.eventId"
             :passing="event"
+            :queued="queued"
             :role="gateRole(event.gateId)"
             :gate-name="gateName(event.gateId)"
             :vehicle-id="vehicleFor(event)"
@@ -1168,6 +1183,7 @@ onUnmounted(() => {
             @pick="(id) => (pickedVehicleIds[event.eventId] = id)"
             @assign="onAssign(event)"
             @dismiss="onDismiss(event)"
+            @dismiss-queued="onDismissAll(queued)"
           />
         </v-card-text>
         <v-table density="comfortable">
