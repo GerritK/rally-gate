@@ -73,7 +73,7 @@ onMounted(refresh);
       </v-btn>
     </v-card-title>
     <v-card-text>
-      <v-table v-if="vehicles.length > 0" density="comfortable">
+      <v-table density="comfortable">
         <thead>
           <tr>
             <th>#</th>
@@ -123,11 +123,13 @@ onMounted(refresh);
               </v-btn>
             </td>
           </tr>
+          <tr v-if="vehicles.length === 0">
+            <td colspan="7" class="rg-empty">
+              No vehicles yet. Add one with + Add Vehicle.
+            </td>
+          </tr>
         </tbody>
       </v-table>
-      <v-alert v-else type="info" variant="tonal">
-        No vehicles yet. Add one with + Add Vehicle.
-      </v-alert>
     </v-card-text>
   </v-card>
 

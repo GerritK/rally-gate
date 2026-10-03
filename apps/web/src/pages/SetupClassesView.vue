@@ -98,7 +98,7 @@ onMounted(refresh);
         Assign them on the Vehicles page; the overall ranking always includes
         everyone.
       </p>
-      <v-table v-if="classes.length > 0" density="comfortable">
+      <v-table density="comfortable">
         <thead>
           <tr>
             <th>Name</th>
@@ -150,12 +150,14 @@ onMounted(refresh);
               </v-menu>
             </td>
           </tr>
+          <tr v-if="classes.length === 0">
+            <td colspan="4" class="rg-empty">
+              No classes yet. Without any, results are one overall ranking. Add
+              one with + Add Class.
+            </td>
+          </tr>
         </tbody>
       </v-table>
-      <v-alert v-else type="info" variant="tonal">
-        No classes yet. Without any, results are one overall ranking. Add one
-        with + Add Class.
-      </v-alert>
     </v-card-text>
   </v-card>
 

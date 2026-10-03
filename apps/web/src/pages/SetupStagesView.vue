@@ -75,7 +75,7 @@ onMounted(refresh);
       </v-btn>
     </v-card-title>
     <v-card-text>
-      <v-table v-if="stages.length > 0" density="comfortable" hover>
+      <v-table density="comfortable" hover>
         <thead>
           <tr>
             <th>#</th>
@@ -127,11 +127,13 @@ onMounted(refresh);
               </v-menu>
             </td>
           </tr>
+          <tr v-if="stages.length === 0">
+            <td colspan="5" class="rg-empty">
+              No stages yet. Add one with + Add Stage.
+            </td>
+          </tr>
         </tbody>
       </v-table>
-      <v-alert v-else type="info" variant="tonal">
-        No stages yet. Add one with + Add Stage.
-      </v-alert>
     </v-card-text>
   </v-card>
 

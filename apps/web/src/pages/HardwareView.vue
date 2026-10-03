@@ -317,11 +317,13 @@ onUnmounted(() => {
               </v-menu>
             </td>
           </tr>
+          <tr v-if="gates.length === 0">
+            <td colspan="8" class="rg-empty">
+              No gates yet — waiting for a gate-agent heartbeat.
+            </td>
+          </tr>
         </tbody>
       </v-table>
-      <v-alert v-if="gates.length === 0" type="info" variant="tonal">
-        No gates yet — waiting for a gate-agent heartbeat.
-      </v-alert>
       <v-alert v-if="!autoDiscover" type="warning" variant="tonal" class="mt-4">
         Auto-discovery is off — heartbeats from gates not listed here are
         ignored until you add them with + Add Gate.
@@ -401,7 +403,7 @@ onUnmounted(() => {
           </td>
         </tr>
         <tr v-if="knownGates.length === 0">
-          <td colspan="3" class="text-center text-medium-emphasis">
+          <td colspan="3" class="rg-empty">
             None yet — every gate that sends a heartbeat or is added above is
             remembered.
           </td>

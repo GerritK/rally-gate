@@ -247,7 +247,7 @@ onMounted(load);
             </td>
           </tr>
           <tr v-if="assignmentsForStage.length === 0">
-            <td colspan="5" class="text-center text-medium-emphasis">
+            <td colspan="5" class="rg-empty">
               No gates assigned yet.{{
                 stageEditable ? ' Add one with + Add Assignment.' : ''
               }}

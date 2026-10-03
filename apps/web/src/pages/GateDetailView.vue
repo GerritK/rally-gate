@@ -313,9 +313,7 @@ onUnmounted(() => {
               </td>
             </tr>
             <tr v-if="gateAssignments.length === 0">
-              <td colspan="3" class="text-center text-medium-emphasis">
-                Not assigned to any stage.
-              </td>
+              <td colspan="3" class="rg-empty">Not assigned to any stage.</td>
             </tr>
           </tbody>
         </v-table>
@@ -372,9 +370,7 @@ onUnmounted(() => {
             </td>
           </tr>
           <tr v-if="detections.length === 0">
-            <td colspan="6" class="text-center text-medium-emphasis">
-              No detections yet.
-            </td>
+            <td colspan="6" class="rg-empty">No detections yet.</td>
           </tr>
         </tbody>
       </v-table>

@@ -107,7 +107,7 @@ onMounted(async () => {
         counted yet. The standings change when
         {{ runningStages.length === 1 ? 'it closes' : 'they close' }}.
       </v-alert>
-      <v-table v-if="overallClassification.length > 0" density="comfortable">
+      <v-table density="comfortable">
         <thead>
           <tr>
             <th>Pos</th>
@@ -169,6 +169,11 @@ onMounted(async () => {
                 </template>
               </v-tooltip>
               <span v-else>{{ entry.stagesCompleted }}</span>
+            </td>
+          </tr>
+          <tr v-if="overallClassification.length === 0">
+            <td colspan="7" class="rg-empty">
+              No crew has completed a closed stage yet.
             </td>
           </tr>
         </tbody>

@@ -147,8 +147,12 @@ Values live in `theme.ts`. The rules:
   added, and clearly tied to the list it fills.
   - Orange when adding is the page's main action (Vehicles, Stages), tonal
     otherwise (Add Assignment on a stage).
-  - An empty table's note names it ("No vehicles yet. Add one with
-    + Add Vehicle."), no second button in the middle.
+  - An empty table keeps its header and shows one `.rg-empty` row
+    (`packages/ui` `utilities.css`: italic, centred, padded) that names it
+    ("No vehicles yet. Add one with + Add Vehicle."), no second button in
+    the middle. Not an alert: those are for states that need attention.
+    The same class marks an empty card ("No car on stage."). Only a page
+    with nothing to show at all (no stages, unknown gate) gets an alert.
 
 ## Confirmations
 

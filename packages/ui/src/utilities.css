@@ -88,3 +88,16 @@ input[type='time']::-webkit-calendar-picker-indicator {
     padding: 0 !important;
   }
 }
+
+/*
+ * Placeholder where a list or table has no rows yet. Italic and padded so it
+ * can't be mistaken for a row or a status message; on a <td>, the table
+ * header stays visible, so nothing jumps when the first row arrives.
+ */
+.rg-empty,
+.v-table > .v-table__wrapper > table > tbody > tr > td.rg-empty {
+  font-style: italic;
+  text-align: center;
+  padding-block: 24px;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}

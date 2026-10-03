@@ -167,6 +167,11 @@ function onStageChange(stageId: string) {
             <td class="rg-timing">{{ formatDuration(entry.durationMs) }}</td>
             <td class="rg-timing">{{ formatGap(entry.gapMs) }}</td>
           </tr>
+          <tr v-if="stageClassification.length === 0">
+            <td :colspan="6 + splitGates.length" class="rg-empty">
+              Nobody has finished this stage yet.
+            </td>
+          </tr>
         </tbody>
       </v-table>
 

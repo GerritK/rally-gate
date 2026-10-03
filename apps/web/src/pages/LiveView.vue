@@ -1031,9 +1031,7 @@ onUnmounted(() => {
           </div>
         </div>
       </template>
-      <div v-else class="text-medium-emphasis">
-        No gates assigned to this stage yet.
-      </div>
+      <div v-else class="rg-empty">No gates assigned to this stage yet.</div>
       <v-alert
         v-if="startOrder && !startOrder.frozen"
         type="info"
@@ -1153,7 +1151,7 @@ onUnmounted(() => {
             </div>
           </template>
         </v-card-text>
-        <v-card-text v-else class="text-medium-emphasis">
+        <v-card-text v-else class="rg-empty">
           Everyone has started.
         </v-card-text>
       </v-card>
@@ -1248,7 +1246,7 @@ onUnmounted(() => {
             </tr>
           </tbody>
         </v-table>
-        <v-card-text v-if="onStage.length === 0" class="text-medium-emphasis">
+        <v-card-text v-if="onStage.length === 0" class="rg-empty">
           {{
             stage.status === StageStatus.ACTIVE
               ? 'No car on stage.'
@@ -1435,6 +1433,11 @@ onUnmounted(() => {
             </td>
           </tr>
         </template>
+        <tr v-if="rows.length === 0">
+          <td colspan="11" class="rg-empty">
+            No vehicles yet — add them under Vehicles.
+          </td>
+        </tr>
       </tbody>
     </v-table>
   </v-card>
