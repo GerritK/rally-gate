@@ -61,6 +61,13 @@ Values live in `theme.ts`. The rules:
   a line of text under it. Never
   a tooltip repeating what's already on screen (a gate's name under it, a
   ★ the legend explains).
+- **Text links are `.rg-link`** (`utilities.css`): the surrounding text's
+  colour, underlined, never the browser's blue and purple, which clash with
+  the theme and with an alert's own colour. One look for every inline link,
+  a hint in an alert and a column header alike. Going somewhere from a
+  hint is such a link, not a button; a button in an alert is an action
+  (Retry now). Back buttons, nav and list items that navigate are
+  Vuetify's and need nothing.
 - **Tooltips are Vuetify's, never the browser's `title`**: one look and
   one delay everywhere. `v-tooltip:top="'…'"` on the element (the
   directive), `:bottom` in the app bar; a conditional one passes `''`, not
@@ -88,7 +95,8 @@ Values live in `theme.ts`. The rules:
   reaches its `text-h*` classes).
 - **Crew names** follow the event's name format (Setup → Display) everywhere
   (`personName` in `src/crew.ts`) and are lettered like a rally car's side
-  window: flag, Barlow Condensed bold italic, capitals (`PersonName`).
+  window: flag, Barlow Condensed bold, capitals (`PersonName`). Upright:
+  italics read worse at table size.
   Wherever a crew appears, it is both names in one cell (`CrewName`), the
   co-driver below the driver and smaller, so the driver leads.
 - **Start numbers** are a door plate: black on white, Barlow Bold
@@ -300,9 +308,10 @@ inconsistencies the first draft had:
   stage runs; a running stage is titled "Provisional". A table too wide for
   portrait turns the page to landscape (more than three stage columns on
   Overall, more than two splits on a stage).
-- Flags (and later the podium) print only when Setup → Display says "Yes";
+- Flags and the podium print only when Setup → Display says "Yes";
   "Screen only" adds `d-print-none` (`printClass`), as a black-and-white
-  printer can't tell most flags apart.
+  printer can't tell most flags apart. The podium's steps have a border,
+  not only a fill, since print drops backgrounds by default.
 - Tables print compact (6px cell padding) and unclipped, from
   `utilities.css`.
 
@@ -342,6 +351,9 @@ Extract a component once it is actually used twice, not before.
   never flag emoji, which Windows renders as two letters.
 - `ClassChip`: a vehicle class, main classes in secondary with a star.
   Live Timing puts a car's main class at the right of Up next and Then.
+- `ResultsPodium`: the first three of a ranking above its table, steps
+  2-1-3, trophies in `podium-gold`/`-silver`/`-bronze` (`theme.ts`, used
+  nowhere else). A click opens the vehicle, as a row does.
 - `VehicleDialog`: add and edit a vehicle, on Vehicles and the vehicle's page.
 - `ManualMark`: the hand-timed icon.
 - `TableLegend`: the icons a table shows, explained under it (see Tables).

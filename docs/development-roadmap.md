@@ -78,23 +78,21 @@ What exists, with where its reasoning lives. History is in git.
   (`THIRD_PARTY_NOTICES.md`). Not the International Flag of Planet Earth:
   its terms forbid it standing for a person. Later on the vehicle page: its
   times per stage, several transponder IDs.
+- **Podium** above the Overall and each stage's results, following the class
+  filter: steps 2-1-3 with gold/silver/bronze trophies, crew, body, time and
+  gap; a click opens the vehicle. Shown, screen only or off like the flags
+  (`design-system.md`).
 - **CI:** build, format, lint, tests, and a headless-stack job against real
   Postgres (`CLAUDE.md`).
 
 ## Next
 
-OpenStint (below) resumes when the hardware arrives. Meanwhile, crew
-presentation — for the look of the event more than for timing:
+OpenStint (below) resumes when the hardware arrives. Meanwhile:
 
-1. **Podium** above the Overall and each stage's results, following the class
-   filter: steps 2-1-3, trophies in new `podium-gold/silver/bronze` theme
-   colours, crew name, body, time or gap; empty steps under three classified,
-   "Provisional" while a stage runs. Printed per the Display setting, in the
-   light print style of `design-system.md` (outlined trophies).
-2. **Print all rankings** — maybe: Overall plus one page per class in one go,
-   instead of picking each class filter and printing. Classes already are the
-   rankings and the filter is already a link, so saved class combinations
-   ("2WD + Rookie") wait until someone needs one.
+- **Print all rankings** — maybe: Overall plus one page per class in one go,
+  instead of picking each class filter and printing. Classes already are the
+  rankings and the filter is already a link, so saved class combinations
+  ("2WD + Rookie") wait until someone needs one.
 
 ## Deliberately deferred
 

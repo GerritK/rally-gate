@@ -16,6 +16,7 @@ import { StageStatus } from '@rally-gate/shared';
 import { rallyName } from '../api/rally-info';
 import TableLegend from '../components/TableLegend.vue';
 import CrewName from '../components/CrewName.vue';
+import ResultsPodium from '../components/ResultsPodium.vue';
 import StartNumber from '../components/StartNumber.vue';
 import {
   formatDuration,
@@ -168,6 +169,7 @@ onMounted(async () => {
         counted yet. The standings change when
         {{ runningStages.length === 1 ? 'it closes' : 'they close' }}.
       </v-alert>
+      <ResultsPodium :entries="overallClassification" />
       <v-table density="comfortable">
         <thead>
           <tr>
@@ -180,7 +182,7 @@ onMounted(async () => {
                   path: `/results/stages/${stage.id}`,
                   query: route.query,
                 }"
-                class="rg-stage-link"
+                class="rg-link"
               >
                 {{ stage.id }} </router-link
               ><span class="rg-time-mark" />
@@ -294,14 +296,3 @@ onMounted(async () => {
     </v-card-text>
   </v-card>
 </template>
-
-<style scoped>
-/* A header, not a body link: same look until hovered. */
-.rg-stage-link {
-  color: inherit;
-  text-decoration: none;
-}
-.rg-stage-link:hover {
-  text-decoration: underline;
-}
-</style>

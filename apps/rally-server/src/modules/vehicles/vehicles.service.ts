@@ -29,6 +29,7 @@ export function crewOf(vehicle: Vehicle | undefined): Crew {
     coDriverFirstName: vehicle?.coDriverFirstName ?? null,
     coDriverLastName: vehicle?.coDriverLastName ?? null,
     coDriverFlag: vehicle?.coDriverFlag ?? null,
+    body: vehicle?.body ?? null,
   };
 }
 

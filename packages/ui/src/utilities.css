@@ -14,6 +14,21 @@
 }
 
 /*
+ * Every text link. The browser's own blue/purple clashes with the theme and
+ * with an alert's colour, so a link keeps its text's colour and is told
+ * apart by the underline alone.
+ */
+.rg-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 50%, transparent);
+  text-underline-offset: 3px;
+}
+.rg-link:hover {
+  text-decoration-color: currentColor;
+}
+
+/*
  * Native <input type="time"> ships its own OS clock icon that doesn't match
  * this app's MDI iconset. Hide it and pair with an
  * append-inner-icon="mdi-clock-outline" + @click:append-inner="openTimePicker"
@@ -60,6 +75,10 @@ input[type='time']::-webkit-calendar-picker-indicator {
 @media print {
   @page {
     margin: 12mm;
+  }
+  /* Nothing to click on paper. */
+  .rg-link {
+    text-decoration: none;
   }
   [class*='v-theme--'] {
     --v-theme-background: 255, 255, 255 !important;

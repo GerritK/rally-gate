@@ -36,7 +36,6 @@ const flag = computed(() =>
 .rg-person-name {
   font-family: 'Barlow Condensed', sans-serif;
   font-weight: 700;
-  font-style: italic;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   white-space: nowrap;

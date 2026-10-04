@@ -7,8 +7,8 @@ export enum VehicleStatus {
 }
 
 /**
- * Who is in the car, carried by every listing so any page can show the crew
- * as the Display settings ask. A flag is a `flag-icons` code (`de`, `gb-eng`)
+ * Who is in the car and the car they look like (`body`), carried by every
+ * listing so any page can show the crew as the Display settings ask. A flag is a `flag-icons` code (`de`, `gb-eng`)
  * or one of our own (`x-pride` …); `null` shows the neutral default.
  */
 export interface Crew {
@@ -18,4 +18,5 @@ export interface Crew {
   coDriverFirstName: string | null;
   coDriverLastName: string | null;
   coDriverFlag: string | null;
+  body: string | null;
 }

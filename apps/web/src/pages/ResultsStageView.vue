@@ -20,6 +20,7 @@ import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
 import { rallyName } from '../api/rally-info';
 import TableLegend from '../components/TableLegend.vue';
 import CrewName from '../components/CrewName.vue';
+import ResultsPodium from '../components/ResultsPodium.vue';
 import StartNumber from '../components/StartNumber.vue';
 import {
   formatDuration,
@@ -167,6 +168,7 @@ function onStageChange(stageId: string) {
       >
         This stage hasn't started yet.
       </v-alert>
+      <ResultsPodium :entries="stageClassification" />
       <v-table density="comfortable">
         <thead>
           <tr>

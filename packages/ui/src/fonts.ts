@@ -18,6 +18,6 @@ import '@fontsource/barlow/700.css';
 import '@fontsource/barlow-condensed/500.css';
 import '@fontsource/barlow-condensed/600.css';
 // Crew names, lettered like a rally car's side window.
-import '@fontsource/barlow-condensed/700-italic.css';
+import '@fontsource/barlow-condensed/700.css';
 import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/700.css';

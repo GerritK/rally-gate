@@ -41,6 +41,11 @@ export const rallyGateDark: ThemeDefinition = {
     'timing-penalty': '#FF3B30', // penalty seconds / missed gate
     'timing-idle': '#6B7686', // no time / DNS
 
+    // Podium trophies
+    'podium-gold': '#F5C542',
+    'podium-silver': '#C3CAD3',
+    'podium-bronze': '#C98A4B',
+
     // Track status (flags)
     'flag-green': '#00E05A',
     'flag-yellow': '#FFC300',

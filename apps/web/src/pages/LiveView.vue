@@ -1023,7 +1023,8 @@ onUnmounted(() => {
     density="comfortable"
   >
     No stages yet — create them under
-    <router-link to="/setup/stages">Setup → Stages</router-link>.
+    <router-link to="/setup/stages" class="rg-link">Setup → Stages</router-link
+    >.
   </v-alert>
 
   <v-card v-if="stage" class="mb-4">
@@ -1150,7 +1151,9 @@ onUnmounted(() => {
         stage can still move it.
         <strong>Freeze it when you post or announce it</strong> — activating the
         stage freezes it otherwise. Order rules are under
-        <router-link to="/setup/start-order">Setup → Start order</router-link>.
+        <router-link to="/setup/start-order" class="rg-link"
+          >Setup → Start order</router-link
+        >.
       </v-alert>
     </v-card-text>
   </v-card>
@@ -1162,22 +1165,11 @@ onUnmounted(() => {
     density="compact"
     class="mb-4 d-print-none"
   >
-    <div
-      v-for="{ stageId, count } in passingsByStage.elsewhere"
-      :key="stageId"
-      class="d-flex align-center flex-wrap ga-2"
-    >
+    <div v-for="{ stageId, count } in passingsByStage.elsewhere" :key="stageId">
       {{ count }} unassigned passing{{ count === 1 ? '' : 's' }} on
-      {{ stageTitle(stageId) }}
-      <v-spacer />
-      <v-btn
-        :to="`/live/${stageId}`"
-        size="small"
-        variant="tonal"
-        append-icon="mdi-arrow-right"
-      >
-        Open {{ stageId }}
-      </v-btn>
+      <router-link :to="`/live/${stageId}`" class="rg-link">{{
+        stageTitle(stageId)
+      }}</router-link>
     </div>
   </v-alert>
 
