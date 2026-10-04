@@ -7,6 +7,7 @@ import ClassChip from '../components/ClassChip.vue';
 import CrewName from '../components/CrewName.vue';
 import StartNumber from '../components/StartNumber.vue';
 import VehicleDialog from '../components/VehicleDialog.vue';
+import VehicleStatusActions from '../components/VehicleStatusActions.vue';
 import { VEHICLE_STATUS_DISPLAY } from '../format';
 
 const router = useRouter();
@@ -22,6 +23,10 @@ function classesOf(vehicle: Vehicle): VehicleClass[] {
   );
 }
 
+function replace(saved: Vehicle) {
+  vehicles.value = vehicles.value.map((v) => (v.id === saved.id ? saved : v));
+}
+
 async function refresh() {
   vehicles.value = await fetchVehicles();
   classes.value = await fetchVehicleClasses();
@@ -35,9 +40,22 @@ onMounted(refresh);
     <v-card-title class="d-flex align-center">
       Vehicles
       <v-spacer />
-      <v-btn color="primary" prepend-icon="mdi-plus" @click="dialogOpen = true">
-        Add Vehicle
-      </v-btn>
+      <div class="d-flex flex-wrap justify-end ga-2">
+        <v-btn
+          variant="tonal"
+          prepend-icon="mdi-clipboard-check-outline"
+          to="/vehicles/check-in"
+        >
+          Check-in
+        </v-btn>
+        <v-btn
+          color="primary"
+          prepend-icon="mdi-plus"
+          @click="dialogOpen = true"
+        >
+          Add Vehicle
+        </v-btn>
+      </div>
     </v-card-title>
     <v-card-text>
       <v-table density="comfortable">
@@ -46,9 +64,12 @@ onMounted(refresh);
             <th>#</th>
             <th>Crew</th>
             <th>Car</th>
-            <th>Transponder</th>
+            <!-- Off a tablet's width, so the status actions stay on screen; the
+                 vehicle page and Check-in show it. -->
+            <th class="d-none d-md-table-cell">Transponder</th>
             <th v-if="classes.length > 0">Classes</th>
             <th>Status</th>
+            <th width="1%"></th>
           </tr>
         </thead>
         <tbody>
@@ -61,7 +82,9 @@ onMounted(refresh);
             <td><StartNumber :number="vehicle.startNumber" /></td>
             <td><CrewName :crew="vehicle" /></td>
             <td>{{ vehicle.body ?? '-' }}</td>
-            <td class="rg-timing">{{ vehicle.transponderId ?? '-' }}</td>
+            <td class="rg-timing d-none d-md-table-cell">
+              {{ vehicle.transponderId ?? '-' }}
+            </td>
             <td v-if="classes.length > 0">
               <ClassChip
                 v-for="c in classesOf(vehicle)"
@@ -80,9 +103,12 @@ onMounted(refresh);
                 {{ VEHICLE_STATUS_DISPLAY[vehicle.status].label }}
               </v-chip>
             </td>
+            <td class="text-no-wrap text-right">
+              <VehicleStatusActions :vehicle="vehicle" @saved="replace" />
+            </td>
           </tr>
           <tr v-if="vehicles.length === 0">
-            <td colspan="6" class="rg-empty">
+            <td colspan="7" class="rg-empty">
               No vehicles yet. Add one with + Add Vehicle.
             </td>
           </tr>

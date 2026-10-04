@@ -1,5 +1,5 @@
 import { ConflictException } from '@nestjs/common';
-import { GateRole, StageStatus } from '@rally-gate/shared';
+import { GateRole, StageStatus, VehicleStatus } from '@rally-gate/shared';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { GatesService } from '../gates/gates.service';
 import { StageRunsService } from '../stage-runs/stage-runs.service';
@@ -45,7 +45,9 @@ function makeService(opts: {
     findByTransponder: jest
       .fn()
       .mockResolvedValue('vehicle' in opts ? opts.vehicle : VEHICLE),
-    findOne: jest.fn().mockResolvedValue(VEHICLE),
+    findOne: jest
+      .fn()
+      .mockResolvedValue('vehicle' in opts ? opts.vehicle : VEHICLE),
   } as unknown as VehiclesService;
   const gateAssignmentsService = {
     findActiveForGate: jest
@@ -180,6 +182,20 @@ describe('EventsService detection failures', () => {
       expect(saved.at(-1)).toMatchObject({ processed: true });
     },
   );
+});
+
+describe('EventsService cars out of the event', () => {
+  it("stores a withdrawn car's passing as evidence without starting a run", async () => {
+    const { service, saved, startRun } = makeService({
+      vehicle: { ...VEHICLE, startNumber: 7, status: VehicleStatus.WITHDRAWN },
+    });
+
+    await service.handleMqttMessage(detection());
+
+    expect(startRun).not.toHaveBeenCalled();
+    // Nothing to apply is not a failure: processed, so it isn't retried.
+    expect(saved.at(-1)).toMatchObject({ eventId: 'e1', processed: true });
+  });
 });
 
 describe('EventsService live detection payload', () => {

@@ -1,19 +1,26 @@
 import {
   Body,
+  ConflictException,
   Controller,
   Delete,
   Get,
   Param,
   Patch,
   Post,
+  NotFoundException,
   Query,
 } from '@nestjs/common';
+import { isOutOfEvent } from '@rally-gate/shared';
+import { VehiclesService } from '../vehicles/vehicles.service';
 import { CorrectStageRunDto, CreateStageRunDto } from './dto';
 import { StageRunsService } from './stage-runs.service';
 
 @Controller('stage-runs')
 export class StageRunsController {
-  constructor(private readonly stageRunsService: StageRunsService) {}
+  constructor(
+    private readonly stageRunsService: StageRunsService,
+    private readonly vehiclesService: VehiclesService,
+  ) {}
 
   /** Every attempt, voided ones included; `?stageId=` narrows to one stage. */
   @Get()
@@ -27,8 +34,19 @@ export class StageRunsController {
     return this.stageRunsService.findSplitsForStage(stageId);
   }
 
+  /** Start now, or a time entered by hand. 409 for a car out of the event:
+   *  a gate's passing wouldn't time it either (`EventsService.applyRules`). */
   @Post()
-  create(@Body() body: CreateStageRunDto) {
+  async create(@Body() body: CreateStageRunDto) {
+    const vehicle = await this.vehiclesService.findOne(body.vehicleId);
+    if (!vehicle) {
+      throw new NotFoundException(`Vehicle ${body.vehicleId} not found`);
+    }
+    if (isOutOfEvent(vehicle.status)) {
+      throw new ConflictException(
+        `#${vehicle.startNumber} is ${vehicle.status.toLowerCase()} and can't start`,
+      );
+    }
     return this.stageRunsService.createManual(body);
   }
 

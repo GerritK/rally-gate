@@ -1,4 +1,4 @@
-import { StageStatus } from '@rally-gate/shared';
+import { StageStatus, VehicleStatus } from '@rally-gate/shared';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { GatesService } from '../gates/gates.service';
 import { SettingsService } from '../settings/settings.service';
@@ -219,6 +219,65 @@ describe('ClassificationService.getOverallClassification', () => {
     expect(result.map((e) => e.durationMs)).toEqual([190_000, 200_000]);
   });
 
+  it('leaves a disqualified car out, its times and the notionals they set', async () => {
+    // v3 is the slowest on SS2; still ranked, its time would set the notional
+    // charged to v2 there.
+    const service = makeOverallService(
+      twoClosed,
+      [
+        ...runs,
+        { vehicleId: 'v3', stageId: 'SS1', durationMs: 50_000 },
+        { vehicleId: 'v3', stageId: 'SS2', durationMs: 400_000 },
+      ],
+      [
+        ...vehicles,
+        {
+          id: 'v3',
+          startNumber: 3,
+          driverFirstName: 'Disqualified',
+          status: VehicleStatus.DISQUALIFIED,
+        },
+      ],
+    );
+
+    const result = await service.getOverallClassification();
+
+    // As if v3 had never run: v2's notional on SS2 is 100s + 30s again.
+    expect(result.map((e) => [e.vehicleId, e.durationMs])).toEqual([
+      ['v2', 190_000],
+      ['v1', 200_000],
+    ]);
+  });
+
+  it('leaves a withdrawn car out, its times still setting the notionals', async () => {
+    // v3 retires after SS2, where it was the slowest: its 400s still sets
+    // the notional v2 is charged there, as before it withdrew.
+    const service = makeOverallService(
+      twoClosed,
+      [
+        ...runs,
+        { vehicleId: 'v3', stageId: 'SS1', durationMs: 50_000 },
+        { vehicleId: 'v3', stageId: 'SS2', durationMs: 400_000 },
+      ],
+      [
+        ...vehicles,
+        {
+          id: 'v3',
+          startNumber: 3,
+          driverFirstName: 'Withdrawn',
+          status: VehicleStatus.WITHDRAWN,
+        },
+      ],
+    );
+
+    const result = await service.getOverallClassification();
+
+    expect(result.map((e) => [e.vehicleId, e.durationMs])).toEqual([
+      ['v1', 200_000],
+      ['v2', 490_000],
+    ]);
+  });
+
   it('returns nothing before any stage has closed', async () => {
     const service = makeOverallService(
       [{ id: 'SS1', status: StageStatus.ACTIVE }],
@@ -350,6 +409,44 @@ describe('ClassificationService.getStageClassification', () => {
       ['v2', 2, 30_000],
     ]);
   });
+
+  it('leaves a disqualified car out, the cars behind moving up', async () => {
+    const vehicles = [
+      { id: 'v1', startNumber: 1, driverFirstName: 'A' },
+      {
+        id: 'v2',
+        startNumber: 2,
+        driverFirstName: 'B',
+        status: VehicleStatus.DISQUALIFIED,
+      },
+      { id: 'v3', startNumber: 3, driverFirstName: 'C' },
+    ];
+    const service = new ClassificationService(
+      {
+        findFinishedByStage: jest.fn().mockResolvedValue([
+          { vehicleId: 'v2', durationMs: 90_000 },
+          { vehicleId: 'v1', durationMs: 100_000 },
+          { vehicleId: 'v3', durationMs: 110_000 },
+        ]),
+      } as unknown as StageRunsService,
+      {
+        findOne: jest.fn().mockResolvedValue({ status: StageStatus.CLOSED }),
+      } as unknown as StagesService,
+      {
+        findAll: jest.fn().mockResolvedValue(vehicles),
+      } as unknown as VehiclesService,
+      {} as unknown as GatesService,
+      {} as unknown as GateAssignmentsService,
+      {} as unknown as SettingsService,
+    );
+
+    const result = await service.getStageClassification('SS1');
+
+    expect(result.map((e) => [e.vehicleId, e.position, e.gapMs])).toEqual([
+      ['v1', 1, 0],
+      ['v3', 2, 10_000],
+    ]);
+  });
 });
 
 describe('ClassificationService.getNonFinishers', () => {
@@ -388,6 +485,40 @@ describe('ClassificationService.getNonFinishers', () => {
     expect(result).toEqual([
       expect.objectContaining({ vehicleId: 'v1', outcome: 'DNF' }),
       expect.objectContaining({ vehicleId: 'v2', outcome: 'DNS' }),
+    ]);
+  });
+
+  it('lists a disqualified car that drove the stage as DSQ, even before it closes', async () => {
+    const withDsq = [
+      ...vehicles,
+      {
+        id: 'v4',
+        startNumber: 4,
+        driverFirstName: 'Disqualified',
+        status: VehicleStatus.DISQUALIFIED,
+      },
+    ];
+    const runs = [{ vehicleId: 'v4', finishTime: undefined }];
+    const open = makeService({ status: StageStatus.ACTIVE }, runs, withDsq);
+    expect(await open.getNonFinishers('WP1')).toEqual([
+      expect.objectContaining({ vehicleId: 'v4', outcome: 'DSQ' }),
+    ]);
+
+    // Closed, its unfinished run is DSQ, not DNF; and a disqualified car
+    // that never ran isn't a DNS.
+    const closed = makeService(
+      { status: StageStatus.CLOSED },
+      [...runs, { vehicleId: 'v3', finishTime: new Date() }],
+      withDsq,
+    );
+    const outcomes = (await closed.getNonFinishers('WP1')).map((e) => [
+      e.vehicleId,
+      e.outcome,
+    ]);
+    expect(outcomes).toEqual([
+      ['v1', 'DNS'],
+      ['v2', 'DNS'],
+      ['v4', 'DSQ'],
     ]);
   });
 });

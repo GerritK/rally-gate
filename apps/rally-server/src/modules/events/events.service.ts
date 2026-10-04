@@ -11,9 +11,10 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   DEFAULT_MIN_STAGE_DURATION_MS,
-  DetectionEvent,
   DETECTION_TOPIC_PREFIX,
+  DetectionEvent,
   GateRole,
+  isOutOfEvent,
   StageStatus,
 } from '@rally-gate/shared';
 import { In, Repository } from 'typeorm';
@@ -158,7 +159,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       gate && (await this.applyRules(gate, vehicleId, effectiveTime(record)));
     if (!applied) {
       throw new ConflictException(
-        `This passing can't be timed for that vehicle: its stage is no longer active, or the vehicle has no matching run (a finish or split needs its start assigned first)`,
+        `This passing can't be timed for that vehicle: its stage is no longer active, the vehicle is withdrawn or disqualified, or it has no matching run (a finish or split needs its start assigned first)`,
       );
     }
     record.vehicleId = vehicleId;
@@ -451,6 +452,16 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       return false;
     }
     const stageId = assignment.stageId;
+
+    // Out of the event: the passing is evidence (a protest may turn on it),
+    // so it stays stored, but it times nothing for this car.
+    const vehicle = await this.vehiclesService.findOne(vehicleId);
+    if (vehicle && isOutOfEvent(vehicle.status)) {
+      this.logger.warn(
+        `#${vehicle.startNumber} is ${vehicle.status} — storing the passing at gate ${gate.id} without timing it`,
+      );
+      return false;
+    }
 
     // `GateAssignment.active` and `Stage.status` are two records kept in step
     // by `StagesService` in separate steps, so a crash between them leaves a

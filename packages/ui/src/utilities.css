@@ -79,6 +79,13 @@ input[type='time']::-webkit-calendar-picker-indicator {
  * second section on, a rule above it, so a long form reads as its parts.
  * Not .text-overline: that is a small label, too faint to divide a form.
  */
+/* A field's message as a warning: allowed, but worth a second look
+   (error-messages would read as refused). */
+.rg-field-warning .v-messages {
+  color: rgb(var(--v-theme-warning));
+  opacity: 1;
+}
+
 .rg-section-title {
   font-family: 'Barlow Condensed', sans-serif;
   font-weight: 600;

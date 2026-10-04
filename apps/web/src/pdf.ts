@@ -107,7 +107,8 @@ export function overallPdf(
     extra:
       unranked.length > 0
         ? {
-            title: 'Not classified: no completed stage that counts yet',
+            title:
+              'Not classified: no completed stage that counts yet, withdrawn or disqualified',
             head: ['#', 'Crew', 'Status'],
             body: unranked.map((v) => [
               String(v.startNumber),
@@ -160,7 +161,10 @@ export function stagePdf(
     extra:
       results.nonFinishers.length > 0
         ? {
-            title: 'DNF / DNS',
+            // Only the outcomes there are: "DNF / DSQ", not every kind.
+            title: [
+              ...new Set(results.nonFinishers.map((e) => e.outcome)),
+            ].join(' / '),
             head: ['#', 'Crew', 'Outcome'],
             body: results.nonFinishers.map((e) => [
               String(e.startNumber),

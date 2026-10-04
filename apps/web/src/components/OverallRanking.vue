@@ -181,7 +181,7 @@ const runningStages = computed(() =>
     <template v-if="notClassified.length > 0">
       <div class="text-subtitle-2 mt-6 mb-1">Not classified</div>
       <div class="text-caption text-medium-emphasis mb-2">
-        No completed stage that counts yet.
+        No completed stage that counts yet, withdrawn or disqualified.
       </div>
       <v-table density="comfortable">
         <thead>

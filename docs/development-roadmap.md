@@ -82,6 +82,14 @@ What exists, with where its reasoning lives. History is in git.
   (`THIRD_PARTY_NOTICES.md`). Not the International Flag of Planet Earth:
   its terms forbid it standing for a person. Later on the vehicle page:
   several transponder IDs.
+- **Check-in:** vehicle status from the Vehicles list, the vehicle page
+  and a check-in page with Desk and Scrutineering stations, the desk
+  taking the transponder (Registered → Checked in → Scrutineered, or both
+  at once; Withdraw, Disqualify, Reinstate). Withdrawn and
+  disqualified cars leave computed start lists and start no run;
+  disqualified ones leave every result, listed as DSQ. Not yet scrutineered
+  still starts, marked on Live Timing, and Freeze/Activate ask
+  (`event-model.md` "Vehicle status").
 - **Podium** above the Overall and each stage's results, following the class
   filter: steps 2-1-3 with gold/silver/bronze trophies, crew, body, time and
   gap; a click opens the vehicle. On screen only, or off; the printed
@@ -93,7 +101,12 @@ What exists, with where its reasoning lives. History is in git.
 
 OpenStint (below) resumes when the hardware arrives. Meanwhile:
 
-- Nothing queued.
+- **One transponder on several cars.** It has to work, not just be warned
+  about (today `findByTransponder` times the passing for whichever car the
+  database returns first, and the desk and vehicle dialog only warn). A
+  passing whose transponder is on more than one car is held like an
+  unassigned passing (`PassingBlock`), its picker offering just those cars.
+  The field warning then says that instead.
 
 ## Deliberately deferred
 

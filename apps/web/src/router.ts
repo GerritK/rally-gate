@@ -61,6 +61,10 @@ export const router = createRouter({
     },
     { path: '/vehicles', component: () => import('./pages/VehiclesView.vue') },
     {
+      path: '/vehicles/check-in',
+      component: () => import('./pages/CheckInView.vue'),
+    },
+    {
       path: '/vehicles/:vehicleId',
       component: () => import('./pages/VehicleDetailView.vue'),
       props: true,

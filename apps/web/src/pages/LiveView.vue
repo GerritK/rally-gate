@@ -2,9 +2,10 @@
 import {
   DEFAULT_MIN_STAGE_DURATION_MS,
   GateRole,
+  isOutOfEvent,
+  isScrutineered,
   StageRunStatus,
   StageStatus,
-  VehicleStatus,
   type StartOrderEntry,
 } from '@rally-gate/shared';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -114,7 +115,6 @@ const confirm = useConfirm();
 const stagesLoaded = ref(false);
 
 const FLASH_DURATION_MS = 600;
-const OUT_OF_EVENT = [VehicleStatus.WITHDRAWN, VehicleStatus.DISQUALIFIED];
 
 const stage = computed(() => stages.value.find((s) => s.id === props.stageId));
 const vehicleById = computed(
@@ -196,7 +196,7 @@ const rows = computed<Row[]>(() => {
     if (run?.status === StageRunStatus.STARTED) state = 'ON_STAGE';
     else if (run?.status === StageRunStatus.FINISHED) state = 'FINISHED';
     else if (run?.status === StageRunStatus.CANCELLED) state = 'DNF';
-    else if (vehicle && OUT_OF_EVENT.includes(vehicle.status)) state = 'OUT';
+    else if (vehicle && isOutOfEvent(vehicle.status)) state = 'OUT';
     else if (voidedRuns.length > 0 && !closed) state = 'RERUN';
     else state = closed ? 'DNS' : 'WAITING';
     return { entry, run, voidedRuns, state };
@@ -589,6 +589,32 @@ async function onFinishNow(run: StageRun) {
   }
 }
 
+/** On the list and allowed to start, but the scrutineers haven't passed
+ *  it: shown where the start marshal looks, never a reason to hold it. */
+function unscrutineered(vehicleId: string): boolean {
+  const vehicle = vehicleById.value.get(vehicleId);
+  return (
+    !!vehicle &&
+    !isOutOfEvent(vehicle.status) &&
+    !isScrutineered(vehicle.status)
+  );
+}
+
+/** Freezing or activating with such cars on the list asks first, naming
+ *  them: a desk that forgot a click is easier to fix before the start. */
+async function clearedToStart(verb: string): Promise<boolean> {
+  const pending = rows.value.filter(
+    (row) => !row.run && unscrutineered(row.entry.vehicleId),
+  );
+  if (pending.length === 0) return true;
+  const numbers = pending.map((row) => `#${row.entry.startNumber}`);
+  return confirm({
+    title: `${pending.length} ${pending.length === 1 ? 'car hasn' : 'cars haven'}'t passed scrutineering`,
+    text: `${numbers.join(', ')} ${pending.length === 1 ? 'is' : 'are'} on the start list and can start, but ${pending.length === 1 ? "hasn't" : "haven't"} been passed yet. ${verb} anyway?`,
+    confirmText: verb,
+  });
+}
+
 function canStart(row: Row): boolean {
   return (
     stage.value?.status === StageStatus.ACTIVE &&
@@ -797,6 +823,7 @@ async function refreshStages() {
 
 async function onActivateStage(force = false) {
   if (!props.stageId || activatingStage.value) return;
+  if (!force && !(await clearedToStart('Activate'))) return;
   activatingStage.value = true;
   let conflictingStageIds: string[] | undefined;
   try {
@@ -857,6 +884,7 @@ async function onCloseStage() {
 
 async function onFreeze() {
   if (!props.stageId) return;
+  if (!(await clearedToStart('Freeze'))) return;
   startOrder.value = await freezeStartOrder(props.stageId);
   stages.value = await fetchStages();
 }
@@ -1210,6 +1238,13 @@ onUnmounted(() => {
               <StartNumber :number="dueToStart[0].entry.startNumber" />
             </div>
             <CrewName :crew="dueToStart[0].entry" class="rg-next-driver" />
+            <v-chip
+              v-if="unscrutineered(dueToStart[0].entry.vehicleId)"
+              color="warning"
+              prepend-icon="mdi-clipboard-alert-outline"
+            >
+              Not scrutineered
+            </v-chip>
             <ClassChip
               v-if="dueToStart[0].entry.mainClassName"
               :name="dueToStart[0].entry.mainClassName"
@@ -1417,6 +1452,16 @@ onUnmounted(() => {
                 class="ml-1"
               >
                 Overdue
+              </v-chip>
+              <v-chip
+                v-if="!row.run && unscrutineered(row.entry.vehicleId)"
+                size="small"
+                variant="outlined"
+                color="warning"
+                prepend-icon="mdi-clipboard-alert-outline"
+                class="ml-1"
+              >
+                Not scrutineered
               </v-chip>
               <span
                 v-if="row.run && row.run.attempt > 1"

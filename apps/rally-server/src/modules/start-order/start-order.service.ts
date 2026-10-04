@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
+  isOutOfEvent,
   START_ORDER_DIRECTION_KEY,
   START_ORDER_GROUPING_KEY,
   START_ORDER_KEY_KEY,
@@ -47,13 +48,17 @@ export class StartOrderService {
   async getStartOrder(stageId: string): Promise<StartOrder> {
     const stage = await this.findStage(stageId);
     const vehicles = await this.vehiclesService.findAll();
-    const ids = stage.startOrder ?? (await this.compute(stage, vehicles));
+    // A frozen list is the one posted and keeps every car it was posted
+    // with, so positions don't shift; Live Timing shows one that has since
+    // withdrawn as out. Anything still computed leaves such a car out.
+    const starters = vehicles.filter((v) => !isOutOfEvent(v.status));
+    const ids = stage.startOrder ?? (await this.compute(stage, starters));
     const byId = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
     const listed = new Set(ids);
     const ordered = [
       ...ids.flatMap((id) => byId.get(id) ?? []),
       // Registered after the freeze; `findAll` is already by start number.
-      ...vehicles.filter((vehicle) => !listed.has(vehicle.id)),
+      ...starters.filter((vehicle) => !listed.has(vehicle.id)),
     ];
     return {
       stageId,
@@ -124,7 +129,9 @@ export class StartOrderService {
   }
 
   private async snapshot(stage: Stage): Promise<void> {
-    const vehicles = await this.vehiclesService.findAll();
+    const vehicles = (await this.vehiclesService.findAll()).filter(
+      (v) => !isOutOfEvent(v.status),
+    );
     await this.stagesService.setStartOrder(
       stage.id,
       await this.compute(stage, vehicles),

@@ -136,8 +136,9 @@ export const VEHICLE_STATUS_DISPLAY: Record<
   },
 };
 
+/** DNF and DSQ end a car's stage (red); DNS only means it never came. */
 export function outcomeColor(outcome: string): string {
-  return outcome === 'DNF' ? 'error' : 'warning';
+  return outcome === 'DNS' ? 'warning' : 'error';
 }
 
 export function toLocalTimeValue(iso?: string): string {

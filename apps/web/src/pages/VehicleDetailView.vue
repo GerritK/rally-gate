@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { StageRunStatus, StageStatus } from '@rally-gate/shared';
+import { StageRunStatus, StageStatus, VehicleStatus } from '@rally-gate/shared';
 import { formatClockTime } from '@rally-gate/ui';
 import {
   fetchOverallClassification,
@@ -18,6 +18,7 @@ import ManualMark from '../components/ManualMark.vue';
 import TableLegend from '../components/TableLegend.vue';
 import StartNumber from '../components/StartNumber.vue';
 import VehicleDialog from '../components/VehicleDialog.vue';
+import VehicleStatusActions from '../components/VehicleStatusActions.vue';
 import { flagName, flagUrl } from '../crew';
 import {
   formatDuration,
@@ -219,7 +220,7 @@ onMounted(refresh);
         <v-card-text>
           <dl class="rg-facts">
             <dt>Status</dt>
-            <dd>
+            <dd class="d-flex flex-wrap align-center ga-1">
               <v-chip
                 size="small"
                 :color="VEHICLE_STATUS_DISPLAY[vehicle.status].color"
@@ -227,6 +228,7 @@ onMounted(refresh);
               >
                 {{ VEHICLE_STATUS_DISPLAY[vehicle.status].label }}
               </v-chip>
+              <VehicleStatusActions :vehicle="vehicle" @saved="refresh" />
             </dd>
             <dt>Classes</dt>
             <dd v-if="ownClasses.length > 0" class="d-flex flex-wrap ga-1">
@@ -272,7 +274,13 @@ onMounted(refresh);
           </div>
         </dl>
         <div v-else class="rg-empty">
-          Not in the overall yet: no completed stage that counts.
+          {{
+            vehicle?.status === VehicleStatus.WITHDRAWN
+              ? 'Retired: withdrawn, so not in the overall.'
+              : vehicle?.status === VehicleStatus.DISQUALIFIED
+                ? 'Disqualified: not in any result.'
+                : 'Not in the overall yet: no completed stage that counts.'
+          }}
         </div>
       </v-card-text>
       <v-table density="comfortable">

@@ -45,7 +45,7 @@ export interface SplitClassificationEntry extends Crew {
 export interface StageOutcomeEntry extends Crew {
   vehicleId: string;
   startNumber: number | null;
-  outcome: 'DNF' | 'DNS';
+  outcome: 'DNF' | 'DNS' | 'DSQ';
 }
 
 export interface SplitGateInfo {

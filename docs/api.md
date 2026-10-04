@@ -19,7 +19,7 @@ Anything outside `/api` that isn't a file returns `index.html`.
 | `/stages/:id/start-order` | GET | `{ frozen, frozenAt, grouped, entries }`; computed live until frozen. See `event-model.md` "Start order" |
 | `/stages/:id/start-order/freeze` | POST | stores the snapshot; no-op if already frozen (activation also freezes) |
 | `/stages/:id/start-order/unfreeze` | POST | back to live; 409 unless the stage is `NOT_STARTED` |
-| `/stage-runs` | GET, POST, `/:id` PATCH/DELETE | POST/PATCH/DELETE are manual corrections. POST without `startTime` is "Start now", stamped with the server clock. POST 409s while a non-voided attempt exists. GET includes voided attempts; `?stageId=` narrows to one stage |
+| `/stage-runs` | GET, POST, `/:id` PATCH/DELETE | POST/PATCH/DELETE are manual corrections. POST without `startTime` is "Start now", stamped with the server clock. POST 409s while a non-voided attempt exists, and for a vehicle withdrawn or disqualified. GET includes voided attempts; `?stageId=` narrows to one stage |
 | `/stage-runs/splits?stageId=` | GET | every split of every attempt on the stage, one request per page |
 | `/stage-runs/:id/finish` | POST | "Finish now": hand-timed finish stamped with the server clock. 409 if already finished, voided or the stage is closed |
 | `/stage-runs/:id/void`, `/unvoid` | POST | red flag / reverse it — see "Voiding" in `event-model.md`. Unvoid 409s with `{ blockingAttempt }` |
@@ -33,7 +33,7 @@ Anything outside `/api` that isn't a file returns `index.html`.
 | `/classification/stages/:stageId` | GET | ranked with gaps |
 | `/classification/stages/:stageId/split-gates` | GET | the stage's split points |
 | `/classification/stages/:stageId/splits/:splitIndex` | GET | live, includes `STARTED` runs, excludes `CANCELLED` |
-| `/classification/stages/:stageId/non-finishers` | GET | DNF; DNS only once the stage is `CLOSED` |
+| `/classification/stages/:stageId/non-finishers` | GET | DNF; DNS only once the stage is `CLOSED`; DSQ for a disqualified car that drove it, at any time. Disqualified cars are in no ranking (`event-model.md` "Vehicle status") |
 | `/rally-info` | GET, PUT | the event's name/details; singleton, since one database is one event |
 | `/event` | GET, POST `{ name, date }`, `/open` POST `{ file }` | the open event file and the others in the folder, `switchable: false` when fixed by config. POST creates/opens by restarting the server (202, then poll GET); 409 while a stage is `ACTIVE` — see `deployment-modes.md` |
 | `/event/known-gates` | GET, `/:id` DELETE | gates this computer remembers across events (standalone only); DELETE forgets one, the open event keeps it |

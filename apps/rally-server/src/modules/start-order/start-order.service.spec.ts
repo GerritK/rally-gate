@@ -1,5 +1,6 @@
 import {
   START_ORDER_DIRECTION_KEY,
+  VehicleStatus,
   START_ORDER_GROUPING_KEY,
   START_ORDER_KEY_KEY,
   StageStatus,
@@ -32,6 +33,7 @@ function makeService(
   stage: { startOrder: string[] | null; status?: StageStatus } = {
     startOrder: null,
   },
+  entrants: unknown[] = vehicles,
 ) {
   const stages = [
     { id: 'SS1', stageNumber: 1, status: StageStatus.CLOSED },
@@ -58,7 +60,7 @@ function makeService(
   const service = new StartOrderService(
     stagesService as unknown as StagesService,
     {
-      findAll: jest.fn().mockResolvedValue(vehicles),
+      findAll: jest.fn().mockResolvedValue(entrants),
     } as unknown as VehiclesService,
     classification as unknown as ClassificationService,
     {
@@ -72,6 +74,31 @@ const order = async (service: StartOrderService, stageId = 'SS2') =>
   (await service.getStartOrder(stageId)).entries.map((e) => e.vehicleId);
 
 describe('StartOrderService', () => {
+  const withOut = vehicles.map((v) =>
+    v.id === 'd'
+      ? { ...v, status: VehicleStatus.WITHDRAWN }
+      : v.id === 'a'
+        ? { ...v, status: VehicleStatus.DISQUALIFIED }
+        : v,
+  );
+
+  it('leaves a withdrawn or disqualified car off a list still computed', async () => {
+    const { service } = makeService({}, {}, undefined, withOut);
+    expect(await order(service)).toEqual(['b', 'e', 'c']);
+  });
+
+  it('keeps a frozen list as posted, a car since withdrawn included', async () => {
+    // Positions on a posted list must not shift; Live Timing shows the car
+    // as out instead.
+    const { service } = makeService(
+      {},
+      {},
+      { startOrder: ['a', 'b', 'c', 'd', 'e'] },
+      withOut,
+    );
+    expect(await order(service)).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
   it('defaults to main classes alphabetically by start number, no main class last', async () => {
     const { service } = makeService({}, {});
     // 10 after 2: numeric, not string order.

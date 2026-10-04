@@ -9,6 +9,7 @@ import {
 import type { VehicleClass } from '../api/vehicle-classes';
 import { FLAG_OPTIONS, flagUrl } from '../crew';
 import { required, VEHICLE_STATUS_DISPLAY } from '../format';
+import { transponderWarning } from '../vehicle-status';
 import ClassPicker from './ClassPicker.vue';
 import FormDialog from './FormDialog.vue';
 
@@ -55,6 +56,14 @@ const bodies = computed(() => suggestions((v) => v.body));
 const chassis = computed(() => suggestions((v) => v.chassis));
 
 // null, not undefined: only null clears the column (CLAUDE.md).
+const transponderShared = computed(() =>
+  transponderWarning(
+    props.vehicles,
+    draft.value.transponderId,
+    props.vehicle?.id ?? undefined,
+  ),
+);
+
 const orNull = (value: string | null) => value?.trim() || null;
 
 async function onSave() {
@@ -189,6 +198,8 @@ async function onSave() {
         <v-text-field
           v-model="draft.transponderId"
           label="Transponder ID (optional)"
+          :messages="transponderShared"
+          class="rg-field-warning"
         />
         <ClassPicker
           v-if="classes.length > 0"

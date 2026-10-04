@@ -163,8 +163,9 @@ fewer: a quick crew can retire and still lead if the penalty is small. The
 penalty is the knob; roughly one stage duration is a sensible start.
 
 - Only `CLOSED` stages count, so the overall table moves when a stage closes.
-- A crew needs at least one completed stage to be classified. The rest are
-  listed below the ranking as "Not classified", with no position or total.
+- A crew needs at least one completed stage to be classified, and must not
+  be withdrawn or disqualified ("Vehicle status"). The rest are listed below
+  the ranking as "Not classified", with no position or total.
 - A closed stage nobody finished is dropped — a notional with no anchor would
   add the same constant to everyone.
 - Lowest total wins; `stagesCompleted` is display-only.
@@ -185,6 +186,41 @@ so who is classified, which stages count and every notional come from within
 that group. No hierarchy (Rookie *under* 2WD): categories exist in every main
 class, and "all Rookies" must stay a ranking of its own. The overall ranking
 always includes everyone.
+
+## Vehicle status
+
+An entry's way through the event (`VehicleStatus`): **Registered**, then
+**Checked in** at the desk, then **Scrutineered** (passed the technical
+check), or out of it: **Withdrawn** or **Disqualified**. A small event with
+no technical check does both steps at the desk in one ("Check in and pass").
+Any status can be set back; Reinstate takes a car out of the event back to
+Registered.
+
+What each one does (`isOutOfEvent`, `isScrutineered` in `packages/shared`):
+
+- **Not yet scrutineered** (Registered, Checked in) still starts. A forgotten
+  click at the desk must not cost a crew its start; Live Timing marks such a
+  car on the start list and in Up next, and Freeze and Activate name them
+  and ask first.
+- **Withdrawn or disqualified** gets no place on a start list still
+  computed. A frozen list keeps it, since a posted list's positions must not
+  shift; Live Timing shows it as out. A gate's passing for it is stored as
+  evidence but times nothing (`EventsService.applyRules`), and a manual
+  start is a 409. Neither is a DNS.
+- **Disqualified** also leaves every result: stage, split and overall
+  rankings drop it before anything is computed, so the notional times the
+  others are charged are set as if it had never run (`rankable` in
+  `ClassificationService`). A stage it drove lists it among the
+  non-finishers as **DSQ**, whether the stage still runs or not. Its runs
+  stay stored; reinstating brings it back.
+- **Withdrawn** is retired: it won't drive again ("can't go on", "out of
+  time"). It keeps the times it drove in each stage's results, but leaves
+  the overall, listed below it as not classified, and collects no notional
+  times. Its real times still anchor the others' notionals, so a withdrawal
+  never moves anyone else's total. A car that broke down but will drive
+  again is not withdrawn: it stays ranked on notionals for what it misses.
+  Reinstating brings a withdrawn car back, with notionals for the stages it
+  missed.
 
 ## Start order
 

@@ -197,6 +197,11 @@ Values live in `theme.ts`. The rules:
   own default for the pickers is filled and a size taller, which reads as a
   different kind of field beside a text field. A field that sits in a row
   of buttons may go `compact` (the passing's vehicle picker).
+- **Refused or just unusual.** A value the server refuses is an
+  `error-messages` and Save won't help. One that is allowed but worth a
+  second look (a transponder already on another car) is a `messages` with
+  `.rg-field-warning` (`utilities.css`) in `warning`, and saves as usual:
+  red there would read as refused.
 
 ## Tables
 
@@ -248,6 +253,10 @@ Values live in `theme.ts`. The rules:
   lost, with numbers ("2 unassigned passings will be discarded"). Not every
   save: a confirmation on everything gets clicked through, and then it
   doesn't protect the delete either.
+- **Ask before an action whose effect isn't on screen:** Disqualify (the
+  car leaves every result, the cars behind move up), Freeze or Activate with
+  cars not yet scrutineered (named by number). A status change that one
+  click undoes doesn't ask.
 - **Time-critical actions never ask:** Start now, Finish now. A dialog would
   add to the reaction time already in the hand time; a slip is fixed with
   Correct.
@@ -404,6 +413,12 @@ Extract a component once it is actually used twice, not before.
   2-1-3, trophies in `podium-gold`/`-silver`/`-bronze` (`theme.ts`, used
   nowhere else). A click opens the vehicle, as a row does.
 - `VehicleDialog`: add and edit a vehicle, on Vehicles and the vehicle's page.
+- `VehicleStatusActions`: a vehicle's status changes, the next step as the
+  direct action and the rest in ⋮ (`statusActions` in `vehicle-status.ts`).
+  Small in a table row (with a short label, "Passed", the full one its
+  tooltip), `large` in the check-in card's footer. There `alsoShow` puts
+  further steps beside the next one, `withStep` saves fields with a step
+  forward. Only Disqualify asks first.
 - `ManualMark`: the hand-timed icon.
 - `TableLegend`: the icons a table shows, explained under it (see Tables).
 - `PassingBlock`: the oldest unidentified passing with its vehicle picker,
