@@ -1,24 +1,18 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import {
-  createVehicle,
-  fetchVehicles,
-  updateVehicle,
-  VehicleStatus,
-  type Vehicle,
-} from '../api/vehicles';
-import ClassPicker from '../components/ClassPicker.vue';
-import FormDialog from '../components/FormDialog.vue';
+import { useRouter } from 'vue-router';
+import { fetchVehicles, type Vehicle } from '../api/vehicles';
 import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
-import { required, VEHICLE_STATUS_DISPLAY } from '../format';
+import ClassChip from '../components/ClassChip.vue';
+import CrewName from '../components/CrewName.vue';
+import StartNumber from '../components/StartNumber.vue';
+import VehicleDialog from '../components/VehicleDialog.vue';
+import { VEHICLE_STATUS_DISPLAY } from '../format';
 
-const STATUS_OPTIONS = Object.values(VehicleStatus).map((value) => ({
-  value,
-  title: VEHICLE_STATUS_DISPLAY[value].label,
-}));
-
+const router = useRouter();
 const vehicles = ref<Vehicle[]>([]);
 const classes = ref<VehicleClass[]>([]);
+const dialogOpen = ref(false);
 
 /** In the order of the class list (main first, then by name), which the
  * server sorts; a vehicle's own classes come back in no particular order. */
@@ -28,44 +22,9 @@ function classesOf(vehicle: Vehicle): VehicleClass[] {
   );
 }
 
-const dialogOpen = ref(false);
-const editing = ref<Vehicle | null>(null);
-const draft = ref(toDraft(null));
-
-function toDraft(vehicle: Vehicle | null) {
-  return {
-    startNumber: vehicle?.startNumber ?? null,
-    driverName: vehicle?.driverName ?? '',
-    coDriverName: vehicle?.coDriverName ?? '',
-    transponderId: vehicle?.transponderId ?? '',
-    status: vehicle?.status ?? VehicleStatus.REGISTERED,
-    classIds: vehicle?.classes.map((c) => c.id) ?? [],
-  };
-}
-
-function openDialog(vehicle: Vehicle | null) {
-  editing.value = vehicle;
-  draft.value = toDraft(vehicle);
-  dialogOpen.value = true;
-}
-
 async function refresh() {
   vehicles.value = await fetchVehicles();
   classes.value = await fetchVehicleClasses();
-}
-
-async function onSave() {
-  const input = {
-    ...draft.value,
-    startNumber: Number(draft.value.startNumber),
-    driverName: draft.value.driverName.trim(),
-    // null, not undefined: only null clears the column (CLAUDE.md).
-    coDriverName: draft.value.coDriverName.trim() || null,
-    transponderId: draft.value.transponderId.trim() || null,
-  };
-  if (editing.value) await updateVehicle(editing.value.id, input);
-  else await createVehicle(input);
-  await refresh();
 }
 
 onMounted(refresh);
@@ -76,7 +35,7 @@ onMounted(refresh);
     <v-card-title class="d-flex align-center">
       Vehicles
       <v-spacer />
-      <v-btn color="primary" prepend-icon="mdi-plus" @click="openDialog(null)">
+      <v-btn color="primary" prepend-icon="mdi-plus" @click="dialogOpen = true">
         Add Vehicle
       </v-btn>
     </v-card-title>
@@ -85,31 +44,32 @@ onMounted(refresh);
         <thead>
           <tr>
             <th>#</th>
-            <th>Driver</th>
-            <th>Co-Driver</th>
+            <th>Crew</th>
+            <th>Car</th>
             <th>Transponder</th>
             <th v-if="classes.length > 0">Classes</th>
             <th>Status</th>
-            <th width="1%"></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="vehicle in vehicles" :key="vehicle.id">
-            <td class="rg-timing">{{ vehicle.startNumber }}</td>
-            <td>{{ vehicle.driverName }}</td>
-            <td>{{ vehicle.coDriverName ?? '-' }}</td>
+          <tr
+            v-for="vehicle in vehicles"
+            :key="vehicle.id"
+            class="cursor-pointer"
+            @click="router.push(`/vehicles/${vehicle.id}`)"
+          >
+            <td><StartNumber :number="vehicle.startNumber" /></td>
+            <td><CrewName :crew="vehicle" /></td>
+            <td>{{ vehicle.body ?? '-' }}</td>
             <td class="rg-timing">{{ vehicle.transponderId ?? '-' }}</td>
             <td v-if="classes.length > 0">
-              <v-chip
+              <ClassChip
                 v-for="c in classesOf(vehicle)"
                 :key="c.id"
-                size="small"
-                :color="c.main ? 'secondary' : undefined"
-                :prepend-icon="c.main ? 'mdi-star' : undefined"
+                :name="c.name"
+                :main="c.main"
                 class="me-1"
-              >
-                {{ c.name }}
-              </v-chip>
+              />
             </td>
             <td>
               <v-chip
@@ -120,19 +80,9 @@ onMounted(refresh);
                 {{ VEHICLE_STATUS_DISPLAY[vehicle.status].label }}
               </v-chip>
             </td>
-            <td class="text-no-wrap">
-              <v-btn
-                size="small"
-                variant="text"
-                prepend-icon="mdi-pencil"
-                @click="openDialog(vehicle)"
-              >
-                Edit
-              </v-btn>
-            </td>
           </tr>
           <tr v-if="vehicles.length === 0">
-            <td colspan="7" class="rg-empty">
+            <td colspan="6" class="rg-empty">
               No vehicles yet. Add one with + Add Vehicle.
             </td>
           </tr>
@@ -141,37 +91,11 @@ onMounted(refresh);
     </v-card-text>
   </v-card>
 
-  <FormDialog
+  <VehicleDialog
     v-model="dialogOpen"
-    :title="editing ? `Edit vehicle ${editing.startNumber}` : 'Add vehicle'"
-    :form="draft"
-    :save="onSave"
-    :saved="editing ? 'Vehicle saved' : 'Vehicle added'"
-    :save-text="editing ? 'Save' : 'Add vehicle'"
-  >
-    <v-text-field
-      v-model.number="draft.startNumber"
-      label="Start #"
-      type="number"
-      min="1"
-      :rules="[required]"
-      autofocus
-    />
-    <v-text-field
-      v-model="draft.driverName"
-      label="Driver"
-      :rules="[required]"
-    />
-    <v-text-field v-model="draft.coDriverName" label="Co-Driver (optional)" />
-    <v-text-field
-      v-model="draft.transponderId"
-      label="Transponder ID (optional)"
-    />
-    <ClassPicker
-      v-if="classes.length > 0"
-      v-model="draft.classIds"
-      :classes="classes"
-    />
-    <v-select v-model="draft.status" :items="STATUS_OPTIONS" label="Status" />
-  </FormDialog>
+    :vehicle="null"
+    :classes="classes"
+    :vehicles="vehicles"
+    @saved="refresh"
+  />
 </template>

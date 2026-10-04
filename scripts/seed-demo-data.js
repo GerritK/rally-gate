@@ -48,7 +48,11 @@ async function main() {
   console.log(
     await post('/vehicles', {
       startNumber: 12,
-      driverName: 'Demo Driver',
+      driverFirstName: 'Demo',
+      driverLastName: 'Driver',
+      driverFlag: 'fi',
+      body: 'Ford Focus RS WRC',
+      chassis: 'HPI WR8',
       transponderId: '1234567',
     }),
   );

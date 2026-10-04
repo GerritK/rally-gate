@@ -1,4 +1,4 @@
-import { VehicleStatus } from '@rally-gate/shared';
+import { Crew, VehicleStatus } from '@rally-gate/shared';
 import {
   Column,
   Entity,
@@ -9,7 +9,7 @@ import {
 import { VehicleClass } from './vehicle-class.entity';
 
 @Entity()
-export class Vehicle {
+export class Vehicle implements Crew {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -17,10 +17,30 @@ export class Vehicle {
   startNumber: number;
 
   @Column()
-  driverName: string;
+  driverFirstName: string;
 
   @Column({ type: 'varchar', nullable: true })
-  coDriverName?: string | null;
+  driverLastName: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  driverFlag: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  coDriverFirstName: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  coDriverLastName: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  coDriverFlag: string | null;
+
+  /** The RC chassis (HPI WR8, Tamiya TT-02). */
+  @Column({ type: 'varchar', nullable: true })
+  chassis: string | null;
+
+  /** The body shell, i.e. the car it looks like (Ford Focus, Toyota Yaris). */
+  @Column({ type: 'varchar', nullable: true })
+  body: string | null;
 
   @Column({ type: 'varchar', nullable: true })
   transponderId?: string | null;

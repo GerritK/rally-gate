@@ -15,6 +15,8 @@ import { fetchVehicles, type Vehicle } from '../api/vehicles';
 import { StageStatus } from '@rally-gate/shared';
 import { rallyName } from '../api/rally-info';
 import TableLegend from '../components/TableLegend.vue';
+import CrewName from '../components/CrewName.vue';
+import StartNumber from '../components/StartNumber.vue';
 import {
   formatDuration,
   formatGap,
@@ -171,8 +173,7 @@ onMounted(async () => {
           <tr>
             <th>Pos</th>
             <th>#</th>
-            <th>Driver</th>
-            <th>Co-Driver</th>
+            <th>Crew</th>
             <th v-for="stage in countedStages" :key="stage.id" class="rg-time">
               <router-link
                 :to="{
@@ -190,11 +191,15 @@ onMounted(async () => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="entry in overallClassification" :key="entry.vehicleId">
+          <tr
+            v-for="entry in overallClassification"
+            :key="entry.vehicleId"
+            class="cursor-pointer"
+            @click="router.push(`/vehicles/${entry.vehicleId}`)"
+          >
             <td>{{ entry.position }}</td>
-            <td>{{ entry.startNumber }}</td>
-            <td>{{ entry.driverName }}</td>
-            <td>{{ entry.coDriverName ?? '-' }}</td>
+            <td><StartNumber :number="entry.startNumber" /></td>
+            <td><CrewName :crew="entry" /></td>
             <td
               v-for="time in entry.stageTimes"
               :key="time.stageId"
@@ -260,16 +265,19 @@ onMounted(async () => {
           <thead>
             <tr>
               <th>#</th>
-              <th>Driver</th>
-              <th>Co-Driver</th>
+              <th>Crew</th>
               <th>Status</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="vehicle in notClassified" :key="vehicle.id">
-              <td>{{ vehicle.startNumber }}</td>
-              <td>{{ vehicle.driverName }}</td>
-              <td>{{ vehicle.coDriverName ?? '-' }}</td>
+            <tr
+              v-for="vehicle in notClassified"
+              :key="vehicle.id"
+              class="cursor-pointer"
+              @click="router.push(`/vehicles/${vehicle.id}`)"
+            >
+              <td><StartNumber :number="vehicle.startNumber" /></td>
+              <td><CrewName :crew="vehicle" /></td>
               <td>
                 <v-chip
                   size="small"

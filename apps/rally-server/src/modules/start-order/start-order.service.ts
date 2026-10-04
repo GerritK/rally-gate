@@ -22,6 +22,7 @@ import { StagesService } from '../stages/stages.service';
 import { Vehicle } from '../vehicles/vehicle.entity';
 import {
   compareClassNames,
+  crewOf,
   VehiclesService,
 } from '../vehicles/vehicles.service';
 
@@ -66,8 +67,7 @@ export class StartOrderService {
         position: index + 1,
         vehicleId: vehicle.id,
         startNumber: vehicle.startNumber,
-        driverName: vehicle.driverName,
-        coDriverName: vehicle.coDriverName ?? undefined,
+        ...crewOf(vehicle),
         mainClassName: mainClassOf(vehicle)?.name ?? null,
       })),
     };

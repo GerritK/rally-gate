@@ -19,11 +19,11 @@ const rookie = { id: 'cr', name: 'Rookie', main: false };
 
 // Sorted by start number, as `VehiclesService.findAll` returns them.
 const vehicles = [
-  { id: 'a', startNumber: 1, driverName: 'A', classes: [fourWd] },
-  { id: 'b', startNumber: 2, driverName: 'B', classes: [twoWd, rookie] },
-  { id: 'c', startNumber: 3, driverName: 'C', classes: [] },
-  { id: 'd', startNumber: 10, driverName: 'D', classes: [twoWd] },
-  { id: 'e', startNumber: 11, driverName: 'E', classes: [fourWd] },
+  { id: 'a', startNumber: 1, driverFirstName: 'A', classes: [fourWd] },
+  { id: 'b', startNumber: 2, driverFirstName: 'B', classes: [twoWd, rookie] },
+  { id: 'c', startNumber: 3, driverFirstName: 'C', classes: [] },
+  { id: 'd', startNumber: 10, driverFirstName: 'D', classes: [twoWd] },
+  { id: 'e', startNumber: 11, driverFirstName: 'E', classes: [fourWd] },
 ];
 
 function makeService(

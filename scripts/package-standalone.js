@@ -81,6 +81,10 @@ async function main() {
 
   cpSync(process.execPath, join(pkg, windows ? 'node.exe' : 'node'));
   cpSync(join(root, 'LICENSE'), join(pkg, 'LICENSE'));
+  cpSync(
+    join(root, 'THIRD_PARTY_NOTICES.md'),
+    join(pkg, 'THIRD_PARTY_NOTICES.md'),
+  );
 
   if (windows) {
     cpSync(

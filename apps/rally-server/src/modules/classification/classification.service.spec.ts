@@ -78,8 +78,8 @@ function makeOverallService(
 
 describe('ClassificationService.getOverallClassification', () => {
   const vehicles = [
-    { id: 'v1', startNumber: 1, driverName: 'Went the distance' },
-    { id: 'v2', startNumber: 2, driverName: 'Quick but retired' },
+    { id: 'v1', startNumber: 1, driverFirstName: 'Went the distance' },
+    { id: 'v2', startNumber: 2, driverFirstName: 'Quick but retired' },
   ];
   const twoClosed = [
     { id: 'SS1', status: StageStatus.CLOSED },
@@ -197,7 +197,7 @@ describe('ClassificationService.getOverallClassification', () => {
     // in the results on an entirely invented total.
     const service = makeOverallService(twoClosed, runs, [
       ...vehicles,
-      { id: 'v3', startNumber: 3, driverName: 'Never turned up' },
+      { id: 'v3', startNumber: 3, driverFirstName: 'Never turned up' },
     ]);
 
     const result = await service.getOverallClassification();
@@ -236,9 +236,24 @@ describe('ClassificationService.getOverallClassification by class', () => {
     { id: 'SS2', status: StageStatus.CLOSED },
   ];
   const vehicles = [
-    { id: 'v1', startNumber: 1, driverName: 'A', classes: [{ id: '2WD' }] },
-    { id: 'v2', startNumber: 2, driverName: 'B', classes: [{ id: '2WD' }] },
-    { id: 'v3', startNumber: 3, driverName: 'C', classes: [{ id: '4WD' }] },
+    {
+      id: 'v1',
+      startNumber: 1,
+      driverFirstName: 'A',
+      classes: [{ id: '2WD' }],
+    },
+    {
+      id: 'v2',
+      startNumber: 2,
+      driverFirstName: 'B',
+      classes: [{ id: '2WD' }],
+    },
+    {
+      id: 'v3',
+      startNumber: 3,
+      driverFirstName: 'C',
+      classes: [{ id: '4WD' }],
+    },
   ];
   // v3 is far slower on SS2; overall, that drags v2's SS2 notional up to it.
   const runs = [
@@ -305,8 +320,8 @@ describe('ClassificationService.getStageClassification', () => {
     // The overall fix must not leak into per-stage ranking, where every
     // entry is one run and totals are directly comparable.
     const vehicles = [
-      { id: 'v1', startNumber: 1, driverName: 'A' },
-      { id: 'v2', startNumber: 2, driverName: 'B' },
+      { id: 'v1', startNumber: 1, driverFirstName: 'A' },
+      { id: 'v2', startNumber: 2, driverFirstName: 'B' },
     ];
     const stagesService = {
       findOne: jest.fn().mockResolvedValue({ status: StageStatus.CLOSED }),
@@ -339,9 +354,9 @@ describe('ClassificationService.getStageClassification', () => {
 
 describe('ClassificationService.getNonFinishers', () => {
   const vehicles = [
-    { id: 'v1', startNumber: 1, driverName: 'Started, no finish' },
-    { id: 'v2', startNumber: 2, driverName: 'Never started' },
-    { id: 'v3', startNumber: 3, driverName: 'Finished' },
+    { id: 'v1', startNumber: 1, driverFirstName: 'Started, no finish' },
+    { id: 'v2', startNumber: 2, driverFirstName: 'Never started' },
+    { id: 'v3', startNumber: 3, driverFirstName: 'Finished' },
   ];
 
   it('reports no one while the stage is still open, even with no runs yet', async () => {

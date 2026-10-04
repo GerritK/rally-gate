@@ -18,7 +18,7 @@ import {
 import { StagesService } from '../stages/stages.service';
 import { SettingsService } from '../settings/settings.service';
 import { Vehicle } from '../vehicles/vehicle.entity';
-import { VehiclesService } from '../vehicles/vehicles.service';
+import { crewOf, VehiclesService } from '../vehicles/vehicles.service';
 
 export const NOTIONAL_PENALTY_MS_KEY = 'notionalPenaltyMs';
 
@@ -213,8 +213,7 @@ export class ClassificationService {
         position: index + 1,
         vehicleId: pair.run.vehicleId,
         startNumber: vehicle?.startNumber ?? null,
-        driverName: vehicle?.driverName ?? 'Unknown',
-        coDriverName: vehicle?.coDriverName ?? undefined,
+        ...crewOf(vehicle),
         splitIndex,
         elapsedMs: pair.split.elapsedMs,
         gapMs: pair.split.elapsedMs - leaderMs,
@@ -245,8 +244,7 @@ export class ClassificationService {
       return {
         vehicleId,
         startNumber: vehicle?.startNumber ?? null,
-        driverName: vehicle?.driverName ?? 'Unknown',
-        coDriverName: vehicle?.coDriverName ?? undefined,
+        ...crewOf(vehicle),
         outcome,
       };
     };
@@ -318,8 +316,7 @@ export class ClassificationService {
         position: index + 1,
         vehicleId: entry.vehicleId,
         startNumber: vehicle?.startNumber ?? null,
-        driverName: vehicle?.driverName ?? 'Unknown',
-        coDriverName: vehicle?.coDriverName ?? undefined,
+        ...crewOf(vehicle),
         durationMs: entry.durationMs,
         gapMs: entry.durationMs - leaderMs,
       };

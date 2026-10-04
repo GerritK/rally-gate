@@ -45,6 +45,10 @@ export const router = createRouter({
       component: () => import('./pages/SetupScoringView.vue'),
     },
     {
+      path: '/setup/display',
+      component: () => import('./pages/SetupDisplayView.vue'),
+    },
+    {
       path: '/setup/stages/:stageId',
       component: () => import('./pages/SetupStageDetailView.vue'),
       props: true,
@@ -56,6 +60,11 @@ export const router = createRouter({
       props: true,
     },
     { path: '/vehicles', component: () => import('./pages/VehiclesView.vue') },
+    {
+      path: '/vehicles/:vehicleId',
+      component: () => import('./pages/VehicleDetailView.vue'),
+      props: true,
+    },
   ],
 });
 

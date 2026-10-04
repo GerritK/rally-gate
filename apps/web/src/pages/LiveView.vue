@@ -58,6 +58,10 @@ import RunningTime from '../components/RunningTime.vue';
 import TableLegend from '../components/TableLegend.vue';
 import PassingBlock from '../components/PassingBlock.vue';
 import StagePicker from '../components/StagePicker.vue';
+import ClassChip from '../components/ClassChip.vue';
+import CrewName from '../components/CrewName.vue';
+import StartNumber from '../components/StartNumber.vue';
+import { driverName } from '../crew';
 import {
   formatClockTime,
   formatStageDuration,
@@ -330,7 +334,7 @@ const dueToStart = computed(() => {
 const vehicleOptions = computed(() =>
   vehicles.value.map((v) => ({
     id: v.id,
-    title: `#${v.startNumber} ${v.driverName}`,
+    title: `#${v.startNumber} ${driverName(v)}`,
   })),
 );
 
@@ -1192,17 +1196,16 @@ onUnmounted(() => {
         </v-card-item>
         <v-card-text v-if="dueToStart.length > 0">
           <div class="d-flex align-center ga-4">
-            <div class="rg-timing rg-next-number">
-              #{{ dueToStart[0].entry.startNumber }}
+            <div class="rg-next-number">
+              <StartNumber :number="dueToStart[0].entry.startNumber" />
             </div>
-            <div>
-              <div class="rg-next-driver">
-                {{ dueToStart[0].entry.driverName }}
-              </div>
-              <div class="text-medium-emphasis">
-                {{ dueToStart[0].entry.mainClassName }}
-              </div>
-            </div>
+            <CrewName :crew="dueToStart[0].entry" class="rg-next-driver" />
+            <ClassChip
+              v-if="dueToStart[0].entry.mainClassName"
+              :name="dueToStart[0].entry.mainClassName"
+              main
+              class="ms-auto"
+            />
           </div>
           <v-btn
             v-if="stage.status === StageStatus.ACTIVE"
@@ -1225,15 +1228,16 @@ onUnmounted(() => {
                 :key="row.entry.vehicleId"
                 class="d-flex align-center ga-3"
               >
-                <span class="rg-timing rg-then-number">
-                  #{{ row.entry.startNumber }}
+                <span class="rg-then-number">
+                  <StartNumber :number="row.entry.startNumber" />
                 </span>
-                <div>
-                  <div class="rg-then-driver">{{ row.entry.driverName }}</div>
-                  <div class="text-medium-emphasis">
-                    {{ row.entry.mainClassName }}
-                  </div>
-                </div>
+                <CrewName :crew="row.entry" class="rg-then-driver" />
+                <ClassChip
+                  v-if="row.entry.mainClassName"
+                  :name="row.entry.mainClassName"
+                  main
+                  class="ms-auto"
+                />
               </div>
             </div>
           </template>
@@ -1277,10 +1281,10 @@ onUnmounted(() => {
         <v-table density="comfortable">
           <tbody>
             <tr v-for="car in onStage" :key="car.run.id">
-              <td class="rg-timing font-weight-bold" style="width: 72px">
-                #{{ car.row.entry.startNumber }}
+              <td style="width: 72px">
+                <StartNumber :number="car.row.entry.startNumber" />
               </td>
-              <td class="text-no-wrap">{{ car.row.entry.driverName }}</td>
+              <td><CrewName :crew="car.row.entry" /></td>
               <td v-if="splitIndices.length > 0" class="text-no-wrap">
                 <v-icon
                   v-for="index in splitIndices"
@@ -1359,8 +1363,7 @@ onUnmounted(() => {
         <tr>
           <th style="width: 56px">Pos</th>
           <th style="width: 72px">#</th>
-          <th>Driver</th>
-          <th class="d-none d-print-table-cell">Co-driver</th>
+          <th>Crew</th>
           <th v-if="!startOrder.grouped">Class</th>
           <th class="d-print-none">Status</th>
           <th class="d-print-none rg-time">
@@ -1381,14 +1384,17 @@ onUnmounted(() => {
           </tr>
           <tr :class="{ 'rg-next-row': row.state === 'NEXT' }">
             <td class="rg-timing">{{ row.entry.position }}</td>
-            <td class="rg-timing font-weight-bold">
-              {{ row.entry.startNumber }}
+            <td>
+              <StartNumber :number="row.entry.startNumber" />
             </td>
-            <td class="text-no-wrap">{{ row.entry.driverName }}</td>
-            <td class="d-none d-print-table-cell">
-              {{ row.entry.coDriverName }}
+            <td><CrewName :crew="row.entry" /></td>
+            <td v-if="!startOrder.grouped">
+              <ClassChip
+                v-if="row.entry.mainClassName"
+                :name="row.entry.mainClassName"
+                main
+              />
             </td>
-            <td v-if="!startOrder.grouped">{{ row.entry.mainClassName }}</td>
             <td class="d-print-none text-no-wrap">
               <v-chip
                 size="small"
@@ -1794,8 +1800,6 @@ onUnmounted(() => {
 /* Readable from a tablet at arm's length or more. */
 .rg-next-number {
   font-size: 3.5rem;
-  font-weight: 700;
-  line-height: 1;
 }
 
 .rg-then-grid {
@@ -1805,19 +1809,13 @@ onUnmounted(() => {
 }
 .rg-then-number {
   font-size: 2rem;
-  font-weight: 700;
-  line-height: 1;
 }
 .rg-then-driver {
   font-size: 1.1rem;
-  font-weight: 600;
-  line-height: 1.2;
 }
 
 .rg-next-driver {
   font-size: 1.75rem;
-  font-weight: 600;
-  line-height: 1.2;
 }
 
 /* The next car is a marshal's main cue, so it gets more than the chip. */

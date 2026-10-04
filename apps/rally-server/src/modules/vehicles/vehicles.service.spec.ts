@@ -26,7 +26,7 @@ describe('VehiclesService.create', () => {
     const service = makeService(() => Promise.reject(uniqueViolation()));
 
     await expect(
-      service.create({ startNumber: 12, driverName: 'Demo' }),
+      service.create({ startNumber: 12, driverFirstName: 'Demo' }),
     ).rejects.toThrow('Start number 12 is already in use');
   });
 
@@ -34,16 +34,16 @@ describe('VehiclesService.create', () => {
     const service = makeService(() => Promise.reject(new Error('disk full')));
 
     await expect(
-      service.create({ startNumber: 12, driverName: 'Demo' }),
+      service.create({ startNumber: 12, driverFirstName: 'Demo' }),
     ).rejects.toThrow('disk full');
   });
 
   it('returns the saved vehicle on success', async () => {
-    const saved = { id: 'v1', startNumber: 12, driverName: 'Demo' };
+    const saved = { id: 'v1', startNumber: 12, driverFirstName: 'Demo' };
     const service = makeService(() => Promise.resolve(saved));
 
     await expect(
-      service.create({ startNumber: 12, driverName: 'Demo' }),
+      service.create({ startNumber: 12, driverFirstName: 'Demo' }),
     ).resolves.toEqual(saved);
   });
 });
@@ -90,20 +90,20 @@ describe('VehiclesService.update', () => {
     const service = makeServiceForUpdate({
       id: 'v1',
       startNumber: 12,
-      driverName: 'Demo',
+      driverFirstName: 'Demo',
       status: VehicleStatus.REGISTERED,
     });
 
     const updated = await service.update('v1', {
       status: VehicleStatus.CHECKED_IN,
-      coDriverName: 'Co Driver',
+      coDriverFirstName: 'Co Driver',
     });
 
     expect(updated).toMatchObject({
       startNumber: 12,
-      driverName: 'Demo',
+      driverFirstName: 'Demo',
       status: VehicleStatus.CHECKED_IN,
-      coDriverName: 'Co Driver',
+      coDriverFirstName: 'Co Driver',
     });
   });
 
@@ -111,28 +111,28 @@ describe('VehiclesService.update', () => {
     const service = makeServiceForUpdate({
       id: 'v1',
       startNumber: 12,
-      driverName: 'Demo',
-      coDriverName: 'Co',
+      driverFirstName: 'Demo',
+      coDriverFirstName: 'Co',
     });
 
     const updated = await service.update('v1', {
       startNumber: undefined,
-      driverName: undefined,
-      coDriverName: null,
+      driverFirstName: undefined,
+      coDriverFirstName: null,
       status: VehicleStatus.CHECKED_IN,
     });
 
     expect(updated).toMatchObject({
       startNumber: 12,
-      driverName: 'Demo',
-      coDriverName: null,
+      driverFirstName: 'Demo',
+      coDriverFirstName: null,
       status: VehicleStatus.CHECKED_IN,
     });
   });
 
   it('throws ConflictException when the new start number is already taken', async () => {
     const service = makeServiceForUpdate(
-      { id: 'v1', startNumber: 12, driverName: 'Demo' },
+      { id: 'v1', startNumber: 12, driverFirstName: 'Demo' },
       () => Promise.reject(uniqueViolation()),
     );
 

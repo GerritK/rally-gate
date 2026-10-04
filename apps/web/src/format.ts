@@ -10,6 +10,7 @@ import type { GateAssignment } from './api/gate-assignments';
 import type { Gate } from './api/gates';
 import type { Stage } from './api/stages';
 import type { Vehicle } from './api/vehicles';
+import { driverName } from './crew';
 
 /**
  * Where a clock offset stops looking like ordinary network transit and
@@ -168,7 +169,7 @@ export function stageName(stages: Stage[], stageId: string): string {
 
 export function vehicleName(vehicles: Vehicle[], vehicleId: string): string {
   const vehicle = vehicles.find((v) => v.id === vehicleId);
-  return vehicle ? `#${vehicle.startNumber} ${vehicle.driverName}` : vehicleId;
+  return vehicle ? `#${vehicle.startNumber} ${driverName(vehicle)}` : vehicleId;
 }
 
 export function isOnline(

@@ -111,7 +111,7 @@ describe('server-owned fields are not settable through the API', () => {
     [
       'Vehicle.id on update',
       UpdateVehicleDto,
-      { id: 'some-other-uuid', driverName: 'Mallory' },
+      { id: 'some-other-uuid', driverFirstName: 'Mallory' },
       'id',
     ],
     // Would make an offline gate look alive on the Hardware page.
@@ -175,8 +175,8 @@ describe('valid payloads still pass', () => {
     // null is not "absent": only null actually writes SQL NULL (CLAUDE.md),
     // so the DTO has to let it through rather than strip it.
     await expect(
-      transform(UpdateVehicleDto, { coDriverName: null }),
-    ).resolves.toEqual({ coDriverName: null });
+      transform(UpdateVehicleDto, { coDriverFirstName: null }),
+    ).resolves.toEqual({ coDriverFirstName: null });
   });
 
   it('accepts null to clear a stage expected duration', async () => {
@@ -239,9 +239,16 @@ describe('malformed values are rejected at the boundary', () => {
   it('rejects an unknown vehicle status', async () => {
     const messages = await rejectionMessages(CreateVehicleDto, {
       startNumber: 1,
-      driverName: 'A',
+      driverFirstName: 'A',
       status: 'VIBING',
     });
     expect(messages).toMatch(/status/);
+  });
+
+  it('rejects a flag that is not a code', async () => {
+    const messages = await rejectionMessages(UpdateVehicleDto, {
+      driverFlag: 'de" onerror="x',
+    });
+    expect(messages).toMatch(/driverFlag/);
   });
 });

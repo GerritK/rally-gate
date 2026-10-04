@@ -158,6 +158,12 @@ onMounted(async () => {
         <v-card-text> How a stage a crew didn't finish is scored. </v-card-text>
       </v-card>
     </v-col>
+    <v-col cols="12" sm="4">
+      <v-card to="/setup/display" prepend-icon="mdi-palette-outline">
+        <v-card-title>Display</v-card-title>
+        <v-card-text>Crew names, flags and the podium.</v-card-text>
+      </v-card>
+    </v-col>
   </v-row>
 
   <FormDialog

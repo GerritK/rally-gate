@@ -19,6 +19,8 @@ import { fetchStages, type Stage } from '../api/stages';
 import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
 import { rallyName } from '../api/rally-info';
 import TableLegend from '../components/TableLegend.vue';
+import CrewName from '../components/CrewName.vue';
+import StartNumber from '../components/StartNumber.vue';
 import {
   formatDuration,
   formatGap,
@@ -170,8 +172,7 @@ function onStageChange(stageId: string) {
           <tr>
             <th>Pos</th>
             <th>#</th>
-            <th>Driver</th>
-            <th>Co-Driver</th>
+            <th>Crew</th>
             <th v-for="gate in splitGates" :key="gate.gateId" class="rg-time">
               Split {{ gate.splitIndex }}
             </th>
@@ -180,11 +181,15 @@ function onStageChange(stageId: string) {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="entry in stageClassification" :key="entry.vehicleId">
+          <tr
+            v-for="entry in stageClassification"
+            :key="entry.vehicleId"
+            class="cursor-pointer"
+            @click="router.push(`/vehicles/${entry.vehicleId}`)"
+          >
             <td>{{ entry.position }}</td>
-            <td>{{ entry.startNumber }}</td>
-            <td>{{ entry.driverName }}</td>
-            <td>{{ entry.coDriverName ?? '-' }}</td>
+            <td><StartNumber :number="entry.startNumber" /></td>
+            <td><CrewName :crew="entry" /></td>
             <td
               v-for="(splits, i) in splitsByGate"
               :key="splitGates[i].gateId"
@@ -222,7 +227,7 @@ function onStageChange(stageId: string) {
             <td class="rg-timing rg-time">{{ formatGap(entry.gapMs) }}</td>
           </tr>
           <tr v-if="stageClassification.length === 0">
-            <td :colspan="6 + splitGates.length" class="rg-empty">
+            <td :colspan="5 + splitGates.length" class="rg-empty">
               Nobody has finished this stage yet.
             </td>
           </tr>
@@ -238,16 +243,19 @@ function onStageChange(stageId: string) {
         <thead>
           <tr>
             <th>#</th>
-            <th>Driver</th>
-            <th>Co-Driver</th>
+            <th>Crew</th>
             <th>Outcome</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="entry in nonFinishers" :key="entry.vehicleId">
-            <td>{{ entry.startNumber }}</td>
-            <td>{{ entry.driverName }}</td>
-            <td>{{ entry.coDriverName ?? '-' }}</td>
+          <tr
+            v-for="entry in nonFinishers"
+            :key="entry.vehicleId"
+            class="cursor-pointer"
+            @click="router.push(`/vehicles/${entry.vehicleId}`)"
+          >
+            <td><StartNumber :number="entry.startNumber" /></td>
+            <td><CrewName :crew="entry" /></td>
             <td>
               <v-chip size="small" :color="outcomeColor(entry.outcome)">
                 {{ entry.outcome }}

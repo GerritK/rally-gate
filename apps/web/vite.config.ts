@@ -1,9 +1,20 @@
+import { createRequire } from 'node:module';
+import { dirname } from 'node:path';
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue()],
+  resolve: {
+    // import.meta.glob takes no bare package names, and npm decides where a
+    // workspace dependency is hoisted to.
+    alias: {
+      '@flag-icons': dirname(
+        createRequire(import.meta.url).resolve('flag-icons/package.json'),
+      ),
+    },
+  },
   build: {
     // Full Vuetify registration (packages/ui/src/vuetify.ts) is one ~600 kB
     // chunk. Served from localhost/LAN, never a CDN, so that is not worth

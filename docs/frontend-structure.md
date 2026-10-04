@@ -10,15 +10,17 @@ sharing `client.ts`). Audience is marshals and organisers only.
 | `/live/:stageId?` | Live Timing | the marshal view, laid out like the stage: its gates on a line in the order a car meets them, each with its health; "Up next" (next car large with Start now, the two after it) beside cars on stage in expected arrival order, each with Finish now (split progress, last split with gap to the best); every vehicle in start order with its run state, times and corrections (a stage time derives the finish), and Enter time for a car with no run (a missed start: finish and stage time give the start); unidentified passings in On stage, starts included (a car that crossed the start line is on stage), with a suggested vehicle; Activate / Close; freeze and print the start list; raw detections collapsed. No stage picks the active one, else the next |
 | `/results/overall` | Results | overall classification, each stage column the time driven, the fastest marked, the gap to it in the tooltip, its header linking to that stage's results, filterable by class, printable |
 | `/results/stages/:stageId` | Results | stage classification with a column per split (the time and its rank, the fastest marked, the gap to it in the tooltip), DNF/DNS, filterable by class, printable |
-| `/vehicles` | Vehicles | registration, editing in a dialog, status, classes |
+| `/vehicles` | Vehicles | registration in a dialog, status, classes; a row opens the vehicle |
+| `/vehicles/:vehicleId` | Vehicles | one vehicle: door number, crew name with flags, body and chassis, edit in the same dialog. Result rows open it too. Later its times per stage, several transponders |
 | `/hardware` | Hardware | gate roster: online, heartbeat, clock offset, version, add/delete, auto-discovery toggle, shut down all gates; a row opens the gate. Gates known to this computer: add to this event, forget (standalone only) |
 | `/hardware/gates/:gateId` | Hardware | one gate: status, clock, address with a link to its gate-config, version, rename; its assignments on every stage; its last 100 detections, live, with clock correction and what became of each |
-| `/setup` | Setup | the event: rally details, file name, New / Open Event dialogs (standalone only); tiles to Stages, Classes, Start order and Scoring. The app bar's cog links here |
+| `/setup` | Setup | the event: rally details, file name, New / Open Event dialogs (standalone only); tiles to Stages, Classes, Start order, Scoring and Display. The app bar's cog links here |
 | `/setup/stages` | Setup | stage list, create |
 | `/setup/stages/:stageId` | Setup | edit stage, its gate assignments (active state read-only) |
 | `/setup/classes` | Setup | vehicle classes table: add/rename/delete, main class or category, vehicle count. Assigned on Vehicles |
 | `/setup/start-order` | Setup | start order rules: grouping, key, direction. Later planned start times |
 | `/setup/scoring` | Setup | notional time penalty; later penalties |
+| `/setup/display` | Setup | crew name format, flags and podium: shown, screen only (not printed) or not at all |
 
 ## Decisions
 
@@ -58,7 +60,9 @@ sharing `client.ts`). Audience is marshals and organisers only.
   and a full-size button is easier to hit on a tablet.
 - **Drawer, not tabs**, so more sections don't need a nav rework.
 - **No store, no speculative components.** Each page fetches what it needs in
-  `onMounted`; data volumes are tiny. Extract a component once it is actually
+  `onMounted`; data volumes are tiny. The one exception is the Display
+  settings (`display` in `src/crew.ts`), loaded once by `App.vue`, since
+  every crew name on every page reads them. Extract a component once it is actually
   duplicated; the shared ones are listed in `design-system.md`. Shared pure
   helpers are in `src/format.ts`.
 - **New / Open Event live in Setup**, on the rally details card: the details

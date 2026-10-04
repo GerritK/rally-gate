@@ -1,3 +1,4 @@
+import { applyDecorators } from '@nestjs/common';
 import { VehicleStatus } from '@rally-gate/shared';
 import {
   IsArray,
@@ -8,33 +9,45 @@ import {
   IsOptional,
   IsPositive,
   IsString,
-  ValidateIf,
+  Matches,
 } from 'class-validator';
 
+// `null` is meaningful here, not just absence: it's how the UI clears an
+// optional field, and only `null` actually writes SQL NULL (CLAUDE.md).
+const NullableString = () => applyDecorators(IsOptional(), IsString());
+
+/** A `flag-icons` code (`de`, `gb-eng`) or one of ours (`x-pride`). */
+const NullableFlag = () =>
+  applyDecorators(IsOptional(), Matches(/^[a-z]+(-[a-z]+)*$/));
+
 /**
- * No `id` on either DTO. `VehiclesService.update` merges the body onto the
- * loaded entity with `Object.assign`, so an `id` in the payload would retarget
- * the save at a different row.
+ * No `id` on any vehicle DTO. `VehiclesService.update` merges the body onto
+ * the loaded entity with `Object.assign`, so an `id` in the payload would
+ * retarget the save at a different row.
  */
-export class CreateVehicleDto {
-  @IsInt()
-  @IsPositive()
-  startNumber: number;
+class VehicleDetailsDto {
+  @NullableString()
+  driverLastName?: string | null;
 
-  @IsString()
-  @IsNotEmpty()
-  driverName: string;
+  @NullableFlag()
+  driverFlag?: string | null;
 
-  // `null` is meaningful here, not just absence: it's how the UI clears an
-  // optional field, and only `null` actually writes SQL NULL (CLAUDE.md).
-  @ValidateIf((_, value) => value !== null)
-  @IsOptional()
-  @IsString()
-  coDriverName?: string | null;
+  @NullableString()
+  coDriverFirstName?: string | null;
 
-  @ValidateIf((_, value) => value !== null)
-  @IsOptional()
-  @IsString()
+  @NullableString()
+  coDriverLastName?: string | null;
+
+  @NullableFlag()
+  coDriverFlag?: string | null;
+
+  @NullableString()
+  chassis?: string | null;
+
+  @NullableString()
+  body?: string | null;
+
+  @NullableString()
   transponderId?: string | null;
 
   @IsOptional()
@@ -48,7 +61,17 @@ export class CreateVehicleDto {
   classIds?: string[];
 }
 
-export class UpdateVehicleDto {
+export class CreateVehicleDto extends VehicleDetailsDto {
+  @IsInt()
+  @IsPositive()
+  startNumber: number;
+
+  @IsString()
+  @IsNotEmpty()
+  driverFirstName: string;
+}
+
+export class UpdateVehicleDto extends VehicleDetailsDto {
   @IsOptional()
   @IsInt()
   @IsPositive()
@@ -57,27 +80,7 @@ export class UpdateVehicleDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  driverName?: string;
-
-  @ValidateIf((_, value) => value !== null)
-  @IsOptional()
-  @IsString()
-  coDriverName?: string | null;
-
-  @ValidateIf((_, value) => value !== null)
-  @IsOptional()
-  @IsString()
-  transponderId?: string | null;
-
-  @IsOptional()
-  @IsEnum(VehicleStatus)
-  status?: VehicleStatus;
-
-  /** Replaces the vehicle's class list; 400 if any id is unknown. */
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  classIds?: string[];
+  driverFirstName?: string;
 }
 
 export class VehicleClassDto {

@@ -1,3 +1,5 @@
+import type { Crew } from './vehicle';
+
 /** Setting keys, stored via `PUT /api/settings/:key`. */
 export const START_ORDER_GROUPING_KEY = 'startOrderGrouping';
 export const START_ORDER_KEY_KEY = 'startOrderKey';
@@ -19,12 +21,10 @@ export enum StartOrderDirection {
   SLOWEST_FIRST = 'SLOWEST_FIRST',
 }
 
-export interface StartOrderEntry {
+export interface StartOrderEntry extends Crew {
   position: number;
   vehicleId: string;
   startNumber: number;
-  driverName: string;
-  coDriverName?: string;
   mainClassName: string | null;
 }
 

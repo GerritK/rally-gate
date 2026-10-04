@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Crew } from '@rally-gate/shared';
 import { In, Repository } from 'typeorm';
 import { isUniqueViolation } from '../../common/db-errors';
 import { VehicleClassDto } from './dto';
@@ -17,6 +18,18 @@ type VehicleInput = Partial<Omit<Vehicle, 'id' | 'classes'>> & {
 
 export function compareClassNames(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+/** `undefined` only if the vehicle was deleted after it drove. */
+export function crewOf(vehicle: Vehicle | undefined): Crew {
+  return {
+    driverFirstName: vehicle?.driverFirstName ?? 'Unknown',
+    driverLastName: vehicle?.driverLastName ?? null,
+    driverFlag: vehicle?.driverFlag ?? null,
+    coDriverFirstName: vehicle?.coDriverFirstName ?? null,
+    coDriverLastName: vehicle?.coDriverLastName ?? null,
+    coDriverFlag: vehicle?.coDriverFlag ?? null,
+  };
 }
 
 @Injectable()

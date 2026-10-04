@@ -1,14 +1,14 @@
-import { VehicleStatus } from '@rally-gate/shared';
+import { VehicleStatus, type Crew } from '@rally-gate/shared';
 import { apiFetch, patchJson, postJson } from './client';
 import type { VehicleClass } from './vehicle-classes';
 
 export { VehicleStatus };
 
-export interface Vehicle {
+export interface Vehicle extends Crew {
   id: string;
   startNumber: number;
-  driverName: string;
-  coDriverName?: string | null;
+  chassis: string | null;
+  body: string | null;
   transponderId?: string | null;
   status: VehicleStatus;
   classes: VehicleClass[];
@@ -23,8 +23,12 @@ export function fetchVehicles(): Promise<Vehicle[]> {
   return apiFetch('/vehicles');
 }
 
+export function fetchVehicle(id: string): Promise<Vehicle | null> {
+  return apiFetch(`/vehicles/${id}`);
+}
+
 export function createVehicle(
-  input: VehiclePatch & { startNumber: number; driverName: string },
+  input: VehiclePatch & { startNumber: number; driverFirstName: string },
 ): Promise<Vehicle> {
   return postJson('/vehicles', input);
 }

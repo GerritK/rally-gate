@@ -69,12 +69,32 @@ What exists, with where its reasoning lives. History is in git.
 - **Events:** new / open event in the dashboard, one file each, switched by
   restarting under `start.js`; gates remembered per computer, picked into
   each event on the Hardware page (`deployment-modes.md` "New / open event").
+- **Crews:** driver and co-driver as first/last name with a flag each, body
+  and chassis; names in the event's format and flags shown, screen only or
+  off (Setup → Display); a vehicle page, opened from Vehicles and Results
+  rows (`frontend-structure.md`, `design-system.md`). Flags are freely
+  usable only: `flag-icons` for countries, own SVGs for the chequered
+  default and the Pride, Progress Pride and trans flags
+  (`THIRD_PARTY_NOTICES.md`). Not the International Flag of Planet Earth:
+  its terms forbid it standing for a person. Later on the vehicle page: its
+  times per stage, several transponder IDs.
 - **CI:** build, format, lint, tests, and a headless-stack job against real
   Postgres (`CLAUDE.md`).
 
 ## Next
 
-OpenStint (below) resumes when the hardware arrives.
+OpenStint (below) resumes when the hardware arrives. Meanwhile, crew
+presentation — for the look of the event more than for timing:
+
+1. **Podium** above the Overall and each stage's results, following the class
+   filter: steps 2-1-3, trophies in new `podium-gold/silver/bronze` theme
+   colours, crew name, body, time or gap; empty steps under three classified,
+   "Provisional" while a stage runs. Printed per the Display setting, in the
+   light print style of `design-system.md` (outlined trophies).
+2. **Print all rankings** — maybe: Overall plus one page per class in one go,
+   instead of picking each class filter and printing. Classes already are the
+   rankings and the filter is already a link, so saved class combinations
+   ("2WD + Rookie") wait until someone needs one.
 
 ## Deliberately deferred
 

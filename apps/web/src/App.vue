@@ -6,6 +6,7 @@ import { fetchRallyInfo, rallyName } from './api/rally-info';
 import { liveStatus } from './api/live';
 import { serverOffsetMs, syncServerClock } from './api/time';
 import { fetchServerVersion, serverVersion } from './api/version';
+import { loadDisplaySettings } from './crew';
 import { eventName } from './format';
 import { useRoute } from 'vue-router';
 import { NAV_ITEMS } from './router';
@@ -39,6 +40,7 @@ onUnmounted(() => clearInterval(timer));
 onMounted(async () => {
   void fetchServerVersion();
   syncServerClock().catch(() => undefined);
+  void loadDisplaySettings();
   await fetchRallyInfo();
   fileName.value = eventName((await fetchEventInfo()).file);
 });

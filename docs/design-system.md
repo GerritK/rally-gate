@@ -26,6 +26,15 @@ most of what follows.
   left, cars on stage to its right.
 - **Offline.** No CDNs: fonts and icons are self-hosted (`@fontsource/*`,
   `@mdi/font`), since rally-site Wi-Fi is closed or absent.
+- **A recurring element looks the same everywhere.** A start number, a
+  crew name, a time, a status is drawn by one shared component or class
+  (`StartNumber`, `PersonName`/`CrewName`, `ClassChip`, `.rg-timing`, the
+  status chips)
+  and never restyled per page. A page sets only the size, through the
+  surrounding `font-size`. A marshal recognises a car by its plate and a
+  name by its lettering, on any page; a second look for the same thing
+  reads as a different thing. Plain-text spots (a select option, a
+  tooltip) write a start number as `#12`.
 
 ## Colour
 
@@ -77,7 +86,16 @@ Values live in `theme.ts`. The rules:
 - **Barlow** for body text, **Barlow Condensed** for headings, card and
   toolbar titles (set in `utilities.css`, since Vuetify's heading font only
   reaches its `text-h*` classes).
-- **`.rg-timing`** on every time and start number: JetBrains Mono, tabular
+- **Crew names** follow the event's name format (Setup → Display) everywhere
+  (`personName` in `src/crew.ts`) and are lettered like a rally car's side
+  window: flag, Barlow Condensed bold italic, capitals (`PersonName`).
+  Wherever a crew appears, it is both names in one cell (`CrewName`), the
+  co-driver below the driver and smaller, so the driver leads.
+- **Start numbers** are a door plate: black on white, Barlow Bold
+  (`StartNumber`). A sans like a real plate, not `.rg-timing`'s mono; the
+  plate's minimum width keeps a column aligned. Not WRC's fluorescent
+  orange: orange is the page's main action, and it prints as grey.
+- **`.rg-timing`** on every time: JetBrains Mono, tabular
   figures so live values don't reflow, slashed zero so 0 and O can't be
   confused at a glance.
 
@@ -282,6 +300,9 @@ inconsistencies the first draft had:
   stage runs; a running stage is titled "Provisional". A table too wide for
   portrait turns the page to landscape (more than three stage columns on
   Overall, more than two splits on a stage).
+- Flags (and later the podium) print only when Setup → Display says "Yes";
+  "Screen only" adds `d-print-none` (`printClass`), as a black-and-white
+  printer can't tell most flags apart.
 - Tables print compact (6px cell padding) and unclipped, from
   `utilities.css`.
 
@@ -312,6 +333,16 @@ Extract a component once it is actually used twice, not before.
   `?classes=` (`useClassQuery`), so it carries between Overall and a stage.
   Every results card names it as its subtitle, "All classes" included, so
   a printout always says which ranking it is.
+- `StartNumber`: the door plate, sized by the surrounding font.
+- `CrewName`: the crew, driver above a smaller co-driver; every table's
+  Crew column, Live Timing's Up next and On stage, the vehicle page. Built
+  from `PersonName`, one person's flag and name per the Display settings.
+  No flag chosen shows the chequered flag. Flags are `flag-icons` (4:3) plus
+  our own in `src/assets/flags`, all freely usable (`THIRD_PARTY_NOTICES.md`);
+  never flag emoji, which Windows renders as two letters.
+- `ClassChip`: a vehicle class, main classes in secondary with a star.
+  Live Timing puts a car's main class at the right of Up next and Then.
+- `VehicleDialog`: add and edit a vehicle, on Vehicles and the vehicle's page.
 - `ManualMark`: the hand-timed icon.
 - `TableLegend`: the icons a table shows, explained under it (see Tables).
 - `PassingBlock`: the oldest unidentified passing with its vehicle picker,

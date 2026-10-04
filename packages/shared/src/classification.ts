@@ -1,10 +1,10 @@
-export interface ClassificationEntry {
+import type { Crew } from './vehicle';
+
+export interface ClassificationEntry extends Crew {
   position: number;
   vehicleId: string;
   /** `null` only if the vehicle was deleted after it drove. */
   startNumber: number | null;
-  driverName: string;
-  coDriverName?: string;
   durationMs: number;
   gapMs: number;
 }
@@ -32,23 +32,19 @@ export interface OverallStageTime {
   notional: boolean;
 }
 
-export interface SplitClassificationEntry {
+export interface SplitClassificationEntry extends Crew {
   position: number;
   vehicleId: string;
   startNumber: number | null;
-  driverName: string;
-  coDriverName?: string;
   splitIndex: number;
   elapsedMs: number;
   gapMs: number;
   stageRunStatus: string;
 }
 
-export interface StageOutcomeEntry {
+export interface StageOutcomeEntry extends Crew {
   vehicleId: string;
   startNumber: number | null;
-  driverName: string;
-  coDriverName?: string;
   outcome: 'DNF' | 'DNS';
 }
 
