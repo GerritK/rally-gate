@@ -56,6 +56,24 @@ input[type='time']::-webkit-calendar-picker-indicator {
 }
 
 /*
+ * A record's facts in a card: a <dl>, label left in medium emphasis, value
+ * right, one per row (the gate's status and clock, a vehicle's car).
+ */
+.rg-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 12px 24px;
+  align-items: center;
+  margin: 0;
+}
+.rg-facts dt {
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+.rg-facts dd {
+  margin: 0;
+}
+
+/*
  * A section inside a card or dialog (Driver, Co-driver, Car; Crew, Results).
  * The card title's font a size down, so the title still leads; from the
  * second section on, a rule above it, so a long form reads as its parts.

@@ -98,7 +98,8 @@ Values live in `theme.ts`. The rules:
   `.rg-section-title` (`utilities.css`): the card title's font a size down,
   so the title still leads, and from the second section on a rule above
   it. Not `text-overline`, which is too faint to divide a form; that stays
-  for a small label inside a block (Live Timing's "Then").
+  for a small label inside a block (Live Timing's "Then"). Sections set
+  side by side share one rule above their row.
 - **Crew names** follow the event's name format (Setup → Display) everywhere
   (`personName` in `src/crew.ts`) and are lettered like a rally car's side
   window: flag, Barlow Condensed bold, capitals (`PersonName`). Upright:
@@ -124,6 +125,12 @@ Values live in `theme.ts`. The rules:
   (the gate line keeps a minimum width per gate).
 - **Phone and tablet:** check portrait tablet width (~820px). Long names
   truncate with an ellipsis and keep the full name in a tooltip.
+- **A record's page is its parts as cards**, the same parts its edit
+  dialog has (a vehicle: Crew, Car, Entry), under one card with what
+  identifies it and the Edit button. Side by side as they fit, the cards of
+  a row equally tall. Inside a card the facts are a `.rg-facts` list
+  (`utilities.css`): label left, value right, `-` where nothing is set, so a
+  gap shows instead of a row going missing.
 
 ## Status
 
@@ -184,6 +191,12 @@ Values live in `theme.ts`. The rules:
 - **After saving**, a dialog closes; a detail page stays open. Both confirm
   with a short snackbar.
 - **Keyboard:** Enter saves, Esc cancels (asking first if there are changes).
+- **Every input field looks alike**, typed or picked: text fields,
+  selects, comboboxes and autocompletes are all outlined and the same
+  height (`comfortable`), set once in `packages/ui` `vuetify.ts`. Vuetify's
+  own default for the pickers is filled and a size taller, which reads as a
+  different kind of field beside a text field. A field that sits in a row
+  of buttons may go `compact` (the passing's vehicle picker).
 
 ## Tables
 
@@ -402,4 +415,8 @@ Extract a component once it is actually used twice, not before.
   `loading` while saving, keeps a server error inside the dialog, asks
   before Esc/outside/Cancel throws away changes, confirms with the snackbar
   and goes fullscreen on phones. The page passes the draft and a `save`
-  function that throws on failure.
+  function that throws on failure. A long form goes wide rather than tall
+  (`maxWidth`): `VehicleDialog` sets its sections in pairs, Driver |
+  Co-driver and Car | Entry, one column on a phone, so it fits a laptop
+  screen without scrolling. Before it outgrows that, its editing moves to
+  the record's page.

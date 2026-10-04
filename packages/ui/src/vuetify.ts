@@ -31,7 +31,12 @@ export function createRallyVuetify() {
       VCard: { rounded: 'lg', flat: true, border: true },
       VBtn: { rounded: 'md', variant: 'flat' },
       VSheet: { rounded: 'lg' },
+      // Every input field alike, picked or typed: Vuetify's own default for
+      // the pickers is filled and a size taller than a text field.
       VTextField: { variant: 'outlined', density: 'comfortable' },
+      VSelect: { variant: 'outlined', density: 'comfortable' },
+      VCombobox: { variant: 'outlined', density: 'comfortable' },
+      VAutocomplete: { variant: 'outlined', density: 'comfortable' },
     },
   });
 }

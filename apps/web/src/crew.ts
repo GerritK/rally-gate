@@ -99,6 +99,13 @@ export const FLAG_OPTIONS: { value: string | null; title: string }[] = [
     .sort((a, b) => a.title.localeCompare(b.title)),
 ];
 
+/** The flag's name as the picker lists it; null when none is chosen. */
+export function flagName(flag: string | null): string | null {
+  return flag
+    ? (FLAG_OPTIONS.find((f) => f.value === flag)?.title ?? flag)
+    : null;
+}
+
 /** Unknown codes fall back too: a flag-icons update may drop one. */
 export function flagUrl(flag: string | null): string {
   return (

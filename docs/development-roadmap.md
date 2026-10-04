@@ -75,12 +75,13 @@ What exists, with where its reasoning lives. History is in git.
 - **Crews:** driver and co-driver as first/last name with a flag each, body
   and chassis; names in the event's format and flags shown or off on
   screen (Setup → Display; printed PDFs never show flags); a vehicle page,
-  opened from Vehicles and Results rows (`frontend-structure.md`,
-  `design-system.md`). Flags are freely usable only: `flag-icons` for countries, own SVGs for the chequered
-  default and the Pride, Progress Pride and trans flags
+  opened from Vehicles and Results rows, with its crew, car, entry and
+  times per stage (`frontend-structure.md`, `design-system.md`). Flags are
+  freely usable only: `flag-icons` for countries, own SVGs for the
+  chequered default and the Pride, Progress Pride and trans flags
   (`THIRD_PARTY_NOTICES.md`). Not the International Flag of Planet Earth:
-  its terms forbid it standing for a person. Later on the vehicle page: its
-  times per stage, several transponder IDs.
+  its terms forbid it standing for a person. Later on the vehicle page:
+  several transponder IDs.
 - **Podium** above the Overall and each stage's results, following the class
   filter: steps 2-1-3 with gold/silver/bronze trophies, crew, body, time and
   gap; a click opens the vehicle. On screen only, or off; the printed

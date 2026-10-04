@@ -33,9 +33,13 @@ export interface StageSplit {
   elapsedMs: number;
 }
 
-/** Every attempt, voided ones included. */
-export function fetchStageRuns(stageId: string): Promise<StageRun[]> {
-  return apiFetch(`/stage-runs?stageId=${encodeURIComponent(stageId)}`);
+/** Every attempt, voided ones included; of one stage, or of them all. */
+export function fetchStageRuns(stageId?: string): Promise<StageRun[]> {
+  return apiFetch(
+    stageId
+      ? `/stage-runs?stageId=${encodeURIComponent(stageId)}`
+      : '/stage-runs',
+  );
 }
 
 export function fetchSplitsForStage(stageId: string): Promise<StageSplit[]> {

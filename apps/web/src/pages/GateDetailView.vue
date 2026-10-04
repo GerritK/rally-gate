@@ -405,16 +405,4 @@ onUnmounted(() => {
     grid-template-columns: 1fr;
   }
 }
-.rg-facts {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 12px 24px;
-  align-items: center;
-}
-.rg-facts dt {
-  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
-}
-.rg-facts dd {
-  margin: 0;
-}
 </style>

@@ -12,6 +12,8 @@ const props = defineProps<{
   /** Snackbar text once saved. */
   saved: string;
   saveText?: string;
+  /** Wider for a form laid out in columns. */
+  maxWidth?: number;
 }>();
 const open = defineModel<boolean>({ required: true });
 
@@ -61,7 +63,7 @@ async function submit(event: SubmitEventPromise) {
 <template>
   <v-dialog
     :model-value="open"
-    max-width="560"
+    :max-width="maxWidth ?? 560"
     :fullscreen="smAndDown"
     @update:model-value="close"
   >
