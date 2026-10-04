@@ -93,6 +93,12 @@ Values live in `theme.ts`. The rules:
 - **Barlow** for body text, **Barlow Condensed** for headings, card and
   toolbar titles (set in `utilities.css`, since Vuetify's heading font only
   reaches its `text-h*` classes).
+- **A section inside a card or dialog** (Driver, Co-driver, Car in the
+  vehicle dialog; Crew, Results on Setup → Display) is headed with
+  `.rg-section-title` (`utilities.css`): the card title's font a size down,
+  so the title still leads, and from the second section on a rule above
+  it. Not `text-overline`, which is too faint to divide a form; that stays
+  for a small label inside a block (Live Timing's "Then").
 - **Crew names** follow the event's name format (Setup → Display) everywhere
   (`personName` in `src/crew.ts`) and are lettered like a rally car's side
   window: flag, Barlow Condensed bold, capitals (`PersonName`). Upright:
@@ -372,7 +378,10 @@ Extract a component once it is actually used twice, not before.
 - `StartNumber`: the door plate, sized by the surrounding font.
 - `CrewName`: the crew, driver above a smaller co-driver; every table's
   Crew column, Live Timing's Up next and On stage, the vehicle page. Built
-  from `PersonName`, one person's flag and name per the Display settings.
+  from `PersonName`, one person's flag and name per the Display settings
+  (`useDisplay()`: the event's, or what a page provides under `DISPLAY`;
+  Setup → Display provides its unsaved form, so its example crew shows a
+  change before it is saved).
   No flag chosen shows the chequered flag. Flags are `flag-icons` (4:3) plus
   our own in `src/assets/flags`, all freely usable (`THIRD_PARTY_NOTICES.md`);
   never flag emoji, which Windows renders as two letters.

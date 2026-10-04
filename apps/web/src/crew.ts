@@ -6,7 +6,7 @@ import {
   type Crew,
 } from '@rally-gate/shared';
 import countries from 'flag-icons/country.json';
-import { reactive } from 'vue';
+import { inject, reactive, type InjectionKey } from 'vue';
 import { fetchSetting } from './api/settings';
 import chequered from './assets/flags/chequered.svg';
 import pride from './assets/flags/x-pride.svg';
@@ -20,6 +20,12 @@ export const display = reactive({
   podium: true,
 });
 
+/** What a crew name is drawn with: the event's settings, unless a page
+ * provides others. Setup → Display provides its unsaved form, so its
+ * example shows a change before it is saved. */
+export const DISPLAY: InjectionKey<typeof display> = Symbol('display');
+export const useDisplay = () => inject(DISPLAY, display);
+
 export async function loadDisplaySettings(): Promise<void> {
   const [nameFormat, flags, podium] = await Promise.all(
     [NAME_FORMAT_KEY, FLAGS_SHOWN_KEY, PODIUM_SHOWN_KEY].map(fetchSetting),
@@ -31,13 +37,17 @@ export async function loadDisplaySettings(): Promise<void> {
   display.podium = podium !== 'false';
 }
 
-export function personName(first: string | null, last: string | null): string {
+export function personName(
+  first: string | null,
+  last: string | null,
+  format = display.nameFormat,
+): string {
   const f = first?.trim() ?? '';
   const l = last?.trim() ?? '';
   if (!f || !l) return f || l;
   // Spread, not [0]: an initial must not split a surrogate pair.
   const initial = (name: string) => `${[...name][0]}.`;
-  switch (display.nameFormat) {
+  switch (format) {
     case NameFormat.INITIAL_LAST:
       return `${initial(f)} ${l}`;
     case NameFormat.FULL:
@@ -47,11 +57,11 @@ export function personName(first: string | null, last: string | null): string {
   }
 }
 
-export const driverName = (crew: Crew) =>
-  personName(crew.driverFirstName, crew.driverLastName);
+export const driverName = (crew: Crew, format?: NameFormat) =>
+  personName(crew.driverFirstName, crew.driverLastName, format);
 
-export const coDriverName = (crew: Crew) =>
-  personName(crew.coDriverFirstName, crew.coDriverLastName) || null;
+export const coDriverName = (crew: Crew, format?: NameFormat) =>
+  personName(crew.coDriverFirstName, crew.coDriverLastName, format) || null;
 
 const countryFlags = Object.fromEntries(
   Object.entries(

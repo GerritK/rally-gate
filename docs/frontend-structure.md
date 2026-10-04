@@ -20,7 +20,7 @@ sharing `client.ts`). Audience is marshals and organisers only.
 | `/setup/classes` | Setup | vehicle classes table: add/rename/delete, main class or category, vehicle count. Assigned on Vehicles |
 | `/setup/start-order` | Setup | start order rules: grouping, key, direction. Later planned start times |
 | `/setup/scoring` | Setup | notional time penalty; later penalties |
-| `/setup/display` | Setup | crew name format; flags and podium shown or not (on screen: printouts are plain PDFs) |
+| `/setup/display` | Setup | Crew: name format and flags, with an example crew drawn with the unsaved settings; Results: podium. Switches, on screen only (printouts are plain PDFs) |
 
 ## Decisions
 

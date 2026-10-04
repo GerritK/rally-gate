@@ -96,7 +96,7 @@ async function onSave() {
       :rules="[required]"
       autofocus
     />
-    <div class="text-overline">Driver</div>
+    <div class="rg-section-title">Driver</div>
     <div class="rg-person">
       <v-text-field
         v-model="draft.driverFirstName"
@@ -124,7 +124,7 @@ async function onSave() {
         </v-list-item>
       </template>
     </v-autocomplete>
-    <div class="text-overline">Co-driver (optional)</div>
+    <div class="rg-section-title">Co-driver (optional)</div>
     <div class="rg-person">
       <v-text-field v-model="draft.coDriverFirstName" label="First name" />
       <v-text-field v-model="draft.coDriverLastName" label="Last name" />
@@ -148,7 +148,7 @@ async function onSave() {
         </v-list-item>
       </template>
     </v-autocomplete>
-    <div class="text-overline">Car</div>
+    <div class="rg-section-title">Car</div>
     <div class="rg-person">
       <v-combobox
         v-model="draft.body"

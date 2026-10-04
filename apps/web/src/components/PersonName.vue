@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import type { Crew } from '@rally-gate/shared';
 import { computed } from 'vue';
-import { coDriverName, display, driverName, flagUrl } from '../crew';
+import { coDriverName, driverName, flagUrl, useDisplay } from '../crew';
 
 const props = defineProps<{ crew: Crew; coDriver?: boolean }>();
+const display = useDisplay();
 
 const name = computed(() =>
-  props.coDriver ? coDriverName(props.crew) : driverName(props.crew),
+  props.coDriver
+    ? coDriverName(props.crew, display.nameFormat)
+    : driverName(props.crew, display.nameFormat),
 );
 const flag = computed(() =>
   props.coDriver ? props.crew.coDriverFlag : props.crew.driverFlag,
