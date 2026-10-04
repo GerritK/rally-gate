@@ -156,10 +156,10 @@ export class StagesService {
   }
 
   /** `null` unfreezes. */
-  async setStartOrder(id: string, vehicleIds: string[] | null): Promise<void> {
+  async setStartOrder(id: string, entryIds: string[] | null): Promise<void> {
     await this.stages.update(id, {
-      startOrder: vehicleIds,
-      startOrderFrozenAt: vehicleIds ? new Date() : null,
+      startOrder: entryIds,
+      startOrderFrozenAt: entryIds ? new Date() : null,
     });
   }
 }

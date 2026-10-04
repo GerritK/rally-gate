@@ -7,14 +7,14 @@ defineProps<{
   /** "Finish", "Split 1"; absent for a gate no stage owns any more. */
   role?: string;
   gateName: string;
-  vehicleId?: string;
-  vehicleOptions: { id: string; title: string }[];
+  entryId?: string;
+  entryOptions: { id: string; title: string }[];
   /** Later passings at this card's gates, shown after this one is handled:
    *  passings are assigned in time order, and the suggestion is too. */
   queued: DetectionEventRecord[];
 }>();
 defineEmits<{
-  pick: [vehicleId: string];
+  pick: [entryId: string];
   assign: [];
   dismiss: [];
   /** This one and every queued one. */
@@ -44,21 +44,21 @@ defineEmits<{
          buttons under the marshal's pointer. -->
       <div class="rg-passing-actions">
         <v-select
-          :model-value="vehicleId"
-          :items="vehicleOptions"
+          :model-value="entryId"
+          :items="entryOptions"
           item-title="title"
           item-value="id"
-          placeholder="Pick a vehicle"
+          placeholder="Pick an entry"
           density="compact"
           variant="outlined"
           hide-details
-          class="rg-passing-vehicle"
+          class="rg-passing-entry"
           @update:model-value="$emit('pick', $event)"
         />
         <v-btn
           variant="tonal"
           prepend-icon="mdi-check"
-          :disabled="!vehicleId"
+          :disabled="!entryId"
           @click="$emit('assign')"
         >
           Assign
@@ -149,7 +149,7 @@ defineEmits<{
   flex: 1 1 auto;
   min-width: 0;
 }
-.rg-passing-vehicle {
+.rg-passing-entry {
   flex: 1 1 auto;
   min-width: 0;
 }

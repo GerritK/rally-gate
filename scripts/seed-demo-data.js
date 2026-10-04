@@ -1,8 +1,8 @@
-// Seeds a minimal demo event: two gates (start/finish), one stage, one vehicle.
+// Seeds a minimal demo event: two gates (start/finish), one stage, one entry.
 // Usage: node scripts/seed-demo-data.js [apiBaseUrl]
 // All API routes live under /api — rally-server serves the dashboard from the
-// same port, so the prefix is what keeps `/vehicles` the page and
-// `/api/vehicles` the resource. Pass a bare origin and the prefix is added.
+// same port, so the prefix is what keeps `/entries` the page and
+// `/api/entries` the resource. Pass a bare origin and the prefix is added.
 const argBase = process.argv[2] ?? 'http://localhost:57430';
 const API_BASE = argBase.endsWith('/api') ? argBase : `${argBase}/api`;
 
@@ -46,7 +46,7 @@ async function main() {
   await assign('FINISH_WP1', 'WP1', 'stage_finish');
   console.log(await post('/stages/WP1/activate'));
   console.log(
-    await post('/vehicles', {
+    await post('/entries', {
       startNumber: 12,
       driverFirstName: 'Demo',
       driverLastName: 'Driver',

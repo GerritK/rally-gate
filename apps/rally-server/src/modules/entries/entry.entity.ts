@@ -1,4 +1,4 @@
-import { Crew, VehicleStatus } from '@rally-gate/shared';
+import { Crew, EntryStatus } from '@rally-gate/shared';
 import {
   Column,
   Entity,
@@ -6,10 +6,10 @@ import {
   ManyToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { VehicleClass } from './vehicle-class.entity';
+import { EntryClass } from './entry-class.entity';
 
 @Entity()
-export class Vehicle implements Crew {
+export class Entry implements Crew {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -45,12 +45,12 @@ export class Vehicle implements Crew {
   @Column({ type: 'varchar', nullable: true })
   transponderId?: string | null;
 
-  @Column({ type: 'varchar', default: VehicleStatus.REGISTERED })
-  status: VehicleStatus;
+  @Column({ type: 'varchar', default: EntryStatus.REGISTERED })
+  status: EntryStatus;
 
   // Many-to-many: a car can be in "2WD" and "Junior" at once, each a separate
   // ranking over the same runs. The junction rows cascade when a class goes.
-  @ManyToMany(() => VehicleClass, { eager: true })
+  @ManyToMany(() => EntryClass, { eager: true })
   @JoinTable()
-  classes: VehicleClass[];
+  classes: EntryClass[];
 }

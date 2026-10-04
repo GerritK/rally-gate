@@ -22,7 +22,7 @@ export class Stage {
   @Column({ type: 'int', nullable: true })
   minDurationMs: number | null;
 
-  /** Vehicle ids, frozen on first activation (`StartOrderService`). */
+  /** Entry ids, frozen on first activation (`StartOrderService`). */
   @Column({ type: 'simple-json', nullable: true })
   startOrder: string[] | null;
 

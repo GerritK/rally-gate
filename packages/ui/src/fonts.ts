@@ -5,7 +5,7 @@
  * width on every live update. @fontsource bundles the font files into the
  * app itself via Vite, same as any other asset.
  *
- * Barlow: derived from American highway/vehicle signage — reads as
+ * Barlow: derived from American highway/entry signage — reads as
  * motorsport without going full gaming-logo. Condensed for headings packs
  * long stage/driver names into table headers, which is the actual
  * bottleneck on a tablet results list; regular Barlow for body text keeps

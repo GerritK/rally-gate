@@ -106,7 +106,7 @@ fixed and the buttons are hidden.
   the file, it is seeded from the open event's gates. A plain file so a club
   can copy it to a second laptop.
 
-Not built: carrying vehicles/stages over from the previous event, and
+Not built: carrying entries/stages over from the previous event, and
 switching under Postgres (it would need `CREATE DATABASE`; Docker's restart
 policy would already do the restart).
 

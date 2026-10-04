@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import { isOutOfEvent, VehicleStatus } from '@rally-gate/shared';
-import { fetchVehicles, type Vehicle } from '../api/vehicles';
-import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
+import { isOutOfEvent, EntryStatus } from '@rally-gate/shared';
+import { fetchEntries, type Entry } from '../api/entries';
+import { fetchEntryClasses, type EntryClass } from '../api/entry-classes';
 import ClassChip from '../components/ClassChip.vue';
 import CrewName from '../components/CrewName.vue';
 import StartNumber from '../components/StartNumber.vue';
-import VehicleDialog from '../components/VehicleDialog.vue';
-import VehicleStatusActions from '../components/VehicleStatusActions.vue';
-import { VEHICLE_STATUS_DISPLAY } from '../format';
-import { transponderWarning } from '../vehicle-status';
+import EntryDialog from '../components/EntryDialog.vue';
+import EntryStatusActions from '../components/EntryStatusActions.vue';
+import { ENTRY_STATUS_DISPLAY } from '../format';
+import { transponderWarning } from '../entry-status';
 
 /**
  * Two stations, one job each: the desk checks crews in, the scrutineers pass
@@ -24,26 +24,26 @@ const STATIONS: Record<
     label: string;
     icon: string;
     /** Still to be done here. */
-    open: VehicleStatus;
+    open: EntryStatus;
     listTitle: string;
     allDone: string;
     /** Shown as a button beside the step rather than in ⋮. */
-    alsoShow: VehicleStatus[];
+    alsoShow: EntryStatus[];
   }
 > = {
   desk: {
     label: 'Desk',
     icon: 'mdi-clipboard-check-outline',
-    open: VehicleStatus.REGISTERED,
+    open: EntryStatus.REGISTERED,
     listTitle: 'To check in',
     allDone: 'Every car is checked in.',
     // An event without a technical check passes cars at the desk.
-    alsoShow: [VehicleStatus.SCRUTINEERED],
+    alsoShow: [EntryStatus.SCRUTINEERED],
   },
   scrutineering: {
     label: 'Scrutineering',
     icon: 'mdi-check-decagram',
-    open: VehicleStatus.CHECKED_IN,
+    open: EntryStatus.CHECKED_IN,
     listTitle: 'To scrutineer',
     allDone: 'No checked-in car is waiting for scrutineering.',
     alsoShow: [],
@@ -69,8 +69,8 @@ watch(station, (value) => {
 });
 const here = computed(() => STATIONS[station.value]);
 
-const vehicles = ref<Vehicle[]>([]);
-const classes = ref<VehicleClass[]>([]);
+const entries = ref<Entry[]>([]);
+const classes = ref<EntryClass[]>([]);
 const query = ref('');
 const selectedId = ref<string | null>(null);
 // A car picked at the other station would offer that station's step.
@@ -81,19 +81,18 @@ const carCard = ref<{ $el: HTMLElement } | null>(null);
 
 /** Out of the event doesn't count against either station. */
 const counts = computed(() => {
-  const starters = vehicles.value.filter((v) => !isOutOfEvent(v.status));
+  const starters = entries.value.filter((v) => !isOutOfEvent(v.status));
   return {
     starters: starters.length,
-    checkedIn: starters.filter((v) => v.status !== VehicleStatus.REGISTERED)
+    checkedIn: starters.filter((v) => v.status !== EntryStatus.REGISTERED)
       .length,
-    scrutineered: starters.filter(
-      (v) => v.status === VehicleStatus.SCRUTINEERED,
-    ).length,
+    scrutineered: starters.filter((v) => v.status === EntryStatus.SCRUTINEERED)
+      .length,
   };
 });
 
 const open = computed(() =>
-  vehicles.value.filter((v) => v.status === here.value.open),
+  entries.value.filter((v) => v.status === here.value.open),
 );
 
 /** Accents and case don't matter: "dvorak" finds Dvořák. */
@@ -110,7 +109,7 @@ const fold = (text: string) =>
 const shown = computed(() => {
   const q = fold(query.value.trim());
   if (!q) return open.value;
-  return vehicles.value
+  return entries.value
     .filter((v) =>
       /^\d+$/.test(q)
         ? String(v.startNumber).startsWith(q)
@@ -133,7 +132,7 @@ const shown = computed(() => {
 });
 
 const selected = computed(
-  () => vehicles.value.find((v) => v.id === selectedId.value) ?? null,
+  () => entries.value.find((v) => v.id === selectedId.value) ?? null,
 );
 const selectedClasses = computed(() =>
   classes.value.filter((c) =>
@@ -150,10 +149,10 @@ watch(selected, (v) => (transponder.value = v?.transponderId ?? ''), {
 const transponderAtDesk = computed(
   () =>
     station.value === 'desk' &&
-    selected.value?.status === VehicleStatus.REGISTERED,
+    selected.value?.status === EntryStatus.REGISTERED,
 );
 const transponderShared = computed(() =>
-  transponderWarning(vehicles.value, transponder.value, selected.value?.id),
+  transponderWarning(entries.value, transponder.value, selected.value?.id),
 );
 const withStep = computed(() =>
   transponderAtDesk.value
@@ -176,8 +175,8 @@ function pickFirst() {
 }
 
 /** The station moves on: the next car is typed into an empty search. */
-async function onSaved(saved: Vehicle) {
-  vehicles.value = vehicles.value.map((v) => (v.id === saved.id ? saved : v));
+async function onSaved(saved: Entry) {
+  entries.value = entries.value.map((v) => (v.id === saved.id ? saved : v));
   selectedId.value = null;
   query.value = '';
   await nextTick();
@@ -185,9 +184,9 @@ async function onSaved(saved: Vehicle) {
 }
 
 async function refresh() {
-  [vehicles.value, classes.value] = await Promise.all([
-    fetchVehicles(),
-    fetchVehicleClasses(),
+  [entries.value, classes.value] = await Promise.all([
+    fetchEntries(),
+    fetchEntryClasses(),
   ]);
 }
 
@@ -198,10 +197,10 @@ onMounted(refresh);
   <v-btn
     variant="text"
     prepend-icon="mdi-arrow-left"
-    to="/vehicles"
+    to="/entries"
     class="mb-4"
   >
-    Back to Vehicles
+    Back to Entries
   </v-btn>
 
   <v-card class="mb-4">
@@ -268,10 +267,10 @@ onMounted(refresh);
           <template v-if="query || v.status !== here.open" #append>
             <v-chip
               size="small"
-              :color="VEHICLE_STATUS_DISPLAY[v.status].color"
-              :prepend-icon="VEHICLE_STATUS_DISPLAY[v.status].icon"
+              :color="ENTRY_STATUS_DISPLAY[v.status].color"
+              :prepend-icon="ENTRY_STATUS_DISPLAY[v.status].icon"
             >
-              {{ VEHICLE_STATUS_DISPLAY[v.status].label }}
+              {{ ENTRY_STATUS_DISPLAY[v.status].label }}
             </v-chip>
           </template>
         </v-list-item>
@@ -298,10 +297,10 @@ onMounted(refresh);
           <dd>
             <v-chip
               size="small"
-              :color="VEHICLE_STATUS_DISPLAY[selected.status].color"
-              :prepend-icon="VEHICLE_STATUS_DISPLAY[selected.status].icon"
+              :color="ENTRY_STATUS_DISPLAY[selected.status].color"
+              :prepend-icon="ENTRY_STATUS_DISPLAY[selected.status].icon"
             >
-              {{ VEHICLE_STATUS_DISPLAY[selected.status].label }}
+              {{ ENTRY_STATUS_DISPLAY[selected.status].label }}
             </v-chip>
           </dd>
           <dt>Car</dt>
@@ -341,8 +340,8 @@ onMounted(refresh);
         />
       </v-card-text>
       <v-card-actions class="rg-checkin-actions">
-        <VehicleStatusActions
-          :vehicle="selected"
+        <EntryStatusActions
+          :entry="selected"
           large
           :also-show="here.alsoShow"
           :with-step="withStep"
@@ -355,7 +354,7 @@ onMounted(refresh);
           >
             Edit
           </v-btn>
-        </VehicleStatusActions>
+        </EntryStatusActions>
       </v-card-actions>
     </v-card>
     <v-card v-else class="rg-checkin-car">
@@ -365,11 +364,11 @@ onMounted(refresh);
     </v-card>
   </div>
 
-  <VehicleDialog
+  <EntryDialog
     v-model="dialogOpen"
-    :vehicle="selected"
+    :entry="selected"
     :classes="classes"
-    :vehicles="vehicles"
+    :entries="entries"
     @saved="refresh"
   />
 </template>

@@ -1,74 +1,74 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import {
-  createVehicleClass,
-  deleteVehicleClass,
-  fetchVehicleClasses,
-  updateVehicleClass,
-  type VehicleClass,
-} from '../api/vehicle-classes';
-import { fetchVehicles, type Vehicle } from '../api/vehicles';
+  createEntryClass,
+  deleteEntryClass,
+  fetchEntryClasses,
+  updateEntryClass,
+  type EntryClass,
+} from '../api/entry-classes';
+import { fetchEntries, type Entry } from '../api/entries';
 import FormDialog from '../components/FormDialog.vue';
 import { required } from '../format';
 import { notify, useConfirm } from '@rally-gate/ui';
 
 const confirm = useConfirm();
 
-const classes = ref<VehicleClass[]>([]);
-const vehicles = ref<Vehicle[]>([]);
+const classes = ref<EntryClass[]>([]);
+const entries = ref<Entry[]>([]);
 
 const dialogOpen = ref(false);
-const editing = ref<VehicleClass | null>(null);
+const editing = ref<EntryClass | null>(null);
 const draft = ref({ name: '', main: false });
 
-const vehicleCounts = computed(() => {
+const entryCounts = computed(() => {
   const counts = new Map<string, number>();
-  for (const vehicle of vehicles.value) {
-    for (const c of vehicle.classes) {
+  for (const entry of entries.value) {
+    for (const c of entry.classes) {
       counts.set(c.id, (counts.get(c.id) ?? 0) + 1);
     }
   }
   return counts;
 });
-const countOf = (vehicleClass: VehicleClass) =>
-  vehicleCounts.value.get(vehicleClass.id) ?? 0;
+const countOf = (entryClass: EntryClass) =>
+  entryCounts.value.get(entryClass.id) ?? 0;
 
 async function refresh() {
-  classes.value = await fetchVehicleClasses();
-  vehicles.value = await fetchVehicles();
+  classes.value = await fetchEntryClasses();
+  entries.value = await fetchEntries();
 }
 
-function openDialog(vehicleClass: VehicleClass | null) {
-  editing.value = vehicleClass;
+function openDialog(entryClass: EntryClass | null) {
+  editing.value = entryClass;
   draft.value = {
-    name: vehicleClass?.name ?? '',
-    main: vehicleClass?.main ?? false,
+    name: entryClass?.name ?? '',
+    main: entryClass?.main ?? false,
   };
   dialogOpen.value = true;
 }
 
 async function onSave() {
   const input = { name: draft.value.name.trim(), main: draft.value.main };
-  if (editing.value) await updateVehicleClass(editing.value.id, input);
-  else await createVehicleClass(input);
+  if (editing.value) await updateEntryClass(editing.value.id, input);
+  else await createEntryClass(input);
   await refresh();
 }
 
-async function onDeleteClass(vehicleClass: VehicleClass) {
-  const count = countOf(vehicleClass);
+async function onDeleteClass(entryClass: EntryClass) {
+  const count = countOf(entryClass);
   if (
     !(await confirm({
-      title: `Delete class "${vehicleClass.name}"?`,
+      title: `Delete class "${entryClass.name}"?`,
       text:
         count > 0
-          ? `${count} vehicle${count === 1 ? '' : 's'} will leave it; the vehicles themselves are kept.`
-          : 'No vehicle is in it.',
+          ? `${count} entry${count === 1 ? '' : 's'} will leave it; the entries themselves are kept.`
+          : 'No entry is in it.',
       confirmText: 'Delete class',
       color: 'error',
     }))
   )
     return;
-  await deleteVehicleClass(vehicleClass.id);
+  await deleteEntryClass(entryClass.id);
   await refresh();
   notify('Class deleted');
 }
@@ -91,11 +91,11 @@ onMounted(refresh);
     </v-card-title>
     <v-card-text>
       <p class="mb-4">
-        <strong>Main classes</strong> (4WD, 2WD) split the field — a vehicle has
+        <strong>Main classes</strong> (4WD, 2WD) split the field — an entry has
         one. <strong>Categories</strong> (Rookie, Stock) cut across them — a
-        vehicle has any number. Results combine any of them, e.g. Stock Rookie
+        entry has any number. Results combine any of them, e.g. Stock Rookie
         2WD, with positions, gaps and notional times computed within that group.
-        Assign them on the Vehicles page; the overall ranking always includes
+        Assign them on the Entries page; the overall ranking always includes
         everyone.
       </p>
       <v-table density="comfortable">
@@ -103,29 +103,29 @@ onMounted(refresh);
           <tr>
             <th>Name</th>
             <th>Kind</th>
-            <th>Vehicles</th>
+            <th>Entries</th>
             <th width="1%"></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="vehicleClass in classes" :key="vehicleClass.id">
-            <td>{{ vehicleClass.name }}</td>
+          <tr v-for="entryClass in classes" :key="entryClass.id">
+            <td>{{ entryClass.name }}</td>
             <td>
               <v-chip
                 size="small"
-                :color="vehicleClass.main ? 'secondary' : undefined"
-                :prepend-icon="vehicleClass.main ? 'mdi-star' : 'mdi-tag'"
+                :color="entryClass.main ? 'secondary' : undefined"
+                :prepend-icon="entryClass.main ? 'mdi-star' : 'mdi-tag'"
               >
-                {{ vehicleClass.main ? 'Main class' : 'Category' }}
+                {{ entryClass.main ? 'Main class' : 'Category' }}
               </v-chip>
             </td>
-            <td>{{ countOf(vehicleClass) }}</td>
+            <td>{{ countOf(entryClass) }}</td>
             <td class="text-no-wrap">
               <v-btn
                 size="small"
                 variant="text"
                 prepend-icon="mdi-pencil"
-                @click="openDialog(vehicleClass)"
+                @click="openDialog(entryClass)"
               >
                 Edit
               </v-btn>
@@ -136,7 +136,7 @@ onMounted(refresh);
                     icon="mdi-dots-vertical"
                     size="small"
                     variant="text"
-                    :aria-label="`More for ${vehicleClass.name}`"
+                    :aria-label="`More for ${entryClass.name}`"
                   />
                 </template>
                 <v-list density="compact">
@@ -144,7 +144,7 @@ onMounted(refresh);
                     prepend-icon="mdi-delete-outline"
                     title="Delete"
                     base-color="error"
-                    @click="onDeleteClass(vehicleClass)"
+                    @click="onDeleteClass(entryClass)"
                   />
                 </v-list>
               </v-menu>
@@ -177,7 +177,7 @@ onMounted(refresh);
     />
     <v-switch
       v-model="draft.main"
-      label="Main class (a vehicle has one)"
+      label="Main class (an entry has one)"
       color="secondary"
       hide-details
     />

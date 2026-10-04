@@ -17,7 +17,7 @@ import {
 export class CreateStageRunDto {
   @IsString()
   @IsNotEmpty()
-  vehicleId: string;
+  entryId: string;
 
   @IsString()
   @IsNotEmpty()

@@ -13,7 +13,7 @@ import {
   fetchClockCorrectionThresholdMs,
 } from '../api/settings';
 import { fetchStages, type Stage } from '../api/stages';
-import { fetchVehicles, type Vehicle } from '../api/vehicles';
+import { fetchEntries, type Entry } from '../api/entries';
 import { serverVersion } from '../api/version';
 import FormDialog from '../components/FormDialog.vue';
 import GateClockChips from '../components/GateClockChips.vue';
@@ -24,7 +24,7 @@ import {
   isOnline,
   required,
   STAGE_STATUS_DISPLAY,
-  vehicleName,
+  entryName,
 } from '../format';
 import { useRouter } from 'vue-router';
 
@@ -49,7 +49,7 @@ const DETECTION_STATE_DISPLAY = {
     label: 'Unknown car',
     color: 'timing-idle',
     icon: 'mdi-help-circle-outline',
-    hint: 'No vehicle has this transponder, so nothing was timed.',
+    hint: 'No entry has this transponder, so nothing was timed.',
   },
   processed: {
     label: 'Processed',
@@ -61,8 +61,8 @@ const DETECTION_STATE_DISPLAY = {
 
 function detectionState(event: DetectionEventRecord) {
   if (event.processed === false) return DETECTION_STATE_DISPLAY.pending;
-  if (event.awaitingVehicle) return DETECTION_STATE_DISPLAY.awaiting;
-  if (!event.vehicleId) return DETECTION_STATE_DISPLAY.unknown;
+  if (event.awaitingEntry) return DETECTION_STATE_DISPLAY.awaiting;
+  if (!event.entryId) return DETECTION_STATE_DISPLAY.unknown;
   return DETECTION_STATE_DISPLAY.processed;
 }
 
@@ -70,7 +70,7 @@ const gate = ref<Gate | null>(null);
 const loaded = ref(false);
 const assignments = ref<GateAssignment[]>([]);
 const stages = ref<Stage[]>([]);
-const vehicles = ref<Vehicle[]>([]);
+const entries = ref<Entry[]>([]);
 const detections = ref<DetectionEventRecord[]>([]);
 const clockCorrectionThresholdMs = ref(CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS);
 
@@ -127,13 +127,13 @@ async function load() {
     gate.value,
     assignments.value,
     stages.value,
-    vehicles.value,
+    entries.value,
     detections.value,
   ] = await Promise.all([
     fetchGate(props.gateId),
     fetchGateAssignments(),
     fetchStages(),
-    fetchVehicles(),
+    fetchEntries(),
     fetchRecentEvents(props.gateId),
   ]);
   loaded.value = true;
@@ -333,7 +333,7 @@ onUnmounted(() => {
             <th class="rg-time">Correction</th>
             <th class="rg-time">Received</th>
             <th>Transponder</th>
-            <th>Vehicle</th>
+            <th>Entry</th>
             <th>State</th>
           </tr>
         </thead>
@@ -354,9 +354,7 @@ onUnmounted(() => {
             </td>
             <td class="rg-timing">{{ event.transponderId ?? '-' }}</td>
             <td>
-              {{
-                event.vehicleId ? vehicleName(vehicles, event.vehicleId) : '-'
-              }}
+              {{ event.entryId ? entryName(entries, event.entryId) : '-' }}
             </td>
             <td>
               <v-chip

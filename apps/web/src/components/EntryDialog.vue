@@ -1,68 +1,76 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import {
-  createVehicle,
-  updateVehicle,
-  VehicleStatus,
-  type Vehicle,
-} from '../api/vehicles';
-import type { VehicleClass } from '../api/vehicle-classes';
+  createEntry,
+  updateEntry,
+  EntryStatus,
+  type Entry,
+} from '../api/entries';
+import type { EntryClass } from '../api/entry-classes';
 import { FLAG_OPTIONS, flagUrl } from '../crew';
-import { required, VEHICLE_STATUS_DISPLAY } from '../format';
-import { transponderWarning } from '../vehicle-status';
+import { required, ENTRY_STATUS_DISPLAY } from '../format';
+import { transponderWarning } from '../entry-status';
 import ClassPicker from './ClassPicker.vue';
 import FormDialog from './FormDialog.vue';
 
 const props = defineProps<{
-  /** `null` adds a vehicle. */
-  vehicle: Vehicle | null;
-  classes: VehicleClass[];
-  /** Every vehicle, for chassis and body suggestions. */
-  vehicles: Vehicle[];
+  /** `null` adds an entry. */
+  entry: Entry | null;
+  classes: EntryClass[];
+  /** Every entry, for chassis and body suggestions. */
+  entries: Entry[];
 }>();
-const emit = defineEmits<{ saved: [vehicle: Vehicle] }>();
+const emit = defineEmits<{ saved: [entry: Entry] }>();
 const open = defineModel<boolean>({ required: true });
 
-const STATUS_OPTIONS = Object.values(VehicleStatus).map((value) => ({
+const STATUS_OPTIONS = Object.values(EntryStatus).map((value) => ({
   value,
-  title: VEHICLE_STATUS_DISPLAY[value].label,
+  title: ENTRY_STATUS_DISPLAY[value].label,
 }));
 
 const draft = ref(toDraft(null));
 watch(open, (isOpen) => {
-  if (isOpen) draft.value = toDraft(props.vehicle);
+  if (isOpen) draft.value = toDraft(props.entry);
 });
 
-function toDraft(vehicle: Vehicle | null) {
+function toDraft(entry: Entry | null) {
   return {
-    startNumber: vehicle?.startNumber ?? null,
-    driverFirstName: vehicle?.driverFirstName ?? '',
-    driverLastName: vehicle?.driverLastName ?? '',
-    driverFlag: vehicle?.driverFlag ?? null,
-    coDriverFirstName: vehicle?.coDriverFirstName ?? '',
-    coDriverLastName: vehicle?.coDriverLastName ?? '',
-    coDriverFlag: vehicle?.coDriverFlag ?? null,
-    body: vehicle?.body ?? '',
-    chassis: vehicle?.chassis ?? '',
-    transponderId: vehicle?.transponderId ?? '',
-    status: vehicle?.status ?? VehicleStatus.REGISTERED,
-    classIds: vehicle?.classes.map((c) => c.id) ?? [],
+    startNumber: entry?.startNumber ?? null,
+    driverFirstName: entry?.driverFirstName ?? '',
+    driverLastName: entry?.driverLastName ?? '',
+    driverFlag: entry?.driverFlag ?? null,
+    coDriverFirstName: entry?.coDriverFirstName ?? '',
+    coDriverLastName: entry?.coDriverLastName ?? '',
+    coDriverFlag: entry?.coDriverFlag ?? null,
+    body: entry?.body ?? '',
+    chassis: entry?.chassis ?? '',
+    transponderId: entry?.transponderId ?? '',
+    status: entry?.status ?? EntryStatus.REGISTERED,
+    classIds: entry?.classes.map((c) => c.id) ?? [],
   };
 }
 
-const suggestions = (pick: (v: Vehicle) => string | null) =>
-  [...new Set(props.vehicles.map(pick).filter((v): v is string => !!v))].sort();
+const suggestions = (pick: (v: Entry) => string | null) =>
+  [...new Set(props.entries.map(pick).filter((v): v is string => !!v))].sort();
 const bodies = computed(() => suggestions((v) => v.body));
 const chassis = computed(() => suggestions((v) => v.chassis));
 
 // null, not undefined: only null clears the column (CLAUDE.md).
 const transponderShared = computed(() =>
   transponderWarning(
-    props.vehicles,
+    props.entries,
     draft.value.transponderId,
-    props.vehicle?.id ?? undefined,
+    props.entry?.id ?? undefined,
   ),
 );
+
+/** Tabbing into a picked flag and typing should search, not append to the
+ *  flag's name. Vuetify writes the name into the input after focus, so the
+ *  select waits a frame. */
+function selectText(e: FocusEvent) {
+  const input = e.target as HTMLInputElement;
+  requestAnimationFrame(() => input.select());
+}
 
 const orNull = (value: string | null) => value?.trim() || null;
 
@@ -81,9 +89,9 @@ async function onSave() {
   };
   emit(
     'saved',
-    props.vehicle
-      ? await updateVehicle(props.vehicle.id, input)
-      : await createVehicle(input),
+    props.entry
+      ? await updateEntry(props.entry.id, input)
+      : await createEntry(input),
   );
 }
 </script>
@@ -91,11 +99,11 @@ async function onSave() {
 <template>
   <FormDialog
     v-model="open"
-    :title="vehicle ? `Edit vehicle ${vehicle.startNumber}` : 'Add vehicle'"
+    :title="entry ? `Edit entry ${entry.startNumber}` : 'Add entry'"
     :form="draft"
     :save="onSave"
-    :saved="vehicle ? 'Vehicle saved' : 'Vehicle added'"
-    :save-text="vehicle ? 'Save' : 'Add vehicle'"
+    :saved="entry ? 'Entry saved' : 'Entry added'"
+    :save-text="entry ? 'Save' : 'Add entry'"
     :max-width="880"
   >
     <v-text-field
@@ -125,6 +133,8 @@ async function onSave() {
           placeholder="None (chequered flag)"
           persistent-placeholder
           clearable
+          auto-select-first
+          @focus="selectText"
         >
           <template #prepend-inner>
             <img :src="flagUrl(draft.driverFlag)" alt="" class="rg-flag-pick" />
@@ -155,6 +165,8 @@ async function onSave() {
           placeholder="None (chequered flag)"
           persistent-placeholder
           clearable
+          auto-select-first
+          @focus="selectText"
         >
           <template #prepend-inner>
             <img
@@ -194,7 +206,7 @@ async function onSave() {
         />
       </section>
       <section>
-        <div class="rg-section-title">Entry</div>
+        <div class="rg-section-title">Registration</div>
         <v-text-field
           v-model="draft.transponderId"
           label="Transponder ID (optional)"

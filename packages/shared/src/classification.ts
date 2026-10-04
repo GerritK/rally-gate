@@ -1,15 +1,15 @@
-import type { Crew } from './vehicle';
+import type { Crew } from './entry';
 
-export interface ClassificationEntry extends Crew {
+export interface Placing extends Crew {
   position: number;
-  vehicleId: string;
-  /** `null` only if the vehicle was deleted after it drove. */
+  entryId: string;
+  /** `null` only if the entry was deleted after it drove. */
   startNumber: number | null;
   durationMs: number;
   gapMs: number;
 }
 
-export interface OverallClassificationEntry extends ClassificationEntry {
+export interface OverallPlacing extends Placing {
   /**
    * Stages this crew actually *drove*, which is display information, not the
    * ranking key. `durationMs` covers every counted stage for everyone —
@@ -32,9 +32,9 @@ export interface OverallStageTime {
   notional: boolean;
 }
 
-export interface SplitClassificationEntry extends Crew {
+export interface SplitPlacing extends Crew {
   position: number;
-  vehicleId: string;
+  entryId: string;
   startNumber: number | null;
   splitIndex: number;
   elapsedMs: number;
@@ -42,8 +42,8 @@ export interface SplitClassificationEntry extends Crew {
   stageRunStatus: string;
 }
 
-export interface StageOutcomeEntry extends Crew {
-  vehicleId: string;
+export interface StageOutcome extends Crew {
+  entryId: string;
   startNumber: number | null;
   outcome: 'DNF' | 'DNS' | 'DSQ';
 }

@@ -11,10 +11,10 @@ import {
 } from '../modules/stage-runs/dto';
 import { CreateStageDto, UpdateStageDto } from '../modules/stages/dto';
 import {
-  CreateVehicleDto,
-  UpdateVehicleDto,
-  VehicleClassDto,
-} from '../modules/vehicles/dto';
+  CreateEntryDto,
+  UpdateEntryDto,
+  EntryClassDto,
+} from '../modules/entries/dto';
 
 /**
  * The DTOs are declarative, so what's worth testing isn't each decorator —
@@ -107,10 +107,10 @@ describe('server-owned fields are not settable through the API', () => {
       { name: 'Pass', stageNumber: 1, startOrder: ['v1'] },
       'startOrder',
     ],
-    // Object.assign in VehiclesService.update would retarget the save.
+    // Object.assign in EntriesService.update would retarget the save.
     [
-      'Vehicle.id on update',
-      UpdateVehicleDto,
+      'Entry.id on update',
+      UpdateEntryDto,
       { id: 'some-other-uuid', driverFirstName: 'Mallory' },
       'id',
     ],
@@ -143,14 +143,14 @@ describe('server-owned fields are not settable through the API', () => {
       'active',
     ],
     // Classes are assigned by id only; a nested object would bypass the
-    // unknown-id check in VehiclesService.resolveClasses.
+    // unknown-id check in EntriesService.resolveClasses.
     [
-      'Vehicle.classes',
-      UpdateVehicleDto,
+      'Entry.classes',
+      UpdateEntryDto,
       { classes: [{ id: 'c1', name: 'Pro' }] },
       'classes',
     ],
-    ['VehicleClass.id', VehicleClassDto, { name: 'Pro', id: 'other' }, 'id'],
+    ['EntryClass.id', EntryClassDto, { name: 'Pro', id: 'other' }, 'id'],
     // Singleton pinned to RALLY_INFO_ID; an id could only make a stray row.
     ['RallyInfo.id', UpsertRallyInfoDto, { name: 'Rally', id: 'other' }, 'id'],
   ];
@@ -171,11 +171,11 @@ describe('valid payloads still pass', () => {
     ).resolves.toMatchObject({ id: 'WP1', stageNumber: 1 });
   });
 
-  it('accepts null to clear an optional vehicle field', async () => {
+  it('accepts null to clear an optional entry field', async () => {
     // null is not "absent": only null actually writes SQL NULL (CLAUDE.md),
     // so the DTO has to let it through rather than strip it.
     await expect(
-      transform(UpdateVehicleDto, { coDriverFirstName: null }),
+      transform(UpdateEntryDto, { coDriverFirstName: null }),
     ).resolves.toEqual({ coDriverFirstName: null });
   });
 
@@ -202,7 +202,7 @@ describe('malformed values are rejected at the boundary', () => {
     ['an empty start time', CreateStageRunDto, ''],
   ])('rejects %s', async (_label, metatype, startTime) => {
     const messages = await rejectionMessages(metatype, {
-      vehicleId: 'v1',
+      entryId: 'v1',
       stageId: 's1',
       startTime,
     });
@@ -236,8 +236,8 @@ describe('malformed values are rejected at the boundary', () => {
     expect(messages).toMatch(/role/);
   });
 
-  it('rejects an unknown vehicle status', async () => {
-    const messages = await rejectionMessages(CreateVehicleDto, {
+  it('rejects an unknown entry status', async () => {
+    const messages = await rejectionMessages(CreateEntryDto, {
       startNumber: 1,
       driverFirstName: 'A',
       status: 'VIBING',
@@ -246,7 +246,7 @@ describe('malformed values are rejected at the boundary', () => {
   });
 
   it('rejects a flag that is not a code', async () => {
-    const messages = await rejectionMessages(UpdateVehicleDto, {
+    const messages = await rejectionMessages(UpdateEntryDto, {
       driverFlag: 'de" onerror="x',
     });
     expect(messages).toMatch(/driverFlag/);

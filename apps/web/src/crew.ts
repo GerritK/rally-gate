@@ -90,8 +90,9 @@ const NOT_FOR_A_PERSON = new Set([
   'xx',
 ]);
 
-export const FLAG_OPTIONS: { value: string | null; title: string }[] = [
-  { value: null, title: 'None (chequered flag)' },
+// No "None" item: one with a null value would count as selected on an empty
+// field, its title sitting in the input so typing appends to it.
+export const FLAG_OPTIONS: { value: string; title: string }[] = [
   ...OWN_FLAGS,
   ...countries
     .filter((c) => !NOT_FOR_A_PERSON.has(c.code))

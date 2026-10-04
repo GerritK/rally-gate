@@ -5,7 +5,7 @@ export * from './stage-run';
 export * from './stage';
 export * from './mqtt-topics';
 export * from './classification';
-export * from './vehicle';
+export * from './entry';
 export * from './live-events';
 export * from './version';
 export * from './start-order';

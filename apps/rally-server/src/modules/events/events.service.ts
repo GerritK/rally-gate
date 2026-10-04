@@ -21,7 +21,7 @@ import { In, Repository } from 'typeorm';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { Gate } from '../gates/gate.entity';
 import { GatesService } from '../gates/gates.service';
-import { VehiclesService } from '../vehicles/vehicles.service';
+import { EntriesService } from '../entries/entries.service';
 import { StageRunsService } from '../stage-runs/stage-runs.service';
 import { StagesService } from '../stages/stages.service';
 import { DetectionEventRecord } from './detection-event.entity';
@@ -95,7 +95,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     private readonly events: Repository<DetectionEventRecord>,
     private readonly gatesService: GatesService,
     private readonly gateAssignmentsService: GateAssignmentsService,
-    private readonly vehiclesService: VehiclesService,
+    private readonly entriesService: EntriesService,
     private readonly stageRunsService: StageRunsService,
     private readonly stagesService: StagesService,
     private readonly emitter: EventEmitter2,
@@ -133,37 +133,37 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Unidentified passings waiting for a marshal, oldest first. */
-  findAwaitingVehicle(): Promise<DetectionEventRecord[]> {
+  findAwaitingEntry(): Promise<DetectionEventRecord[]> {
     return this.events.find({
-      where: { awaitingVehicle: true },
+      where: { awaitingEntry: true },
       order: { timestampGate: 'ASC' },
     });
   }
 
   /**
-   * Times an unidentified passing as the given vehicle. Refuses rather than
+   * Times an unidentified passing as the given entry. Refuses rather than
    * silently consuming it when the rules would do nothing — a finish for a car
    * that never started, a start for one already running, a stage no longer
    * live — so the marshal hears about it while the passing is still listed.
    */
-  async assignVehicle(
+  async assignEntry(
     eventId: string,
-    vehicleId: string,
+    entryId: string,
   ): Promise<DetectionEventRecord> {
     const record = await this.findAwaitingOrThrow(eventId);
-    if (!(await this.vehiclesService.findOne(vehicleId))) {
-      throw new NotFoundException(`Vehicle ${vehicleId} not found`);
+    if (!(await this.entriesService.findOne(entryId))) {
+      throw new NotFoundException(`Entry ${entryId} not found`);
     }
     const gate = await this.gatesService.findOne(record.gateId);
     const applied =
-      gate && (await this.applyRules(gate, vehicleId, effectiveTime(record)));
+      gate && (await this.applyRules(gate, entryId, effectiveTime(record)));
     if (!applied) {
       throw new ConflictException(
-        `This passing can't be timed for that vehicle: its stage is no longer active, the vehicle is withdrawn or disqualified, or it has no matching run (a finish or split needs its start assigned first)`,
+        `This passing can't be timed for that entry: its stage is no longer active, the entry is withdrawn or disqualified, or it has no matching run (a finish or split needs its start assigned first)`,
       );
     }
-    record.vehicleId = vehicleId;
-    record.awaitingVehicle = false;
+    record.entryId = entryId;
+    record.awaitingEntry = false;
     record.processed = true;
     await this.events.save(record);
     await this.emitAwaitingChanged();
@@ -186,8 +186,8 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
   }): Promise<void> {
     if (gateIds.length === 0) return;
     const { affected } = await this.events.update(
-      { awaitingVehicle: true, gateId: In(gateIds) },
-      { awaitingVehicle: false },
+      { awaitingEntry: true, gateId: In(gateIds) },
+      { awaitingEntry: false },
     );
     if (affected) {
       this.logger.warn(
@@ -200,7 +200,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
   /** For a passing that was no car at all: a marshal, a dog, a double trigger. */
   async dismissAwaiting(eventId: string): Promise<DetectionEventRecord> {
     const record = await this.findAwaitingOrThrow(eventId);
-    record.awaitingVehicle = false;
+    record.awaitingEntry = false;
     await this.events.save(record);
     await this.emitAwaitingChanged();
     return record;
@@ -210,9 +210,9 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     eventId: string,
   ): Promise<DetectionEventRecord> {
     const record = await this.events.findOneBy({ eventId });
-    if (!record?.awaitingVehicle) {
+    if (!record?.awaitingEntry) {
       throw new NotFoundException(
-        `No passing ${eventId} is waiting for a vehicle`,
+        `No passing ${eventId} is waiting for an entry`,
       );
     }
     return record;
@@ -278,7 +278,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
   private async emitAwaitingChanged(): Promise<void> {
     try {
       this.emitter.emit('detection.awaiting-changed', {
-        awaiting: await this.findAwaitingVehicle(),
+        awaiting: await this.findAwaitingEntry(),
       });
     } catch (err) {
       this.logger.warn(
@@ -329,17 +329,17 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       );
     }
     const { transponderId } = detection;
-    const vehicle = transponderId
-      ? await this.vehiclesService.findByTransponder(transponderId)
+    const entry = transponderId
+      ? await this.entriesService.findByTransponder(transponderId)
       : null;
-    if (transponderId && !vehicle) {
+    if (transponderId && !entry) {
       this.logger.warn(
         `Detection for unregistered transponder ${transponderId}`,
       );
     }
     // Only a passing at a live gate needs a marshal; one at an idle gate (setup,
     // someone walking through) has nothing to be timed against.
-    const awaitingVehicle =
+    const awaitingEntry =
       !transponderId &&
       !!gate &&
       !!(await this.gateAssignmentsService.findActiveForGate(gate.id));
@@ -357,8 +357,8 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       eventId: detection.eventId,
       gateId: detection.gateId,
       transponderId: transponderId ?? null,
-      vehicleId: vehicle?.id ?? null,
-      awaitingVehicle,
+      entryId: entry?.id ?? null,
+      awaitingEntry,
       timestampGate,
       timestampServer: new Date(),
       clockCorrectionMs,
@@ -375,7 +375,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       }
       throw err;
     }
-    if (awaitingVehicle) {
+    if (awaitingEntry) {
       await this.emitAwaitingChanged();
     }
 
@@ -390,7 +390,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
    * QoS 1 is at-least-once: a gate that never saw the PUBACK republishes a
    * detection the server already stored. The stored record must win — a
    * re-ingest would re-measure `clockCorrectionMs` and, for a passing a
-   * marshal already assigned, clear `vehicleId` and list it as awaiting again.
+   * marshal already assigned, clear `entryId` and list it as awaiting again.
    * `save()` would do exactly that, as it upserts on the primary key.
    */
   private async isDuplicate(eventId: string): Promise<boolean> {
@@ -417,11 +417,11 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
   ): Promise<boolean> {
     try {
       const gate = await this.gatesService.findOne(record.gateId);
-      // An unknown gate or unidentified vehicle is not a failure — there's
+      // An unknown gate or unidentified entry is not a failure — there's
       // nothing to apply and retrying won't change that, so it's marked
       // processed to keep the pending list to real problems.
-      if (gate && record.vehicleId) {
-        await this.applyRules(gate, record.vehicleId, effectiveTime(record));
+      if (gate && record.entryId) {
+        await this.applyRules(gate, record.entryId, effectiveTime(record));
       }
       record.processed = true;
       await this.events.save(record);
@@ -442,7 +442,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
    */
   private async applyRules(
     gate: Gate,
-    vehicleId: string,
+    entryId: string,
     at: Date,
   ): Promise<boolean> {
     const assignment = await this.gateAssignmentsService.findActiveForGate(
@@ -455,10 +455,10 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
 
     // Out of the event: the passing is evidence (a protest may turn on it),
     // so it stays stored, but it times nothing for this car.
-    const vehicle = await this.vehiclesService.findOne(vehicleId);
-    if (vehicle && isOutOfEvent(vehicle.status)) {
+    const entry = await this.entriesService.findOne(entryId);
+    if (entry && isOutOfEvent(entry.status)) {
       this.logger.warn(
-        `#${vehicle.startNumber} is ${vehicle.status} — storing the passing at gate ${gate.id} without timing it`,
+        `#${entry.startNumber} is ${entry.status} — storing the passing at gate ${gate.id} without timing it`,
       );
       return false;
     }
@@ -475,13 +475,13 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       return false;
     }
     if (assignment.role === GateRole.STAGE_START) {
-      const run = await this.stageRunsService.startRun(vehicleId, stageId, at);
+      const run = await this.stageRunsService.startRun(entryId, stageId, at);
       this.emitter.emit('stage-run.updated', run);
       // startRun hands back the existing run for a duplicate start.
       return run.startTime.getTime() === at.getTime();
     }
     if (assignment.role === GateRole.STAGE_FINISH) {
-      const run = await this.stageRunsService.finishRun(vehicleId, stageId, at);
+      const run = await this.stageRunsService.finishRun(entryId, stageId, at);
       if (run) {
         this.emitter.emit('stage-run.updated', run);
       }
@@ -489,7 +489,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     }
     if (assignment.role === GateRole.STAGE_START_FINISH) {
       const run = await this.stageRunsService.startOrFinishRun(
-        vehicleId,
+        entryId,
         stageId,
         at,
         stage.minDurationMs ?? DEFAULT_MIN_STAGE_DURATION_MS,
@@ -506,7 +506,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     }
     if (assignment.role === GateRole.STAGE_SPLIT) {
       const split = await this.stageRunsService.recordSplit(
-        vehicleId,
+        entryId,
         stageId,
         gate.id,
         assignment.splitIndex ?? 0,

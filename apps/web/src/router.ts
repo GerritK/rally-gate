@@ -4,7 +4,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 export const NAV_ITEMS = [
   { to: '/live', label: 'Live Timing', icon: 'mdi-timer-outline' },
   { to: '/results/overall', label: 'Results', icon: 'mdi-podium' },
-  { to: '/vehicles', label: 'Vehicles', icon: 'mdi-car' },
+  { to: '/entries', label: 'Entries', icon: 'mdi-car' },
   { to: '/hardware', label: 'Hardware', icon: 'mdi-router-wireless' },
   { to: '/setup', label: 'Setup', icon: 'mdi-cog-outline' },
 ];
@@ -59,14 +59,14 @@ export const router = createRouter({
       component: () => import('./pages/GateDetailView.vue'),
       props: true,
     },
-    { path: '/vehicles', component: () => import('./pages/VehiclesView.vue') },
+    { path: '/entries', component: () => import('./pages/EntriesView.vue') },
     {
-      path: '/vehicles/check-in',
+      path: '/entries/check-in',
       component: () => import('./pages/CheckInView.vue'),
     },
     {
-      path: '/vehicles/:vehicleId',
-      component: () => import('./pages/VehicleDetailView.vue'),
+      path: '/entries/:entryId',
+      component: () => import('./pages/EntryDetailView.vue'),
       props: true,
     },
   ],

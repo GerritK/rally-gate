@@ -43,7 +43,7 @@ the rally's own closed Wi-Fi.
 
 - Stages with start, finish and split gates; stage, split and overall
   classification; DNF/DNS, manual corrections, voided runs and re-runs.
-- Vehicle classes, with rankings per class or combination of classes.
+- Entry classes, with rankings per class or combination of classes.
 - Results and start lists as PDFs to post or share, every class's ranking
   in one go, on numbered sheets.
 - Start lists per stage, ordered by class and start number or by times so
@@ -134,7 +134,7 @@ gate need the server's IP address entered there.
 1. Start the server and join the rally Wi-Fi with every gate.
 2. **Setup** → create the event, then the stages; assign gates as start,
    finish or split. Set how start lists are ordered.
-3. **Vehicles** → register the cars.
+3. **Entries** → register the cars.
 4. **Hardware** → check every gate is online and its clock is in sync.
 5. **Live Timing** → freeze and print a stage's start list when you post it,
    activate the stage when it starts, close it when the last car is
@@ -160,7 +160,7 @@ npm install
 npm run build:shared         # after every change in packages/shared
 
 npm run dev:server           # API on :57430, MQTT on :57431
-npm run seed-demo-data       # a demo stage, gates and a vehicle
+npm run seed-demo-data       # a demo stage, gates and an entry
 npm run simulate -- --gate START_WP1 --transponder 1234567
 npm run simulate -- --gate FINISH_WP1 --transponder 1234567
 npm run dev:web              # dashboard on :57440

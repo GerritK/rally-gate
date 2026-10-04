@@ -1,6 +1,6 @@
 import {
   START_ORDER_DIRECTION_KEY,
-  VehicleStatus,
+  EntryStatus,
   START_ORDER_GROUPING_KEY,
   START_ORDER_KEY_KEY,
   StageStatus,
@@ -11,15 +11,15 @@ import {
 import { ClassificationService } from '../classification/classification.service';
 import { SettingsService } from '../settings/settings.service';
 import { StagesService } from '../stages/stages.service';
-import { VehiclesService } from '../vehicles/vehicles.service';
+import { EntriesService } from '../entries/entries.service';
 import { StartOrderService } from './start-order.service';
 
 const twoWd = { id: 'c2', name: '2WD', main: true };
 const fourWd = { id: 'c4', name: '4WD', main: true };
 const rookie = { id: 'cr', name: 'Rookie', main: false };
 
-// Sorted by start number, as `VehiclesService.findAll` returns them.
-const vehicles = [
+// Sorted by start number, as `EntriesService.findAll` returns them.
+const entries = [
   { id: 'a', startNumber: 1, driverFirstName: 'A', classes: [fourWd] },
   { id: 'b', startNumber: 2, driverFirstName: 'B', classes: [twoWd, rookie] },
   { id: 'c', startNumber: 3, driverFirstName: 'C', classes: [] },
@@ -33,22 +33,24 @@ function makeService(
   stage: { startOrder: string[] | null; status?: StageStatus } = {
     startOrder: null,
   },
-  entrants: unknown[] = vehicles,
+  entrants: unknown[] = entries,
 ) {
   const stages = [
     { id: 'SS1', stageNumber: 1, status: StageStatus.CLOSED },
     { id: 'SS2', stageNumber: 2, status: StageStatus.NOT_STARTED, ...stage },
   ];
-  const toEntries = (map: Record<string, number> = {}) =>
-    Object.entries(map).map(([vehicleId, durationMs]) => ({
-      vehicleId,
+  const toPlacings = (map: Record<string, number> = {}) =>
+    Object.entries(map).map(([entryId, durationMs]) => ({
+      entryId,
       durationMs,
     }));
   const classification = {
     getOverallClassification: jest
       .fn()
-      .mockResolvedValue(toEntries(times.overall)),
-    getStageClassification: jest.fn().mockResolvedValue(toEntries(times.stage)),
+      .mockResolvedValue(toPlacings(times.overall)),
+    getStageClassification: jest
+      .fn()
+      .mockResolvedValue(toPlacings(times.stage)),
   };
   const stagesService = {
     findOne: jest.fn((id: string) =>
@@ -61,7 +63,7 @@ function makeService(
     stagesService as unknown as StagesService,
     {
       findAll: jest.fn().mockResolvedValue(entrants),
-    } as unknown as VehiclesService,
+    } as unknown as EntriesService,
     classification as unknown as ClassificationService,
     {
       get: jest.fn((key: string) => Promise.resolve(settings[key] ?? null)),
@@ -71,14 +73,14 @@ function makeService(
 }
 
 const order = async (service: StartOrderService, stageId = 'SS2') =>
-  (await service.getStartOrder(stageId)).entries.map((e) => e.vehicleId);
+  (await service.getStartOrder(stageId)).starters.map((e) => e.entryId);
 
 describe('StartOrderService', () => {
-  const withOut = vehicles.map((v) =>
+  const withOut = entries.map((v) =>
     v.id === 'd'
-      ? { ...v, status: VehicleStatus.WITHDRAWN }
+      ? { ...v, status: EntryStatus.WITHDRAWN }
       : v.id === 'a'
-        ? { ...v, status: VehicleStatus.DISQUALIFIED }
+        ? { ...v, status: EntryStatus.DISQUALIFIED }
         : v,
   );
 
@@ -149,7 +151,7 @@ describe('StartOrderService', () => {
     const result = await service.getStartOrder('SS2');
     expect(result.frozen).toBe(true);
     expect(result.grouped).toBe(true);
-    expect(result.entries.map((e) => e.vehicleId)).toEqual([
+    expect(result.starters.map((e) => e.entryId)).toEqual([
       'e',
       'a',
       'b',

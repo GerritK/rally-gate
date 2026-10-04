@@ -1,12 +1,12 @@
-import { VehicleStatus } from '@rally-gate/shared';
+import { EntryStatus } from '@rally-gate/shared';
 import { notify, useConfirm } from '@rally-gate/ui';
-import { updateVehicle, type Vehicle, type VehiclePatch } from './api/vehicles';
+import { updateEntry, type Entry, type EntryPatch } from './api/entries';
 
 const { REGISTERED, CHECKED_IN, SCRUTINEERED, WITHDRAWN, DISQUALIFIED } =
-  VehicleStatus;
+  EntryStatus;
 
 export interface StatusAction {
-  to: VehicleStatus;
+  to: EntryStatus;
   label: string;
   /** For a table row, where the full label would push the column off a
    *  tablet's screen; the full one is its tooltip. */
@@ -17,12 +17,12 @@ export interface StatusAction {
 /** The desk's way forward: registered, checked in, passed by the
  *  scrutineers. Nothing after that; out of the event is a choice, not a
  *  step. */
-const NEXT: Partial<Record<VehicleStatus, VehicleStatus>> = {
+const NEXT: Partial<Record<EntryStatus, EntryStatus>> = {
   [REGISTERED]: CHECKED_IN,
   [CHECKED_IN]: SCRUTINEERED,
 };
 
-function action(from: VehicleStatus, to: VehicleStatus): StatusAction | null {
+function action(from: EntryStatus, to: EntryStatus): StatusAction | null {
   const out = from === WITHDRAWN || from === DISQUALIFIED;
   switch (to) {
     case CHECKED_IN:
@@ -61,7 +61,7 @@ function action(from: VehicleStatus, to: VehicleStatus): StatusAction | null {
 
 /** The next step as the one direct action, every other change for the
  *  menu: forward first, then back, then out of the event. */
-export function statusActions(status: VehicleStatus): {
+export function statusActions(status: EntryStatus): {
   next: StatusAction | null;
   others: StatusAction[];
 } {
@@ -73,7 +73,7 @@ export function statusActions(status: VehicleStatus): {
   return { next, others };
 }
 
-const DONE: Record<VehicleStatus, string> = {
+const DONE: Record<EntryStatus, string> = {
   [REGISTERED]: 'registered',
   [CHECKED_IN]: 'checked in',
   [SCRUTINEERED]: 'passed scrutineering',
@@ -85,13 +85,13 @@ const DONE: Record<VehicleStatus, string> = {
  *  transponder is a marshal's call) but worth saying: a passing is timed for
  *  only one of the cars carrying it. */
 export function transponderWarning(
-  vehicles: Vehicle[],
+  entries: Entry[],
   transponderId: string | null | undefined,
   selfId?: string,
 ): string | undefined {
   const id = transponderId?.trim();
   const others = id
-    ? vehicles.filter((v) => v.id !== selfId && v.transponderId === id)
+    ? entries.filter((v) => v.id !== selfId && v.transponderId === id)
     : [];
   if (others.length === 0) return undefined;
   const on = others.map((v) => `#${v.startNumber}`).join(', ');
@@ -100,32 +100,32 @@ export function transponderWarning(
 
 /** Steps that move a car on at a station, as opposed to setting it back or
  *  taking it out of the event. */
-export const isForward = (to: VehicleStatus) =>
+export const isForward = (to: EntryStatus) =>
   to === CHECKED_IN || to === SCRUTINEERED;
 
 /** Applies a status change, with `extra` fields saved in the same request
  *  (the desk's transponder with Check in). Only disqualifying asks: the car
  *  leaves every result and the cars behind move up, which nothing on screen
  *  shows. Every other change is one click to undo. */
-export function useVehicleStatus() {
+export function useEntryStatus() {
   const confirm = useConfirm();
   return async function setStatus(
-    vehicle: Vehicle,
-    to: VehicleStatus,
-    extra: VehiclePatch = {},
-  ): Promise<Vehicle | null> {
+    entry: Entry,
+    to: EntryStatus,
+    extra: EntryPatch = {},
+  ): Promise<Entry | null> {
     if (
       to === DISQUALIFIED &&
       !(await confirm({
-        title: `Disqualify #${vehicle.startNumber}?`,
+        title: `Disqualify #${entry.startNumber}?`,
         text: 'It leaves every result and the cars behind it move up. Its times stay stored; Reinstate brings it back.',
         confirmText: 'Disqualify',
         color: 'error',
       }))
     )
       return null;
-    const saved = await updateVehicle(vehicle.id, { ...extra, status: to });
-    notify(`#${vehicle.startNumber} ${DONE[to]}`);
+    const saved = await updateEntry(entry.id, { ...extra, status: to });
+    notify(`#${entry.startNumber} ${DONE[to]}`);
     return saved;
   };
 }

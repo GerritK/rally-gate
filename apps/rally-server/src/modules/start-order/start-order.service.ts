@@ -20,17 +20,17 @@ import { ClassificationService } from '../classification/classification.service'
 import { SettingsService } from '../settings/settings.service';
 import { Stage } from '../stages/stage.entity';
 import { StagesService } from '../stages/stages.service';
-import { Vehicle } from '../vehicles/vehicle.entity';
+import { Entry } from '../entries/entry.entity';
 import {
   compareClassNames,
   crewOf,
-  VehiclesService,
-} from '../vehicles/vehicles.service';
+  EntriesService,
+} from '../entries/entries.service';
 
 interface Group {
   classId: string | null;
   name: string | null;
-  vehicles: Vehicle[];
+  entries: Entry[];
 }
 
 /** See "Start order" in `docs/event-model.md`. */
@@ -40,25 +40,25 @@ export class StartOrderService {
 
   constructor(
     private readonly stagesService: StagesService,
-    private readonly vehiclesService: VehiclesService,
+    private readonly entriesService: EntriesService,
     private readonly classificationService: ClassificationService,
     private readonly settingsService: SettingsService,
   ) {}
 
   async getStartOrder(stageId: string): Promise<StartOrder> {
     const stage = await this.findStage(stageId);
-    const vehicles = await this.vehiclesService.findAll();
+    const entries = await this.entriesService.findAll();
     // A frozen list is the one posted and keeps every car it was posted
     // with, so positions don't shift; Live Timing shows one that has since
     // withdrawn as out. Anything still computed leaves such a car out.
-    const starters = vehicles.filter((v) => !isOutOfEvent(v.status));
-    const ids = stage.startOrder ?? (await this.compute(stage, starters));
-    const byId = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
+    const eligible = entries.filter((v) => !isOutOfEvent(v.status));
+    const ids = stage.startOrder ?? (await this.compute(stage, eligible));
+    const byId = new Map(entries.map((entry) => [entry.id, entry]));
     const listed = new Set(ids);
     const ordered = [
       ...ids.flatMap((id) => byId.get(id) ?? []),
       // Registered after the freeze; `findAll` is already by start number.
-      ...starters.filter((vehicle) => !listed.has(vehicle.id)),
+      ...eligible.filter((entry) => !listed.has(entry.id)),
     ];
     return {
       stageId,
@@ -68,12 +68,12 @@ export class StartOrderService {
       // frozen with. Only the presentation is off if the setting changed
       // since; store it alongside the snapshot if that ever matters.
       grouped: (await this.grouping()) === StartOrderGrouping.MAIN_CLASS,
-      entries: ordered.map((vehicle, index) => ({
+      starters: ordered.map((entry, index) => ({
         position: index + 1,
-        vehicleId: vehicle.id,
-        startNumber: vehicle.startNumber,
-        ...crewOf(vehicle),
-        mainClassName: mainClassOf(vehicle)?.name ?? null,
+        entryId: entry.id,
+        startNumber: entry.startNumber,
+        ...crewOf(entry),
+        mainClassName: mainClassOf(entry)?.name ?? null,
       })),
     };
   }
@@ -129,16 +129,16 @@ export class StartOrderService {
   }
 
   private async snapshot(stage: Stage): Promise<void> {
-    const vehicles = (await this.vehiclesService.findAll()).filter(
+    const entries = (await this.entriesService.findAll()).filter(
       (v) => !isOutOfEvent(v.status),
     );
     await this.stagesService.setStartOrder(
       stage.id,
-      await this.compute(stage, vehicles),
+      await this.compute(stage, entries),
     );
   }
 
-  private async compute(stage: Stage, vehicles: Vehicle[]): Promise<string[]> {
+  private async compute(stage: Stage, entries: Entry[]): Promise<string[]> {
     const grouping = await this.grouping();
     const key = await this.setting(
       START_ORDER_KEY_KEY,
@@ -154,13 +154,13 @@ export class StartOrderService {
 
     const groups =
       grouping === StartOrderGrouping.NONE
-        ? [{ classId: null, name: null, vehicles }]
-        : groupByMainClass(vehicles);
+        ? [{ classId: null, name: null, entries }]
+        : groupByMainClass(entries);
 
     const ids: string[] = [];
     for (const group of groups) {
       const times = await this.timesFor(key, stage, group.classId);
-      const sorted = [...group.vehicles].sort((a, b) => {
+      const sorted = [...group.entries].sort((a, b) => {
         const ta = times.get(a.id);
         const tb = times.get(b.id);
         if (ta !== undefined && tb !== undefined && ta !== tb) {
@@ -172,7 +172,7 @@ export class StartOrderService {
         }
         return a.startNumber - b.startNumber;
       });
-      ids.push(...sorted.map((vehicle) => vehicle.id));
+      ids.push(...sorted.map((entry) => entry.id));
     }
     return ids;
   }
@@ -186,9 +186,9 @@ export class StartOrderService {
     stage: Stage,
     classId: string | null,
   ): Promise<Map<string, number>> {
-    let entries: { vehicleId: string; durationMs: number }[] = [];
+    let placings: { entryId: string; durationMs: number }[] = [];
     if (key === StartOrderKey.OVERALL_TIME) {
-      entries = await this.classificationService.getOverallClassification(
+      placings = await this.classificationService.getOverallClassification(
         classId ? [classId] : [],
       );
     } else if (key === StartOrderKey.LAST_STAGE_TIME) {
@@ -200,12 +200,12 @@ export class StartOrderService {
         )
         .at(-1);
       if (previous) {
-        entries = await this.classificationService.getStageClassification(
+        placings = await this.classificationService.getStageClassification(
           previous.id,
         );
       }
     }
-    return new Map(entries.map((e) => [e.vehicleId, e.durationMs]));
+    return new Map(placings.map((e) => [e.entryId, e.durationMs]));
   }
 
   private grouping(): Promise<StartOrderGrouping> {
@@ -227,25 +227,25 @@ export class StartOrderService {
   }
 }
 
-/** The server allows several main classes per vehicle; the first by name counts. */
-function mainClassOf(vehicle: Vehicle) {
-  return vehicle.classes
+/** The server allows several main classes per entry; the first by name counts. */
+function mainClassOf(entry: Entry) {
+  return entry.classes
     .filter((c) => c.main)
     .sort((a, b) => compareClassNames(a.name, b.name))[0];
 }
 
-/** Main classes alphabetically, vehicles without one last. */
-function groupByMainClass(vehicles: Vehicle[]): Group[] {
+/** Main classes alphabetically, entries without one last. */
+function groupByMainClass(entries: Entry[]): Group[] {
   const groups = new Map<string | null, Group>();
-  for (const vehicle of vehicles) {
-    const mainClass = mainClassOf(vehicle);
+  for (const entry of entries) {
+    const mainClass = mainClassOf(entry);
     const classId = mainClass?.id ?? null;
     const group = groups.get(classId) ?? {
       classId,
       name: mainClass?.name ?? null,
-      vehicles: [],
+      entries: [],
     };
-    group.vehicles.push(vehicle);
+    group.entries.push(entry);
     groups.set(classId, group);
   }
   return [...groups.values()].sort((a, b) =>

@@ -3,13 +3,13 @@ import {
   GateRole,
   HEARTBEAT_ONLINE_THRESHOLD_MS,
   StageStatus,
-  VehicleStatus,
+  EntryStatus,
 } from '@rally-gate/shared';
 import { formatStageDuration } from '@rally-gate/ui';
 import type { GateAssignment } from './api/gate-assignments';
 import type { Gate } from './api/gates';
 import type { Stage } from './api/stages';
-import type { Vehicle } from './api/vehicles';
+import type { Entry } from './api/entries';
 import { driverName } from './crew';
 
 /**
@@ -105,31 +105,31 @@ export const STAGE_STATUS_DISPLAY: Record<
 
 /** Withdrawn and disqualified are race problems (red); the rest is entry
  *  paperwork. */
-export const VEHICLE_STATUS_DISPLAY: Record<
-  VehicleStatus,
+export const ENTRY_STATUS_DISPLAY: Record<
+  EntryStatus,
   { label: string; color: string; icon: string }
 > = {
-  [VehicleStatus.REGISTERED]: {
+  [EntryStatus.REGISTERED]: {
     label: 'Registered',
     color: 'timing-idle',
     icon: 'mdi-clipboard-text-outline',
   },
-  [VehicleStatus.CHECKED_IN]: {
+  [EntryStatus.CHECKED_IN]: {
     label: 'Checked in',
     color: 'info',
     icon: 'mdi-clipboard-check-outline',
   },
-  [VehicleStatus.SCRUTINEERED]: {
+  [EntryStatus.SCRUTINEERED]: {
     label: 'Scrutineered',
     color: 'success',
     icon: 'mdi-check-decagram',
   },
-  [VehicleStatus.WITHDRAWN]: {
+  [EntryStatus.WITHDRAWN]: {
     label: 'Withdrawn',
     color: 'error',
     icon: 'mdi-flag-remove',
   },
-  [VehicleStatus.DISQUALIFIED]: {
+  [EntryStatus.DISQUALIFIED]: {
     label: 'Disqualified',
     color: 'error',
     icon: 'mdi-cancel',
@@ -168,9 +168,9 @@ export function stageName(stages: Stage[], stageId: string): string {
   return stages.find((stage) => stage.id === stageId)?.name ?? stageId;
 }
 
-export function vehicleName(vehicles: Vehicle[], vehicleId: string): string {
-  const vehicle = vehicles.find((v) => v.id === vehicleId);
-  return vehicle ? `#${vehicle.startNumber} ${driverName(vehicle)}` : vehicleId;
+export function entryName(entries: Entry[], entryId: string): string {
+  const entry = entries.find((v) => v.id === entryId);
+  return entry ? `#${entry.startNumber} ${driverName(entry)}` : entryId;
 }
 
 export function isOnline(

@@ -5,9 +5,9 @@ export interface DetectionEventRecord {
   gateId: string;
   /** Null for a passing the gate couldn't identify (a light barrier). */
   transponderId: string | null;
-  vehicleId: string | null;
+  entryId: string | null;
   /** Unidentified passing at a live gate, waiting for a marshal. */
-  awaitingVehicle?: boolean;
+  awaitingEntry?: boolean;
   timestampGate: string;
   timestampServer: string;
   /** Clock correction applied to `timestampGate`, in ms (0 if none). */
@@ -42,16 +42,16 @@ export function retryPendingEvents(): Promise<{ recovered: number }> {
 
 /** Passings a gate saw but couldn't identify, oldest first. */
 export function fetchAwaitingEvents(): Promise<DetectionEventRecord[]> {
-  return apiFetch('/events/awaiting-vehicle');
+  return apiFetch('/events/awaiting-entry');
 }
 
 /** 409s when the rules would time nothing, e.g. a finish before its start. */
-export function assignVehicleToEvent(
+export function assignEntryToEvent(
   eventId: string,
-  vehicleId: string,
+  entryId: string,
 ): Promise<DetectionEventRecord> {
   return postJson(`/events/${encodeURIComponent(eventId)}/assign`, {
-    vehicleId,
+    entryId,
   });
 }
 

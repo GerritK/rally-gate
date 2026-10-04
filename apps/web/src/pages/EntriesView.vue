@@ -1,35 +1,35 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { fetchVehicles, type Vehicle } from '../api/vehicles';
-import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
+import { fetchEntries, type Entry } from '../api/entries';
+import { fetchEntryClasses, type EntryClass } from '../api/entry-classes';
 import ClassChip from '../components/ClassChip.vue';
 import CrewName from '../components/CrewName.vue';
 import StartNumber from '../components/StartNumber.vue';
-import VehicleDialog from '../components/VehicleDialog.vue';
-import VehicleStatusActions from '../components/VehicleStatusActions.vue';
-import { VEHICLE_STATUS_DISPLAY } from '../format';
+import EntryDialog from '../components/EntryDialog.vue';
+import EntryStatusActions from '../components/EntryStatusActions.vue';
+import { ENTRY_STATUS_DISPLAY } from '../format';
 
 const router = useRouter();
-const vehicles = ref<Vehicle[]>([]);
-const classes = ref<VehicleClass[]>([]);
+const entries = ref<Entry[]>([]);
+const classes = ref<EntryClass[]>([]);
 const dialogOpen = ref(false);
 
 /** In the order of the class list (main first, then by name), which the
- * server sorts; a vehicle's own classes come back in no particular order. */
-function classesOf(vehicle: Vehicle): VehicleClass[] {
+ * server sorts; an entry's own classes come back in no particular order. */
+function classesOf(entry: Entry): EntryClass[] {
   return classes.value.filter((c) =>
-    vehicle.classes.some((own) => own.id === c.id),
+    entry.classes.some((own) => own.id === c.id),
   );
 }
 
-function replace(saved: Vehicle) {
-  vehicles.value = vehicles.value.map((v) => (v.id === saved.id ? saved : v));
+function replace(saved: Entry) {
+  entries.value = entries.value.map((v) => (v.id === saved.id ? saved : v));
 }
 
 async function refresh() {
-  vehicles.value = await fetchVehicles();
-  classes.value = await fetchVehicleClasses();
+  entries.value = await fetchEntries();
+  classes.value = await fetchEntryClasses();
 }
 
 onMounted(refresh);
@@ -38,13 +38,13 @@ onMounted(refresh);
 <template>
   <v-card>
     <v-card-title class="d-flex align-center">
-      Vehicles
+      Entries
       <v-spacer />
       <div class="d-flex flex-wrap justify-end ga-2">
         <v-btn
           variant="tonal"
           prepend-icon="mdi-clipboard-check-outline"
-          to="/vehicles/check-in"
+          to="/entries/check-in"
         >
           Check-in
         </v-btn>
@@ -53,7 +53,7 @@ onMounted(refresh);
           prepend-icon="mdi-plus"
           @click="dialogOpen = true"
         >
-          Add Vehicle
+          Add Entry
         </v-btn>
       </div>
     </v-card-title>
@@ -65,7 +65,7 @@ onMounted(refresh);
             <th>Crew</th>
             <th>Car</th>
             <!-- Off a tablet's width, so the status actions stay on screen; the
-                 vehicle page and Check-in show it. -->
+                 entry page and Check-in show it. -->
             <th class="d-none d-md-table-cell">Transponder</th>
             <th v-if="classes.length > 0">Classes</th>
             <th>Status</th>
@@ -74,20 +74,20 @@ onMounted(refresh);
         </thead>
         <tbody>
           <tr
-            v-for="vehicle in vehicles"
-            :key="vehicle.id"
+            v-for="entry in entries"
+            :key="entry.id"
             class="cursor-pointer"
-            @click="router.push(`/vehicles/${vehicle.id}`)"
+            @click="router.push(`/entries/${entry.id}`)"
           >
-            <td><StartNumber :number="vehicle.startNumber" /></td>
-            <td><CrewName :crew="vehicle" /></td>
-            <td>{{ vehicle.body ?? '-' }}</td>
+            <td><StartNumber :number="entry.startNumber" /></td>
+            <td><CrewName :crew="entry" /></td>
+            <td>{{ entry.body ?? '-' }}</td>
             <td class="rg-timing d-none d-md-table-cell">
-              {{ vehicle.transponderId ?? '-' }}
+              {{ entry.transponderId ?? '-' }}
             </td>
             <td v-if="classes.length > 0">
               <ClassChip
-                v-for="c in classesOf(vehicle)"
+                v-for="c in classesOf(entry)"
                 :key="c.id"
                 :name="c.name"
                 :main="c.main"
@@ -97,19 +97,19 @@ onMounted(refresh);
             <td>
               <v-chip
                 size="small"
-                :color="VEHICLE_STATUS_DISPLAY[vehicle.status].color"
-                :prepend-icon="VEHICLE_STATUS_DISPLAY[vehicle.status].icon"
+                :color="ENTRY_STATUS_DISPLAY[entry.status].color"
+                :prepend-icon="ENTRY_STATUS_DISPLAY[entry.status].icon"
               >
-                {{ VEHICLE_STATUS_DISPLAY[vehicle.status].label }}
+                {{ ENTRY_STATUS_DISPLAY[entry.status].label }}
               </v-chip>
             </td>
             <td class="text-no-wrap text-right">
-              <VehicleStatusActions :vehicle="vehicle" @saved="replace" />
+              <EntryStatusActions :entry="entry" @saved="replace" />
             </td>
           </tr>
-          <tr v-if="vehicles.length === 0">
+          <tr v-if="entries.length === 0">
             <td colspan="7" class="rg-empty">
-              No vehicles yet. Add one with + Add Vehicle.
+              No entries yet. Add one with + Add Entry.
             </td>
           </tr>
         </tbody>
@@ -117,11 +117,11 @@ onMounted(refresh);
     </v-card-text>
   </v-card>
 
-  <VehicleDialog
+  <EntryDialog
     v-model="dialogOpen"
-    :vehicle="null"
+    :entry="null"
     :classes="classes"
-    :vehicles="vehicles"
+    :entries="entries"
     @saved="refresh"
   />
 </template>

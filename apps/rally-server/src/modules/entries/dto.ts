@@ -1,5 +1,5 @@
 import { applyDecorators } from '@nestjs/common';
-import { VehicleStatus } from '@rally-gate/shared';
+import { EntryStatus } from '@rally-gate/shared';
 import {
   IsArray,
   IsBoolean,
@@ -21,11 +21,11 @@ const NullableFlag = () =>
   applyDecorators(IsOptional(), Matches(/^[a-z]+(-[a-z]+)*$/));
 
 /**
- * No `id` on any vehicle DTO. `VehiclesService.update` merges the body onto
+ * No `id` on any entry DTO. `EntriesService.update` merges the body onto
  * the loaded entity with `Object.assign`, so an `id` in the payload would
  * retarget the save at a different row.
  */
-class VehicleDetailsDto {
+class EntryDetailsDto {
   @NullableString()
   driverLastName?: string | null;
 
@@ -51,17 +51,17 @@ class VehicleDetailsDto {
   transponderId?: string | null;
 
   @IsOptional()
-  @IsEnum(VehicleStatus)
-  status?: VehicleStatus;
+  @IsEnum(EntryStatus)
+  status?: EntryStatus;
 
-  /** Replaces the vehicle's class list; 400 if any id is unknown. */
+  /** Replaces the entry's class list; 400 if any id is unknown. */
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   classIds?: string[];
 }
 
-export class CreateVehicleDto extends VehicleDetailsDto {
+export class CreateEntryDto extends EntryDetailsDto {
   @IsInt()
   @IsPositive()
   startNumber: number;
@@ -71,7 +71,7 @@ export class CreateVehicleDto extends VehicleDetailsDto {
   driverFirstName: string;
 }
 
-export class UpdateVehicleDto extends VehicleDetailsDto {
+export class UpdateEntryDto extends EntryDetailsDto {
   @IsOptional()
   @IsInt()
   @IsPositive()
@@ -83,7 +83,7 @@ export class UpdateVehicleDto extends VehicleDetailsDto {
   driverFirstName?: string;
 }
 
-export class VehicleClassDto {
+export class EntryClassDto {
   @IsString()
   @IsNotEmpty()
   name: string;

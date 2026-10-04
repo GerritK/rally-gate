@@ -4,11 +4,11 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   fastestByStage,
   notClassified as unranked,
-  type OverallClassificationEntry,
+  type OverallPlacing,
 } from '../api/classification';
 import { StageStatus, type OverallStageTime } from '@rally-gate/shared';
 import type { Stage } from '../api/stages';
-import type { Vehicle } from '../api/vehicles';
+import type { Entry } from '../api/entries';
 import TableLegend from './TableLegend.vue';
 import CrewName from './CrewName.vue';
 import ResultsPodium from './ResultsPodium.vue';
@@ -18,15 +18,15 @@ import {
   formatGap,
   TIMING_MARKS,
   type TimingMark,
-  VEHICLE_STATUS_DISPLAY,
+  ENTRY_STATUS_DISPLAY,
 } from '../format';
 
 const props = defineProps<{
   /** The overall as fetched for `classIds`. */
-  entries: OverallClassificationEntry[];
+  placings: OverallPlacing[];
   classIds: string[];
   stages: Stage[];
-  vehicles: Vehicle[];
+  entries: Entry[];
 }>();
 
 const route = useRoute();
@@ -35,21 +35,21 @@ const router = useRouter();
 /** Stages counted toward the overall — every closed stage that anyone
  * finished. A crew below this has notional time inside its total. */
 const stagesCounted = computed(() =>
-  Math.max(0, ...props.entries.map((e) => e.stagesCompleted)),
+  Math.max(0, ...props.placings.map((e) => e.stagesCompleted)),
 );
 
-// Every entry carries the same counted stages, in stage order.
+// Every placing carries the same counted stages, in stage order.
 const countedStages = computed(() =>
-  (props.entries[0]?.stageTimes ?? []).map(({ stageId }) => ({
+  (props.placings[0]?.stageTimes ?? []).map(({ stageId }) => ({
     id: stageId,
     name: props.stages.find((s) => s.id === stageId)?.name,
   })),
 );
 
-const bestByStage = computed(() => fastestByStage(props.entries));
+const bestByStage = computed(() => fastestByStage(props.placings));
 
 const legendMarks = computed<TimingMark[]>(() => {
-  const times = props.entries.flatMap((e) => e.stageTimes);
+  const times = props.placings.flatMap((e) => e.stageTimes);
   return [
     ...(times.some((t) => !t.notional) ? (['best'] as const) : []),
     ...(times.some((t) => t.notional) ? (['notional'] as const) : []),
@@ -61,7 +61,7 @@ function stageGapMs(time: OverallStageTime): number {
 }
 
 const notClassified = computed(() =>
-  unranked(props.entries, props.vehicles, props.classIds),
+  unranked(props.placings, props.entries, props.classIds),
 );
 
 /** Not in the overall at all until they close (only closed stages count). */
@@ -84,7 +84,7 @@ const runningStages = computed(() =>
       counted yet. The standings change when
       {{ runningStages.length === 1 ? 'it closes' : 'they close' }}.
     </v-alert>
-    <ResultsPodium :entries="entries" />
+    <ResultsPodium :placings="placings" />
     <v-table density="comfortable">
       <thead>
         <tr>
@@ -109,16 +109,16 @@ const runningStages = computed(() =>
       </thead>
       <tbody>
         <tr
-          v-for="entry in entries"
-          :key="entry.vehicleId"
+          v-for="placing in placings"
+          :key="placing.entryId"
           class="cursor-pointer"
-          @click="router.push(`/vehicles/${entry.vehicleId}`)"
+          @click="router.push(`/entries/${placing.entryId}`)"
         >
-          <td>{{ entry.position }}</td>
-          <td><StartNumber :number="entry.startNumber" /></td>
-          <td><CrewName :crew="entry" /></td>
+          <td>{{ placing.position }}</td>
+          <td><StartNumber :number="placing.startNumber" /></td>
+          <td><CrewName :crew="placing" /></td>
           <td
-            v-for="time in entry.stageTimes"
+            v-for="time in placing.stageTimes"
             :key="time.stageId"
             class="rg-timing rg-time text-no-wrap"
           >
@@ -149,21 +149,21 @@ const runningStages = computed(() =>
             </span>
           </td>
           <td class="rg-timing rg-time font-weight-bold">
-            {{ formatDuration(entry.durationMs) }}
+            {{ formatDuration(placing.durationMs) }}
           </td>
-          <td class="rg-timing rg-time">{{ formatGap(entry.gapMs) }}</td>
+          <td class="rg-timing rg-time">{{ formatGap(placing.gapMs) }}</td>
           <td>
             <span
-              v-if="entry.stagesCompleted < stagesCounted"
+              v-if="placing.stagesCompleted < stagesCounted"
               class="text-medium-emphasis"
             >
-              {{ entry.stagesCompleted }}
+              {{ placing.stagesCompleted }}
               <v-icon size="x-small" :icon="TIMING_MARKS.notional.icon" />
             </span>
-            <span v-else>{{ entry.stagesCompleted }}</span>
+            <span v-else>{{ placing.stagesCompleted }}</span>
           </td>
         </tr>
-        <tr v-if="entries.length === 0">
+        <tr v-if="placings.length === 0">
           <td colspan="7" class="rg-empty">
             No crew has completed a closed stage yet.
           </td>
@@ -193,20 +193,20 @@ const runningStages = computed(() =>
         </thead>
         <tbody>
           <tr
-            v-for="vehicle in notClassified"
-            :key="vehicle.id"
+            v-for="entry in notClassified"
+            :key="entry.id"
             class="cursor-pointer"
-            @click="router.push(`/vehicles/${vehicle.id}`)"
+            @click="router.push(`/entries/${entry.id}`)"
           >
-            <td><StartNumber :number="vehicle.startNumber" /></td>
-            <td><CrewName :crew="vehicle" /></td>
+            <td><StartNumber :number="entry.startNumber" /></td>
+            <td><CrewName :crew="entry" /></td>
             <td>
               <v-chip
                 size="small"
-                :color="VEHICLE_STATUS_DISPLAY[vehicle.status].color"
-                :prepend-icon="VEHICLE_STATUS_DISPLAY[vehicle.status].icon"
+                :color="ENTRY_STATUS_DISPLAY[entry.status].color"
+                :prepend-icon="ENTRY_STATUS_DISPLAY[entry.status].icon"
               >
-                {{ VEHICLE_STATUS_DISPLAY[vehicle.status].label }}
+                {{ ENTRY_STATUS_DISPLAY[entry.status].label }}
               </v-chip>
             </td>
           </tr>

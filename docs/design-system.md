@@ -93,8 +93,8 @@ Values live in `theme.ts`. The rules:
 - **Barlow** for body text, **Barlow Condensed** for headings, card and
   toolbar titles (set in `utilities.css`, since Vuetify's heading font only
   reaches its `text-h*` classes).
-- **A section inside a card or dialog** (Driver, Co-driver, Car, Entry in
-  the vehicle dialog; Crew, Results on Setup → Display) is headed with
+- **A section inside a card or dialog** (Driver, Co-driver, Car, Registration in
+  the entry dialog; Crew, Results on Setup → Display) is headed with
   `.rg-section-title` (`utilities.css`): the card title's font a size down,
   so the title still leads, and from the second section on a rule above
   it. Not `text-overline`, which is too faint to divide a form; that stays
@@ -126,7 +126,7 @@ Values live in `theme.ts`. The rules:
 - **Phone and tablet:** check portrait tablet width (~820px). Long names
   truncate with an ellipsis and keep the full name in a tooltip.
 - **A record's page is its parts as cards**, the same parts its edit
-  dialog has (a vehicle: Crew, Car, Entry), under one card with what
+  dialog has (an entry: Crew, Car, Registration), under one card with what
   identifies it and the Edit button. Side by side as they fit, the cards of
   a row equally tall. Inside a card the facts are a `.rg-facts` list
   (`utilities.css`): label left, value right, `-` where nothing is set, so a
@@ -171,7 +171,7 @@ Values live in `theme.ts`. The rules:
   when it has sub-lists (a stage and its gate assignments) or should be
   linkable. A field in a table cell that saves on change is one stray scroll
   wheel away from a changed result.
-- **Actions with a parameter are not edits.** Picking the vehicle for an
+- **Actions with a parameter are not edits.** Picking the entry for an
   unassigned passing and pressing Assign stays in the row; a dialog there
   would only add clicks mid-event.
 - **Creating works like editing**, with the same form component. A record
@@ -187,7 +187,7 @@ Values live in `theme.ts`. The rules:
   allowed: there is no other way to ask. A dialog with changes turns
   `persistent`, so Esc or a click outside asks instead of discarding.
 - **Save shows `loading` and is disabled while the request runs**, so a
-  double click can't create two vehicles.
+  double click can't create two entries.
 - **After saving**, a dialog closes; a detail page stays open. Both confirm
   with a short snackbar.
 - **Keyboard:** Enter saves, Esc cancels (asking first if there are changes).
@@ -196,7 +196,7 @@ Values live in `theme.ts`. The rules:
   height (`comfortable`), set once in `packages/ui` `vuetify.ts`. Vuetify's
   own default for the pickers is filled and a size taller, which reads as a
   different kind of field beside a text field. A field that sits in a row
-  of buttons may go `compact` (the passing's vehicle picker).
+  of buttons may go `compact` (the passing's entry picker).
 - **Refused or just unusual.** A value the server refuses is an
   `error-messages` and Save won't help. One that is allowed but worth a
   second look (a transponder already on another car) is a `messages` with
@@ -227,13 +227,13 @@ Values live in `theme.ts`. The rules:
 - **A row with a detail page opens it on click**, so it needs no Edit
   button and the direct action stays free for the real one.
 - **Add sits top right in the table card's title** (`#append`): visible
-  without scrolling to the end of 80 vehicles, never moving as rows are
+  without scrolling to the end of 80 entries, never moving as rows are
   added, and clearly tied to the list it fills.
-  - Orange when adding is the page's main action (Vehicles, Stages), tonal
+  - Orange when adding is the page's main action (Entries, Stages), tonal
     otherwise (Add Assignment on a stage).
   - An empty table keeps its header and shows one `.rg-empty` row
     (`packages/ui` `utilities.css`: italic, centred, padded) that names it
-    ("No vehicles yet. Add one with + Add Vehicle."), no second button in
+    ("No entries yet. Add one with + Add Entry."), no second button in
     the middle. Not an alert: those are for states that need attention.
     The same class marks an empty card ("No car on stage."). Only a page
     with nothing to show at all (no stages, unknown gate) gets an alert.
@@ -245,7 +245,7 @@ Values live in `theme.ts`. The rules:
   gates during an active stage. A disabled button can't explain itself on
   touch, and a permanent caption beside it is noise for an exception.
   Disable only where the reason is already on screen beside it: Assign
-  with no vehicle picked, a stage's Save under "This stage is ACTIVE…", a
+  with no entry picked, a stage's Save under "This stage is ACTIVE…", a
   menu item with the reason as its subtitle.
 - **Ask when data is lost that can't be retyped from the screen or from
   memory:** delete a run or a passing, close a stage, unfreeze a published
@@ -390,7 +390,7 @@ Extract a component once it is actually used twice, not before.
   stage. It is ringed on the overall page, so the track is the one switch
   between all results.
 - `ClassPicker`: one classes field, main class first and exclusive, for
-  assigning classes on Vehicles.
+  assigning classes on Entries.
 - `ClassFilter`: the Results filter, one click per choice. A row of main
   classes (exactly one, "All" by default) and a row of categories (any
   number), ANDed as the server filters. The selection lives in
@@ -399,7 +399,7 @@ Extract a component once it is actually used twice, not before.
   so does every printed sheet.
 - `StartNumber`: the door plate, sized by the surrounding font.
 - `CrewName`: the crew, driver above a smaller co-driver; every table's
-  Crew column, Live Timing's Up next and On stage, the vehicle page. Built
+  Crew column, Live Timing's Up next and On stage, the entry page. Built
   from `PersonName`, one person's flag and name per the Display settings
   (`useDisplay()`: the event's, or what a page provides under `DISPLAY`;
   Setup → Display provides its unsaved form, so its example crew shows a
@@ -407,21 +407,21 @@ Extract a component once it is actually used twice, not before.
   No flag chosen shows the chequered flag. Flags are `flag-icons` (4:3) plus
   our own in `src/assets/flags`, all freely usable (`THIRD_PARTY_NOTICES.md`);
   never flag emoji, which Windows renders as two letters.
-- `ClassChip`: a vehicle class, main classes in secondary with a star.
+- `ClassChip`: an entry class, main classes in secondary with a star.
   Live Timing puts a car's main class at the right of Up next and Then.
 - `ResultsPodium`: the first three of a ranking above its table, steps
   2-1-3, trophies in `podium-gold`/`-silver`/`-bronze` (`theme.ts`, used
-  nowhere else). A click opens the vehicle, as a row does.
-- `VehicleDialog`: add and edit a vehicle, on Vehicles and the vehicle's page.
-- `VehicleStatusActions`: a vehicle's status changes, the next step as the
-  direct action and the rest in ⋮ (`statusActions` in `vehicle-status.ts`).
+  nowhere else). A click opens the entry, as a row does.
+- `EntryDialog`: add and edit an entry, on Entries and the entry's page.
+- `EntryStatusActions`: an entry's status changes, the next step as the
+  direct action and the rest in ⋮ (`statusActions` in `entry-status.ts`).
   Small in a table row (with a short label, "Passed", the full one its
   tooltip), `large` in the check-in card's footer. There `alsoShow` puts
   further steps beside the next one, `withStep` saves fields with a step
   forward. Only Disqualify asks first.
 - `ManualMark`: the hand-timed icon.
 - `TableLegend`: the icons a table shows, explained under it (see Tables).
-- `PassingBlock`: the oldest unidentified passing with its vehicle picker,
+- `PassingBlock`: the oldest unidentified passing with its entry picker,
   Assign and a ⋮ for Not a car, in On stage; later ones wait
   below it as a count; "Dismiss all" (confirmed) discards it and them.
 - `GateClockChips`: a gate's measured offset (tooltip says whether it is
@@ -431,7 +431,7 @@ Extract a component once it is actually used twice, not before.
   before Esc/outside/Cancel throws away changes, confirms with the snackbar
   and goes fullscreen on phones. The page passes the draft and a `save`
   function that throws on failure. A long form goes wide rather than tall
-  (`maxWidth`): `VehicleDialog` sets its sections in pairs, Driver |
-  Co-driver and Car | Entry, one column on a phone, so it fits a laptop
+  (`maxWidth`): `EntryDialog` sets its sections in pairs, Driver |
+  Co-driver and Car | Registration, one column on a phone, so it fits a laptop
   screen without scrolling. Before it outgrows that, its editing moves to
   the record's page.

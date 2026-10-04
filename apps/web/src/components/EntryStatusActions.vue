@@ -1,29 +1,29 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { VehicleStatus } from '@rally-gate/shared';
+import type { EntryStatus } from '@rally-gate/shared';
 import { notifyError } from '@rally-gate/ui';
-import type { Vehicle, VehiclePatch } from '../api/vehicles';
-import { isForward, statusActions, useVehicleStatus } from '../vehicle-status';
+import type { Entry, EntryPatch } from '../api/entries';
+import { isForward, statusActions, useEntryStatus } from '../entry-status';
 
-/** A vehicle's status changes: the next step as the direct action, the
+/** An entry's status changes: the next step as the direct action, the
  *  rest in ⋮ (Tables: one direct action, one menu). `large` fills a card's
  *  footer: the step on the left, the slot's own buttons (Edit) on the right
  *  before ⋮, all one height. */
 const props = defineProps<{
-  vehicle: Vehicle;
+  entry: Entry;
   large?: boolean;
   /** More steps as buttons beside the next one rather than in ⋮ (the desk's
    *  Check in and pass). */
-  alsoShow?: VehicleStatus[];
+  alsoShow?: EntryStatus[];
   /** Saved with a step forward, in the same request. */
-  withStep?: VehiclePatch;
+  withStep?: EntryPatch;
 }>();
-const emit = defineEmits<{ saved: [vehicle: Vehicle] }>();
+const emit = defineEmits<{ saved: [entry: Entry] }>();
 
-const setStatus = useVehicleStatus();
+const setStatus = useEntryStatus();
 const actions = computed(() => {
-  const { next, others } = statusActions(props.vehicle.status);
-  const shown = (to: VehicleStatus) =>
+  const { next, others } = statusActions(props.entry.status);
+  const shown = (to: EntryStatus) =>
     props.large && props.alsoShow?.includes(to);
   return {
     next,
@@ -33,12 +33,12 @@ const actions = computed(() => {
 });
 const saving = ref(false);
 
-async function apply(to: VehicleStatus) {
+async function apply(to: EntryStatus) {
   if (saving.value) return;
   saving.value = true;
   try {
     const saved = await setStatus(
-      props.vehicle,
+      props.entry,
       to,
       isForward(to) ? props.withStep : undefined,
     );

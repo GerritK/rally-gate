@@ -1,7 +1,7 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity()
-export class VehicleClass {
+export class EntryClass {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -10,7 +10,7 @@ export class VehicleClass {
 
   /**
    * A main class (4WD, 2WD) as opposed to a category that cuts across them
-   * (Rookie, Stock). Only steers the UI towards one main class per vehicle;
+   * (Rookie, Stock). Only steers the UI towards one main class per entry;
    * rankings treat both alike and combine any of them.
    */
   @Column({ default: false })

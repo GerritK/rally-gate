@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { VehicleClass } from '../api/vehicle-classes';
+import type { EntryClass } from '../api/entry-classes';
 
-const props = defineProps<{ classes: VehicleClass[] }>();
+const props = defineProps<{ classes: EntryClass[] }>();
 const classIds = defineModel<string[]>({ required: true });
 
 // Class ids are uuids, so this can't collide with one.
@@ -10,8 +10,7 @@ const ALL = 'all';
 
 const mains = computed(() => props.classes.filter((c) => c.main));
 const categories = computed(() => props.classes.filter((c) => !c.main));
-const isIn = (list: VehicleClass[], id: string) =>
-  list.some((c) => c.id === id);
+const isIn = (list: EntryClass[], id: string) => list.some((c) => c.id === id);
 
 // Main class and categories are ANDed server-side, the same as the title
 // spells out: "2WD · Rookie" is the 2WD Rookies.

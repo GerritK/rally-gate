@@ -1,7 +1,7 @@
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import type { VehicleClass } from './api/vehicle-classes';
-import type { Vehicle } from './api/vehicles';
+import type { EntryClass } from './api/entry-classes';
+import type { Entry } from './api/entries';
 
 /**
  * The Results class filter, kept in `?classes=` so it survives switching
@@ -24,7 +24,7 @@ export function useClassQuery() {
 
 /** Shown even unfiltered, so a ranking always says which one it is. */
 export function classFilterLabel(
-  classes: VehicleClass[],
+  classes: EntryClass[],
   classIds: string[],
 ): string {
   const names = classes
@@ -36,14 +36,14 @@ export function classFilterLabel(
 /** What "Print all" prints: All classes, then each class on its own. A
  * class nobody is in would print an empty page. */
 export function rankingClassIds(
-  classes: VehicleClass[],
-  vehicles: Vehicle[],
+  classes: EntryClass[],
+  entries: Entry[],
 ): string[][] {
   return [
     [],
     ...classes
       .filter((c) =>
-        vehicles.some((v) => v.classes.some((vc) => vc.id === c.id)),
+        entries.some((v) => v.classes.some((vc) => vc.id === c.id)),
       )
       .map((c) => [c.id]),
   ];

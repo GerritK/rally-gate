@@ -22,7 +22,7 @@ ever sees a `DetectionEvent`.
 
 Times a passing but can't identify the car: detections carry no
 `transponderId`, and the server holds them as **unassigned passings** until a
-marshal picks the vehicle on Live Timing (see `event-model.md`).
+marshal picks the entry on Live Timing (see `event-model.md`).
 
 Reads the pin through libgpiod's `gpiomon` (package `gpiod`, installed by the
 gate installer), not a native Node module, so nothing compiles on the Pi. The
@@ -98,7 +98,7 @@ e.g. `P 1618706341 OPN 1615544 3.50 64 89113`.
 - `decoder_timestamp` is monotonic since decoder start unless the decoder runs
   with `-t` (system clock).
 - `transponder_type` is `OPN` or `AMB` (legacy RC3) — two ID namespaces, see
-  "Multiple IDs per vehicle" below.
+  "Multiple IDs per entry" below.
 - Upstream recently replaced EVM with `pass_duration` as the last field; old
   sample output won't match.
 
@@ -127,12 +127,12 @@ fixes was seconds. Confirm the `-t` timestamp format against real output.
   publishes the right JSON to `rally/gates/<gateId>/detections` — no gate-agent
   needed.
 
-### Multiple IDs per vehicle
+### Multiple IDs per entry
 
 An RFID badge, a backup transponder, or OpenStint's `OPN`/`AMB` split all mean
-one vehicle with several IDs. Today `Vehicle` has one `transponderId` and lookup
+one entry with several IDs. Today `Entry` has one `transponderId` and lookup
 is one exact match, so anything else looks unregistered. Fix when needed: a
-list of IDs per vehicle, matched by `DetectionEvent.source`. Small change.
+list of IDs per entry, matched by `DetectionEvent.source`. Small change.
 
 ## Gate system clock policy
 

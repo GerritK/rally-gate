@@ -57,7 +57,7 @@ input[type='time']::-webkit-calendar-picker-indicator {
 
 /*
  * A record's facts in a card: a <dl>, label left in medium emphasis, value
- * right, one per row (the gate's status and clock, a vehicle's car).
+ * right, one per row (the gate's status and clock, an entry's car).
  */
 .rg-facts {
   display: grid;

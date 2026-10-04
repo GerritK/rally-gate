@@ -11,7 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { isOutOfEvent } from '@rally-gate/shared';
-import { VehiclesService } from '../vehicles/vehicles.service';
+import { EntriesService } from '../entries/entries.service';
 import { CorrectStageRunDto, CreateStageRunDto } from './dto';
 import { StageRunsService } from './stage-runs.service';
 
@@ -19,7 +19,7 @@ import { StageRunsService } from './stage-runs.service';
 export class StageRunsController {
   constructor(
     private readonly stageRunsService: StageRunsService,
-    private readonly vehiclesService: VehiclesService,
+    private readonly entriesService: EntriesService,
   ) {}
 
   /** Every attempt, voided ones included; `?stageId=` narrows to one stage. */
@@ -38,13 +38,13 @@ export class StageRunsController {
    *  a gate's passing wouldn't time it either (`EventsService.applyRules`). */
   @Post()
   async create(@Body() body: CreateStageRunDto) {
-    const vehicle = await this.vehiclesService.findOne(body.vehicleId);
-    if (!vehicle) {
-      throw new NotFoundException(`Vehicle ${body.vehicleId} not found`);
+    const entry = await this.entriesService.findOne(body.entryId);
+    if (!entry) {
+      throw new NotFoundException(`Entry ${body.entryId} not found`);
     }
-    if (isOutOfEvent(vehicle.status)) {
+    if (isOutOfEvent(entry.status)) {
       throw new ConflictException(
-        `#${vehicle.startNumber} is ${vehicle.status.toLowerCase()} and can't start`,
+        `#${entry.startNumber} is ${entry.status.toLowerCase()} and can't start`,
       );
     }
     return this.stageRunsService.createManual(body);
@@ -63,7 +63,7 @@ export class StageRunsController {
 
   /**
    * Strikes out an attempt (red flag). Keeps the row as evidence, drops it
-   * from results, and frees the vehicle so the start gate can open a re-run
+   * from results, and frees the entry so the start gate can open a re-run
    * on its next pass — see "StageRun" in `docs/event-model.md`.
    */
   @Post(':id/void')
@@ -73,7 +73,7 @@ export class StageRunsController {
 
   /**
    * Reverses a void. 409s with `{ blockingAttempt }` if another attempt
-   * already counts for that stage — a vehicle has at most one non-voided
+   * already counts for that stage — an entry has at most one non-voided
    * attempt, so that one has to be voided first.
    */
   @Post(':id/unvoid')

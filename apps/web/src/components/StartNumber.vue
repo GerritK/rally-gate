@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** `null` only for a vehicle deleted after it drove. */
+/** `null` only for an entry deleted after it drove. */
 defineProps<{ number: number | null }>();
 </script>
 

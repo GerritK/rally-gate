@@ -4,7 +4,7 @@
 Gate hardware (or SimulatedAdapter)
   -> gate-agent (DetectionEvent + heartbeat over MQTT)
   -> embedded Aedes broker inside rally-server
-  -> EventsService (stores DetectionEventRecord, looks up gate + vehicle)
+  -> EventsService (stores DetectionEventRecord, looks up gate + entry)
   -> rule engine (active GateAssignment.role -> start/finish/split a StageRun)
   -> EventEmitter2 ("detection.created", "stage-run.updated", "stage-run.split")
   -> LiveController (one SSE stream, /api/live) -> web dashboard

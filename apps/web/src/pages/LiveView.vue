@@ -6,13 +6,13 @@ import {
   isScrutineered,
   StageRunStatus,
   StageStatus,
-  type StartOrderEntry,
+  type Starter,
 } from '@rally-gate/shared';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { ApiError } from '../api/client';
 import {
-  assignVehicleToEvent,
+  assignEntryToEvent,
   dismissEvent,
   fetchAwaitingEvents,
   fetchPendingEvents,
@@ -52,7 +52,7 @@ import {
   unfreezeStartOrder,
   type StartOrder,
 } from '../api/start-order';
-import { fetchVehicles, type Vehicle } from '../api/vehicles';
+import { fetchEntries, type Entry } from '../api/entries';
 import FormDialog from '../components/FormDialog.vue';
 import ManualMark from '../components/ManualMark.vue';
 import RunningTime from '../components/RunningTime.vue';
@@ -84,7 +84,7 @@ import {
   runStatusColor,
   required,
   toLocalTimeValue,
-  vehicleName,
+  entryName,
 } from '../format';
 
 const props = defineProps<{ stageId?: string }>();
@@ -96,7 +96,7 @@ let nowTimer: ReturnType<typeof setInterval>;
 let liveSource: EventSource;
 
 const stages = ref<Stage[]>([]);
-const vehicles = ref<Vehicle[]>([]);
+const entries = ref<Entry[]>([]);
 const gates = ref<Gate[]>([]);
 const gateAssignments = ref<GateAssignment[]>([]);
 const startOrder = ref<StartOrder | null>(null);
@@ -106,7 +106,7 @@ const detections = ref<DetectionEventRecord[]>([]);
 const pendingDetections = ref<DetectionEventRecord[]>([]);
 const awaitingDetections = ref<DetectionEventRecord[]>([]);
 /** Only what a marshal picked by hand; otherwise the suggestion applies. */
-const pickedVehicleIds = ref<Record<string, string>>({});
+const pickedEntryIds = ref<Record<string, string>>({});
 const flashingGateIds = ref<Record<string, boolean>>({});
 const retryingPending = ref(false);
 const activatingStage = ref(false);
@@ -117,11 +117,9 @@ const stagesLoaded = ref(false);
 const FLASH_DURATION_MS = 600;
 
 const stage = computed(() => stages.value.find((s) => s.id === props.stageId));
-const vehicleById = computed(
-  () => new Map(vehicles.value.map((v) => [v.id, v])),
-);
+const entryById = computed(() => new Map(entries.value.map((v) => [v.id, v])));
 
-// ---- Rows: every vehicle in start order, with its run --------------------
+// ---- Rows: every entry in start order, with its run --------------------
 
 type RowState =
   | 'WAITING'
@@ -134,8 +132,8 @@ type RowState =
   | 'OUT';
 
 interface Row {
-  entry: StartOrderEntry;
-  /** The attempt that counts — a vehicle has at most one non-voided one. */
+  starter: Starter;
+  /** The attempt that counts — an entry has at most one non-voided one. */
   run?: StageRun;
   voidedRuns: StageRun[];
   state: RowState;
@@ -177,29 +175,29 @@ const rows = computed<Row[]>(() => {
   const order = startOrder.value;
   if (!order) return [];
   const closed = stage.value?.status === StageStatus.CLOSED;
-  const runsByVehicle = new Map<string, StageRun[]>();
+  const runsByEntry = new Map<string, StageRun[]>();
   for (const run of stageRuns.value) {
-    runsByVehicle.set(run.vehicleId, [
-      ...(runsByVehicle.get(run.vehicleId) ?? []),
+    runsByEntry.set(run.entryId, [
+      ...(runsByEntry.get(run.entryId) ?? []),
       run,
     ]);
   }
 
-  const base = order.entries.map((entry): Omit<Row, 'classHeader'> => {
-    const runs = runsByVehicle.get(entry.vehicleId) ?? [];
+  const base = order.starters.map((starter): Omit<Row, 'classHeader'> => {
+    const runs = runsByEntry.get(starter.entryId) ?? [];
     const run = runs.find((r) => !r.voided);
     const voidedRuns = runs
       .filter((r) => r.voided)
       .sort((a, b) => a.attempt - b.attempt);
-    const vehicle = vehicleById.value.get(entry.vehicleId);
+    const entry = entryById.value.get(starter.entryId);
     let state: RowState;
     if (run?.status === StageRunStatus.STARTED) state = 'ON_STAGE';
     else if (run?.status === StageRunStatus.FINISHED) state = 'FINISHED';
     else if (run?.status === StageRunStatus.CANCELLED) state = 'DNF';
-    else if (vehicle && isOutOfEvent(vehicle.status)) state = 'OUT';
+    else if (entry && isOutOfEvent(entry.status)) state = 'OUT';
     else if (voidedRuns.length > 0 && !closed) state = 'RERUN';
     else state = closed ? 'DNS' : 'WAITING';
-    return { entry, run, voidedRuns, state };
+    return { starter, run, voidedRuns, state };
   });
 
   // Next = the first waiting car after the last one that started, so a
@@ -216,8 +214,9 @@ const rows = computed<Row[]>(() => {
     ...row,
     classHeader:
       order.grouped &&
-      (i === 0 || base[i - 1].entry.mainClassName !== row.entry.mainClassName)
-        ? (row.entry.mainClassName ?? 'No main class')
+      (i === 0 ||
+        base[i - 1].starter.mainClassName !== row.starter.mainClassName)
+        ? (row.starter.mainClassName ?? 'No main class')
         : null,
   }));
 });
@@ -331,10 +330,10 @@ const dueToStart = computed(() => {
     .filter((row) => row.state === 'NEXT' || row.state === 'WAITING');
 });
 
-// ---- Unassigned passings, with a suggested vehicle -----------------------
+// ---- Unassigned passings, with a suggested entry -----------------------
 
-const vehicleOptions = computed(() =>
-  vehicles.value.map((v) => ({
+const entryOptions = computed(() =>
+  entries.value.map((v) => ({
     id: v.id,
     title: `#${v.startNumber} ${driverName(v)}`,
   })),
@@ -374,7 +373,7 @@ function combinedCandidates(event: DetectionEventRecord) {
   return justStarted ? [] : dueToStart.value;
 }
 
-const suggestedVehicleIds = computed(() => {
+const suggestedEntryIds = computed(() => {
   const suggestions: Record<string, string> = {};
   const taken = new Set<string>();
   const running = onStage.value.map((car) => car.row);
@@ -398,24 +397,24 @@ const suggestedVehicleIds = computed(() => {
             : [];
     const pick = candidates.find(
       (row) =>
-        !taken.has(row.entry.vehicleId) &&
+        !taken.has(row.starter.entryId) &&
         (assignment.role !== GateRole.STAGE_SPLIT ||
           !splitsByRun.value[row.run?.id ?? '']?.some(
             (s) => s.splitIndex === assignment.splitIndex,
           )),
     );
     if (pick) {
-      suggestions[event.eventId] = pick.entry.vehicleId;
-      taken.add(pick.entry.vehicleId);
+      suggestions[event.eventId] = pick.starter.entryId;
+      taken.add(pick.starter.entryId);
     }
   }
   return suggestions;
 });
 
-function vehicleFor(event: DetectionEventRecord): string | undefined {
+function entryFor(event: DetectionEventRecord): string | undefined {
   return (
-    pickedVehicleIds.value[event.eventId] ??
-    suggestedVehicleIds.value[event.eventId]
+    pickedEntryIds.value[event.eventId] ??
+    suggestedEntryIds.value[event.eventId]
   );
 }
 
@@ -461,10 +460,10 @@ function gateName(gateId: string): string {
 /** The live stream refreshes the list for every marshal; this is just faster
  *  feedback for the one who clicked. */
 async function onAssign(event: DetectionEventRecord) {
-  const vehicleId = vehicleFor(event);
-  if (!vehicleId) return;
-  await assignVehicleToEvent(event.eventId, vehicleId);
-  delete pickedVehicleIds.value[event.eventId];
+  const entryId = entryFor(event);
+  if (!entryId) return;
+  await assignEntryToEvent(event.eventId, entryId);
+  delete pickedEntryIds.value[event.eventId];
   awaitingDetections.value = await fetchAwaitingEvents();
 }
 
@@ -574,7 +573,7 @@ function upsertSplit(split: StageSplit) {
   ].sort((a, b) => a.splitIndex - b.splitIndex);
 }
 
-const startingVehicleId = ref<string | null>(null);
+const startingEntryId = ref<string | null>(null);
 
 const finishingRunId = ref<string | null>(null);
 
@@ -591,12 +590,10 @@ async function onFinishNow(run: StageRun) {
 
 /** On the list and allowed to start, but the scrutineers haven't passed
  *  it: shown where the start marshal looks, never a reason to hold it. */
-function unscrutineered(vehicleId: string): boolean {
-  const vehicle = vehicleById.value.get(vehicleId);
+function unscrutineered(entryId: string): boolean {
+  const entry = entryById.value.get(entryId);
   return (
-    !!vehicle &&
-    !isOutOfEvent(vehicle.status) &&
-    !isScrutineered(vehicle.status)
+    !!entry && !isOutOfEvent(entry.status) && !isScrutineered(entry.status)
   );
 }
 
@@ -604,10 +601,10 @@ function unscrutineered(vehicleId: string): boolean {
  *  them: a desk that forgot a click is easier to fix before the start. */
 async function clearedToStart(verb: string): Promise<boolean> {
   const pending = rows.value.filter(
-    (row) => !row.run && unscrutineered(row.entry.vehicleId),
+    (row) => !row.run && unscrutineered(row.starter.entryId),
   );
   if (pending.length === 0) return true;
-  const numbers = pending.map((row) => `#${row.entry.startNumber}`);
+  const numbers = pending.map((row) => `#${row.starter.startNumber}`);
   return confirm({
     title: `${pending.length} ${pending.length === 1 ? 'car hasn' : 'cars haven'}'t passed scrutineering`,
     text: `${numbers.join(', ')} ${pending.length === 1 ? 'is' : 'are'} on the start list and can start, but ${pending.length === 1 ? "hasn't" : "haven't"} been passed yet. ${verb} anyway?`,
@@ -623,13 +620,13 @@ function canStart(row: Row): boolean {
 }
 
 /** The server stamps the start, so its clock counts, not this device's. */
-async function onStartNow(vehicleId: string) {
-  if (!props.stageId || startingVehicleId.value) return;
-  startingVehicleId.value = vehicleId;
+async function onStartNow(entryId: string) {
+  if (!props.stageId || startingEntryId.value) return;
+  startingEntryId.value = entryId;
   try {
-    upsertStageRun(await createStageRun({ vehicleId, stageId: props.stageId }));
+    upsertStageRun(await createStageRun({ entryId, stageId: props.stageId }));
   } finally {
-    startingVehicleId.value = null;
+    startingEntryId.value = null;
   }
 }
 
@@ -645,13 +642,13 @@ const correctDialogOpen = ref(false);
 const correcting = ref<StageRun | null>(null);
 /** "Enter time" on a car with no run: a missed start, typically on a closed
  * stage where Start now is long gone. */
-const enteringVehicleId = ref<string | null>(null);
+const enteringEntryId = ref<string | null>(null);
 const correction = ref({ start: '', finish: '', stageTime: '' });
 const initialStageTime = ref('');
 
 function openCorrect(run: StageRun) {
   correcting.value = run;
-  enteringVehicleId.value = null;
+  enteringEntryId.value = null;
   initialStageTime.value =
     run.durationMs != null ? formatStageDuration(run.durationMs) : '';
   correction.value = {
@@ -662,9 +659,9 @@ function openCorrect(run: StageRun) {
   correctDialogOpen.value = true;
 }
 
-function openEnterTime(vehicleId: string) {
+function openEnterTime(entryId: string) {
   correcting.value = null;
-  enteringVehicleId.value = vehicleId;
+  enteringEntryId.value = entryId;
   initialStageTime.value = '';
   correction.value = { start: '', finish: '', stageTime: '' };
   correctDialogOpen.value = true;
@@ -719,12 +716,12 @@ const derivedIso = computed(() => {
  */
 async function onSaveCorrection() {
   const { start, finish } = correction.value;
-  const vehicleId = enteringVehicleId.value;
-  if (vehicleId && props.stageId) {
+  const entryId = enteringEntryId.value;
+  if (entryId && props.stageId) {
     const finishTime = combineDateAndTime(new Date(), finish);
     upsertStageRun(
       await createStageRun({
-        vehicleId,
+        entryId,
         stageId: props.stageId,
         startTime: derivedIso.value ?? combineDateAndTime(finishTime, start),
         finishTime,
@@ -752,7 +749,7 @@ async function onSaveCorrection() {
 async function onVoidRun(run: StageRun) {
   if (
     !(await confirm({
-      title: `Void ${vehicleName(vehicles.value, run.vehicleId)}'s attempt ${run.attempt}?`,
+      title: `Void ${entryName(entries.value, run.entryId)}'s attempt ${run.attempt}?`,
       text:
         'It stays on record but stops counting, and the car can run this stage again — ' +
         'the start gate will time the new attempt automatically.',
@@ -772,7 +769,7 @@ async function onUnvoidRun(run: StageRun) {
 async function onDeleteRun(run: StageRun) {
   if (
     !(await confirm({
-      title: `Delete ${vehicleName(vehicles.value, run.vehicleId)}'s attempt ${run.attempt}?`,
+      title: `Delete ${entryName(entries.value, run.entryId)}'s attempt ${run.attempt}?`,
       text: 'Unlike voiding, this leaves no record. Use it for a run that never happened.',
       confirmText: 'Delete attempt',
       color: 'error',
@@ -916,7 +913,7 @@ async function printStartList() {
           startOrder.value.frozen ? frozenAt.value : null,
           rows.value.map((row) => ({
             ...row,
-            car: vehicleById.value.get(row.entry.vehicleId),
+            car: entryById.value.get(row.starter.entryId),
           })),
           startOrder.value.grouped,
         ),
@@ -970,11 +967,11 @@ function defaultStage(): Stage | undefined {
 }
 
 onMounted(async () => {
-  // Stages, vehicles and assignments aren't pushed over SSE, so they're
+  // Stages, entries and assignments aren't pushed over SSE, so they're
   // loaded here and refreshed explicitly when an action changes them.
-  [stages.value, vehicles.value, gateAssignments.value] = await Promise.all([
+  [stages.value, entries.value, gateAssignments.value] = await Promise.all([
     fetchStages(),
-    fetchVehicles(),
+    fetchEntries(),
     fetchGateAssignments(),
   ]);
   stagesLoaded.value = true;
@@ -1235,19 +1232,19 @@ onUnmounted(() => {
         <v-card-text v-if="dueToStart.length > 0">
           <div class="d-flex align-center ga-4">
             <div class="rg-next-number">
-              <StartNumber :number="dueToStart[0].entry.startNumber" />
+              <StartNumber :number="dueToStart[0].starter.startNumber" />
             </div>
-            <CrewName :crew="dueToStart[0].entry" class="rg-next-driver" />
+            <CrewName :crew="dueToStart[0].starter" class="rg-next-driver" />
             <v-chip
-              v-if="unscrutineered(dueToStart[0].entry.vehicleId)"
+              v-if="unscrutineered(dueToStart[0].starter.entryId)"
               color="warning"
               prepend-icon="mdi-clipboard-alert-outline"
             >
               Not scrutineered
             </v-chip>
             <ClassChip
-              v-if="dueToStart[0].entry.mainClassName"
-              :name="dueToStart[0].entry.mainClassName"
+              v-if="dueToStart[0].starter.mainClassName"
+              :name="dueToStart[0].starter.mainClassName"
               main
               class="ms-auto"
             />
@@ -1259,8 +1256,8 @@ onUnmounted(() => {
             block
             prepend-icon="mdi-play"
             class="mt-4"
-            :loading="startingVehicleId === dueToStart[0].entry.vehicleId"
-            @click="onStartNow(dueToStart[0].entry.vehicleId)"
+            :loading="startingEntryId === dueToStart[0].starter.entryId"
+            @click="onStartNow(dueToStart[0].starter.entryId)"
           >
             Start now
           </v-btn>
@@ -1270,16 +1267,16 @@ onUnmounted(() => {
             <div class="rg-then-grid">
               <div
                 v-for="row in dueToStart.slice(1, 3)"
-                :key="row.entry.vehicleId"
+                :key="row.starter.entryId"
                 class="d-flex align-center ga-3"
               >
                 <span class="rg-then-number">
-                  <StartNumber :number="row.entry.startNumber" />
+                  <StartNumber :number="row.starter.startNumber" />
                 </span>
-                <CrewName :crew="row.entry" class="rg-then-driver" />
+                <CrewName :crew="row.starter" class="rg-then-driver" />
                 <ClassChip
-                  v-if="row.entry.mainClassName"
-                  :name="row.entry.mainClassName"
+                  v-if="row.starter.mainClassName"
+                  :name="row.starter.mainClassName"
                   main
                   class="ms-auto"
                 />
@@ -1315,9 +1312,9 @@ onUnmounted(() => {
             :queued="queued"
             :role="gateRole(event.gateId)"
             :gate-name="gateName(event.gateId)"
-            :vehicle-id="vehicleFor(event)"
-            :vehicle-options="vehicleOptions"
-            @pick="(id) => (pickedVehicleIds[event.eventId] = id)"
+            :entry-id="entryFor(event)"
+            :entry-options="entryOptions"
+            @pick="(id) => (pickedEntryIds[event.eventId] = id)"
             @assign="onAssign(event)"
             @dismiss="onDismiss(event)"
             @dismiss-all="onDismissAll([event, ...queued])"
@@ -1327,9 +1324,9 @@ onUnmounted(() => {
           <tbody>
             <tr v-for="car in onStage" :key="car.run.id">
               <td style="width: 72px">
-                <StartNumber :number="car.row.entry.startNumber" />
+                <StartNumber :number="car.row.starter.startNumber" />
               </td>
-              <td><CrewName :crew="car.row.entry" /></td>
+              <td><CrewName :crew="car.row.starter" /></td>
               <td v-if="splitIndices.length > 0" class="text-no-wrap">
                 <v-icon
                   v-for="index in splitIndices"
@@ -1419,20 +1416,20 @@ onUnmounted(() => {
         </tr>
       </thead>
       <tbody>
-        <template v-for="row in rows" :key="row.entry.vehicleId">
+        <template v-for="row in rows" :key="row.starter.entryId">
           <tr v-if="row.classHeader" class="rg-class-row">
             <td colspan="11">{{ row.classHeader }}</td>
           </tr>
           <tr :class="{ 'rg-next-row': row.state === 'NEXT' }">
-            <td class="rg-timing">{{ row.entry.position }}</td>
+            <td class="rg-timing">{{ row.starter.position }}</td>
             <td>
-              <StartNumber :number="row.entry.startNumber" />
+              <StartNumber :number="row.starter.startNumber" />
             </td>
-            <td><CrewName :crew="row.entry" /></td>
+            <td><CrewName :crew="row.starter" /></td>
             <td v-if="!startOrder.grouped">
               <ClassChip
-                v-if="row.entry.mainClassName"
-                :name="row.entry.mainClassName"
+                v-if="row.starter.mainClassName"
+                :name="row.starter.mainClassName"
                 main
               />
             </td>
@@ -1454,7 +1451,7 @@ onUnmounted(() => {
                 Overdue
               </v-chip>
               <v-chip
-                v-if="!row.run && unscrutineered(row.entry.vehicleId)"
+                v-if="!row.run && unscrutineered(row.starter.entryId)"
                 size="small"
                 variant="outlined"
                 color="warning"
@@ -1513,8 +1510,8 @@ onUnmounted(() => {
                 size="small"
                 variant="text"
                 prepend-icon="mdi-play"
-                :loading="startingVehicleId === row.entry.vehicleId"
-                @click="onStartNow(row.entry.vehicleId)"
+                :loading="startingEntryId === row.starter.entryId"
+                @click="onStartNow(row.starter.entryId)"
               >
                 Start now
               </v-btn>
@@ -1534,7 +1531,7 @@ onUnmounted(() => {
                   <v-list-item
                     prepend-icon="mdi-timer-edit-outline"
                     title="Enter time (missed start)"
-                    @click="openEnterTime(row.entry.vehicleId)"
+                    @click="openEnterTime(row.starter.entryId)"
                   />
                 </v-list>
               </v-menu>
@@ -1630,7 +1627,7 @@ onUnmounted(() => {
         </template>
         <tr v-if="rows.length === 0">
           <td colspan="11" class="rg-empty">
-            No vehicles yet — add them under Vehicles.
+            No entries yet — add them under Entries.
           </td>
         </tr>
       </tbody>
@@ -1651,7 +1648,7 @@ onUnmounted(() => {
             <tr>
               <th>Gate</th>
               <th>Transponder</th>
-              <th>Vehicle</th>
+              <th>Entry</th>
               <th class="rg-time">Gate Time</th>
             </tr>
           </thead>
@@ -1661,9 +1658,7 @@ onUnmounted(() => {
               <td>{{ event.transponderId ?? '-' }}</td>
               <td>
                 {{
-                  event.vehicleId
-                    ? vehicleName(vehicles, event.vehicleId)
-                    : 'unknown'
+                  event.entryId ? entryName(entries, event.entryId) : 'unknown'
                 }}
               </td>
               <td class="rg-timing rg-time">
@@ -1680,27 +1675,27 @@ onUnmounted(() => {
     v-model="correctDialogOpen"
     :title="
       correcting
-        ? `Correct ${vehicleName(vehicles, correcting.vehicleId)}, attempt ${correcting.attempt}`
-        : enteringVehicleId
-          ? `Enter time for ${vehicleName(vehicles, enteringVehicleId)}`
+        ? `Correct ${entryName(entries, correcting.entryId)}, attempt ${correcting.attempt}`
+        : enteringEntryId
+          ? `Enter time for ${entryName(entries, enteringEntryId)}`
           : ''
     "
     :form="correction"
     :save="onSaveCorrection"
-    :saved="enteringVehicleId ? 'Time entered' : 'Times corrected'"
+    :saved="enteringEntryId ? 'Time entered' : 'Times corrected'"
   >
     <p class="text-body-2 text-medium-emphasis">
       Start and finish are times of day, to the second; the stage time is what
       the stopwatch read.
       {{
-        enteringVehicleId
+        enteringEntryId
           ? 'With a stage time, the start is worked out from the finish.'
           : 'A changed stage time sets the finish from the start.'
       }}
       Entered times are marked as hand-set.
     </p>
     <v-text-field
-      v-if="enteringVehicleId && derivedIso"
+      v-if="enteringEntryId && derivedIso"
       :model-value="toLocalTimeValue(derivedIso)"
       type="time"
       step="1"
@@ -1718,11 +1713,11 @@ onUnmounted(() => {
       label="Start"
       class="rg-timing"
       append-inner-icon="mdi-clock-outline"
-      :rules="enteringVehicleId && stageTimeChanged ? [] : [required]"
+      :rules="enteringEntryId && stageTimeChanged ? [] : [required]"
       @click:append-inner="openTimePicker"
     />
     <v-text-field
-      v-if="!enteringVehicleId && derivedIso"
+      v-if="!enteringEntryId && derivedIso"
       :model-value="toLocalTimeValue(derivedIso)"
       type="time"
       step="1"
@@ -1739,10 +1734,10 @@ onUnmounted(() => {
       step="1"
       label="Finish"
       class="rg-timing"
-      :hint="enteringVehicleId ? '' : 'Empty while the car is still on stage'"
+      :hint="enteringEntryId ? '' : 'Empty while the car is still on stage'"
       persistent-hint
-      :clearable="!enteringVehicleId"
-      :rules="enteringVehicleId ? [required] : []"
+      :clearable="!enteringEntryId"
+      :rules="enteringEntryId ? [required] : []"
       append-inner-icon="mdi-clock-outline"
       @click:append-inner="openTimePicker"
     />

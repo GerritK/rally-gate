@@ -1,6 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
-import { VehicleStatus } from '@rally-gate/shared';
-import { VehiclesService } from './vehicles.service';
+import { EntryStatus } from '@rally-gate/shared';
+import { EntriesService } from './entries.service';
 
 /**
  * Shaped like what the sqlite driver actually throws — the code is what
@@ -14,14 +14,14 @@ function uniqueViolation(): Error {
 }
 
 function makeService(saveImpl: (v: unknown) => Promise<unknown>) {
-  const vehicles = {
+  const entries = {
     create: jest.fn().mockImplementation((v: unknown) => v),
     save: jest.fn().mockImplementation(saveImpl),
   };
-  return new VehiclesService(vehicles as never, {} as never);
+  return new EntriesService(entries as never, {} as never);
 }
 
-describe('VehiclesService.create', () => {
+describe('EntriesService.create', () => {
   it('throws ConflictException when the start number is already taken', async () => {
     const service = makeService(() => Promise.reject(uniqueViolation()));
 
@@ -38,7 +38,7 @@ describe('VehiclesService.create', () => {
     ).rejects.toThrow('disk full');
   });
 
-  it('returns the saved vehicle on success', async () => {
+  it('returns the saved entry on success', async () => {
     const saved = { id: 'v1', startNumber: 12, driverFirstName: 'Demo' };
     const service = makeService(() => Promise.resolve(saved));
 
@@ -48,7 +48,7 @@ describe('VehiclesService.create', () => {
   });
 });
 
-describe('VehiclesService.findAllClasses', () => {
+describe('EntriesService.findAllClasses', () => {
   it('lists main classes first, each group alphabetical regardless of case', async () => {
     const classes = {
       find: jest.fn().mockResolvedValue([
@@ -58,7 +58,7 @@ describe('VehiclesService.findAllClasses', () => {
         { name: '2WD', main: true },
       ]),
     };
-    const service = new VehiclesService({} as never, classes as never);
+    const service = new EntriesService({} as never, classes as never);
 
     const names = (await service.findAllClasses()).map((c) => c.name);
 
@@ -67,42 +67,42 @@ describe('VehiclesService.findAllClasses', () => {
 });
 
 function makeServiceForUpdate(
-  existingVehicle: unknown,
+  existingEntry: unknown,
   saveImpl: (v: unknown) => Promise<unknown> = (v) => Promise.resolve(v),
 ) {
-  const vehicles = {
-    findOneBy: jest.fn().mockResolvedValue(existingVehicle),
+  const entries = {
+    findOneBy: jest.fn().mockResolvedValue(existingEntry),
     save: jest.fn().mockImplementation(saveImpl),
   };
-  return new VehiclesService(vehicles as never, {} as never);
+  return new EntriesService(entries as never, {} as never);
 }
 
-describe('VehiclesService.update', () => {
-  it('throws NotFoundException for an unknown vehicle', async () => {
+describe('EntriesService.update', () => {
+  it('throws NotFoundException for an unknown entry', async () => {
     const service = makeServiceForUpdate(null);
 
     await expect(
-      service.update('missing', { status: VehicleStatus.CHECKED_IN }),
+      service.update('missing', { status: EntryStatus.CHECKED_IN }),
     ).rejects.toThrow(NotFoundException);
   });
 
-  it('merges the patch onto the existing vehicle and saves it', async () => {
+  it('merges the patch onto the existing entry and saves it', async () => {
     const service = makeServiceForUpdate({
       id: 'v1',
       startNumber: 12,
       driverFirstName: 'Demo',
-      status: VehicleStatus.REGISTERED,
+      status: EntryStatus.REGISTERED,
     });
 
     const updated = await service.update('v1', {
-      status: VehicleStatus.CHECKED_IN,
+      status: EntryStatus.CHECKED_IN,
       coDriverFirstName: 'Co Driver',
     });
 
     expect(updated).toMatchObject({
       startNumber: 12,
       driverFirstName: 'Demo',
-      status: VehicleStatus.CHECKED_IN,
+      status: EntryStatus.CHECKED_IN,
       coDriverFirstName: 'Co Driver',
     });
   });
@@ -119,14 +119,14 @@ describe('VehiclesService.update', () => {
       startNumber: undefined,
       driverFirstName: undefined,
       coDriverFirstName: null,
-      status: VehicleStatus.CHECKED_IN,
+      status: EntryStatus.CHECKED_IN,
     });
 
     expect(updated).toMatchObject({
       startNumber: 12,
       driverFirstName: 'Demo',
       coDriverFirstName: null,
-      status: VehicleStatus.CHECKED_IN,
+      status: EntryStatus.CHECKED_IN,
     });
   });
 

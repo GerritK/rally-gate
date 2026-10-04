@@ -19,19 +19,19 @@ function uniqueViolation(): Error {
 
 describe('latestAttempts', () => {
   const run = (
-    vehicleId: string,
+    entryId: string,
     stageId: string,
     attempt: number,
     durationMs: number,
   ) =>
     ({
-      vehicleId,
+      entryId,
       stageId,
       attempt,
       durationMs,
     }) as StageRun;
 
-  it('keeps only the most recent attempt per vehicle and stage', () => {
+  it('keeps only the most recent attempt per entry and stage', () => {
     const first = run('v1', 'SS1', 1, 90_000);
     const rerun = run('v1', 'SS1', 2, 120_000);
 
@@ -58,7 +58,7 @@ describe('latestAttempts', () => {
     expect(latestAttempts([only])).toEqual([]);
   });
 
-  it('keeps attempts on different stages and by different vehicles apart', () => {
+  it('keeps attempts on different stages and by different entries apart', () => {
     const a = run('v1', 'SS1', 1, 90_000);
     const b = run('v1', 'SS2', 1, 95_000);
     const c = run('v2', 'SS1', 1, 88_000);
@@ -121,7 +121,7 @@ describe('StageRunsService.findSplitsForStageAtIndex', () => {
     // attempt's split times kept showing on the split classification.
     const surviving = {
       id: 'r2',
-      vehicleId: 'v1',
+      entryId: 'v1',
       stageId: 's1',
       attempt: 2,
       voided: false,
@@ -129,7 +129,7 @@ describe('StageRunsService.findSplitsForStageAtIndex', () => {
     };
     const voided = {
       id: 'r1',
-      vehicleId: 'v1',
+      entryId: 'v1',
       stageId: 's1',
       attempt: 1,
       voided: true,
@@ -162,7 +162,7 @@ describe('StageRunsService.findSplitsForStageAtIndex', () => {
 describe('StageRunsService.correctRun', () => {
   const baseRun = {
     id: 'r1',
-    vehicleId: 'v1',
+    entryId: 'v1',
     stageId: 's1',
     startTime: new Date('2026-01-01T00:00:00.000Z'),
     finishTime: new Date('2026-01-01T00:01:00.000Z'),
@@ -260,7 +260,7 @@ describe('StageRunsService.correctRun', () => {
 describe('StageRunsService.unvoidRun', () => {
   const voidedRun = {
     id: 'r1',
-    vehicleId: 'v1',
+    entryId: 'v1',
     stageId: 's1',
     attempt: 1,
     voided: true,
@@ -300,7 +300,7 @@ describe('StageRunsService.unvoidRun', () => {
   });
 
   // One rule covers every shape of "something else already counts", because
-  // there is one invariant: at most one non-voided attempt per vehicle+stage.
+  // there is one invariant: at most one non-voided attempt per entry+stage.
   it.each([
     ['a higher attempt survives', { id: 'r2', attempt: 2 }],
     ['a lower attempt survives', { id: 'r0', attempt: 0 }],
@@ -326,7 +326,7 @@ describe('StageRunsService.unvoidRun', () => {
 });
 
 describe('StageRunsService.createManual', () => {
-  it('throws ConflictException when the vehicle already has an unfinished run', async () => {
+  it('throws ConflictException when the entry already has an unfinished run', async () => {
     const stageRuns = {
       findOne: jest.fn().mockResolvedValue(null), // nextAttempt lookup
       create: jest.fn().mockImplementation((r: unknown) => r),
@@ -343,7 +343,7 @@ describe('StageRunsService.createManual', () => {
 
     await expect(
       service.createManual({
-        vehicleId: 'v1',
+        entryId: 'v1',
         stageId: 's1',
         startTime: '2026-01-01T00:00:00.000Z',
       }),
@@ -364,7 +364,7 @@ describe('StageRunsService.createManual', () => {
     );
     const before = Date.now();
 
-    await service.createManual({ vehicleId: 'v1', stageId: 's1' });
+    await service.createManual({ entryId: 'v1', stageId: 's1' });
 
     const { startTime } = stageRuns.create.mock.calls[0][0];
     expect(startTime.getTime()).toBeGreaterThanOrEqual(before);
@@ -376,7 +376,7 @@ describe('StageRunsService.createManual', () => {
 
     await expect(
       service.createManual({
-        vehicleId: 'v1',
+        entryId: 'v1',
         stageId: 's1',
         startTime: '2026-01-01T00:01:00.000Z',
         finishTime: '2026-01-01T00:00:00.000Z',
@@ -409,7 +409,7 @@ describe('StageRunsService.finishNow', () => {
   it('finishes a running car with the server clock', async () => {
     const { service, emitter } = makeFinishNowService({
       id: 'r1',
-      vehicleId: 'v1',
+      entryId: 'v1',
       stageId: 's1',
       startTime: new Date(Date.now() - 60_000),
       finishTime: null,
@@ -496,7 +496,7 @@ describe('StageRunsService.startOrFinishRun', () => {
 describe('StageRunsService.finishRun', () => {
   const activeRun = {
     id: 'r1',
-    vehicleId: 'v1',
+    entryId: 'v1',
     stageId: 's1',
     startTime: new Date('2026-01-01T00:00:00.000Z'),
     finishTime: null,
@@ -538,7 +538,7 @@ describe('StageRunsService.startRun', () => {
     // second one becoming a duplicate row.
     const existing = {
       id: 'r1',
-      vehicleId: 'v1',
+      entryId: 'v1',
       stageId: 's1',
       startTime: new Date('2026-01-01T00:00:00.000Z'),
       finishTime: undefined,

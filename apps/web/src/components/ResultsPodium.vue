@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ClassificationEntry } from '@rally-gate/shared';
+import type { Placing } from '@rally-gate/shared';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { display } from '../crew';
@@ -9,7 +9,7 @@ import StartNumber from './StartNumber.vue';
 
 const props = defineProps<{
   /** Ranked, as the table below shows it; only the first three are used. */
-  entries: ClassificationEntry[];
+  placings: Placing[];
 }>();
 const router = useRouter();
 
@@ -20,40 +20,40 @@ const steps = computed(() =>
   [1, 0, 2].map((i) => ({
     place: i + 1,
     color: MEDALS[i],
-    entry: props.entries[i] as ClassificationEntry | undefined,
+    placing: props.placings[i] as Placing | undefined,
   })),
 );
 </script>
 
 <template>
-  <div v-if="display.podium && entries.length > 0" class="mb-6">
+  <div v-if="display.podium && placings.length > 0" class="mb-6">
     <div class="rg-podium">
       <div
         v-for="step in steps"
         :key="step.place"
         class="rg-podium-place"
-        :class="{ 'cursor-pointer': step.entry }"
-        @click="step.entry && router.push(`/vehicles/${step.entry.vehicleId}`)"
+        :class="{ 'cursor-pointer': step.placing }"
+        @click="step.placing && router.push(`/entries/${step.placing.entryId}`)"
       >
-        <template v-if="step.entry">
+        <template v-if="step.placing">
           <v-icon
             icon="mdi-trophy"
             :color="step.color"
             :size="step.place === 1 ? 56 : 40"
           />
           <StartNumber
-            :number="step.entry.startNumber"
+            :number="step.placing.startNumber"
             class="rg-podium-number"
           />
-          <CrewName :crew="step.entry" class="rg-podium-crew" />
-          <div v-if="step.entry.body" class="text-medium-emphasis">
-            {{ step.entry.body }}
+          <CrewName :crew="step.placing" class="rg-podium-crew" />
+          <div v-if="step.placing.body" class="text-medium-emphasis">
+            {{ step.placing.body }}
           </div>
           <div class="rg-timing font-weight-bold">
-            {{ formatDuration(step.entry.durationMs) }}
+            {{ formatDuration(step.placing.durationMs) }}
           </div>
           <div v-if="step.place > 1" class="rg-timing text-medium-emphasis">
-            {{ formatGap(step.entry.gapMs) }}
+            {{ formatGap(step.placing.gapMs) }}
           </div>
         </template>
         <div

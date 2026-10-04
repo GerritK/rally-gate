@@ -1,7 +1,7 @@
 # apps/web
 
 The dashboard `rally-server` serves: live timing, results, setup, hardware and
-vehicles, as a `vue-router` multi-page app behind a Vuetify nav drawer.
+entries, as a `vue-router` multi-page app behind a Vuetify nav drawer.
 
 Route and navigation structure, plus the reasoning behind it, is in
 [docs/frontend-structure.md](../../docs/frontend-structure.md). The theme and

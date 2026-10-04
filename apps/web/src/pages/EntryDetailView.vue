@@ -1,24 +1,24 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { StageRunStatus, StageStatus, VehicleStatus } from '@rally-gate/shared';
+import { StageRunStatus, StageStatus, EntryStatus } from '@rally-gate/shared';
 import { formatClockTime } from '@rally-gate/ui';
 import {
   fetchOverallClassification,
   fetchStageClassification,
-  type ClassificationEntry,
-  type OverallClassificationEntry,
+  type Placing,
+  type OverallPlacing,
 } from '../api/classification';
 import { fetchStageRuns, type StageRun } from '../api/stage-runs';
 import { fetchStages, type Stage } from '../api/stages';
-import { fetchVehicles, type Vehicle } from '../api/vehicles';
-import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
+import { fetchEntries, type Entry } from '../api/entries';
+import { fetchEntryClasses, type EntryClass } from '../api/entry-classes';
 import ClassChip from '../components/ClassChip.vue';
 import CrewName from '../components/CrewName.vue';
 import ManualMark from '../components/ManualMark.vue';
 import TableLegend from '../components/TableLegend.vue';
 import StartNumber from '../components/StartNumber.vue';
-import VehicleDialog from '../components/VehicleDialog.vue';
-import VehicleStatusActions from '../components/VehicleStatusActions.vue';
+import EntryDialog from '../components/EntryDialog.vue';
+import EntryStatusActions from '../components/EntryStatusActions.vue';
 import { flagName, flagUrl } from '../crew';
 import {
   formatDuration,
@@ -26,34 +26,32 @@ import {
   runStatusColor,
   TIMING_MARKS,
   type TimingMark,
-  VEHICLE_STATUS_DISPLAY,
+  ENTRY_STATUS_DISPLAY,
 } from '../format';
 
-const props = defineProps<{ vehicleId: string }>();
+const props = defineProps<{ entryId: string }>();
 
-const vehicles = ref<Vehicle[]>([]);
-const classes = ref<VehicleClass[]>([]);
+const entries = ref<Entry[]>([]);
+const classes = ref<EntryClass[]>([]);
 const stages = ref<Stage[]>([]);
 const runs = ref<StageRun[]>([]);
 /** Each started stage's classification, all classes. */
-const stageRanks = ref(new Map<string, ClassificationEntry[]>());
-const overall = ref<OverallClassificationEntry[]>([]);
+const stageRanks = ref(new Map<string, Placing[]>());
+const overall = ref<OverallPlacing[]>([]);
 const loaded = ref(false);
 const dialogOpen = ref(false);
 
-const vehicle = computed(
-  () => vehicles.value.find((v) => v.id === props.vehicleId) ?? null,
+const entry = computed(
+  () => entries.value.find((v) => v.id === props.entryId) ?? null,
 );
 const ownClasses = computed(() =>
-  classes.value.filter((c) =>
-    vehicle.value?.classes.some((o) => o.id === c.id),
-  ),
+  classes.value.filter((c) => entry.value?.classes.some((o) => o.id === c.id)),
 );
 
 /** Written out in full here, whatever the event's name format: the header
  *  shows the crew as everywhere else, this is the record. */
 const people = computed(() => {
-  const v = vehicle.value;
+  const v = entry.value;
   if (!v) return [];
   const full = (first: string | null, last: string | null) =>
     [first, last].filter(Boolean).join(' ');
@@ -72,7 +70,7 @@ const people = computed(() => {
 });
 
 const standing = computed(() =>
-  overall.value.find((e) => e.vehicleId === props.vehicleId),
+  overall.value.find((e) => e.entryId === props.entryId),
 );
 
 /** One row per stage in stage order: the attempt that counts (a voided one
@@ -83,13 +81,11 @@ const stageRows = computed(() =>
     .map((stage) => {
       const run = runs.value.find(
         (r) =>
-          r.vehicleId === props.vehicleId &&
-          r.stageId === stage.id &&
-          !r.voided,
+          r.entryId === props.entryId && r.stageId === stage.id && !r.voided,
       );
       const rank = stageRanks.value
         .get(stage.id)
-        ?.find((e) => e.vehicleId === props.vehicleId);
+        ?.find((e) => e.entryId === props.entryId);
       let state: { label: string; color?: string } | null = null;
       if (run?.status === StageRunStatus.STARTED) {
         state = { label: 'On stage', color: runStatusColor('STARTED') };
@@ -123,10 +119,10 @@ const legendMarks = computed<TimingMark[]>(() => [
 ]);
 
 async function refresh() {
-  [vehicles.value, classes.value, stages.value, runs.value, overall.value] =
+  [entries.value, classes.value, stages.value, runs.value, overall.value] =
     await Promise.all([
-      fetchVehicles(),
-      fetchVehicleClasses(),
+      fetchEntries(),
+      fetchEntryClasses(),
       fetchStages(),
       fetchStageRuns(),
       fetchOverallClassification(),
@@ -151,26 +147,26 @@ onMounted(refresh);
   <v-btn
     variant="text"
     prepend-icon="mdi-arrow-left"
-    to="/vehicles"
+    to="/entries"
     class="mb-4"
   >
-    Back to Vehicles
+    Back to Entries
   </v-btn>
 
-  <v-alert v-if="loaded && !vehicle" type="info" variant="tonal">
-    No such vehicle in this event.
+  <v-alert v-if="loaded && !entry" type="info" variant="tonal">
+    No such entry in this event.
   </v-alert>
 
-  <template v-if="vehicle">
+  <template v-if="entry">
     <v-card class="mb-4">
-      <v-card-item class="rg-vehicle-head">
+      <v-card-item class="rg-entry-head">
         <template #prepend>
           <StartNumber
-            :number="vehicle.startNumber"
+            :number="entry.startNumber"
             class="me-4 rg-head-number"
           />
         </template>
-        <CrewName :crew="vehicle" class="rg-head-crew" />
+        <CrewName :crew="entry" class="rg-head-crew" />
         <template #append>
           <v-btn
             variant="tonal"
@@ -184,7 +180,7 @@ onMounted(refresh);
     </v-card>
 
     <!-- The same parts as the edit dialog, so a value is where it was set. -->
-    <div class="rg-vehicle-grid">
+    <div class="rg-entry-grid">
       <v-card title="Crew">
         <v-card-text>
           <dl class="rg-facts">
@@ -209,26 +205,26 @@ onMounted(refresh);
         <v-card-text>
           <dl class="rg-facts">
             <dt>Body</dt>
-            <dd>{{ vehicle.body ?? '-' }}</dd>
+            <dd>{{ entry.body ?? '-' }}</dd>
             <dt>Chassis</dt>
-            <dd>{{ vehicle.chassis ?? '-' }}</dd>
+            <dd>{{ entry.chassis ?? '-' }}</dd>
           </dl>
         </v-card-text>
       </v-card>
 
-      <v-card title="Entry">
+      <v-card title="Registration">
         <v-card-text>
           <dl class="rg-facts">
             <dt>Status</dt>
             <dd class="d-flex flex-wrap align-center ga-1">
               <v-chip
                 size="small"
-                :color="VEHICLE_STATUS_DISPLAY[vehicle.status].color"
-                :prepend-icon="VEHICLE_STATUS_DISPLAY[vehicle.status].icon"
+                :color="ENTRY_STATUS_DISPLAY[entry.status].color"
+                :prepend-icon="ENTRY_STATUS_DISPLAY[entry.status].icon"
               >
-                {{ VEHICLE_STATUS_DISPLAY[vehicle.status].label }}
+                {{ ENTRY_STATUS_DISPLAY[entry.status].label }}
               </v-chip>
-              <VehicleStatusActions :vehicle="vehicle" @saved="refresh" />
+              <EntryStatusActions :entry="entry" @saved="refresh" />
             </dd>
             <dt>Classes</dt>
             <dd v-if="ownClasses.length > 0" class="d-flex flex-wrap ga-1">
@@ -243,10 +239,10 @@ onMounted(refresh);
             <dt>Transponder</dt>
             <dd
               :class="
-                vehicle.transponderId ? 'rg-timing' : 'text-medium-emphasis'
+                entry.transponderId ? 'rg-timing' : 'text-medium-emphasis'
               "
             >
-              {{ vehicle.transponderId ?? '-' }}
+              {{ entry.transponderId ?? '-' }}
             </dd>
           </dl>
         </v-card-text>
@@ -275,9 +271,9 @@ onMounted(refresh);
         </dl>
         <div v-else class="rg-empty">
           {{
-            vehicle?.status === VehicleStatus.WITHDRAWN
+            entry?.status === EntryStatus.WITHDRAWN
               ? 'Retired: withdrawn, so not in the overall.'
-              : vehicle?.status === VehicleStatus.DISQUALIFIED
+              : entry?.status === EntryStatus.DISQUALIFIED
                 ? 'Disqualified: not in any result.'
                 : 'Not in the overall yet: no completed stage that counts.'
           }}
@@ -381,11 +377,11 @@ onMounted(refresh);
     </v-card>
   </template>
 
-  <VehicleDialog
+  <EntryDialog
     v-model="dialogOpen"
-    :vehicle="vehicle"
+    :entry="entry"
     :classes="classes"
-    :vehicles="vehicles"
+    :entries="entries"
     @saved="refresh"
   />
 </template>
@@ -412,7 +408,7 @@ onMounted(refresh);
   line-height: 1.2;
 }
 /* Edit sits level with the top of the plate, as in every card header. */
-.rg-vehicle-head :deep(.v-card-item__append) {
+.rg-entry-head :deep(.v-card-item__append) {
   align-self: flex-start;
 }
 /* Large on a desk, down to what still fits beside Edit on a phone: a
@@ -423,9 +419,9 @@ onMounted(refresh);
 .rg-head-crew {
   font-size: clamp(1rem, 4vw, 1.75rem);
 }
-/* Crew, Car and Entry side by side, a row of them equally tall; stacked
+/* Crew, Car and Registration side by side, a row of them equally tall; stacked
    as the screen narrows. */
-.rg-vehicle-grid {
+.rg-entry-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px;

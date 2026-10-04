@@ -9,7 +9,7 @@ import {
 
 export interface StageRun {
   id: string;
-  vehicleId: string;
+  entryId: string;
   stageId: string;
   startTime: string;
   finishTime?: string;
@@ -48,7 +48,7 @@ export function fetchSplitsForStage(stageId: string): Promise<StageSplit[]> {
 
 /** Without `startTime` the server stamps the start with its own clock. */
 export function createStageRun(input: {
-  vehicleId: string;
+  entryId: string;
   stageId: string;
   startTime?: string;
   finishTime?: string;
@@ -74,7 +74,7 @@ export function deleteStageRun(id: string): Promise<void> {
 
 /**
  * Strikes out an attempt after a red flag. The row is kept as evidence but
- * stops counting, and the vehicle is freed so the start gate opens the
+ * stops counting, and the entry is freed so the start gate opens the
  * re-run itself on its next pass — no hand-entered restart time.
  */
 export function voidStageRun(id: string): Promise<StageRun> {
@@ -83,7 +83,7 @@ export function voidStageRun(id: string): Promise<StageRun> {
 
 /**
  * Reverses a void. Throws `ApiError` 409 with `body.blockingAttempt` if
- * another attempt already counts for that stage — a vehicle has at most one
+ * another attempt already counts for that stage — an entry has at most one
  * non-voided attempt, so that one must be voided first. Deliberately not a
  * cascade: discarding the other run is the marshal's call to make explicitly.
  */

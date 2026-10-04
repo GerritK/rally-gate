@@ -1,19 +1,19 @@
 import { ConflictException } from '@nestjs/common';
-import { GateRole, StageStatus, VehicleStatus } from '@rally-gate/shared';
+import { GateRole, StageStatus, EntryStatus } from '@rally-gate/shared';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { GatesService } from '../gates/gates.service';
 import { StageRunsService } from '../stage-runs/stage-runs.service';
 import { StagesService } from '../stages/stages.service';
-import { VehiclesService } from '../vehicles/vehicles.service';
+import { EntriesService } from '../entries/entries.service';
 import { DetectionEventRecord } from './detection-event.entity';
 import { EventsService } from './events.service';
 
 const GATE = { id: 'G1', name: 'G1', clockOffsetMs: null };
-const VEHICLE = { id: 'v1', transponderId: '1234567' };
+const ENTRY = { id: 'v1', transponderId: '1234567' };
 
 function makeService(opts: {
   gate?: unknown;
-  vehicle?: unknown;
+  entry?: unknown;
   pending?: unknown[];
   startRun?: jest.Mock;
   stageStatus?: StageStatus;
@@ -41,14 +41,12 @@ function makeService(opts: {
     findOne: jest.fn().mockResolvedValue('gate' in opts ? opts.gate : GATE),
     clockCorrectionMsFor: jest.fn().mockResolvedValue(0),
   } as unknown as GatesService;
-  const vehiclesService = {
+  const entriesService = {
     findByTransponder: jest
       .fn()
-      .mockResolvedValue('vehicle' in opts ? opts.vehicle : VEHICLE),
-    findOne: jest
-      .fn()
-      .mockResolvedValue('vehicle' in opts ? opts.vehicle : VEHICLE),
-  } as unknown as VehiclesService;
+      .mockResolvedValue('entry' in opts ? opts.entry : ENTRY),
+    findOne: jest.fn().mockResolvedValue('entry' in opts ? opts.entry : ENTRY),
+  } as unknown as EntriesService;
   const gateAssignmentsService = {
     findActiveForGate: jest
       .fn()
@@ -78,7 +76,7 @@ function makeService(opts: {
     events as never,
     gatesService,
     gateAssignmentsService,
-    vehiclesService,
+    entriesService,
     stageRunsService,
     stagesService,
     emitter as never,
@@ -165,9 +163,9 @@ describe('EventsService detection failures', () => {
     expect(saved.at(-1)).toMatchObject({ processed: true });
   });
 
-  const nothingToApply: [string, { gate?: null; vehicle?: null }][] = [
+  const nothingToApply: [string, { gate?: null; entry?: null }][] = [
     ['an unknown gate', { gate: null }],
-    ['an unregistered transponder', { vehicle: null }],
+    ['an unregistered transponder', { entry: null }],
   ];
 
   it.each(nothingToApply)(
@@ -187,7 +185,7 @@ describe('EventsService detection failures', () => {
 describe('EventsService cars out of the event', () => {
   it("stores a withdrawn car's passing as evidence without starting a run", async () => {
     const { service, saved, startRun } = makeService({
-      vehicle: { ...VEHICLE, startNumber: 7, status: VehicleStatus.WITHDRAWN },
+      entry: { ...ENTRY, startNumber: 7, status: EntryStatus.WITHDRAWN },
     });
 
     await service.handleMqttMessage(detection());
@@ -305,7 +303,7 @@ describe('EventsService.reprocessPending', () => {
   const pendingRecord = {
     eventId: 'e1',
     gateId: 'G1',
-    vehicleId: 'v1',
+    entryId: 'v1',
     transponderId: '1234567',
     timestampGate: new Date('2026-01-01T12:00:00.000Z'),
     clockCorrectionMs: 0,
@@ -363,11 +361,11 @@ describe('EventsService unidentified passings', () => {
     eventId: 'e1',
     gateId: 'G1',
     transponderId: null,
-    vehicleId: null,
+    entryId: null,
     timestampGate: new Date('2026-01-01T12:00:00.000Z'),
     clockCorrectionMs: 2_000,
     processed: true,
-    awaitingVehicle: true,
+    awaitingEntry: true,
   };
 
   it('holds a passing without a transponder for a marshal', async () => {
@@ -378,7 +376,7 @@ describe('EventsService unidentified passings', () => {
     expect(startRun).not.toHaveBeenCalled();
     expect(saved.at(-1)).toMatchObject({
       transponderId: null,
-      awaitingVehicle: true,
+      awaitingEntry: true,
       processed: true,
     });
     expect(emitter.emit).toHaveBeenCalledWith(
@@ -392,7 +390,7 @@ describe('EventsService unidentified passings', () => {
 
     await service.handleMqttMessage(detection(beam));
 
-    expect(saved.at(-1)).toMatchObject({ awaitingVehicle: false });
+    expect(saved.at(-1)).toMatchObject({ awaitingEntry: false });
   });
 
   it('times an assigned passing with the correction stored at ingest', async () => {
@@ -400,7 +398,7 @@ describe('EventsService unidentified passings', () => {
       stored: { ...awaiting },
     });
 
-    await service.assignVehicle('e1', 'v1');
+    await service.assignEntry('e1', 'v1');
 
     expect(startRun).toHaveBeenCalledWith(
       'v1',
@@ -408,8 +406,8 @@ describe('EventsService unidentified passings', () => {
       new Date('2026-01-01T12:00:02.000Z'),
     );
     expect(saved.at(-1)).toMatchObject({
-      vehicleId: 'v1',
-      awaitingVehicle: false,
+      entryId: 'v1',
+      awaitingEntry: false,
     });
   });
 
@@ -424,7 +422,7 @@ describe('EventsService unidentified passings', () => {
       }),
     });
 
-    await expect(service.assignVehicle('e1', 'v1')).rejects.toThrow(
+    await expect(service.assignEntry('e1', 'v1')).rejects.toThrow(
       ConflictException,
     );
     expect(saved).toHaveLength(0);
@@ -439,8 +437,8 @@ describe('EventsService unidentified passings', () => {
 
     expect(startRun).not.toHaveBeenCalled();
     expect(saved.at(-1)).toMatchObject({
-      vehicleId: null,
-      awaitingVehicle: false,
+      entryId: null,
+      awaitingEntry: false,
     });
   });
 });

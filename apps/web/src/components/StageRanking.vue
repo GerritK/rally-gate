@@ -24,9 +24,9 @@ const props = defineProps<{
 const router = useRouter();
 
 const legendMarks = computed<TimingMark[]>(() =>
-  props.results.classification.some((entry) =>
+  props.results.classification.some((placing) =>
     props.results.splitsByGate.some(
-      (splits) => splits.get(entry.vehicleId)?.gapMs === 0,
+      (splits) => splits.get(placing.entryId)?.gapMs === 0,
     ),
   )
     ? ['best']
@@ -55,7 +55,7 @@ const legendMarks = computed<TimingMark[]>(() =>
     >
       This stage hasn't started yet.
     </v-alert>
-    <ResultsPodium :entries="results.classification" />
+    <ResultsPodium :placings="results.classification" />
     <v-table density="comfortable">
       <thead>
         <tr>
@@ -75,49 +75,49 @@ const legendMarks = computed<TimingMark[]>(() =>
       </thead>
       <tbody>
         <tr
-          v-for="entry in results.classification"
-          :key="entry.vehicleId"
+          v-for="placing in results.classification"
+          :key="placing.entryId"
           class="cursor-pointer"
-          @click="router.push(`/vehicles/${entry.vehicleId}`)"
+          @click="router.push(`/entries/${placing.entryId}`)"
         >
-          <td>{{ entry.position }}</td>
-          <td><StartNumber :number="entry.startNumber" /></td>
-          <td><CrewName :crew="entry" /></td>
+          <td>{{ placing.position }}</td>
+          <td><StartNumber :number="placing.startNumber" /></td>
+          <td><CrewName :crew="placing" /></td>
           <td
             v-for="(splits, i) in results.splitsByGate"
             :key="results.splitGates[i].gateId"
             class="rg-timing rg-time text-no-wrap"
           >
-            <template v-if="splits.get(entry.vehicleId)">
+            <template v-if="splits.get(placing.entryId)">
               <span
                 v-tooltip:top="
-                  splits.get(entry.vehicleId)!.gapMs === 0
+                  splits.get(placing.entryId)!.gapMs === 0
                     ? ''
-                    : `${formatGap(splits.get(entry.vehicleId)!.gapMs)} to the fastest`
+                    : `${formatGap(splits.get(placing.entryId)!.gapMs)} to the fastest`
                 "
                 :class="{
                   'text-timing-best font-weight-bold':
-                    splits.get(entry.vehicleId)!.gapMs === 0,
+                    splits.get(placing.entryId)!.gapMs === 0,
                 }"
               >
-                {{ formatDuration(splits.get(entry.vehicleId)!.elapsedMs) }}
+                {{ formatDuration(splits.get(placing.entryId)!.elapsedMs) }}
               </span>
               <span class="rg-time-mark"
                 ><v-icon
-                  v-if="splits.get(entry.vehicleId)!.gapMs === 0"
+                  v-if="splits.get(placing.entryId)!.gapMs === 0"
                   size="x-small"
                   :icon="TIMING_MARKS.best.icon"
                   :color="TIMING_MARKS.best.color" /></span
               ><span class="text-medium-emphasis"
-                >({{ splits.get(entry.vehicleId)!.position }})</span
+                >({{ splits.get(placing.entryId)!.position }})</span
               >
             </template>
             <template v-else>-</template>
           </td>
           <td class="rg-timing rg-time">
-            {{ formatDuration(entry.durationMs) }}
+            {{ formatDuration(placing.durationMs) }}
           </td>
-          <td class="rg-timing rg-time">{{ formatGap(entry.gapMs) }}</td>
+          <td class="rg-timing rg-time">{{ formatGap(placing.gapMs) }}</td>
         </tr>
         <tr v-if="results.classification.length === 0">
           <td :colspan="5 + results.splitGates.length" class="rg-empty">
@@ -148,16 +148,16 @@ const legendMarks = computed<TimingMark[]>(() =>
       </thead>
       <tbody>
         <tr
-          v-for="entry in results.nonFinishers"
-          :key="entry.vehicleId"
+          v-for="row in results.nonFinishers"
+          :key="row.entryId"
           class="cursor-pointer"
-          @click="router.push(`/vehicles/${entry.vehicleId}`)"
+          @click="router.push(`/entries/${row.entryId}`)"
         >
-          <td><StartNumber :number="entry.startNumber" /></td>
-          <td><CrewName :crew="entry" /></td>
+          <td><StartNumber :number="row.startNumber" /></td>
+          <td><CrewName :crew="row" /></td>
           <td>
-            <v-chip size="small" :color="outcomeColor(entry.outcome)">
-              {{ entry.outcome }}
+            <v-chip size="small" :color="outcomeColor(row.outcome)">
+              {{ row.outcome }}
             </v-chip>
           </td>
         </tr>

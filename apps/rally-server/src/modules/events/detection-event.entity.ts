@@ -13,14 +13,14 @@ export class DetectionEventRecord {
   transponderId: string | null;
 
   @Column({ type: 'varchar', nullable: true })
-  vehicleId: string | null;
+  entryId: string | null;
 
   /**
    * An unidentified passing at a gate that was live on a stage: stored untimed
-   * until a marshal assigns the vehicle or dismisses it. Cleared by either.
+   * until a marshal assigns the entry or dismisses it. Cleared by either.
    */
   @Column({ default: false })
-  awaitingVehicle: boolean;
+  awaitingEntry: boolean;
 
   /** As reported by the gate, never rewritten — the raw evidence. */
   @Column({ type: Date })

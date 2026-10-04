@@ -3,20 +3,20 @@ import type { CellHookData, RowInput } from 'jspdf-autotable';
 import {
   fastestByStage,
   notClassified,
-  type OverallClassificationEntry,
+  type OverallPlacing,
   type StageResults,
 } from './api/classification';
 import { rallyName } from './api/rally-info';
 import { serverOffsetMs } from './api/time';
-import type { Vehicle } from './api/vehicles';
+import type { Entry } from './api/entries';
 import { coDriverName, driverName } from './crew';
 import {
   formatDuration,
   formatGap,
   TIMING_MARKS,
-  VEHICLE_STATUS_DISPLAY,
+  ENTRY_STATUS_DISPLAY,
 } from './format';
-import type { Crew, StartOrderEntry } from '@rally-gate/shared';
+import type { Crew, Starter } from '@rally-gate/shared';
 import { logoUrl } from '@rally-gate/ui';
 import barlowBoldUrl from './assets/fonts/Barlow-Bold.ttf?url';
 import barlowRegularUrl from './assets/fonts/Barlow-Regular.ttf?url';
@@ -62,13 +62,13 @@ const crewCell = (crew: Crew) =>
 export function overallPdf(
   heading: string,
   subtitle: string,
-  entries: OverallClassificationEntry[],
-  vehicles: Vehicle[],
+  placings: OverallPlacing[],
+  entries: Entry[],
   classIds: string[],
 ): PdfSection {
-  const fastest = fastestByStage(entries);
-  const times = entries.flatMap((e) => e.stageTimes);
-  const unranked = notClassified(entries, vehicles, classIds);
+  const fastest = fastestByStage(placings);
+  const times = placings.flatMap((e) => e.stageTimes);
+  const unranked = notClassified(placings, entries, classIds);
   return {
     heading,
     subtitle,
@@ -79,9 +79,9 @@ export function overallPdf(
       'Total',
       'Gap',
       'Stages',
-      ...(entries[0]?.stageTimes ?? []).map((t) => t.stageId),
+      ...(placings[0]?.stageTimes ?? []).map((t) => t.stageId),
     ],
-    body: entries.map((e) => [
+    body: placings.map((e) => [
       String(e.position),
       String(e.startNumber),
       crewCell(e),
@@ -113,7 +113,7 @@ export function overallPdf(
             body: unranked.map((v) => [
               String(v.startNumber),
               crewCell(v),
-              VEHICLE_STATUS_DISPLAY[v.status].label,
+              ENTRY_STATUS_DISPLAY[v.status].label,
             ]),
           }
         : undefined,
@@ -132,7 +132,7 @@ export function stagePdf(
     time(formatDuration(e.durationMs)),
     time(formatGap(e.gapMs)),
     ...results.splitsByGate.map((splits) => {
-      const split = splits.get(e.vehicleId);
+      const split = splits.get(e.entryId);
       return split
         ? time(
             `${formatDuration(split.elapsedMs)} (${split.position})`,
@@ -183,7 +183,7 @@ export function startListPdf(
   /** When it was frozen, formatted; null while it is still provisional. */
   published: string | null,
   rows: {
-    entry: StartOrderEntry;
+    starter: Starter;
     classHeader: string | null;
     car?: { body: string | null; chassis: string | null };
   }[],
@@ -195,7 +195,7 @@ export function startListPdf(
     subtitle: published ? '' : 'Provisional',
     note: published ? `Published ${published}` : undefined,
     head,
-    body: rows.flatMap(({ entry, classHeader, car }) => [
+    body: rows.flatMap(({ starter, classHeader, car }) => [
       ...(classHeader
         ? [
             [
@@ -208,11 +208,11 @@ export function startListPdf(
           ]
         : []),
       [
-        String(entry.position),
-        String(entry.startNumber),
-        crewCell(entry),
+        String(starter.position),
+        String(starter.startNumber),
+        crewCell(starter),
         [car?.body, car?.chassis].filter(Boolean).join('\n'),
-        ...(grouped ? [] : [entry.mainClassName ?? '']),
+        ...(grouped ? [] : [starter.mainClassName ?? '']),
       ],
     ]),
     repeat: head.length,

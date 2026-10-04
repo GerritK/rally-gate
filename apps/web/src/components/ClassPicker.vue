@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { VehicleClass } from '../api/vehicle-classes';
+import type { EntryClass } from '../api/entry-classes';
 
 const props = defineProps<{
-  classes: VehicleClass[];
+  classes: EntryClass[];
   density?: 'compact' | 'comfortable';
 }>();
 const classIds = defineModel<string[]>({ required: true });
@@ -13,8 +13,8 @@ const isMain = (id: string) => props.classes.some((c) => c.id === id && c.main);
 const inOrder = (ids: string[]) =>
   props.classes.map((c) => c.id).filter((id) => ids.includes(id));
 
-// One main class per vehicle: picking another replaces it. The server doesn't
-// enforce this, so a vehicle could still carry two from elsewhere.
+// One main class per entry: picking another replaces it. The server doesn't
+// enforce this, so an entry could still carry two from elsewhere.
 const selected = computed({
   get: () => inOrder(classIds.value),
   set: (ids: string[]) => {
@@ -33,7 +33,7 @@ const selected = computed({
     v-model="selected"
     :items="classes"
     :item-props="
-      (c: VehicleClass) => ({ prependIcon: c.main ? 'mdi-star' : undefined })
+      (c: EntryClass) => ({ prependIcon: c.main ? 'mdi-star' : undefined })
     "
     item-title="name"
     item-value="id"

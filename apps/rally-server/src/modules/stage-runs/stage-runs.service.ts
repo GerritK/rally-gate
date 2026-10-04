@@ -25,7 +25,7 @@ export interface StageRunCorrection {
 }
 
 export interface ManualStageRunInput {
-  vehicleId: string;
+  entryId: string;
   stageId: string;
   /** Absent means "now" by the server's clock, which the gates sync to. */
   startTime?: string;
@@ -51,7 +51,7 @@ export function deriveStageRunStatus(
 }
 
 /**
- * Collapses a set of runs to the most recent attempt per vehicle+stage.
+ * Collapses a set of runs to the most recent attempt per entry+stage.
  *
  * A stage that gets red-flagged is re-run, and both attempts are kept — the
  * earlier one is evidence, not garbage. Results only ever count the latest,
@@ -66,7 +66,7 @@ export function latestAttempts(runs: StageRun[]): StageRun[] {
     if (run.voided) {
       continue;
     }
-    const key = `${run.vehicleId}:${run.stageId}`;
+    const key = `${run.entryId}:${run.stageId}`;
     const seen = latest.get(key);
     // The unique index already guarantees one survivor per key; this is a
     // tiebreak rather than trusting the schema blindly with a result.
@@ -155,7 +155,7 @@ export class StageRunsService {
   }
 
   // The three finders below feed results, so each returns only the latest
-  // attempt per vehicle+stage. `findAll` deliberately does not — the
+  // attempt per entry+stage. `findAll` deliberately does not — the
   // dashboard shows every attempt, including superseded ones.
 
   async findFinishedByStage(stageId: string): Promise<StageRun[]> {
@@ -178,63 +178,60 @@ export class StageRunsService {
   }
 
   /**
-   * The vehicle's in-progress attempt on this stage, if any. Voided runs are
-   * excluded throughout: voiding is what releases a vehicle to run again, so
+   * The entry's in-progress attempt on this stage, if any. Voided runs are
+   * excluded throughout: voiding is what releases an entry to run again, so
    * a voided row must stop counting as either "already running" or "already
    * finished" everywhere the rule engine checks.
    */
   private findActive(
-    vehicleId: string,
+    entryId: string,
     stageId: string,
   ): Promise<StageRun | null> {
     return this.stageRuns.findOneBy({
-      vehicleId,
+      entryId,
       stageId,
       finishTime: IsNull(),
       voided: false,
     });
   }
 
-  /** The vehicle's most recent completed attempt on this stage, if any. */
+  /** The entry's most recent completed attempt on this stage, if any. */
   private findFinished(
-    vehicleId: string,
+    entryId: string,
     stageId: string,
   ): Promise<StageRun | null> {
     return this.stageRuns.findOne({
-      where: { vehicleId, stageId, finishTime: Not(IsNull()), voided: false },
+      where: { entryId, stageId, finishTime: Not(IsNull()), voided: false },
       order: { attempt: 'DESC' },
     });
   }
 
   /**
-   * Next attempt number for this vehicle on this stage. Taken from the
+   * Next attempt number for this entry on this stage. Taken from the
    * highest existing attempt rather than a count, so deleting a phantom run
    * can't hand a later attempt a number that's already in use.
    */
-  private async nextAttempt(
-    vehicleId: string,
-    stageId: string,
-  ): Promise<number> {
+  private async nextAttempt(entryId: string, stageId: string): Promise<number> {
     const highest = await this.stageRuns.findOne({
-      where: { vehicleId, stageId },
+      where: { entryId, stageId },
       order: { attempt: 'DESC' },
     });
     return (highest?.attempt ?? 0) + 1;
   }
 
   async startRun(
-    vehicleId: string,
+    entryId: string,
     stageId: string,
     startTime: Date,
   ): Promise<StageRunWithStatus> {
-    const existing = await this.findActive(vehicleId, stageId);
+    const existing = await this.findActive(entryId, stageId);
     if (existing) {
       this.logger.warn(
-        `Vehicle ${vehicleId} already has a running stage run on ${stageId}, ignoring duplicate start`,
+        `Entry ${entryId} already has a running stage run on ${stageId}, ignoring duplicate start`,
       );
       return this.withStatus(existing);
     }
-    const finished = await this.findFinished(vehicleId, stageId);
+    const finished = await this.findFinished(entryId, stageId);
     if (finished) {
       // Re-runs are supported, but a gate detection must not be what starts
       // one. The start gate stays live for the rest of the field while a
@@ -245,15 +242,15 @@ export class StageRunsService {
       // marshal action (`POST /stage-runs`); the finish gate then completes
       // it on its own, because `findActive` picks up the new open run.
       this.logger.warn(
-        `Vehicle ${vehicleId} already finished stage ${stageId}, ignoring restart (create a re-run explicitly if the stage was red-flagged)`,
+        `Entry ${entryId} already finished stage ${stageId}, ignoring restart (create a re-run explicitly if the stage was red-flagged)`,
       );
       return this.withStatus(finished);
     }
     const run = this.stageRuns.create({
-      vehicleId,
+      entryId,
       stageId,
       startTime,
-      attempt: await this.nextAttempt(vehicleId, stageId),
+      attempt: await this.nextAttempt(entryId, stageId),
     });
     try {
       return this.withStatus(await this.stageRuns.save(run));
@@ -262,25 +259,25 @@ export class StageRunsService {
         throw err;
       }
       // Lost a race with a concurrent detection for the same passing — the
-      // partial unique index on (vehicleId, stageId) where finishTime IS NULL
+      // partial unique index on (entryId, stageId) where finishTime IS NULL
       // is what catches it, since both callers can clear `findActive` first.
       const raced =
-        (await this.findActive(vehicleId, stageId)) ??
-        (await this.findFinished(vehicleId, stageId));
+        (await this.findActive(entryId, stageId)) ??
+        (await this.findFinished(entryId, stageId));
       return this.withStatus(raced!);
     }
   }
 
   async finishRun(
-    vehicleId: string,
+    entryId: string,
     stageId: string,
     finishTime: Date,
     manual = false,
   ): Promise<StageRunWithStatus | null> {
-    const run = await this.findActive(vehicleId, stageId);
+    const run = await this.findActive(entryId, stageId);
     if (!run) {
       this.logger.warn(
-        `No active stage run for vehicle ${vehicleId} on ${stageId}, ignoring finish event`,
+        `No active stage run for entry ${entryId} on ${stageId}, ignoring finish event`,
       );
       return null;
     }
@@ -289,7 +286,7 @@ export class StageRunsService {
       // a bad detection shouldn't error out the MQTT pipeline. A burst of
       // these means the finish gate's clock is behind the start gate's.
       this.logger.warn(
-        `Finish ${finishTime.toISOString()} is not after start ${run.startTime.toISOString()} for vehicle ${vehicleId} on ${stageId} (check gate clock sync), ignoring finish event`,
+        `Finish ${finishTime.toISOString()} is not after start ${run.startTime.toISOString()} for entry ${entryId} on ${stageId} (check gate clock sync), ignoring finish event`,
       );
       return null;
     }
@@ -307,35 +304,35 @@ export class StageRunsService {
    * a passing assigned late) is misread; a marshal corrects that.
    */
   async startOrFinishRun(
-    vehicleId: string,
+    entryId: string,
     stageId: string,
     at: Date,
     minDurationMs: number,
   ): Promise<StageRunWithStatus | null> {
-    const open = await this.findActive(vehicleId, stageId);
+    const open = await this.findActive(entryId, stageId);
     if (!open) {
-      return this.startRun(vehicleId, stageId, at);
+      return this.startRun(entryId, stageId, at);
     }
     if (at.getTime() - open.startTime.getTime() < minDurationMs) {
       this.logger.warn(
-        `Passing for vehicle ${vehicleId} on ${stageId} is within ${minDurationMs} ms of its start, ignoring it as the same passing`,
+        `Passing for entry ${entryId} on ${stageId} is within ${minDurationMs} ms of its start, ignoring it as the same passing`,
       );
       return null;
     }
-    return this.finishRun(vehicleId, stageId, at);
+    return this.finishRun(entryId, stageId, at);
   }
 
   async recordSplit(
-    vehicleId: string,
+    entryId: string,
     stageId: string,
     gateId: string,
     splitIndex: number,
     at: Date,
   ): Promise<StageSplit | null> {
-    const run = await this.findActive(vehicleId, stageId);
+    const run = await this.findActive(entryId, stageId);
     if (!run) {
       this.logger.warn(
-        `No active stage run for vehicle ${vehicleId} on ${stageId}, ignoring split event`,
+        `No active stage run for entry ${entryId} on ${stageId}, ignoring split event`,
       );
       return null;
     }
@@ -404,9 +401,9 @@ export class StageRunsService {
       assertValidRunDuration(startTime, finishTime);
     }
     const run = this.stageRuns.create({
-      vehicleId: input.vehicleId,
+      entryId: input.entryId,
       stageId: input.stageId,
-      attempt: await this.nextAttempt(input.vehicleId, input.stageId),
+      attempt: await this.nextAttempt(input.entryId, input.stageId),
       startTime,
       finishTime,
       startManual: true,
@@ -420,11 +417,11 @@ export class StageRunsService {
       saved = await this.stageRuns.save(run);
     } catch (err) {
       if (isUniqueViolation(err)) {
-        // A vehicle has at most one non-voided attempt per stage. Recording
+        // An entry has at most one non-voided attempt per stage. Recording
         // a re-run by hand therefore means voiding the previous attempt
         // first — the same act that frees the car for a gate-timed re-run.
         throw new ConflictException(
-          `Vehicle ${input.vehicleId} already has an attempt on stage ${input.stageId} that counts; void it first to record another`,
+          `Entry ${input.entryId} already has an attempt on stage ${input.stageId} that counts; void it first to record another`,
         );
       }
       throw err;
@@ -439,7 +436,7 @@ export class StageRunsService {
    * record of what was originally timed, which is exactly what a protest
    * would turn on, so this is deliberately not a delete.
    *
-   * Once voided the vehicle has no active and no finished attempt on the
+   * Once voided the entry has no active and no finished attempt on the
    * stage, so the *start gate* opens the re-run by itself on the car's next
    * pass. That is the point of doing it this way rather than hand-entering a
    * replacement run: both ends of the re-run stay gate-timed.
@@ -464,7 +461,7 @@ export class StageRunsService {
       );
     }
     const finished = await this.finishRun(
-      run.vehicleId,
+      run.entryId,
       run.stageId,
       new Date(),
       true,
@@ -491,7 +488,7 @@ export class StageRunsService {
 
   /**
    * Reverses a void. Allowed exactly when no other attempt survives, since a
-   * vehicle has at most one non-voided attempt per stage. Refuses rather than
+   * entry has at most one non-voided attempt per stage. Refuses rather than
    * cascading: striking out a run the car actually drove is the marshal's
    * call to make explicitly, not a side effect of "restore".
    */
@@ -503,7 +500,7 @@ export class StageRunsService {
     const survivor = (
       await this.stageRuns.find({
         where: {
-          vehicleId: run.vehicleId,
+          entryId: run.entryId,
           stageId: run.stageId,
           voided: false,
         },

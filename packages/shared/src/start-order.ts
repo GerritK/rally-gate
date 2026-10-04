@@ -1,4 +1,4 @@
-import type { Crew } from './vehicle';
+import type { Crew } from './entry';
 
 /** Setting keys, stored via `PUT /api/settings/:key`. */
 export const START_ORDER_GROUPING_KEY = 'startOrderGrouping';
@@ -21,9 +21,9 @@ export enum StartOrderDirection {
   SLOWEST_FIRST = 'SLOWEST_FIRST',
 }
 
-export interface StartOrderEntry extends Crew {
+export interface Starter extends Crew {
   position: number;
-  vehicleId: string;
+  entryId: string;
   startNumber: number;
   mainClassName: string | null;
 }
@@ -37,7 +37,7 @@ export interface StartOrder {
   frozen: boolean;
   /** ISO 8601, the "as of" on a posted list. */
   frozenAt: string | null;
-  /** Entries come in main-class blocks, so a page can show one per class. */
+  /** Starters come in main-class blocks, so a page can show one per class. */
   grouped: boolean;
-  entries: StartOrderEntry[];
+  starters: Starter[];
 }

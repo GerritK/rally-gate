@@ -3,7 +3,7 @@ export interface DetectionEvent {
   gateId: string;
   /**
    * Absent when the gate saw a passing but identified nothing, e.g. a light
-   * barrier. The server then holds it for a marshal to assign a vehicle.
+   * barrier. The server then holds it for a marshal to assign an entry.
    */
   transponderId?: string;
   timestampGate: string;

@@ -19,7 +19,7 @@ What exists, with where its reasoning lives. History is in git.
   optional minimum stage time (`event-model.md`), stage/split/overall classification, DNF/DNS,
   manual corrections (a time of day or a stage time), a missed start
   entered from finish and stage time, voiding and gate-timed re-runs, notional times,
-  vehicle classes as filtered rankings, splits as columns of the stage
+  entry classes as filtered rankings, splits as columns of the stage
   classification, crews without a counted stage listed
   as "Not classified" below the overall (`event-model.md`).
 - **Light barrier:** `BeamAdapter` (E3Z-T61 via GPIO), unassigned passings
@@ -40,11 +40,11 @@ What exists, with where its reasoning lives. History is in git.
   "Start order").
 - **Marshal view:** Live Timing is laid out like the stage: "Up next" with
   Start now beside the cars on stage in expected arrival order, above one
-  table of every vehicle in start order with run state, corrections and
+  table of every entry in start order with run state, corrections and
   Start now per row, and unassigned passings pre-selected from the start
   order (never auto-assigned). Prints as the posted start list (`frontend-structure.md`).
 - **Overall stage headers** link to that stage's results, class filter
-  kept. Header only: a row click is kept free for a vehicle detail page.
+  kept. Header only: a row click is kept free for an entry detail page.
 - **Printing:** start lists and results (Overall, each stage) as PDFs
   built in the browser (jsPDF), on numbered sheets with what each holds,
   the print time, and "Provisional" while a stage runs or a start list
@@ -52,7 +52,7 @@ What exists, with where its reasoning lives. History is in git.
   class combinations ("2WD + Rookie") wait until someone needs one; the
   filter is a link (`design-system.md` "Print").
 - **Dashboard:** multi-page `apps/web` — Live Timing, Results, Setup, Hardware,
-  Vehicles (`frontend-structure.md`).
+  Entries (`frontend-structure.md`).
 - **UI guidelines** (`design-system.md`): shared confirm dialog and
   snackbar in both apps, add/edit forms in `FormDialog`, one direct action
   plus a menu per row, unsaved changes guarded on page forms.
@@ -74,25 +74,25 @@ What exists, with where its reasoning lives. History is in git.
   each event on the Hardware page (`deployment-modes.md` "New / open event").
 - **Crews:** driver and co-driver as first/last name with a flag each, body
   and chassis; names in the event's format and flags shown or off on
-  screen (Setup → Display; printed PDFs never show flags); a vehicle page,
-  opened from Vehicles and Results rows, with its crew, car, entry and
+  screen (Setup → Display; printed PDFs never show flags); an entry page,
+  opened from Entries and Results rows, with its crew, car, entry and
   times per stage (`frontend-structure.md`, `design-system.md`). Flags are
   freely usable only: `flag-icons` for countries, own SVGs for the
   chequered default and the Pride, Progress Pride and trans flags
   (`THIRD_PARTY_NOTICES.md`). Not the International Flag of Planet Earth:
-  its terms forbid it standing for a person. Later on the vehicle page:
+  its terms forbid it standing for a person. Later on the entry page:
   several transponder IDs.
-- **Check-in:** vehicle status from the Vehicles list, the vehicle page
+- **Check-in:** entry status from the Entries list, the entry page
   and a check-in page with Desk and Scrutineering stations, the desk
   taking the transponder (Registered → Checked in → Scrutineered, or both
   at once; Withdraw, Disqualify, Reinstate). Withdrawn and
   disqualified cars leave computed start lists and start no run;
   disqualified ones leave every result, listed as DSQ. Not yet scrutineered
   still starts, marked on Live Timing, and Freeze/Activate ask
-  (`event-model.md` "Vehicle status").
+  (`event-model.md` "Entry status").
 - **Podium** above the Overall and each stage's results, following the class
   filter: steps 2-1-3 with gold/silver/bronze trophies, crew, body, time and
-  gap; a click opens the vehicle. On screen only, or off; the printed
+  gap; a click opens the entry. On screen only, or off; the printed
   result is a plain table (`design-system.md`).
 - **CI:** build, format, lint, tests, and a headless-stack job against real
   Postgres (`CLAUDE.md`).
@@ -103,7 +103,7 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
 
 - **One transponder on several cars.** It has to work, not just be warned
   about (today `findByTransponder` times the passing for whichever car the
-  database returns first, and the desk and vehicle dialog only warn). A
+  database returns first, and the desk and entry dialog only warn). A
   passing whose transponder is on more than one car is held like an
   unassigned passing (`PassingBlock`), its picker offering just those cars.
   The field warning then says that instead.
@@ -147,12 +147,12 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
   They depend on penalties as a whole (Rally controls, above).
 - **Smarter passing suggestions** — today a start passing suggests the next
   car in start order and a split/finish one the first car on stage
-  (`LiveView.vue` `suggestedVehicleIds`). Planned start times could narrow it
+  (`LiveView.vue` `suggestedEntryIds`). Planned start times could narrow it
   by time window.
 - **Auth** on broker, API and dashboard — the closed rally network is the
   boundary until the timing pipeline is solid. Gates would authenticate against
   rally-server itself.
-- **Carrying vehicles/stages over** into a new event (the useful part of an
+- **Carrying entries/stages over** into a new event (the useful part of an
   event wizard) — low priority, re-entering them per event is acceptable — and
   new/open event under Postgres (`deployment-modes.md`).
 - **Renaming an event file** after a rally rename. The file name is fixed at

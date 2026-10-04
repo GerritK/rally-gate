@@ -22,7 +22,7 @@ otherwise poison a duration silently.
 
 ## DetectionEventRecord (stored)
 
-Adds `vehicleId` (resolved from `transponderId`), `timestampServer`,
+Adds `entryId` (resolved from `transponderId`), `timestampServer`,
 `clockCorrectionMs`, `rawPayload` and `processed`. `timestampGate` is never
 rewritten; the time the rules used is `timestampGate + clockCorrectionMs` (see
 "Clock offset" in `architecture.md`).
@@ -36,13 +36,13 @@ nothing and would bury real problems.
 ### Unassigned passings
 
 A detection without a `transponderId` (a light barrier) at a gate with an
-active assignment is stored with `awaitingVehicle: true` and not timed. Live
-Timing lists them; the marshal picks the vehicle (`POST /events/:id/assign`),
+active assignment is stored with `awaitingEntry: true` and not timed. Live
+Timing lists them; the marshal picks the entry (`POST /events/:id/assign`),
 which runs the rules with the stored clock correction, or dismisses one that was
 no car (`POST /events/:id/dismiss`). At an idle gate such a passing is just
 stored.
 
-The vehicle is **pre-selected from the start order, never assigned
+The entry is **pre-selected from the start order, never assigned
 automatically**: a wrong assignment is a wrong time nobody notices in the
 results. Passings are matched in time order. At a start gate the suggestion is
 the next car after the last one that started, so a no-show is skipped; at a
@@ -99,7 +99,7 @@ minimum of a car's start gets no suggestion: it is that car breaking the beam
 again, typically pulling away slowly enough to outlast the gate's
 `BEAM_LOCKOUT_MS`, and is dismissed.
 
-**At most one non-voided attempt per vehicle+stage**, enforced by a partial
+**At most one non-voided attempt per entry+stage**, enforced by a partial
 unique index (`where "voided" = false`). The invariant is *not voided means it
 counts*: if several attempts could survive, a superseded run would show
 `FINISHED` with a duration while missing from the results. Results use the
@@ -134,7 +134,7 @@ phantom runs that replace real times.
 
 Instead the marshal voids the attempt (`POST /stage-runs/:id/void`) — the red
 flag. The row stays as evidence (a protest turns on what was originally timed),
-stops counting, and leaves the vehicle with neither an open nor a finished
+stops counting, and leaves the entry with neither an open nor a finished
 attempt, so **the start gate opens the re-run by itself** on the next pass. Both
 ends stay gate-timed.
 
@@ -145,7 +145,7 @@ run the car actually drove is a call the marshal makes explicitly.
 ## StageSplit
 
 One row per (stage run, split gate), recorded on a `stage_split` detection while
-the vehicle has an active run on that stage. `splitIndex` is copied from the
+the entry has an active run on that stage. `splitIndex` is copied from the
 assignment, `elapsedMs` is time since `startTime`. Duplicates are ignored. Split
 classification ranks by `elapsedMs` and includes runs still `STARTED`, which is
 what makes it a live leaderboard.
@@ -164,7 +164,7 @@ penalty is the knob; roughly one stage duration is a sensible start.
 
 - Only `CLOSED` stages count, so the overall table moves when a stage closes.
 - A crew needs at least one completed stage to be classified, and must not
-  be withdrawn or disqualified ("Vehicle status"). The rest are listed below
+  be withdrawn or disqualified ("Entry status"). The rest are listed below
   the ranking as "Not classified", with no position or total.
 - A closed stage nobody finished is dropped — a notional with no anchor would
   add the same constant to everyone.
@@ -174,22 +174,22 @@ penalty is the knob; roughly one stage duration is a sensible start.
 
 ## Classes
 
-Organiser-defined data (`VehicleClass`: a name and a `main` flag), not an
+Organiser-defined data (`EntryClass`: a name and a `main` flag), not an
 enum. **Main classes** (4WD, 2WD) split the field; **categories** (Rookie,
-Stock) cut across them. A vehicle can be in any number of either — the flag
-only makes the UI offer one main class per vehicle, the server doesn't
+Stock) cut across them. An entry can be in any number of either — the flag
+only makes the UI offer one main class per entry, the server doesn't
 enforce it, and rankings treat both alike.
 
-A ranking takes any set of classes and narrows to vehicles in **all** of them
+A ranking takes any set of classes and narrows to entries in **all** of them
 (Stock + Rookie + 2WD), then runs the same calculation as the unfiltered one —
 so who is classified, which stages count and every notional come from within
 that group. No hierarchy (Rookie *under* 2WD): categories exist in every main
 class, and "all Rookies" must stay a ranking of its own. The overall ranking
 always includes everyone.
 
-## Vehicle status
+## Entry status
 
-An entry's way through the event (`VehicleStatus`): **Registered**, then
+An entry's way through the event (`EntryStatus`): **Registered**, then
 **Checked in** at the desk, then **Scrutineered** (passed the technical
 check), or out of it: **Withdrawn** or **Disqualified**. A small event with
 no technical check does both steps at the desk in one ("Check in and pass").
@@ -233,15 +233,15 @@ starting out of order.
 each other:
 
 - **Grouping**: by main class, or none. Blocks go in alphabetical order of class
-  name, and vehicles with no main class start last. A vehicle in several main
+  name, and entries with no main class start last. An entry in several main
   classes counts under the first one alphabetically, because the server doesn't
   stop that from happening.
 - **Key within a group**: start number, overall time, or last stage time.
 - **Direction**: fastest first or slowest first. It has no effect when the key
   is the start number.
 
-Vehicles with no value for the key go to the end of their group. Ties, and those
-vehicles at the end, are always ordered by start number. That also covers stage 1
+Entries with no value for the key go to the end of their group. Ties, and those
+entries at the end, are always ordered by start number. That also covers stage 1
 under "last stage time". **Overall time** comes from the group's own ranking
 (the main class ranking when grouping by class), because notionals depend on the
 ranking. Otherwise the list would contradict the class results posted next to
@@ -252,7 +252,7 @@ a hobby event a crew that has fixed its car gets to drive again.
 
 **Frozen when published.** Until then the list is computed live, so a time
 correction on an earlier stage still moves it. Freezing stores it on the stage
-as a snapshot of vehicle ids with `startOrderFrozenAt` (the "as of" on a
+as a snapshot of entry ids with `startOrderFrozenAt` (the "as of" on a
 posted copy), and it is never recomputed. A marshal freezes it when posting or
 announcing it (`POST /stages/:id/start-order/freeze`); otherwise the first
 activation does. Unfreezing is only allowed while the stage is `NOT_STARTED`,

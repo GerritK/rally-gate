@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   fetchOverallClassification,
   fetchStageResults,
-  type OverallClassificationEntry,
+  type OverallPlacing,
   type StageResults,
 } from '../api/classification';
 import { StageStatus } from '@rally-gate/shared';
@@ -18,8 +18,8 @@ import StagePicker from '../components/StagePicker.vue';
 import OverallRanking from '../components/OverallRanking.vue';
 import StageRanking from '../components/StageRanking.vue';
 import { fetchStages, type Stage } from '../api/stages';
-import { fetchVehicleClasses, type VehicleClass } from '../api/vehicle-classes';
-import { fetchVehicles, type Vehicle } from '../api/vehicles';
+import { fetchEntryClasses, type EntryClass } from '../api/entry-classes';
+import { fetchEntries, type Entry } from '../api/entries';
 import { rallyName } from '../api/rally-info';
 import { notifyError } from '@rally-gate/ui';
 import { openPdf, overallPdf, stagePdf } from '../pdf';
@@ -32,13 +32,13 @@ const router = useRouter();
 /** One ranking as the card shows it: either the overall or a stage's. */
 interface Ranking {
   classIds: string[];
-  overall?: OverallClassificationEntry[];
+  overall?: OverallPlacing[];
   stage?: StageResults;
 }
 
 const stages = ref<Stage[]>([]);
-const classes = ref<VehicleClass[]>([]);
-const vehicles = ref<Vehicle[]>([]);
+const classes = ref<EntryClass[]>([]);
+const entries = ref<Entry[]>([]);
 const selectedClassIds = useClassQuery();
 const current = ref<Ranking | null>(null);
 const printing = ref(false);
@@ -71,7 +71,7 @@ async function print(all: boolean) {
   try {
     const rankings = await Promise.all(
       (all
-        ? rankingClassIds(classes.value, vehicles.value)
+        ? rankingClassIds(classes.value, entries.value)
         : [selectedClassIds.value]
       ).map(loadRanking),
     );
@@ -84,7 +84,7 @@ async function print(all: boolean) {
               heading.value,
               label(r),
               r.overall ?? [],
-              vehicles.value,
+              entries.value,
               r.classIds,
             ),
       ),
@@ -114,8 +114,8 @@ watch(() => [props.stageId, route.query.classes], refresh);
 onMounted(async () => {
   await refresh();
   stages.value = await fetchStages();
-  classes.value = await fetchVehicleClasses();
-  vehicles.value = await fetchVehicles();
+  classes.value = await fetchEntryClasses();
+  entries.value = await fetchEntries();
 });
 
 function onStageChange(stageId: string) {
@@ -176,10 +176,10 @@ function onStageChange(stageId: string) {
       />
       <OverallRanking
         v-else
-        :entries="current.overall ?? []"
+        :placings="current.overall ?? []"
         :class-ids="current.classIds"
         :stages="stages"
-        :vehicles="vehicles"
+        :entries="entries"
       />
     </v-card-text>
   </v-card>
