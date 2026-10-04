@@ -44,6 +44,8 @@ the rally's own closed Wi-Fi.
 - Stages with start, finish and split gates; stage, split and overall
   classification; DNF/DNS, manual corrections, voided runs and re-runs.
 - Vehicle classes, with rankings per class or combination of classes.
+- Results and start lists as PDFs to post or share, every class's ranking
+  in one go, on numbered sheets.
 - Start lists per stage, ordered by class and start number or by times so
   far, frozen and printed for posting.
 - **Light barrier gates**: a Raspberry Pi with a light barrier on a GPIO pin.

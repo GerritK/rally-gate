@@ -1,4 +1,6 @@
-/** Setting keys, stored via `PUT /api/settings/:key`. */
+/** Setting keys, stored via `PUT /api/settings/:key`. Flags and podium are
+ * "true" or "false", shown unless "false"; on screen only, since everything
+ * printed is a plain PDF without them. */
 export const NAME_FORMAT_KEY = 'nameFormat';
 export const FLAGS_SHOWN_KEY = 'flagsShown';
 export const PODIUM_SHOWN_KEY = 'podiumShown';
@@ -10,12 +12,4 @@ export enum NameFormat {
   INITIAL_LAST = 'INITIAL_LAST',
   /** "Max Mustermann" */
   FULL = 'FULL',
-}
-
-/** Screen only is for black-and-white printers, which lose flags and
- * trophies. */
-export enum Shown {
-  ALWAYS = 'ALWAYS',
-  SCREEN_ONLY = 'SCREEN_ONLY',
-  NEVER = 'NEVER',
 }

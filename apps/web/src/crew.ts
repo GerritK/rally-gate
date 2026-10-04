@@ -3,7 +3,6 @@ import {
   NAME_FORMAT_KEY,
   NameFormat,
   PODIUM_SHOWN_KEY,
-  Shown,
   type Crew,
 } from '@rally-gate/shared';
 import countries from 'flag-icons/country.json';
@@ -17,8 +16,8 @@ import trans from './assets/flags/x-trans.svg';
 /** One event per page load (switching events reloads), so load once. */
 export const display = reactive({
   nameFormat: NameFormat.FIRST_INITIAL,
-  flags: Shown.SCREEN_ONLY,
-  podium: Shown.SCREEN_ONLY,
+  flags: true,
+  podium: true,
 });
 
 export async function loadDisplaySettings(): Promise<void> {
@@ -28,13 +27,9 @@ export async function loadDisplaySettings(): Promise<void> {
   const isIn = <T extends string>(e: Record<string, T>, v: string | null) =>
     Object.values(e).includes(v as T) ? (v as T) : undefined;
   display.nameFormat = isIn(NameFormat, nameFormat) ?? display.nameFormat;
-  display.flags = isIn(Shown, flags) ?? display.flags;
-  display.podium = isIn(Shown, podium) ?? display.podium;
+  display.flags = flags !== 'false';
+  display.podium = podium !== 'false';
 }
-
-/** For a `v-if` plus `:class`: screen only is hidden in print. */
-export const printClass = (shown: Shown) =>
-  shown === Shown.SCREEN_ONLY ? 'd-print-none' : undefined;
 
 export function personName(first: string | null, last: string | null): string {
   const f = first?.trim() ?? '';

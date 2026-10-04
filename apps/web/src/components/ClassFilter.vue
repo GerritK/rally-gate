@@ -30,7 +30,7 @@ const selectedCategories = computed({
 </script>
 
 <template>
-  <div v-if="classes.length > 0" class="rg-class-filter d-print-none">
+  <div v-if="classes.length > 0" class="rg-class-filter">
     <template v-if="mains.length > 0">
       <span class="text-medium-emphasis">Class</span>
       <v-chip-group v-model="main" mandatory color="secondary">

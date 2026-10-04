@@ -66,9 +66,11 @@ import {
   formatClockTime,
   formatStageDuration,
   openTimePicker,
+  notifyError,
   parseStageDuration,
   useConfirm,
 } from '@rally-gate/ui';
+import { openPdf, startListPdf } from '../pdf';
 import {
   combineDateAndTime,
   formatDuration,
@@ -873,8 +875,31 @@ async function onUnfreeze() {
   stages.value = await fetchStages();
 }
 
-function print() {
-  window.print();
+async function printStartList() {
+  if (!stage.value || !startOrder.value) return;
+  const { id, name } = stage.value;
+  // Opened by the click itself: one opened after an await is a popup.
+  const tab = window.open('', '_blank');
+  try {
+    await openPdf(
+      [
+        startListPdf(
+          `Start list — ${id} · ${name}`,
+          startOrder.value.frozen ? frozenAt.value : null,
+          rows.value.map((row) => ({
+            ...row,
+            car: vehicleById.value.get(row.entry.vehicleId),
+          })),
+          startOrder.value.grouped,
+        ),
+      ],
+      [rallyName.value, id, 'Start list'].filter(Boolean).join(' - '),
+      tab,
+    );
+  } catch (err) {
+    tab?.close();
+    notifyError(err);
+  }
 }
 
 function onSelectStage(stageId: string) {
@@ -978,7 +1003,7 @@ onUnmounted(() => {
     v-if="pendingDetections.length > 0"
     type="error"
     variant="tonal"
-    class="mb-4 d-print-none"
+    class="mb-4"
     icon="mdi-alert-circle-outline"
   >
     <div class="d-flex flex-wrap align-center ga-4">
@@ -1029,19 +1054,12 @@ onUnmounted(() => {
 
   <v-card v-if="stage" class="mb-4">
     <v-card-item>
-      <v-card-title>
-        <span class="d-none d-print-inline">Start list — </span>{{ stage.id }} ·
-        {{ stage.name }}
-      </v-card-title>
+      <v-card-title> {{ stage.id }} · {{ stage.name }} </v-card-title>
       <v-card-subtitle>
-        <!-- The app bar names the rally on screen; a print has no app bar. -->
-        <span v-if="rallyName" class="d-none d-print-inline"
-          >{{ rallyName }} ·
-        </span>
         {{ startListStatus }}
       </v-card-subtitle>
       <template #append>
-        <div class="d-flex flex-wrap justify-end ga-2 d-print-none">
+        <div class="d-flex flex-wrap justify-end ga-2">
           <v-btn
             v-if="
               stage.status === StageStatus.NOT_STARTED && !startOrder?.frozen
@@ -1066,7 +1084,7 @@ onUnmounted(() => {
             variant="tonal"
             prepend-icon="mdi-printer"
             :disabled="!startOrder"
-            @click="print"
+            @click="printStartList"
           >
             Print start list
           </v-btn>
@@ -1094,7 +1112,7 @@ onUnmounted(() => {
       </template>
     </v-card-item>
 
-    <v-card-text class="d-print-none">
+    <v-card-text>
       <div class="d-flex flex-wrap align-center ga-2 mb-3">
         <v-chip
           v-for="{ state, count } in stateCounts"
@@ -1163,7 +1181,7 @@ onUnmounted(() => {
     type="warning"
     variant="tonal"
     density="compact"
-    class="mb-4 d-print-none"
+    class="mb-4"
   >
     <div v-for="{ stageId, count } in passingsByStage.elsewhere" :key="stageId">
       {{ count }} unassigned passing{{ count === 1 ? '' : 's' }} on
@@ -1175,7 +1193,7 @@ onUnmounted(() => {
 
   <div
     v-if="stage && stage.status !== StageStatus.CLOSED"
-    class="rg-stage-flow mb-4 d-print-none"
+    class="rg-stage-flow mb-4"
   >
     <div>
       <v-card class="h-100">
@@ -1357,16 +1375,12 @@ onUnmounted(() => {
           <th style="width: 72px">#</th>
           <th>Crew</th>
           <th v-if="!startOrder.grouped">Class</th>
-          <th class="d-print-none">Status</th>
-          <th class="d-print-none rg-time">
-            Start<span class="rg-time-mark" />
-          </th>
-          <th class="d-print-none rg-time">Splits</th>
-          <th class="d-print-none rg-time">
-            Finish<span class="rg-time-mark" />
-          </th>
-          <th class="d-print-none rg-time">Time</th>
-          <th class="d-print-none"></th>
+          <th>Status</th>
+          <th class="rg-time">Start<span class="rg-time-mark" /></th>
+          <th class="rg-time">Splits</th>
+          <th class="rg-time">Finish<span class="rg-time-mark" /></th>
+          <th class="rg-time">Time</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -1387,7 +1401,7 @@ onUnmounted(() => {
                 main
               />
             </td>
-            <td class="d-print-none text-no-wrap">
+            <td class="text-no-wrap">
               <v-chip
                 size="small"
                 :color="ROW_STATE_DISPLAY[row.state].color"
@@ -1411,7 +1425,7 @@ onUnmounted(() => {
                 attempt {{ row.run.attempt }}
               </span>
             </td>
-            <td class="d-print-none rg-time">
+            <td class="rg-time">
               <span v-if="row.run" class="rg-timing text-no-wrap">
                 {{ formatClockTime(row.run.startTime)
                 }}<span class="rg-time-mark"
@@ -1419,10 +1433,10 @@ onUnmounted(() => {
                 /></span>
               </span>
             </td>
-            <td class="d-print-none rg-timing rg-time text-no-wrap">
+            <td class="rg-timing rg-time text-no-wrap">
               {{ row.run ? formatSplits(row.run.id) : '' }}
             </td>
-            <td class="d-print-none rg-time">
+            <td class="rg-time">
               <span v-if="row.run?.finishTime" class="rg-timing text-no-wrap">
                 {{ formatClockTime(row.run.finishTime)
                 }}<span class="rg-time-mark"
@@ -1430,7 +1444,7 @@ onUnmounted(() => {
                 /></span>
               </span>
             </td>
-            <td class="d-print-none rg-timing rg-time">
+            <td class="rg-timing rg-time">
               <RunningTime
                 v-if="row.run?.status === StageRunStatus.STARTED"
                 :start-time="row.run.startTime"
@@ -1439,7 +1453,7 @@ onUnmounted(() => {
                 formatDuration(row.run.durationMs)
               }}</template>
             </td>
-            <td class="d-print-none text-no-wrap text-right">
+            <td class="text-no-wrap text-right">
               <v-btn
                 v-if="row.run"
                 size="small"
@@ -1508,7 +1522,7 @@ onUnmounted(() => {
           <tr
             v-for="voided in row.voidedRuns"
             :key="voided.id"
-            class="rg-voided-row d-print-none"
+            class="rg-voided-row"
           >
             <td colspan="3"></td>
             <td v-if="!startOrder.grouped"></td>
@@ -1576,13 +1590,12 @@ onUnmounted(() => {
         </tr>
       </tbody>
     </v-table>
-    <!-- Wrapped: the legend's own d-flex would beat d-print-none. -->
-    <div class="d-print-none px-4 pb-3">
+    <div class="px-4 pb-3">
       <TableLegend :marks="anyManual ? ['manual'] : []" />
     </div>
   </v-card>
 
-  <v-expansion-panels v-if="stage" class="d-print-none">
+  <v-expansion-panels v-if="stage">
     <v-expansion-panel>
       <v-expansion-panel-title>
         Raw detections ({{ stageDetections.length }})
@@ -1782,12 +1795,6 @@ onUnmounted(() => {
     grid-template-columns: 1fr;
   }
 }
-/* Its own display would override Vuetify's d-print-none. */
-@media print {
-  .rg-stage-flow {
-    display: none;
-  }
-}
 
 /* Readable from a tablet at arm's length or more. */
 .rg-next-number {
@@ -1820,15 +1827,5 @@ onUnmounted(() => {
 
 .rg-voided-row td {
   opacity: 0.6;
-}
-
-@media print {
-  .rg-next-row td {
-    background: none;
-    box-shadow: none !important;
-  }
-  .rg-class-row {
-    break-after: avoid;
-  }
 }
 </style>

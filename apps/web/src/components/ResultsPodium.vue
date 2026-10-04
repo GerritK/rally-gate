@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Shown, type ClassificationEntry } from '@rally-gate/shared';
+import type { ClassificationEntry } from '@rally-gate/shared';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { display, printClass } from '../crew';
+import { display } from '../crew';
 import { formatDuration, formatGap } from '../format';
 import CrewName from './CrewName.vue';
 import StartNumber from './StartNumber.vue';
@@ -26,11 +26,7 @@ const steps = computed(() =>
 </script>
 
 <template>
-  <div
-    v-if="display.podium !== Shown.NEVER && entries.length > 0"
-    class="mb-6"
-    :class="printClass(display.podium)"
-  >
+  <div v-if="display.podium && entries.length > 0" class="mb-6">
     <div class="rg-podium">
       <div
         v-for="step in steps"

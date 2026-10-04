@@ -4,7 +4,6 @@ import {
   NAME_FORMAT_KEY,
   NameFormat,
   PODIUM_SHOWN_KEY,
-  Shown,
 } from '@rally-gate/shared';
 import { notify } from '@rally-gate/ui';
 import { onMounted, ref } from 'vue';
@@ -18,9 +17,8 @@ const NAME_FORMATS = [
   { value: NameFormat.FULL, title: 'Max Mustermann' },
 ];
 const SHOWN = [
-  { value: Shown.ALWAYS, title: 'Yes' },
-  { value: Shown.SCREEN_ONLY, title: 'Screen only' },
-  { value: Shown.NEVER, title: 'No' },
+  { value: true, title: 'Yes' },
+  { value: false, title: 'No' },
 ];
 
 const form = ref({ ...display });
@@ -33,8 +31,8 @@ async function onSave() {
   try {
     await Promise.all([
       saveSetting(NAME_FORMAT_KEY, form.value.nameFormat),
-      saveSetting(FLAGS_SHOWN_KEY, form.value.flags),
-      saveSetting(PODIUM_SHOWN_KEY, form.value.podium),
+      saveSetting(FLAGS_SHOWN_KEY, String(form.value.flags)),
+      saveSetting(PODIUM_SHOWN_KEY, String(form.value.podium)),
     ]);
     Object.assign(display, form.value);
     markSaved();
@@ -70,15 +68,15 @@ onMounted(async () => {
           v-model="form.flags"
           :items="SHOWN"
           label="Flags"
-          hint="Screen only leaves them off printouts: a black-and-white printer can't tell most flags apart."
           persistent-hint
+          hint="On screen: start lists and results print as plain PDFs, without flags."
         />
         <v-select
           v-model="form.podium"
           :items="SHOWN"
           label="Podium above results"
           persistent-hint
-          hint="Screen only keeps the posted result a plain table."
+          hint="On screen: printed results have no podium."
         />
         <div>
           <v-btn

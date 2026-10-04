@@ -102,7 +102,7 @@ Values live in `theme.ts`. The rules:
 - **Start numbers** are a door plate: black on white, Barlow Bold
   (`StartNumber`). A sans like a real plate, not `.rg-timing`'s mono; the
   plate's minimum width keeps a column aligned. Not WRC's fluorescent
-  orange: orange is the page's main action, and it prints as grey.
+  orange: orange is the page's main action.
 - **`.rg-timing`** on every time: JetBrains Mono, tabular
   figures so live values don't reflow, slashed zero so 0 and O can't be
   confused at a glance.
@@ -187,6 +187,9 @@ Values live in `theme.ts`. The rules:
   slot. Every time in that column gets the slot, empty where there is no
   icon, so the times stay in line either way; the header too, or it ends
   a slot's width right of them.
+- **A legend explains a table's icons** (`TableLegend`), only those the
+  table actually shows: a legend listing absent icons is noise that gets
+  skipped. Under the table; on Results it is the table's footer row.
 - **Actions sit in the last column**, kept to its minimum width
   (`width="1%"`, `text-no-wrap`) so it really ends the row.
 - **At most one direct action and one ⋮ menu** per row, either alone is
@@ -273,7 +276,9 @@ status on the right.
 both apps' app bar. It isn't an action, so its orange doesn't compete with a
 page's main button. The favicons (`apps/web/public/favicon.svg`,
 `apps/gate-config/web/public/favicon.svg`) are the same paths on a square
-`#0B0D10` tile; change all three together.
+`#0B0D10` tile; change all three together. Printed PDFs carry it small beside
+"Rally Gate" at the foot, in two greys (`LOGO_GREYS` in
+`apps/web/src/pdf.ts`), drawn from the same file.
 
 Rules the geometry follows, so an edit doesn't reintroduce the
 inconsistencies the first draft had:
@@ -291,29 +296,51 @@ inconsistencies the first draft had:
 
 ## Print
 
-- `window.print()` and print styles, no PDF library.
-- `utilities.css` flips the theme to black on white (the theme class is set
-  on every component, so the override targets all of them), hides the app
-  shell and drops `color-scheme: dark`, which otherwise paints the page
-  margins.
-- A page prints by hiding what isn't for paper with Vuetify's
-  `d-print-none`, and showing print-only parts with `d-none d-print-*`.
-  An element with its own `display` (a grid) overrides `d-print-none` and
-  needs its own `@media print` rule.
-- Live Timing prints as the posted start list: position, number, driver,
-  co-driver, class header rows, the published time.
-- Results (Overall and a stage) print as the posted result: rally name,
-  class filter and the time printed (server clock, `usePrint` in
-  `apps/web/src/print.ts`, Ctrl+P included), since results move while a
-  stage runs; a running stage is titled "Provisional". A table too wide for
-  portrait turns the page to landscape (more than three stage columns on
-  Overall, more than two splits on a stage).
-- Flags and the podium print only when Setup → Display says "Yes";
-  "Screen only" adds `d-print-none` (`printClass`), as a black-and-white
-  printer can't tell most flags apart. The podium's steps have a border,
-  not only a fill, since print drops backgrounds by default.
-- Tables print compact (6px cell padding) and unclipped, from
-  `utilities.css`.
+Everything on paper is a PDF, built from the data by jsPDF +
+`jspdf-autotable` in the browser (`apps/web/src/pdf.ts`, loaded only on
+click): no server, works offline, no print CSS anywhere. The browser's print
+can't paginate a table it doesn't know the page size for, and every attempt
+to make it (measuring the screen, estimating the page) was a workaround; a
+PDF lays out the pages itself, on A4 whatever the print dialog says. Ctrl+P
+on a page prints the screen as it is, dark; anything meant for paper has a
+button.
+
+- Deliberately plain, for the notice board, but in the app's fonts:
+  Barlow for text and JetBrains Mono for every time, so digits line up down
+  a column as `.rg-timing` does on screen. Both are embedded (TTFs in
+  `apps/web/src/assets/fonts`, fetched only on print), since the PDF base
+  fonts know Western European letters only and one ř or Ł garbles a whole
+  line. No flags, no podium. Fastest times bold, notional times in
+  parentheses, a one-line legend at the foot of every sheet.
+- Every sheet is headed with what it is (a ranking or "Start list — WP3 ·
+  name"), the rally, the class filter or "Provisional", the part it holds
+  ("Pos 16–18 · WP1–WP13", named only where it is actually split), and
+  "3 / 4" top right, numbered per section; that number is the only "more
+  follows", no "continues on" line repeating it. The foot has the legend
+  and below it, in grey, the logo with "Rally Gate" on the left and when it
+  is from on the right (a start list's publish time, the print time by the
+  server clock). "Print all" puts every ranking in one PDF, each
+  starting a new sheet.
+- Results: Pos/#/Crew and the totals (Total, Gap, Stages) come first and
+  repeat on every sheet, so each sheet is a complete standing; a vertical
+  line sets them apart from the stage times, which follow and split across
+  sheets. Sheets go across first, then down
+  (`horizontalPageBreakBehaviour: 'immediately'`), so they hang as a grid.
+- The start list: Pos, #, Crew, Car (body above chassis), Class when not
+  grouped; main classes as full-width header rows, posted top to bottom.
+- Portrait unless a table needs the width, decided from the measured
+  column widths, not a column count.
+- Every table spans the sheet: the columns get their measured content
+  width and the text columns (Crew, Car) share the rest, so times stay
+  together on the right. A table too wide for one sheet is split evenly,
+  the same number of stage columns on each sheet, widened to fill it,
+  rather than autotable's greedy split that leaves a lone column on the
+  last sheet.
+- Nothing runs off the sheet: the heading is cut short before "x / y",
+  the details line and the legend wrap onto a second line. Widths carry 0.2 mm of slack (`SLACK`) against floating-point
+  rounding, so a time never wraps by a hair.
+- It opens in a new tab, to print, save or share; the tab is opened by the
+  click itself, since one opened after an `await` is a blocked popup.
 
 ## Shared components (`apps/web/src/components`)
 
@@ -340,8 +367,8 @@ Extract a component once it is actually used twice, not before.
   classes (exactly one, "All" by default) and a row of categories (any
   number), ANDed as the server filters. The selection lives in
   `?classes=` (`useClassQuery`), so it carries between Overall and a stage.
-  Every results card names it as its subtitle, "All classes" included, so
-  a printout always says which ranking it is.
+  Every results card names it as its subtitle, "All classes" included, and
+  so does every printed sheet.
 - `StartNumber`: the door plate, sized by the surrounding font.
 - `CrewName`: the crew, driver above a smaller co-driver; every table's
   Crew column, Live Timing's Up next and On stage, the vehicle page. Built

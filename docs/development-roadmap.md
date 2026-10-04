@@ -41,13 +41,16 @@ What exists, with where its reasoning lives. History is in git.
 - **Marshal view:** Live Timing is laid out like the stage: "Up next" with
   Start now beside the cars on stage in expected arrival order, above one
   table of every vehicle in start order with run state, corrections and
-  Start now per row, and unassigned passings pre-selected from the start order (never
-  auto-assigned). Prints as the posted start list (`frontend-structure.md`).
+  Start now per row, and unassigned passings pre-selected from the start
+  order (never auto-assigned). Prints as the posted start list (`frontend-structure.md`).
 - **Overall stage headers** link to that stage's results, class filter
   kept. Header only: a row click is kept free for a vehicle detail page.
-- **Printed results:** Overall and each stage's results print as the posted
-  result, with the print time and "Provisional" while a stage runs
-  (`design-system.md` "Print").
+- **Printing:** start lists and results (Overall, each stage) as PDFs
+  built in the browser (jsPDF), on numbered sheets with what each holds,
+  the print time, and "Provisional" while a stage runs or a start list
+  isn't frozen; "Print all" puts every class's ranking in one PDF. Saved
+  class combinations ("2WD + Rookie") wait until someone needs one; the
+  filter is a link (`design-system.md` "Print").
 - **Dashboard:** multi-page `apps/web` — Live Timing, Results, Setup, Hardware,
   Vehicles (`frontend-structure.md`).
 - **UI guidelines** (`design-system.md`): shared confirm dialog and
@@ -70,18 +73,18 @@ What exists, with where its reasoning lives. History is in git.
   restarting under `start.js`; gates remembered per computer, picked into
   each event on the Hardware page (`deployment-modes.md` "New / open event").
 - **Crews:** driver and co-driver as first/last name with a flag each, body
-  and chassis; names in the event's format and flags shown, screen only or
-  off (Setup → Display); a vehicle page, opened from Vehicles and Results
-  rows (`frontend-structure.md`, `design-system.md`). Flags are freely
-  usable only: `flag-icons` for countries, own SVGs for the chequered
+  and chassis; names in the event's format and flags shown or off on
+  screen (Setup → Display; printed PDFs never show flags); a vehicle page,
+  opened from Vehicles and Results rows (`frontend-structure.md`,
+  `design-system.md`). Flags are freely usable only: `flag-icons` for countries, own SVGs for the chequered
   default and the Pride, Progress Pride and trans flags
   (`THIRD_PARTY_NOTICES.md`). Not the International Flag of Planet Earth:
   its terms forbid it standing for a person. Later on the vehicle page: its
   times per stage, several transponder IDs.
 - **Podium** above the Overall and each stage's results, following the class
   filter: steps 2-1-3 with gold/silver/bronze trophies, crew, body, time and
-  gap; a click opens the vehicle. Shown, screen only or off like the flags
-  (`design-system.md`).
+  gap; a click opens the vehicle. On screen only, or off; the printed
+  result is a plain table (`design-system.md`).
 - **CI:** build, format, lint, tests, and a headless-stack job against real
   Postgres (`CLAUDE.md`).
 
@@ -89,10 +92,7 @@ What exists, with where its reasoning lives. History is in git.
 
 OpenStint (below) resumes when the hardware arrives. Meanwhile:
 
-- **Print all rankings** — maybe: Overall plus one page per class in one go,
-  instead of picking each class filter and printing. Classes already are the
-  rankings and the filter is already a link, so saved class combinations
-  ("2WD + Rookie") wait until someone needs one.
+- Nothing queued.
 
 ## Deliberately deferred
 

@@ -1,13 +1,7 @@
 <script setup lang="ts">
-import { Shown, type Crew } from '@rally-gate/shared';
+import type { Crew } from '@rally-gate/shared';
 import { computed } from 'vue';
-import {
-  coDriverName,
-  display,
-  driverName,
-  flagUrl,
-  printClass,
-} from '../crew';
+import { coDriverName, display, driverName, flagUrl } from '../crew';
 
 const props = defineProps<{ crew: Crew; coDriver?: boolean }>();
 
@@ -22,11 +16,10 @@ const flag = computed(() =>
 <template>
   <span v-if="name" class="rg-person-name">
     <img
-      v-if="display.flags !== Shown.NEVER"
+      v-if="display.flags"
       :src="flagUrl(flag)"
       alt=""
       class="rg-flag me-2"
-      :class="printClass(display.flags)"
     />{{ name }}
   </span>
 </template>

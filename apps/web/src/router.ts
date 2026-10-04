@@ -20,11 +20,11 @@ export const router = createRouter({
     },
     {
       path: '/results/overall',
-      component: () => import('./pages/ResultsOverallView.vue'),
+      component: () => import('./pages/ResultsView.vue'),
     },
     {
       path: '/results/stages/:stageId',
-      component: () => import('./pages/ResultsStageView.vue'),
+      component: () => import('./pages/ResultsView.vue'),
       props: true,
     },
     { path: '/setup', component: () => import('./pages/SetupView.vue') },

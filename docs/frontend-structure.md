@@ -8,8 +8,8 @@ sharing `client.ts`). Audience is marshals and organisers only.
 |---|---|---|
 | `/` | — | redirect to `/live` |
 | `/live/:stageId?` | Live Timing | the marshal view, laid out like the stage: its gates on a line in the order a car meets them, each with its health; "Up next" (next car large with Start now, the two after it) beside cars on stage in expected arrival order, each with Finish now (split progress, last split with gap to the best); every vehicle in start order with its run state, times and corrections (a stage time derives the finish), and Enter time for a car with no run (a missed start: finish and stage time give the start); unidentified passings in On stage, starts included (a car that crossed the start line is on stage), with a suggested vehicle; Activate / Close; freeze and print the start list; raw detections collapsed. No stage picks the active one, else the next |
-| `/results/overall` | Results | podium, overall classification, each stage column the time driven, the fastest marked, the gap to it in the tooltip, its header linking to that stage's results, filterable by class, printable |
-| `/results/stages/:stageId` | Results | podium, stage classification with a column per split (the time and its rank, the fastest marked, the gap to it in the tooltip), DNF/DNS, filterable by class, printable |
+| `/results/overall` | Results | podium, overall classification, each stage column the time driven, the fastest marked, the gap to it in the tooltip, its header linking to that stage's results, filterable by class; Print / Print all open a PDF (every class's ranking on its own sheets) |
+| `/results/stages/:stageId` | Results | podium, stage classification with a column per split (the time and its rank, the fastest marked, the gap to it in the tooltip), DNF/DNS, filterable by class; Print / Print all open a PDF (every class's ranking on its own sheets) |
 | `/vehicles` | Vehicles | registration in a dialog, status, classes; a row opens the vehicle |
 | `/vehicles/:vehicleId` | Vehicles | one vehicle: door number, crew name with flags, body and chassis, edit in the same dialog. Result rows open it too. Later its times per stage, several transponders |
 | `/hardware` | Hardware | gate roster: online, heartbeat, clock offset, version, add/delete, auto-discovery toggle, shut down all gates; a row opens the gate. Gates known to this computer: add to this event, forget (standalone only) |
@@ -20,16 +20,19 @@ sharing `client.ts`). Audience is marshals and organisers only.
 | `/setup/classes` | Setup | vehicle classes table: add/rename/delete, main class or category, vehicle count. Assigned on Vehicles |
 | `/setup/start-order` | Setup | start order rules: grouping, key, direction. Later planned start times |
 | `/setup/scoring` | Setup | notional time penalty; later penalties |
-| `/setup/display` | Setup | crew name format, flags and podium: shown, screen only (not printed) or not at all |
+| `/setup/display` | Setup | crew name format; flags and podium shown or not (on screen: printouts are plain PDFs) |
 
 ## Decisions
 
 - **The start list is Live Timing's backbone**, not a page of its own: one row
   per vehicle in start order, runs merged in, main classes as header rows.
-  Printing it is `window.print()`; print styles (`d-print-none`,
-  `packages/ui/src/utilities.css`) cut it down to the start list (position,
-  number, driver, co-driver), so the posted copy and the marshal's screen are
-  one page. No PDF library. Its rules are configured under Setup.
+  Printing it is a PDF of the same rows (position, number, crew, car, class
+  headers), like the results (`design-system.md` "Print"). Its rules are
+  configured under Setup.
+- **Overall and a stage's results are one page** (`ResultsView`), two
+  URLs: track, class filter, card header, Print and "Print all" exist once.
+  Only the table differs (`OverallRanking`, `StageRanking`), since the
+  columns and the second table (not classified vs. DNF/DNS) really differ.
 - **The app bar** shows the open event, the server clock and the live
   stream's state (see `design-system.md` "App bar"). The state comes from the
   page's own stream (`liveStatus` in `api/live.ts`), never a second

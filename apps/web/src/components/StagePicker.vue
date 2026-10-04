@@ -153,9 +153,4 @@ function display(stage: Stage): {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-@media print {
-  .rg-stage-track-scroll {
-    display: none;
-  }
-}
 </style>
