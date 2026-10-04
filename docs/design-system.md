@@ -93,8 +93,8 @@ Values live in `theme.ts`. The rules:
 - **Barlow** for body text, **Barlow Condensed** for headings, card and
   toolbar titles (set in `utilities.css`, since Vuetify's heading font only
   reaches its `text-h*` classes).
-- **A section inside a card or dialog** (Driver, Co-driver, Car in the
-  vehicle dialog; Crew, Results on Setup → Display) is headed with
+- **A section inside a card or dialog** (Driver, Co-driver, Car, Entry in
+  the vehicle dialog; Crew, Results on Setup → Display) is headed with
   `.rg-section-title` (`utilities.css`): the card title's font a size down,
   so the title still leads, and from the second section on a rule above
   it. Not `text-overline`, which is too faint to divide a form; that stays

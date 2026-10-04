@@ -163,6 +163,7 @@ async function onSave() {
         placeholder="HPI WR8"
       />
     </div>
+    <div class="rg-section-title">Entry</div>
     <v-text-field
       v-model="draft.transponderId"
       label="Transponder ID (optional)"
