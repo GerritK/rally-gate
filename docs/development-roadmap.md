@@ -226,6 +226,10 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
   first (one database = one event makes that a file copy). Emits an event so
   open dashboards reload. Overlaps with carrying entries/stages over (below):
   a reset is the same-file version of it.
+- **Screens and announcements** — tablets, Pis and browser windows as
+  server-controlled kiosk screens (start list, live timing, results, picked
+  automatically by stage state), and finisher announcements. Thoughts only,
+  not a plan: `ideas/output-devices.md`.
 - **Carrying entries/stages over** into a new event (the useful part of an
   event wizard) — low priority, re-entering them per event is acceptable — and
   new/open event under Postgres (`deployment-modes.md`).
