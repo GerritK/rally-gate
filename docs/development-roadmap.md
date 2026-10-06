@@ -80,8 +80,7 @@ What exists, with where its reasoning lives. History is in git.
   freely usable only: `flag-icons` for countries, own SVGs for the
   chequered default and the Pride, Progress Pride and trans flags
   (`THIRD_PARTY_NOTICES.md`). Not the International Flag of Planet Earth:
-  its terms forbid it standing for a person. Later on the entry page:
-  several transponder IDs.
+  its terms forbid it standing for a person.
 - **Check-in:** entry status from the Entries list, the entry page
   and a check-in page with Desk and Scrutineering stations, the desk
   taking the transponder (Registered → Checked in → Scrutineered, or both
@@ -107,6 +106,19 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
   passing whose transponder is on more than one car is held like an
   unassigned passing (`PassingBlock`), its picker offering just those cars.
   The field warning then says that instead.
+- **Several transponders per entry.** A spare car, a second transponder for
+  redundancy, and later an NFC gate where the driver taps in rather than the
+  car being read — the tag identifies the driver, so it sits beside the car's
+  transponder. Together with the item above, entry ↔ identifier becomes
+  many-to-many: an `EntryTransponder` table, `findByTransponder` returning
+  every match (none: unregistered, one: timed, several: held for a marshal).
+  `Entry.transponderId` holds data in existing event files, so copy it into
+  the new table at startup before the column goes — `synchronize` would
+  otherwise drop it. The detection field keeps its name and means any
+  identifier. Two transponders read on one passing are two detections for one
+  entry; the rules already ignore the repeat start/finish/split, but the
+  required-passings gate (below) would count it as a lap unless its minimum
+  pass interval is per entry, not per identifier.
 
 ## Deliberately deferred
 
@@ -168,6 +180,18 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
   also need a transponder decoder first (OpenStint, above): a light barrier
   can't tell cars apart once several are on track, and the decoder has to
   separate simultaneous passings.
+- **Event-wide status** — Setup → Running → Closed, on `RallyInfo`,
+  server-owned like `Stage.status`. Activating the first stage starts the
+  rally, with a pre-start check in that confirmation (every stage has a start
+  and finish, gates online and synced, transponder gaps and duplicates,
+  entries without a class): few hard errors, mostly warnings, as a marshal
+  knows things the check doesn't. Running locks only what reinterprets
+  results already timed (deleting/renaming classes, a timed car's start
+  number, start-order settings) — late entries, transponder swaps, withdrawals
+  and corrections stay open, or marshals unlock and forget. Closed is the
+  valuable one: results official, no corrections, no "Provisional"; reopening
+  is deliberate (a protest). Locks as a per-route decorator, and disabled
+  controls say why.
 - **Manual start-order edits** on the frozen snapshot (late entry, car moved
   to the back after a repair, swaps). Until then, change start numbers before
   the start list is frozen.
