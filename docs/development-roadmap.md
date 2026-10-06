@@ -124,9 +124,8 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
   `DetectionEvent` set by the adapter (not derived from `source`, which names
   the adapter — beam + OpenStint reads RC). Absent means RC, so a gate still
   on an older version keeps working. The detection field keeps the name
-  `transponderId` and means any identifier. `Entry.transponderId` holds data
-  in existing event files, so copy it into the new table as RC at startup
-  before the column goes — `synchronize` would otherwise drop it. If a car
+  `transponderId` and means any identifier. `Entry.transponderId` simply
+  goes: no event file in use needs carrying over. If a car
   does carry two of a kind, one passing is two detections for one entry: the
   rules already ignore the repeat start/finish/split, but the
   required-passings gate (below) would count it as a lap unless its minimum
