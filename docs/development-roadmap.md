@@ -215,6 +215,17 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
 - **Auth** on broker, API and dashboard — the closed rally network is the
   boundary until the timing pipeline is solid. Gates would authenticate against
   rally-server itself.
+- **Reset event** — clear a rally that was only a trial so the same file can
+  be used for real. Clears detections, stage runs and splits, sets stages
+  back to NOT_STARTED with their gates inactive, and unfreezes start lists;
+  keeps stages, gate assignments, classes, settings, rally info and known
+  gates. A checkbox also clears the entries; kept entries go back to
+  Registered, as the trial's check-in says nothing about the real one. It
+  destroys evidence, so: refused while a stage is active, confirmed by typing
+  the rally name, and in standalone mode the event file is copied aside
+  first (one database = one event makes that a file copy). Emits an event so
+  open dashboards reload. Overlaps with carrying entries/stages over (below):
+  a reset is the same-file version of it.
 - **Carrying entries/stages over** into a new event (the useful part of an
   event wizard) — low priority, re-entering them per event is acceptable — and
   new/open event under Postgres (`deployment-modes.md`).
