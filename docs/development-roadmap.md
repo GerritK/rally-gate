@@ -112,6 +112,15 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
   transponder. Together with the item above, entry ↔ identifier becomes
   many-to-many: an `EntryTransponder` table, `findByTransponder` returning
   every match (none: unregistered, one: timed, several: held for a marshal).
+  Each row has a kind and an optional free-text label ("spare car"). The kind
+  is a fixed enum in `packages/shared` (RC transponder, NFC, …), a dropdown,
+  not free text: it's what matching keys on, so "NFC"/"nfc"/"NFC-Karte" must
+  not be three kinds. Unique on (kind, id), and a detection matches only its
+  own kind — an NFC tap never times a car whose RC transponder happens to
+  share the number. The gate states the kind: a `transponderKind` on
+  `DetectionEvent` set by the adapter (not derived from `source`, which names
+  the adapter — beam + OpenStint reads RC). Absent means RC, so a gate still
+  on an older version keeps working.
   `Entry.transponderId` holds data in existing event files, so copy it into
   the new table at startup before the column goes — `synchronize` would
   otherwise drop it. The detection field keeps its name and means any
