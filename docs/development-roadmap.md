@@ -140,6 +140,21 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
   undesigned; don't grow Setup UI for them speculatively. When checkpoint
   interval times land, give them their own formatter rather than reusing
   `formatStageDuration` (see `packages/ui/src/format.ts`).
+- **Other competition formats** — circuit races (several cars at once, ended
+  by lap count or time) and regularity rallies, both asked for by the
+  community. Not wanted yet; don't build the abstraction ahead of the first
+  real second format. Direction when one comes: a `Stage.kind` with
+  per-kind settings (each its own DTO class), and `EventsService.applyRules`'
+  role branching moved into one handler per kind that also ranks — still
+  hardcoded, not a DSL. Passings become generic (`StageSplit` minus its
+  one-per-gate unique, plus a pass number), so laps, splits and regularity
+  checks are one table read differently. Keep the `Stage` entity name: a
+  rename makes `synchronize` create new tables and every existing event file
+  opens empty. The overall keeps summing stage-rally times only; ranking
+  across formats needs a points scheme, decided when needed. Circuit races
+  also need a transponder decoder first (OpenStint, above): a light barrier
+  can't tell cars apart once several are on track, and the decoder has to
+  separate simultaneous passings.
 - **Manual start-order edits** on the frozen snapshot (late entry, car moved
   to the back after a repair, swaps). Until then, change start numbers before
   the start list is frozen.
