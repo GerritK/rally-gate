@@ -80,8 +80,7 @@ What exists, with where its reasoning lives. History is in git.
   freely usable only: `flag-icons` for countries, own SVGs for the
   chequered default and the Pride, Progress Pride and trans flags
   (`THIRD_PARTY_NOTICES.md`). Not the International Flag of Planet Earth:
-  its terms forbid it standing for a person. Later on the entry page:
-  several transponder IDs.
+  its terms forbid it standing for a person.
 - **Check-in:** entry status from the Entries list, the entry page
   and a check-in page with Desk and Scrutineering stations, the desk
   taking the transponder (Registered → Checked in → Scrutineered, or both
@@ -107,6 +106,30 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
   passing whose transponder is on more than one car is held like an
   unassigned passing (`PassingBlock`), its picker offering just those cars.
   The field warning then says that instead.
+- **Several transponders per entry.** A spare car, a replacement for a dead
+  transponder, and later an NFC gate where the driver taps in rather than the
+  car being read — the tag identifies the driver, so it sits beside the car's
+  RC transponder. An `EntryTransponder` table with a kind and an optional
+  free-text label ("spare car"). Physically a car carries one transponder per
+  kind at a time, but the software allows several of a kind and only warns
+  (entry dialog, check-in desk, pre-start check): refusing would block the
+  desk mid-swap. Nothing is unique on the identifier either: the item above
+  allows one transponder on several cars, so `findByTransponder` returns
+  every match (none: unregistered, one: timed, several: held for a marshal).
+  The kind is a fixed enum in `packages/shared` (RC transponder, NFC, …), a
+  dropdown, not free text: it's what matching keys on, so "NFC"/"nfc"/
+  "NFC-Karte" must not be three kinds. A detection matches only its own
+  kind — an NFC tap never times a car whose RC transponder happens to share
+  the number. The gate states the kind: a `transponderKind` on
+  `DetectionEvent` set by the adapter (not derived from `source`, which names
+  the adapter — beam + OpenStint reads RC). Absent means RC, so a gate still
+  on an older version keeps working. The detection field keeps the name
+  `transponderId` and means any identifier. `Entry.transponderId` simply
+  goes: no event file in use needs carrying over. If a car
+  does carry two of a kind, one passing is two detections for one entry: the
+  rules already ignore the repeat start/finish/split, but the
+  required-passings gate (below) would count it as a lap unless its minimum
+  pass interval is per entry, not per identifier.
 
 ## Deliberately deferred
 
@@ -140,6 +163,46 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
   undesigned; don't grow Setup UI for them speculatively. When checkpoint
   interval times land, give them their own formatter rather than reusing
   `formatStageDuration` (see `packages/ui/src/format.ts`).
+- **Required passings at one gate** — a stage that loops past the same gate
+  n times between its own entry and exit (a car-park rally). Fits the
+  stage-rally model: a `requiredPassings` on the `GateAssignment`, earlier
+  passings recorded as splits with the pass number as `splitIndex`, and when
+  it's the finish gate only the nth one finishes. Today the second passing is
+  dropped: `StageSplit` is unique on `(stageRunId, gateId)` and `finishRun`
+  takes the first. Needs a minimum pass interval like the combined gate's
+  `minDurationMs` — a transponder reads a passing several times, and a double
+  read counted as a lap finishes the car early, i.e. wins it the stage. A
+  missed read leaves the car short a lap with no finish coming, so Live Timing
+  shows "lap 2/3" and a marshal can add the missing one. One gate counts
+  passings, it can't see a cut; that takes a second gate on the loop.
+- **Other competition formats** — circuit races (several cars at once, ended
+  by lap count or time) and regularity rallies, both asked for by the
+  community. Not wanted yet; don't build the abstraction ahead of the first
+  real second format. Direction when one comes: a `Stage.kind` with
+  per-kind settings (each its own DTO class), and `EventsService.applyRules`'
+  role branching moved into one handler per kind that also ranks — still
+  hardcoded, not a DSL. Passings become generic (`StageSplit` minus its
+  one-per-gate unique, plus a pass number — the required-passings gate above
+  gets there first), so laps, splits and regularity checks are one table
+  read differently. Keep the `Stage` entity name: a
+  rename makes `synchronize` create new tables and every existing event file
+  opens empty. The overall keeps summing stage-rally times only; ranking
+  across formats needs a points scheme, decided when needed. Circuit races
+  also need a transponder decoder first (OpenStint, above): a light barrier
+  can't tell cars apart once several are on track, and the decoder has to
+  separate simultaneous passings.
+- **Event-wide status** — Setup → Running → Closed, on `RallyInfo`,
+  server-owned like `Stage.status`. Activating the first stage starts the
+  rally, with a pre-start check in that confirmation (every stage has a start
+  and finish, gates online and synced, transponder gaps and duplicates,
+  entries without a class): few hard errors, mostly warnings, as a marshal
+  knows things the check doesn't. Running locks only what reinterprets
+  results already timed (deleting/renaming classes, a timed car's start
+  number, start-order settings) — late entries, transponder swaps, withdrawals
+  and corrections stay open, or marshals unlock and forget. Closed is the
+  valuable one: results official, no corrections, no "Provisional"; reopening
+  is deliberate (a protest). Locks as a per-route decorator, and disabled
+  controls say why.
 - **Manual start-order edits** on the frozen snapshot (late entry, car moved
   to the back after a repair, swaps). Until then, change start numbers before
   the start list is frozen.
@@ -152,6 +215,17 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
 - **Auth** on broker, API and dashboard — the closed rally network is the
   boundary until the timing pipeline is solid. Gates would authenticate against
   rally-server itself.
+- **Reset event** — clear a rally that was only a trial so the same file can
+  be used for real. Clears detections, stage runs and splits, sets stages
+  back to NOT_STARTED with their gates inactive, and unfreezes start lists;
+  keeps stages, gate assignments, classes, settings, rally info and known
+  gates. A checkbox also clears the entries; kept entries go back to
+  Registered, as the trial's check-in says nothing about the real one. It
+  destroys evidence, so: refused while a stage is active, confirmed by typing
+  the rally name, and in standalone mode the event file is copied aside
+  first (one database = one event makes that a file copy). Emits an event so
+  open dashboards reload. Overlaps with carrying entries/stages over (below):
+  a reset is the same-file version of it.
 - **Carrying entries/stages over** into a new event (the useful part of an
   event wizard) — low priority, re-entering them per event is acceptable — and
   new/open event under Postgres (`deployment-modes.md`).
