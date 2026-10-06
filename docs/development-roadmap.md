@@ -140,6 +140,18 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
   undesigned; don't grow Setup UI for them speculatively. When checkpoint
   interval times land, give them their own formatter rather than reusing
   `formatStageDuration` (see `packages/ui/src/format.ts`).
+- **Required passings at one gate** — a stage that loops past the same gate
+  n times between its own entry and exit (a car-park rally). Fits the
+  stage-rally model: a `requiredPassings` on the `GateAssignment`, earlier
+  passings recorded as splits with the pass number as `splitIndex`, and when
+  it's the finish gate only the nth one finishes. Today the second passing is
+  dropped: `StageSplit` is unique on `(stageRunId, gateId)` and `finishRun`
+  takes the first. Needs a minimum pass interval like the combined gate's
+  `minDurationMs` — a transponder reads a passing several times, and a double
+  read counted as a lap finishes the car early, i.e. wins it the stage. A
+  missed read leaves the car short a lap with no finish coming, so Live Timing
+  shows "lap 2/3" and a marshal can add the missing one. One gate counts
+  passings, it can't see a cut; that takes a second gate on the loop.
 - **Other competition formats** — circuit races (several cars at once, ended
   by lap count or time) and regularity rallies, both asked for by the
   community. Not wanted yet; don't build the abstraction ahead of the first
@@ -147,8 +159,9 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
   per-kind settings (each its own DTO class), and `EventsService.applyRules`'
   role branching moved into one handler per kind that also ranks — still
   hardcoded, not a DSL. Passings become generic (`StageSplit` minus its
-  one-per-gate unique, plus a pass number), so laps, splits and regularity
-  checks are one table read differently. Keep the `Stage` entity name: a
+  one-per-gate unique, plus a pass number — the required-passings gate above
+  gets there first), so laps, splits and regularity checks are one table
+  read differently. Keep the `Stage` entity name: a
   rename makes `synchronize` create new tables and every existing event file
   opens empty. The overall keeps summing stage-rally times only; ranking
   across formats needs a points scheme, decided when needed. Circuit races
