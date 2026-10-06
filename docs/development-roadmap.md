@@ -106,28 +106,26 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
   passing whose transponder is on more than one car is held like an
   unassigned passing (`PassingBlock`), its picker offering just those cars.
   The field warning then says that instead.
-- **Several transponders per entry.** A spare car, a second transponder for
-  redundancy, and later an NFC gate where the driver taps in rather than the
-  car being read — the tag identifies the driver, so it sits beside the car's
-  transponder. Together with the item above, entry ↔ identifier becomes
-  many-to-many: an `EntryTransponder` table, `findByTransponder` returning
+- **Several transponders per entry — one per kind.** A car carries exactly
+  one transponder of each technology at a time; a second kind arrives with
+  an NFC gate where the driver taps in rather than the car being read — the
+  tag identifies the driver, so it sits beside the car's RC transponder. An
+  `EntryTransponder` table unique on (entry, kind); a swap (spare car, dead
+  transponder) replaces that kind's row, and passings already stored keep
+  the entry resolved at ingest. Not unique on the identifier: the item above
+  allows one transponder on several cars, so `findByTransponder` returns
   every match (none: unregistered, one: timed, several: held for a marshal).
-  Each row has a kind and an optional free-text label ("spare car"). The kind
-  is a fixed enum in `packages/shared` (RC transponder, NFC, …), a dropdown,
-  not free text: it's what matching keys on, so "NFC"/"nfc"/"NFC-Karte" must
-  not be three kinds. Unique on (kind, id), and a detection matches only its
-  own kind — an NFC tap never times a car whose RC transponder happens to
-  share the number. The gate states the kind: a `transponderKind` on
+  The kind is a fixed enum in `packages/shared` (RC transponder, NFC, …), a
+  dropdown, not free text: it's what matching keys on, so "NFC"/"nfc"/
+  "NFC-Karte" must not be three kinds. A detection matches only its own
+  kind — an NFC tap never times a car whose RC transponder happens to share
+  the number. The gate states the kind: a `transponderKind` on
   `DetectionEvent` set by the adapter (not derived from `source`, which names
   the adapter — beam + OpenStint reads RC). Absent means RC, so a gate still
-  on an older version keeps working.
-  `Entry.transponderId` holds data in existing event files, so copy it into
-  the new table at startup before the column goes — `synchronize` would
-  otherwise drop it. The detection field keeps its name and means any
-  identifier. Two transponders read on one passing are two detections for one
-  entry; the rules already ignore the repeat start/finish/split, but the
-  required-passings gate (below) would count it as a lap unless its minimum
-  pass interval is per entry, not per identifier.
+  on an older version keeps working. The detection field keeps the name
+  `transponderId` and means any identifier. `Entry.transponderId` holds data
+  in existing event files, so copy it into the new table as RC at startup
+  before the column goes — `synchronize` would otherwise drop it.
 
 ## Deliberately deferred
 
