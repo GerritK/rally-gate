@@ -106,13 +106,14 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
   passing whose transponder is on more than one car is held like an
   unassigned passing (`PassingBlock`), its picker offering just those cars.
   The field warning then says that instead.
-- **Several transponders per entry — one per kind.** A car carries exactly
-  one transponder of each technology at a time; a second kind arrives with
-  an NFC gate where the driver taps in rather than the car being read — the
-  tag identifies the driver, so it sits beside the car's RC transponder. An
-  `EntryTransponder` table unique on (entry, kind); a swap (spare car, dead
-  transponder) replaces that kind's row, and passings already stored keep
-  the entry resolved at ingest. Not unique on the identifier: the item above
+- **Several transponders per entry.** A spare car, a replacement for a dead
+  transponder, and later an NFC gate where the driver taps in rather than the
+  car being read — the tag identifies the driver, so it sits beside the car's
+  RC transponder. An `EntryTransponder` table with a kind and an optional
+  free-text label ("spare car"). Physically a car carries one transponder per
+  kind at a time, but the software allows several of a kind and only warns
+  (entry dialog, check-in desk, pre-start check): refusing would block the
+  desk mid-swap. Nothing is unique on the identifier either: the item above
   allows one transponder on several cars, so `findByTransponder` returns
   every match (none: unregistered, one: timed, several: held for a marshal).
   The kind is a fixed enum in `packages/shared` (RC transponder, NFC, …), a
@@ -125,7 +126,11 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
   on an older version keeps working. The detection field keeps the name
   `transponderId` and means any identifier. `Entry.transponderId` holds data
   in existing event files, so copy it into the new table as RC at startup
-  before the column goes — `synchronize` would otherwise drop it.
+  before the column goes — `synchronize` would otherwise drop it. If a car
+  does carry two of a kind, one passing is two detections for one entry: the
+  rules already ignore the repeat start/finish/split, but the
+  required-passings gate (below) would count it as a lap unless its minimum
+  pass interval is per entry, not per identifier.
 
 ## Deliberately deferred
 
