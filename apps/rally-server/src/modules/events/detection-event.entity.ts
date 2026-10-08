@@ -1,3 +1,4 @@
+import { TransponderKind } from '@rally-gate/shared';
 import { Column, Entity, PrimaryColumn } from 'typeorm';
 
 @Entity()
@@ -11,6 +12,10 @@ export class DetectionEventRecord {
   /** Null for a passing the gate couldn't identify (a light barrier). */
   @Column({ type: 'varchar', nullable: true })
   transponderId: string | null;
+
+  /** What read `transponderId`; null along with it. */
+  @Column({ type: 'varchar', nullable: true })
+  transponderKind: TransponderKind | null;
 
   @Column({ type: 'varchar', nullable: true })
   entryId: string | null;

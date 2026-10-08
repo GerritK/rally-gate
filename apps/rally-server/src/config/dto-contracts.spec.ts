@@ -245,6 +245,15 @@ describe('malformed values are rejected at the boundary', () => {
     expect(messages).toMatch(/status/);
   });
 
+  // Nested too: an id would point the cascade save at another entry's row.
+  it('rejects an id or an unknown kind on a transponder', async () => {
+    const messages = await rejectionMessages(UpdateEntryDto, {
+      transponders: [{ id: 't1', kind: 'RFID', identifier: '1' }],
+    });
+    expect(messages).toMatch(/transponders\.0\.property id/);
+    expect(messages).toMatch(/transponders\.0\.kind/);
+  });
+
   it('rejects a flag that is not a code', async () => {
     const messages = await rejectionMessages(UpdateEntryDto, {
       driverFlag: 'de" onerror="x',

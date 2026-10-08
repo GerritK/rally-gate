@@ -9,9 +9,10 @@ import {
 import type { EntryClass } from '../api/entry-classes';
 import { FLAG_OPTIONS, flagUrl } from '../crew';
 import { required, ENTRY_STATUS_DISPLAY } from '../format';
-import { transponderWarning } from '../entry-status';
+import { toTransponderDrafts, toTransponderInput } from '../entry-status';
 import ClassPicker from './ClassPicker.vue';
 import FormDialog from './FormDialog.vue';
+import TransponderFields from './TransponderFields.vue';
 
 const props = defineProps<{
   /** `null` adds an entry. */
@@ -44,7 +45,7 @@ function toDraft(entry: Entry | null) {
     coDriverFlag: entry?.coDriverFlag ?? null,
     body: entry?.body ?? '',
     chassis: entry?.chassis ?? '',
-    transponderId: entry?.transponderId ?? '',
+    transponders: toTransponderDrafts(entry),
     status: entry?.status ?? EntryStatus.REGISTERED,
     classIds: entry?.classes.map((c) => c.id) ?? [],
   };
@@ -55,15 +56,6 @@ const suggestions = (pick: (v: Entry) => string | null) =>
 const bodies = computed(() => suggestions((v) => v.body));
 const chassis = computed(() => suggestions((v) => v.chassis));
 
-// null, not undefined: only null clears the column (CLAUDE.md).
-const transponderShared = computed(() =>
-  transponderWarning(
-    props.entries,
-    draft.value.transponderId,
-    props.entry?.id ?? undefined,
-  ),
-);
-
 /** Tabbing into a picked flag and typing should search, not append to the
  *  flag's name. Vuetify writes the name into the input after focus, so the
  *  select waits a frame. */
@@ -72,6 +64,7 @@ function selectText(e: FocusEvent) {
   requestAnimationFrame(() => input.select());
 }
 
+// null, not undefined: only null clears the column (CLAUDE.md).
 const orNull = (value: string | null) => value?.trim() || null;
 
 async function onSave() {
@@ -85,7 +78,7 @@ async function onSave() {
     coDriverLastName: orNull(d.coDriverLastName),
     body: orNull(d.body),
     chassis: orNull(d.chassis),
-    transponderId: orNull(d.transponderId),
+    transponders: toTransponderInput(d.transponders),
   };
   emit(
     'saved',
@@ -207,11 +200,10 @@ async function onSave() {
       </section>
       <section>
         <div class="rg-section-title">Registration</div>
-        <v-text-field
-          v-model="draft.transponderId"
-          label="Transponder ID (optional)"
-          :messages="transponderShared"
-          class="rg-field-warning"
+        <TransponderFields
+          v-model="draft.transponders"
+          :entries="entries"
+          :self-id="entry?.id"
         />
         <ClassPicker
           v-if="classes.length > 0"

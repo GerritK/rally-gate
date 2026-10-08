@@ -256,7 +256,7 @@ async function seed(client, version) {
       driverFlag: flag,
       body,
       chassis,
-      transponderId: transponder(startNumber),
+      transponders: [{ kind: 'RC', identifier: transponder(startNumber) }],
       classIds: [classes[cls]],
       status,
     });

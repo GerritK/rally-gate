@@ -16,6 +16,7 @@ import {
   GateRole,
   isOutOfEvent,
   StageStatus,
+  TransponderKind,
 } from '@rally-gate/shared';
 import { In, Repository } from 'typeorm';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
@@ -52,11 +53,18 @@ const MAX_ID_LENGTH = 128;
  * lands in the pending list forever. Returns null for anything malformed.
  *
  * `transponderId` may be absent — a light barrier sees a passing without
- * identifying it — but if present it must be a usable id.
+ * identifying it — but if present it must be a usable id. An absent
+ * `transponderKind` is RC; an unknown one is refused rather than guessed.
  */
 function parseDetection(payload: unknown): DetectionEvent | null {
-  const { eventId, gateId, transponderId, timestampGate, source } = (payload ??
-    {}) as Record<string, unknown>;
+  const {
+    eventId,
+    gateId,
+    transponderId,
+    transponderKind = TransponderKind.RC,
+    timestampGate,
+    source,
+  } = (payload ?? {}) as Record<string, unknown>;
 
   const isUsableId = (value: unknown): value is string =>
     typeof value === 'string' &&
@@ -70,6 +78,11 @@ function parseDetection(payload: unknown): DetectionEvent | null {
     return null;
   }
   if (
+    !Object.values(TransponderKind).includes(transponderKind as TransponderKind)
+  ) {
+    return null;
+  }
+  if (
     typeof timestampGate !== 'string' ||
     Number.isNaN(new Date(timestampGate).getTime())
   ) {
@@ -80,6 +93,7 @@ function parseDetection(payload: unknown): DetectionEvent | null {
     eventId,
     gateId,
     transponderId,
+    transponderKind: transponderKind as TransponderKind,
     timestampGate,
     source: typeof source === 'string' ? source.slice(0, MAX_ID_LENGTH) : '',
   };
@@ -311,7 +325,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     const detection = parseDetection(parsed);
     if (!detection) {
       this.logger.warn(
-        `Ignoring detection on ${topic} with missing or invalid fields — expected non-empty eventId and gateId, a usable transponderId if any, and a parseable timestampGate`,
+        `Ignoring detection on ${topic} with missing or invalid fields — expected non-empty eventId and gateId, a usable transponderId if any, a known transponderKind if any, and a parseable timestampGate`,
       );
       return;
     }
@@ -329,9 +343,16 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       );
     }
     const { transponderId } = detection;
-    const matches = transponderId
-      ? await this.entriesService.findByTransponder(transponderId)
-      : [];
+    const transponderKind = transponderId
+      ? (detection.transponderKind ?? TransponderKind.RC)
+      : null;
+    const matches =
+      transponderId && transponderKind
+        ? await this.entriesService.findByTransponder(
+            transponderKind,
+            transponderId,
+          )
+        : [];
     // A transponder moved off a withdrawn car is often still registered on it.
     const inEvent = matches.filter((e) => !isOutOfEvent(e.status));
     const entry =
@@ -345,7 +366,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     const shared = !entry && matches.length > 1;
     if (transponderId && matches.length === 0) {
       this.logger.warn(
-        `Detection for unregistered transponder ${transponderId}`,
+        `Detection for unregistered ${transponderKind} transponder ${transponderId}`,
       );
     }
     if (shared) {
@@ -373,6 +394,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       eventId: detection.eventId,
       gateId: detection.gateId,
       transponderId: transponderId ?? null,
+      transponderKind,
       entryId: entry?.id ?? null,
       awaitingEntry,
       timestampGate,

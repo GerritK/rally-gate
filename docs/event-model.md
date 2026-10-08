@@ -10,6 +10,7 @@ interface DetectionEvent {
   eventId: string;         // ULID, generated on the gate — the idempotency key
   gateId: string;
   transponderId?: string;  // absent when the gate can't identify the car
+  transponderKind?: TransponderKind;  // 'RC' | 'NFC'; absent means RC
   timestampGate: string;   // ISO 8601, the gate's clock
   source: string;          // the gate's ADAPTER, or 'simulated-cli'
   metadata?: Record<string, unknown>;
@@ -22,7 +23,8 @@ otherwise poison a duration silently.
 
 ## DetectionEventRecord (stored)
 
-Adds `entryId` (resolved from `transponderId`), `timestampServer`,
+Adds `transponderKind` (null along with `transponderId`), `entryId` (resolved
+from the two, see "Transponders" below), `timestampServer`,
 `clockCorrectionMs`, `rawPayload` and `processed`. `timestampGate` is never
 rewritten; the time the rules used is `timestampGate + clockCorrectionMs` (see
 "Clock offset" in `architecture.md`).
@@ -189,6 +191,26 @@ so who is classified, which stages count and every notional come from within
 that group. No hierarchy (Rookie *under* 2WD): categories exist in every main
 class, and "all Rookies" must stay a ranking of its own. The overall ranking
 always includes everyone.
+
+## Transponders
+
+An entry has a list of `EntryTransponder`s: a `kind` (`TransponderKind`, a
+fixed enum, not free text — matching keys on it), an `identifier`, and an
+optional `label` ("spare car"). A spare car, a replacement for a dead
+transponder, an NFC tag the driver taps in with beside the car's RC
+transponder. The entry dialog and the check-in desk edit the list as a whole;
+`PATCH /entries/:id` with `transponders` replaces it.
+
+A detection matches by kind and identifier, so an NFC tap never times a car
+whose RC transponder shares the number. Nothing is unique: several of one kind
+on a car, or one transponder on several cars, is allowed and only warned
+about — refusing would block the desk mid-swap. No match is an unregistered
+transponder, one match is timed, several are held for a marshal (see
+"Unassigned passings").
+
+A car that really carries two of a kind makes one passing two detections for
+one entry. The rules ignore the repeat start, finish or split; a gate that
+counts passings would have to dedupe per entry, not per identifier.
 
 ## Entry status
 

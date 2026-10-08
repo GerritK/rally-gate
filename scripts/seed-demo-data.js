@@ -53,7 +53,7 @@ async function main() {
       driverFlag: 'fi',
       body: 'Ford Focus RS WRC',
       chassis: 'HPI WR8',
-      transponderId: '1234567',
+      transponders: [{ kind: 'RC', identifier: '1234567' }],
     }),
   );
   console.log('Demo data seeded. Trigger a run with:');

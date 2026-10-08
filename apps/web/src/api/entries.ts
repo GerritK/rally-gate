@@ -1,4 +1,8 @@
-import { EntryStatus, type Crew } from '@rally-gate/shared';
+import {
+  EntryStatus,
+  type Crew,
+  type TransponderKind,
+} from '@rally-gate/shared';
 import { apiFetch, patchJson, postJson } from './client';
 import type { EntryClass } from './entry-classes';
 
@@ -9,14 +13,27 @@ export interface Entry extends Crew {
   startNumber: number;
   chassis: string | null;
   body: string | null;
-  transponderId?: string | null;
+  transponders: EntryTransponder[];
   status: EntryStatus;
   classes: EntryClass[];
 }
 
-/** Classes are written by id and read back as objects. */
-export type EntryPatch = Partial<Omit<Entry, 'id' | 'classes'>> & {
+export interface EntryTransponder {
+  id: string;
+  kind: TransponderKind;
+  identifier: string;
+  label: string | null;
+}
+
+export type TransponderInput = Omit<EntryTransponder, 'id'>;
+
+/** Classes are written by id and read back as objects; transponders are
+ *  written as a whole list, which replaces the entry's. */
+export type EntryPatch = Partial<
+  Omit<Entry, 'id' | 'classes' | 'transponders'>
+> & {
   classIds?: string[];
+  transponders?: TransponderInput[];
 };
 
 export function fetchEntries(): Promise<Entry[]> {

@@ -20,6 +20,7 @@ import StartNumber from '../components/StartNumber.vue';
 import EntryDialog from '../components/EntryDialog.vue';
 import EntryStatusActions from '../components/EntryStatusActions.vue';
 import { flagName, flagUrl } from '../crew';
+import { formatTransponders } from '../entry-status';
 import {
   formatDuration,
   formatGap,
@@ -239,10 +240,12 @@ onMounted(refresh);
             <dt>Transponder</dt>
             <dd
               :class="
-                entry.transponderId ? 'rg-timing' : 'text-medium-emphasis'
+                entry.transponders.length > 0
+                  ? 'rg-timing'
+                  : 'text-medium-emphasis'
               "
             >
-              {{ entry.transponderId ?? '-' }}
+              {{ formatTransponders(entry) ?? '-' }}
             </dd>
           </dl>
         </v-card-text>

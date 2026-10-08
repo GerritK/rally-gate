@@ -5,15 +5,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Crew } from '@rally-gate/shared';
+import { Crew, TransponderKind } from '@rally-gate/shared';
 import { In, Repository } from 'typeorm';
 import { isUniqueViolation } from '../../common/db-errors';
-import { EntryClassDto } from './dto';
+import { EntryClassDto, EntryTransponderDto } from './dto';
 import { EntryClass } from './entry-class.entity';
 import { Entry } from './entry.entity';
 
-type EntryInput = Partial<Omit<Entry, 'id' | 'classes'>> & {
+type EntryInput = Partial<Omit<Entry, 'id' | 'classes' | 'transponders'>> & {
   classIds?: string[];
+  transponders?: EntryTransponderDto[];
 };
 
 export function compareClassNames(a: string, b: string): number {
@@ -50,8 +51,12 @@ export class EntriesService {
     return this.entries.findOneBy({ id });
   }
 
-  findByTransponder(transponderId: string): Promise<Entry[]> {
-    return this.entries.findBy({ transponderId });
+  /** Every car carrying it: none is unregistered, several is for a marshal. */
+  findByTransponder(
+    kind: TransponderKind,
+    identifier: string,
+  ): Promise<Entry[]> {
+    return this.entries.find({ where: { transponders: { kind, identifier } } });
   }
 
   async create({ classIds, ...data }: EntryInput): Promise<Entry> {

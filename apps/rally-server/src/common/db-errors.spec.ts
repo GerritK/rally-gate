@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { StageRun } from '../modules/stage-runs/stage-run.entity';
 import { Entry } from '../modules/entries/entry.entity';
 import { EntryClass } from '../modules/entries/entry-class.entity';
+import { EntryTransponder } from '../modules/entries/entry-transponder.entity';
 import { isUniqueViolation } from './db-errors';
 
 /**
@@ -21,7 +22,7 @@ describe('isUniqueViolation', () => {
     dataSource = new DataSource({
       type: 'better-sqlite3',
       database: ':memory:',
-      entities: [Entry, EntryClass, StageRun],
+      entities: [Entry, EntryClass, EntryTransponder, StageRun],
       synchronize: true,
     });
     await dataSource.initialize();

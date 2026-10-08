@@ -344,8 +344,12 @@ const entryOptions = computed(() =>
  *  transponder has since moved and matches none. */
 function carriersOf(event: DetectionEventRecord): Set<string> | undefined {
   const ids = entries.value
-    .filter(
-      (v) => event.transponderId && v.transponderId === event.transponderId,
+    .filter((v) =>
+      v.transponders.some(
+        (t) =>
+          t.kind === event.transponderKind &&
+          t.identifier === event.transponderId,
+      ),
     )
     .map((v) => v.id);
   return ids.length > 0 ? new Set(ids) : undefined;

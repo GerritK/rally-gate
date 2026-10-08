@@ -89,9 +89,10 @@ What exists, with where its reasoning lives. History is in git.
   disqualified ones leave every result, listed as DSQ. Not yet scrutineered
   still starts, marked on Live Timing, and Freeze/Activate ask
   (`event-model.md` "Entry status").
-- **Shared transponders:** one transponder on several cars holds its
-  passings for a marshal like a beam passing, the picker offering just those
-  cars (`event-model.md` "Unassigned passings").
+- **Transponders:** several per entry, each with a kind (RC, NFC) and an
+  optional label, a detection matching only its own kind; one transponder on
+  several cars holds its passings for a marshal like a beam passing, the
+  picker offering just those cars (`event-model.md` "Transponders").
 - **Podium** above the Overall and each stage's results, following the class
   filter: steps 2-1-3 with gold/silver/bronze trophies, crew, body, time and
   gap; a click opens the entry. On screen only, or off; the printed
@@ -101,32 +102,8 @@ What exists, with where its reasoning lives. History is in git.
 
 ## Next
 
-OpenStint (below) resumes when the hardware arrives. Meanwhile:
-
-- **Several transponders per entry.** A spare car, a replacement for a dead
-  transponder, and later an NFC gate where the driver taps in rather than the
-  car being read — the tag identifies the driver, so it sits beside the car's
-  RC transponder. An `EntryTransponder` table with a kind and an optional
-  free-text label ("spare car"). Physically a car carries one transponder per
-  kind at a time, but the software allows several of a kind and only warns
-  (entry dialog, check-in desk, pre-start check): refusing would block the
-  desk mid-swap. Nothing is unique on the identifier either: the item above
-  allowed one transponder on several cars (built), so `findByTransponder`
-  already returns every match (none: unregistered, one: timed, several: held for a marshal).
-  The kind is a fixed enum in `packages/shared` (RC transponder, NFC, …), a
-  dropdown, not free text: it's what matching keys on, so "NFC"/"nfc"/
-  "NFC-Karte" must not be three kinds. A detection matches only its own
-  kind — an NFC tap never times a car whose RC transponder happens to share
-  the number. The gate states the kind: a `transponderKind` on
-  `DetectionEvent` set by the adapter (not derived from `source`, which names
-  the adapter — beam + OpenStint reads RC). Absent means RC, so a gate still
-  on an older version keeps working. The detection field keeps the name
-  `transponderId` and means any identifier. `Entry.transponderId` simply
-  goes: no event file in use needs carrying over. If a car
-  does carry two of a kind, one passing is two detections for one entry: the
-  rules already ignore the repeat start/finish/split, but the
-  required-passings gate (below) would count it as a lap unless its minimum
-  pass interval is per entry, not per identifier.
+OpenStint (below) resumes when the hardware arrives. Nothing else is queued:
+pick the next item from the deferred list.
 
 ## Deliberately deferred
 
@@ -172,6 +149,8 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
   missed read leaves the car short a lap with no finish coming, so Live Timing
   shows "lap 2/3" and a marshal can add the missing one. One gate counts
   passings, it can't see a cut; that takes a second gate on the loop.
+  The minimum interval is per entry, not per identifier: a car carrying two
+  transponders of one kind is two detections per passing.
 - **Other competition formats** — circuit races (several cars at once, ended
   by lap count or time) and regularity rallies, both asked for by the
   community. Not wanted yet; don't build the abstraction ahead of the first

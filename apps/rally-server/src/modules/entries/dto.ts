@@ -1,5 +1,6 @@
 import { applyDecorators } from '@nestjs/common';
-import { EntryStatus } from '@rally-gate/shared';
+import { EntryStatus, TransponderKind } from '@rally-gate/shared';
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
@@ -10,6 +11,8 @@ import {
   IsPositive,
   IsString,
   Matches,
+  MaxLength,
+  ValidateNested,
 } from 'class-validator';
 
 // `null` is meaningful here, not just absence: it's how the UI clears an
@@ -19,6 +22,21 @@ const NullableString = () => applyDecorators(IsOptional(), IsString());
 /** A `flag-icons` code (`de`, `gb-eng`) or one of ours (`x-pride`). */
 const NullableFlag = () =>
   applyDecorators(IsOptional(), Matches(/^[a-z]+(-[a-z]+)*$/));
+
+/** No `id` either: a list replaces the entry's transponders as a whole. */
+export class EntryTransponderDto {
+  @IsEnum(TransponderKind)
+  kind: TransponderKind;
+
+  // As long as a detection's id may be, or a registered one could never match.
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(128)
+  identifier: string;
+
+  @NullableString()
+  label?: string | null;
+}
 
 /**
  * No `id` on any entry DTO. `EntriesService.update` merges the body onto
@@ -47,8 +65,12 @@ class EntryDetailsDto {
   @NullableString()
   body?: string | null;
 
-  @NullableString()
-  transponderId?: string | null;
+  /** Replaces the entry's transponders. */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => EntryTransponderDto)
+  transponders?: EntryTransponderDto[];
 
   @IsOptional()
   @IsEnum(EntryStatus)

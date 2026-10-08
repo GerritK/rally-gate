@@ -43,13 +43,14 @@ function makeService(opts: {
     findOne: jest.fn().mockResolvedValue('gate' in opts ? opts.gate : GATE),
     clockCorrectionMsFor: jest.fn().mockResolvedValue(0),
   } as unknown as GatesService;
+  const findByTransponder = jest
+    .fn()
+    .mockResolvedValue(
+      opts.matches ??
+        ('entry' in opts ? [opts.entry].filter(Boolean) : [ENTRY]),
+    );
   const entriesService = {
-    findByTransponder: jest
-      .fn()
-      .mockResolvedValue(
-        opts.matches ??
-          ('entry' in opts ? [opts.entry].filter(Boolean) : [ENTRY]),
-      ),
+    findByTransponder,
     findOne: jest.fn().mockResolvedValue('entry' in opts ? opts.entry : ENTRY),
   } as unknown as EntriesService;
   const gateAssignmentsService = {
@@ -86,7 +87,7 @@ function makeService(opts: {
     stagesService,
     emitter as never,
   );
-  return { service, events, saved, startRun, emitter };
+  return { service, events, saved, startRun, emitter, findByTransponder };
 }
 
 function detection(overrides: Record<string, unknown> = {}) {
@@ -283,6 +284,7 @@ describe('EventsService detection payload validation', () => {
     ['a missing eventId', { eventId: undefined }],
     ['an empty gateId', { gateId: '' }],
     ['a non-string transponderId', { transponderId: 1234567 }],
+    ['an unknown transponderKind', { transponderKind: 'RFID-ish' }],
     ['an unparseable timestampGate', { timestampGate: 'yesterday-ish' }],
     ['an absurdly long gateId', { gateId: 'g'.repeat(500) }],
   ])('drops a detection with %s', async (_label, overrides) => {
@@ -388,6 +390,18 @@ describe('EventsService unidentified passings', () => {
       'detection.awaiting-changed',
       expect.anything(),
     );
+  });
+
+  it('matches a transponder of the kind the gate states, RC if none', async () => {
+    const { service, findByTransponder } = makeService({});
+
+    await service.handleMqttMessage(detection());
+    await service.handleMqttMessage(
+      detection({ eventId: 'e2', transponderKind: 'NFC' }),
+    );
+
+    expect(findByTransponder).toHaveBeenNthCalledWith(1, 'RC', '1234567');
+    expect(findByTransponder).toHaveBeenNthCalledWith(2, 'NFC', '1234567');
   });
 
   it('holds a passing whose transponder is on several entries', async () => {

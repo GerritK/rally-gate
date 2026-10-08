@@ -129,10 +129,13 @@ fixes was seconds. Confirm the `-t` timestamp format against real output.
 
 ### Multiple IDs per entry
 
-An RFID badge, a backup transponder, or OpenStint's `OPN`/`AMB` split all mean
-one entry with several IDs. Today `Entry` has one `transponderId` and lookup
-is one exact match, so anything else looks unregistered. Fix when needed: a
-list of IDs per entry, matched by `DetectionEvent.source`. Small change.
+Built: an entry has a list of transponders, each with a kind (RC, NFC) from
+`TransponderKind` in `packages/shared`, and a detection matches only its own
+kind. The adapter states the kind as `DetectionEvent.transponderKind` — not
+derived from `source`, which names the adapter (beam + OpenStint reads RC) —
+and absent means RC. OpenStint's `OPN`/`AMB` split is still open: two ID
+namespaces within RC, so either two kinds or a prefixed identifier, settled
+with the adapter.
 
 ## Gate system clock policy
 

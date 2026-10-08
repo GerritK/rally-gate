@@ -9,7 +9,12 @@ import StartNumber from '../components/StartNumber.vue';
 import EntryDialog from '../components/EntryDialog.vue';
 import EntryStatusActions from '../components/EntryStatusActions.vue';
 import { ENTRY_STATUS_DISPLAY } from '../format';
-import { transponderWarning } from '../entry-status';
+import TransponderFields from '../components/TransponderFields.vue';
+import {
+  formatTransponders,
+  toTransponderDrafts,
+  toTransponderInput,
+} from '../entry-status';
 
 /**
  * Two stations, one job each: the desk checks crews in, the scrutineers pass
@@ -142,8 +147,8 @@ const selectedClasses = computed(() =>
 
 /** The desk's most common correction, taken with Check in rather than
  *  through Edit. */
-const transponder = ref('');
-watch(selected, (v) => (transponder.value = v?.transponderId ?? ''), {
+const transponders = ref(toTransponderDrafts(null));
+watch(selected, (v) => (transponders.value = toTransponderDrafts(v)), {
   immediate: true,
 });
 const transponderAtDesk = computed(
@@ -151,12 +156,9 @@ const transponderAtDesk = computed(
     station.value === 'desk' &&
     selected.value?.status === EntryStatus.REGISTERED,
 );
-const transponderShared = computed(() =>
-  transponderWarning(entries.value, transponder.value, selected.value?.id),
-);
 const withStep = computed(() =>
   transponderAtDesk.value
-    ? { transponderId: transponder.value.trim() || null }
+    ? { transponders: toTransponderInput(transponders.value) }
     : undefined,
 );
 
@@ -324,19 +326,21 @@ onMounted(refresh);
             <dt>Transponder</dt>
             <dd
               :class="
-                selected.transponderId ? 'rg-timing' : 'text-medium-emphasis'
+                selected.transponders.length > 0
+                  ? 'rg-timing'
+                  : 'text-medium-emphasis'
               "
             >
-              {{ selected.transponderId ?? '-' }}
+              {{ formatTransponders(selected) ?? '-' }}
             </dd>
           </template>
         </dl>
-        <v-text-field
+        <TransponderFields
           v-if="transponderAtDesk"
-          v-model="transponder"
-          label="Transponder ID"
-          :messages="transponderShared"
-          class="rg-checkin-transponder rg-field-warning mt-4"
+          v-model="transponders"
+          :entries="entries"
+          :self-id="selected.id"
+          class="rg-checkin-transponder mt-4"
         />
       </v-card-text>
       <v-card-actions class="rg-checkin-actions">
@@ -378,7 +382,7 @@ onMounted(refresh);
   max-width: 420px;
 }
 .rg-checkin-transponder {
-  max-width: 320px;
+  max-width: 560px;
 }
 /* The car's facts above, what to do with it below. */
 .rg-checkin-actions {

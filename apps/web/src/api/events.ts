@@ -1,3 +1,4 @@
+import type { TransponderKind } from '@rally-gate/shared';
 import { apiFetch, postJson, postRequest } from './client';
 
 export interface DetectionEventRecord {
@@ -5,6 +6,8 @@ export interface DetectionEventRecord {
   gateId: string;
   /** Null for a passing the gate couldn't identify (a light barrier). */
   transponderId: string | null;
+  /** What read `transponderId`; null along with it. */
+  transponderKind: TransponderKind | null;
   entryId: string | null;
   /** Unidentified passing at a live gate, waiting for a marshal. */
   awaitingEntry?: boolean;

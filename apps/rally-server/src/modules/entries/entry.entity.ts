@@ -4,9 +4,11 @@ import {
   Entity,
   JoinTable,
   ManyToMany,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { EntryClass } from './entry-class.entity';
+import { EntryTransponder } from './entry-transponder.entity';
 
 @Entity()
 export class Entry implements Crew {
@@ -42,8 +44,11 @@ export class Entry implements Crew {
   @Column({ type: 'varchar', nullable: true })
   body: string | null;
 
-  @Column({ type: 'varchar', nullable: true })
-  transponderId?: string | null;
+  @OneToMany(() => EntryTransponder, (t) => t.entry, {
+    eager: true,
+    cascade: true,
+  })
+  transponders: EntryTransponder[];
 
   @Column({ type: 'varchar', default: EntryStatus.REGISTERED })
   status: EntryStatus;
