@@ -16,6 +16,7 @@
 #   curl -fsSL <url> | bash -s -- -v
 set -euo pipefail
 
+VERBOSE=0
 for arg in "$@"; do
   case "$arg" in
     -v|--verbose) VERBOSE=1 ;;
@@ -26,12 +27,136 @@ done
 REPO_URL="${REPO_URL:-https://github.com/GerritK/rally-gate.git}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/rally-gate}"
 
-quiet() {
-  if [ "${VERBOSE:-0}" = "1" ]; then "$@"; return; fi
-  local log; log="$(mktemp)"
-  "$@" >"$log" 2>&1 || { local rc=$?; cat "$log"; rm -f "$log"; return "$rc"; }
-  rm -f "$log"
+# ---------------------------------------------------------------------------
+# Output helpers. Colour and animation only on a real terminal (NO_COLOR
+# honoured), so a piped/logged run stays plain text.
+# ---------------------------------------------------------------------------
+IS_TTY=0
+[ -t 1 ] && IS_TTY=1
+if [ "$IS_TTY" = 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  C_RESET=$'\e[0m' C_BOLD=$'\e[1m' C_DIM=$'\e[2m'
+  C_RED=$'\e[31m' C_GREEN=$'\e[32m' C_YELLOW=$'\e[33m' C_CYAN=$'\e[36m'
+else
+  C_RESET='' C_BOLD='' C_DIM='' C_RED='' C_GREEN='' C_YELLOW='' C_CYAN=''
+fi
+# Box/braille glyphs need a UTF-8 terminal; a bare serial console may not be one.
+case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
+  *UTF-8*|*utf8*|*UTF8*|*utf-8*)
+    G_OK='✓' G_FAIL='✘' G_WARN='!' G_FULL='█' G_EMPTY='░' G_RULE='─'
+    SPIN=(⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏) ;;
+  *)
+    G_OK='+' G_FAIL='x' G_WARN='!' G_FULL='#' G_EMPTY='.' G_RULE='-'
+    SPIN=('|' '/' '-' '\') ;;
+esac
+
+rule() { local r; printf -v r '%*s' 60 ''; printf '  %s%s%s\n' "$C_DIM" "${r// /$G_RULE}" "$C_RESET"; }
+title() { echo; printf '  %s%s%s\n' "$C_BOLD$C_CYAN" "$1" "$C_RESET"; rule; }
+
+# During the install the bottom two lines of the screen are a live area — the
+# progress bar and the current task — redrawn in place instead of scrolling.
+# Anything printed through note/ok/warn lands above it and stays. Off without a
+# terminal and with -v (raw command output would tear it), which falls back to
+# one line per finished task.
+LIVE=0
+AREA=0
+TASK=""
+STEP=0
+TOTAL_STEPS=8
+CURRENT_STEP=""
+cols() { local c; c="$(tput cols 2>/dev/null || echo 80)"; echo "${c:-80}"; }
+# Labels are cut to the terminal width: a line that wraps would make the
+# one-line cursor jump in area_clear land in the wrong place.
+fit() { local max=$(($(cols) - $2)); [ "${#1}" -le "$max" ] && printf '%s' "$1" || printf '%s…' "${1:0:max-1}"; }
+bar_line() {
+  local width=24 filled bar='' i
+  filled=$(($1 * width / TOTAL_STEPS))
+  for ((i = 0; i < width; i++)); do
+    if [ "$i" -lt "$filled" ]; then bar+="$G_FULL"; else bar+="$G_EMPTY"; fi
+  done
+  printf '  %s%s%s %s%3d%%%s  %s%s%s %s(%d/%d)%s' "$C_CYAN" "$bar" "$C_RESET" \
+    "$C_BOLD" "$(($1 * 100 / TOTAL_STEPS))" "$C_RESET" "$C_BOLD" "$(fit "$2" 48)" "$C_RESET" \
+    "$C_DIM" "$STEP" "$TOTAL_STEPS" "$C_RESET"
 }
+area_clear() { if [ "$AREA" = 1 ]; then printf '\r\e[1A\e[J'; AREA=0; fi; }
+# Leaves the cursor at the end of the task line, so the spinner can rewrite
+# just that line with \r.
+area_draw() {
+  [ "$LIVE" = 1 ] || return 0
+  area_clear
+  printf '%s\n%s' "$(bar_line "${1:-$((STEP - 1))}" "$CURRENT_STEP")" "$TASK"
+  AREA=1
+}
+say() { area_clear; printf '%s\n' "$1"; area_draw; }
+note() { say "  ${C_DIM}$1${C_RESET}"; }
+ok() { say "  ${C_GREEN}${G_OK}${C_RESET} $1"; }
+warn() { say "  ${C_YELLOW}${C_BOLD}${G_WARN} $1${C_RESET}"; }
+# A routine result: replaces the task line in the live area rather than adding one.
+info() { if [ "$LIVE" = 1 ]; then TASK="  ${C_GREEN}${G_OK}${C_RESET} $1"; area_draw; else ok "$1"; fi; }
+
+step() {
+  STEP=$((STEP + 1)) CURRENT_STEP="$1" TASK=""
+  if [ "$LIVE" = 1 ]; then area_draw; return; fi
+  echo
+  printf '%s\n' "$(bar_line "$STEP" "$1")"
+}
+
+# Runs a command with its output hidden behind a spinner, replaying the output
+# only if it fails. Backgrounded so the spinner can animate; stdin is
+# /dev/null because under curl | bash stdin is this script itself.
+RUN_PID=""
+run() {
+  local label="$1"; shift
+  if [ "$VERBOSE" = 1 ]; then
+    printf '  %s>%s %s\n' "$C_CYAN" "$C_RESET" "$label"
+    "$@"
+    return
+  fi
+  local log rc=0 i=0 start=$SECONDS short
+  short="$(fit "$label" 12)"
+  log="$(mktemp)"
+  "$@" >"$log" 2>&1 </dev/null &
+  RUN_PID=$!
+  if [ "$IS_TTY" = 1 ]; then
+    while kill -0 "$RUN_PID" 2>/dev/null; do
+      printf '\r  %s%s%s %s %s%ds%s\e[K' "$C_CYAN" "${SPIN[i++ % ${#SPIN[@]}]}" "$C_RESET" \
+        "$short" "$C_DIM" "$((SECONDS - start))" "$C_RESET"
+      sleep 0.1
+    done
+    printf '\r\e[K'
+  fi
+  wait "$RUN_PID" || rc=$?
+  RUN_PID=""
+  if [ "$rc" != 0 ]; then
+    area_clear
+    LIVE=0
+    printf '  %s%s %s%s\n\n' "$C_RED$C_BOLD" "$G_FAIL" "$label" "$C_RESET"
+    sed 's/^/    /' "$log"
+  elif [ "$LIVE" = 1 ]; then
+    TASK="  ${C_GREEN}${G_OK}${C_RESET} $short ${C_DIM}$((SECONDS - start))s${C_RESET}"
+    printf '%s' "$TASK"
+  else
+    printf '  %s%s%s %s %s%ds%s\n' "$C_GREEN" "$G_OK" "$C_RESET" "$label" "$C_DIM" "$((SECONDS - start))" "$C_RESET"
+  fi
+  rm -f "$log"
+  return "$rc"
+}
+
+on_exit() {
+  local rc=$?
+  [ -n "$RUN_PID" ] && kill "$RUN_PID" 2>/dev/null
+  area_clear
+  [ "$IS_TTY" = 1 ] && printf '\e[?25h'
+  if [ "$rc" != 0 ] && [ -n "$CURRENT_STEP" ]; then
+    LIVE=0
+    echo
+    printf '  %s%s Installation stopped during: %s%s\n' "$C_RED$C_BOLD" "$G_FAIL" "$CURRENT_STEP" "$C_RESET"
+    note "Nothing is broken by stopping here. Check the message above (often a"
+    note "lost internet connection), then run the same install command again."
+    note "Add  -s -- -v  after  bash  to see every detail."
+  fi
+}
+trap on_exit EXIT
+
 # The audit report is about the repo's lockfile, not something a marshal can act on.
 export npm_config_audit=false npm_config_fund=false npm_config_update_notifier=false
 
@@ -40,9 +165,10 @@ ask() {
   local var="$1" msg="$2" default="${3:-}"
   if [ -n "${!var:-}" ]; then return; fi
   local value
-  read -rp "$msg${default:+ [$default]}: " value < /dev/tty
+  read -rp "  ${C_BOLD}${C_CYAN}?${C_RESET} ${C_BOLD}${msg}${C_RESET}${default:+ ${C_DIM}[$default]${C_RESET}}: " value < /dev/tty
   printf -v "$var" '%s' "${value:-$default}"
 }
+is_yes() { [[ "$1" =~ ^[Yy] ]]; }
 
 GATE_ENV=/etc/rally-gate/gate.env
 BOOT_CONFIG=/boot/firmware/config.txt
@@ -62,19 +188,22 @@ fi
 CUR_HAS_RTC=n
 grep -qs '^dtoverlay=i2c-rtc,ds3231' "$BOOT_CONFIG" && CUR_HAS_RTC=y
 
-echo "== rally-gate gate-agent setup =="
-[ -r "$GATE_ENV" ] && echo "(existing install found — current settings are the defaults)"
 echo
+printf '  %sRALLY GATE%s  %s·  Timing gate installer%s\n' "$C_BOLD$C_CYAN" "$C_RESET" "$C_DIM" "$C_RESET"
+rule
+note "This sets up this Raspberry Pi as a timing gate. You'll answer a few"
+note "questions first; pressing Enter accepts the suggestion in [brackets]."
+if [ -r "$GATE_ENV" ]; then
+  echo
+  ok "Existing gate found — the suggestions are its current settings,"
+  note "  so pressing Enter everywhere simply updates it."
+fi
 
-echo "No two gates need a globally unique ID by force, but pick one that"
-echo "won't collide if this gate is ever borrowed/loaned to another club or"
-echo "used at a joint event. Prefix it with your club's short code, e.g."
-echo "CLUB_START_WP1 rather than just START_WP1. Defaults to this Pi's"
-echo "current hostname, in case that's already set up the way you want."
-echo "This is the gate's identity on the server; the Pi's network name is"
-echo "derived from it separately, since host names allow no underscores."
-ask GATE_ID "Gate ID (e.g. CLUB_START_WP1)" "${CUR_GATE_ID:-$(hostname)}"
-while [ -z "$GATE_ID" ]; do ask GATE_ID "Gate ID is required"; done
+title "1. Name this gate"
+note "Every gate needs its own name. Start it with your club's short code so"
+note "it stays unique when gates are shared between clubs, e.g. CLUB_START_WP1."
+ask GATE_ID "Gate name" "${CUR_GATE_ID:-$(hostname | tr '[:lower:]-' '[:upper:]_')}"
+while [ -z "$GATE_ID" ]; do ask GATE_ID "A gate name is required"; done
 
 # Derived rather than reused: a host name may contain only letters, digits and
 # hyphens (RFC 1123), while GATE_ID is deliberately underscore-separated
@@ -89,22 +218,23 @@ GATE_HOSTNAME="$(printf '%s' "$GATE_ID" | tr '[:upper:]_ ' '[:lower:]--' | tr -c
 
 SET_HOSTNAME="n"
 if [ "$GATE_HOSTNAME" != "$(hostname)" ]; then
-  ask SET_HOSTNAME "Also rename this Pi's hostname to $GATE_HOSTNAME? (reachable as $GATE_HOSTNAME.local, which the gate config UI will need) (Y/n)" "y"
+  echo
+  note "To open this gate's settings page later, it needs a matching network"
+  note "name: $GATE_HOSTNAME.local (recommended)."
+  ask SET_HOSTNAME "Rename this Pi to $GATE_HOSTNAME? (Y/n)" "y"
 fi
 
+title "2. Timing server"
 # Defaulted, not required: rally-server advertises this name over mDNS
 # (DiscoveryService), and both gate-agent and chrony resolve it through plain
 # getaddrinfo. A gate install therefore needs no knowledge of the network it
 # will be used on — see "Zero-config gates" in docs/development-roadmap.md.
 # An IP typed here still wins, which is the fallback for APs that block
 # multicast.
-echo
-echo "rally-server advertises itself as rally-server.local, so the default works"
-echo "on any rally-gate network. Only enter an address if mDNS/multicast is"
-echo "blocked on your network."
-ask MQTT_HOST "rally-server address" "${CUR_MQTT_HOST:-rally-server.local}"
-
-ask MQTT_PORT "rally-server MQTT port" "${CUR_MQTT_PORT:-57431}"
+note "The gate finds the timing server on its own. Just press Enter, unless"
+note "a technician gave you an address to type in."
+ask MQTT_HOST "Server address" "${CUR_MQTT_HOST:-rally-server.local}"
+ask MQTT_PORT "Server port" "${CUR_MQTT_PORT:-57431}"
 # Not a prompt: this is a property of rally-server, not of the event, and a gate
 # install must not require knowing anything about the rally it will be used at.
 NTP_PORT="${NTP_PORT:-57432}"
@@ -116,80 +246,94 @@ NTP_PORT="${NTP_PORT:-57432}"
 # hardware. Predictable on purpose rather than generated — the organiser needs
 # it on a sticker, and a random one nobody wrote down is a gate that needs a
 # keyboard. 8 characters is WPA2's own minimum.
-echo
-echo "This gate raises a Wi-Fi access point called rally-gate-$GATE_HOSTNAME when"
-echo "it cannot join any network, so the config page stays reachable. Set the same"
-echo "password on every gate at your club and write it on the box."
-ask HOTSPOT_PASSWORD "Hotspot password (min 8 characters)" "${CUR_HOTSPOT_PASSWORD:-rally-gate}"
+title "3. Emergency Wi-Fi"
+note "When this gate can't find a known Wi-Fi, it opens its own network called"
+note "rally-gate-$GATE_HOSTNAME so you can still reach it with a phone."
+note "Use the same password on all your club's gates and write it on the box."
+ask HOTSPOT_PASSWORD "Wi-Fi password (at least 8 characters)" "${CUR_HOTSPOT_PASSWORD:-rally-gate}"
 while [ "${#HOTSPOT_PASSWORD}" -lt 8 ]; do
   HOTSPOT_PASSWORD=""
-  ask HOTSPOT_PASSWORD "Too short — WPA2 needs at least 8 characters" "rally-gate"
+  ask HOTSPOT_PASSWORD "Too short — please use at least 8 characters" "rally-gate"
 done
 
-ask HAS_RTC "DS3231 RTC module connected? (y/n)" "$CUR_HAS_RTC"
+title "4. Clock module"
+note "A DS3231 is a small battery-backed clock board on the Pi's pins."
+note "Answer n if you're not sure."
+ask HAS_RTC "Is a DS3231 clock module fitted? (y/n)" "$CUR_HAS_RTC"
 
+title "Summary"
+row() { printf '  %s%-16s%s %s\n' "$C_DIM" "$1" "$C_RESET" "$2"; }
+row "Gate name" "$GATE_ID"
+row "Network name" "$(is_yes "$SET_HOSTNAME" && echo "$GATE_HOSTNAME.local (renamed from $(hostname))" || echo "$(hostname).local (unchanged)")"
+row "Timing server" "$MQTT_HOST:$MQTT_PORT"
+row "Emergency Wi-Fi" "rally-gate-$GATE_HOSTNAME  /  $HOTSPOT_PASSWORD"
+row "Clock module" "$(is_yes "$HAS_RTC" && echo "DS3231" || echo "none")"
+row "Install folder" "$INSTALL_DIR"
 echo
-echo "  Gate ID:     $GATE_ID"
-echo "  Hostname:    $([[ "$SET_HOSTNAME" =~ ^[Yy]$ ]] && echo "$GATE_HOSTNAME.local (renaming from $(hostname))" || echo "unchanged ($(hostname).local)")"
-echo "  MQTT host:   $MQTT_HOST:$MQTT_PORT"
-echo "  Hotspot:     rally-gate-$GATE_HOSTNAME / $HOTSPOT_PASSWORD"
-echo "  Install dir: $INSTALL_DIR"
-echo "  RTC:         $([[ "$HAS_RTC" =~ ^[Yy]$ ]] && echo "DS3231" || echo "none")"
-echo
-read -rp "Proceed with install? [Y/n] " confirm < /dev/tty
-[[ "${confirm:-y}" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 1; }
+note "Installing takes about 5–15 minutes and needs internet access."
+read -rp "  ${C_BOLD}${C_CYAN}?${C_RESET} ${C_BOLD}Start the installation?${C_RESET} ${C_DIM}[Y/n]${C_RESET}: " confirm < /dev/tty
+is_yes "${confirm:-y}" || { echo; note "Cancelled — nothing was changed."; exit 0; }
 
+# The spinner runs commands in the background, where sudo can't ask for a
+# password — so ask once up front and keep the ticket alive for the long build.
+sudo -v
+( while kill -0 $$ 2>/dev/null; do sudo -n true; sleep 50; done ) >/dev/null 2>&1 &
+
+if [ "$IS_TTY" = 1 ] && [ "$VERBOSE" = 0 ]; then
+  LIVE=1
+  printf '\n\e[?25l'
+fi
+
+step "Preparing the system"
 # A fresh Pi OS image ships with empty apt lists, so every apt-get install
 # below (git, chrony, i2c-tools, and nodejs when nodesource doesn't run) needs
 # this.
-echo "-- updating package lists --"
-quiet sudo apt-get update
-
+run "Updating package lists" sudo apt-get update
 # Pi OS Lite ships no git, and this script reaches the Pi through curl | bash
 # rather than from a clone — so nothing has pulled it in by the time the clone
 # below runs. Installed unconditionally: apt is a no-op when it is already
 # there, and a `command -v` guard only adds a branch that is wrong on the one
 # image that matters.
-quiet sudo apt-get install -y git
+run "Installing git" sudo apt-get install -y git
 # gpiod: the light-barrier adapter reads its GPIO pin through gpiomon, and the
 # gpio group is what lets the unprivileged service open /dev/gpiochip*.
-quiet sudo apt-get install -y gpiod
+run "Installing sensor tools" sudo apt-get install -y gpiod
 getent group gpio >/dev/null && sudo usermod -aG gpio "$USER"
 
-if ! command -v node >/dev/null; then
-  echo "-- installing Node.js --"
-  curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
-  quiet sudo -E bash /tmp/nodesource_setup.sh
-  quiet sudo apt-get install -y nodejs
+step "Installing Node.js"
+if command -v node >/dev/null; then
+  info "Node.js $(node --version) already installed"
+else
+  run "Downloading Node.js setup" curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
+  run "Adding Node.js source" sudo -E bash /tmp/nodesource_setup.sh
+  run "Installing Node.js" sudo apt-get install -y nodejs
 fi
 
-echo "-- fetching rally-gate --"
+step "Downloading Rally Gate"
 if [ -d "$INSTALL_DIR/.git" ]; then
   # Not `pull`: it refuses on a rewritten upstream history or on a lockfile an
   # older installer's `npm install` left modified. Nobody edits this clone on
   # purpose — config lives in /etc, build output is gitignored.
-  quiet git -C "$INSTALL_DIR" fetch
-  quiet git -C "$INSTALL_DIR" reset --hard '@{u}'
+  run "Fetching the latest version" git -C "$INSTALL_DIR" fetch
+  run "Updating files" git -C "$INSTALL_DIR" reset --hard '@{u}'
 else
-  quiet git clone "$REPO_URL" "$INSTALL_DIR"
+  run "Downloading" git clone "$REPO_URL" "$INSTALL_DIR"
 fi
 
-echo "-- building gate-agent --"
+step "Building the gate software"
 cd "$INSTALL_DIR"
 # ci, not install: exactly what CI tested, and it never rewrites the lockfile —
 # which `install` did, leaving the clone dirty.
 # Only the gate's workspaces: the rest of the monorepo (rally-server's Nest,
 # TypeORM and native better-sqlite3, the dashboard) is about half the install
 # and never runs here. A new workspace the gate imports must be added here too.
-quiet npm ci --workspace=@rally-gate/shared --workspace=@rally-gate/gate-agent --workspace=@rally-gate/gate-config
-quiet npm run build --workspace=@rally-gate/shared
-quiet npm run build --workspace=@rally-gate/gate-agent
-
-echo "-- building gate-config (web UI, takes a minute on slower hardware) --"
+run "Installing dependencies" npm ci --workspace=@rally-gate/shared --workspace=@rally-gate/gate-agent --workspace=@rally-gate/gate-config
+run "Building shared code" npm run build --workspace=@rally-gate/shared
+run "Building the gate service" npm run build --workspace=@rally-gate/gate-agent
 # build:deploy skips vue-tsc: it OOMs a Pi on the Vuetify types, and CI already typechecks.
-quiet npm run build:deploy --workspace=@rally-gate/gate-config
+run "Building the settings page (the slowest part)" npm run build:deploy --workspace=@rally-gate/gate-config
 
-echo "-- installing configuration --"
+step "Saving gate settings"
 # Config lives in a file, not in the unit: the gate config UI rewrites it at
 # runtime, and a unit file is code — a partial write there bricks the service,
 # and changing it needs a daemon-reload. On a re-run only the keys prompted for
@@ -208,8 +352,9 @@ sudo mv /tmp/rally-gate.env "$GATE_ENV"
 # The directory, not just the file: gate-config saves by writing a temp file
 # beside gate.env and renaming it over, which needs write access to the dir.
 sudo chown -R "$USER": /etc/rally-gate
+info "Settings saved to $GATE_ENV"
 
-echo "-- installing systemd services --"
+step "Setting up background services"
 sudo tee /etc/systemd/system/rally-gate-agent.service >/dev/null <<EOF
 [Unit]
 Description=rally-gate gate-agent ($GATE_ID)
@@ -266,7 +411,7 @@ EOF
 # only recommends it, and without it the hotspot comes up but no phone gets an
 # address. -base is the bare binary; the `dnsmasq` package would add a
 # system-wide service fighting NetworkManager's for port 53.
-quiet sudo apt-get install -y dnsmasq-base
+run "Installing emergency Wi-Fi support" sudo apt-get install -y dnsmasq-base
 sudo mkdir -p /etc/NetworkManager/dnsmasq-shared.d
 echo 'address=/#/10.42.0.1' | sudo tee /etc/NetworkManager/dnsmasq-shared.d/rally-gate-captive.conf >/dev/null
 
@@ -290,7 +435,8 @@ EOF
 sudo chmod 0440 /etc/sudoers.d/rally-gate-config
 # A malformed sudoers file locks out sudo entirely, so check before trusting it.
 sudo visudo -cf /etc/sudoers.d/rally-gate-config >/dev/null || {
-  echo "   sudoers drop-in invalid, removing it"; sudo rm -f /etc/sudoers.d/rally-gate-config; }
+  warn "Permission file invalid, removing it — the settings page can't restart the gate"
+  sudo rm -f /etc/sudoers.d/rally-gate-config; }
 
 # Reachability before the gate has a network — the state the config page is
 # most needed in. Also the recovery path *after* a network that used to work
@@ -331,32 +477,30 @@ sudo systemctl daemon-reload
 # README tells a marshal to update by re-running this script, so it has to
 # actually take effect. `restart` starts a stopped unit too, so one line covers
 # both a fresh install and an upgrade.
-quiet sudo systemctl enable rally-gate-agent
-sudo systemctl restart rally-gate-agent
-quiet sudo systemctl enable rally-gate-config
-sudo systemctl restart rally-gate-config
+run "Starting the gate service" sh -c 'sudo systemctl enable rally-gate-agent && sudo systemctl restart rally-gate-agent'
+run "Starting the settings page" sh -c 'sudo systemctl enable rally-gate-config && sudo systemctl restart rally-gate-config'
 if command -v nmcli >/dev/null; then
-  quiet sudo systemctl enable --now rally-gate-hotspot.timer
+  run "Enabling emergency Wi-Fi" sudo systemctl enable --now rally-gate-hotspot.timer
 else
   # Pi OS Bookworm ships NetworkManager; an older image or a gate wired by
   # Ethernet has none, and the watchdog would just fail every 30s.
-  echo "   no NetworkManager — skipping the hotspot fallback"
+  warn "No NetworkManager on this Pi — emergency Wi-Fi is not available"
 fi
 
-echo "-- configuring chrony against $MQTT_HOST:$NTP_PORT --"
+step "Setting up clock sync"
 # apt's chrony Conflicts: with systemd-timesyncd so this is usually redundant,
 # but do it explicitly: two daemons steering one clock is precisely the
 # mid-stage discontinuity "Gate system clock policy" in docs/decoder-adapters.md
 # exists to prevent, and it would be invisible in the timing data.
 sudo systemctl disable --now systemd-timesyncd >/dev/null 2>&1 || true
-quiet sudo apt-get install -y chrony
+run "Installing the clock service" sudo apt-get install -y chrony
 
 # What makes rally-server.local resolve for chrony and gate-agent alike: avahi
 # answers mDNS, libnss-mdns is what puts it behind getaddrinfo. Raspberry Pi OS
 # ships both (it is how raspberrypi.local works), installed explicitly because
 # without them the default address resolves to nothing and the gate simply
 # never connects.
-quiet sudo apt-get install -y avahi-daemon libnss-mdns
+run "Installing server discovery" sudo apt-get install -y avahi-daemon libnss-mdns
 
 # A conf.d drop-in, not a replacement chrony.conf, because Debian's default
 # already sets `makestep 1 3` (step only on the first few updates, slew forever
@@ -379,37 +523,37 @@ EOF
 # (seen with a laptop 3.5s off) and follows a different clock than a gate that
 # can't. Commented out rather than replacing chrony.conf, to keep makestep.
 sudo sed -i -E 's,^(pool |sourcedir /run/chrony-dhcp),#rally-gate: &,' /etc/chrony/chrony.conf
-sudo systemctl restart chrony
+run "Pointing the clock at the timing server ($MQTT_HOST:$NTP_PORT)" sudo systemctl restart chrony
 
 # Printed rather than asserted: a hostname typed for MQTT_HOST comes back
 # resolved here, so grepping for it would false-alarm. Look for a line whose
 # first column is '^*' or '^+' against the time reference. If it is absent
 # entirely, this chrony's chrony.conf is missing `confdir /etc/chrony/conf.d`
 # and the drop-in above was ignored.
-echo "   chrony sources ($MQTT_HOST should appear here):"
-chronyc sources || true
+CHRONY_SOURCES="$(chronyc sources 2>&1 || true)"
 
 # Exercises the exact path chrony and gate-agent use (getaddrinfo, so nss-mdns
 # included), rather than trusting that avahi is merely installed.
+SERVER_STATUS="not found yet"
 if getent hosts "$MQTT_HOST" >/dev/null 2>&1; then
-  echo "   $MQTT_HOST resolves to $(getent hosts "$MQTT_HOST" | awk '{print $1}' | head -1)"
+  SERVER_STATUS="found at $(getent hosts "$MQTT_HOST" | awk '{print $1}' | head -1)"
+  info "Timing server $SERVER_STATUS"
 else
-  echo "   WARNING: $MQTT_HOST does not resolve. If rally-server is running,"
-  echo "   this network is probably blocking mDNS/multicast — re-run with an IP:"
-  echo "     MQTT_HOST=<ip> bash -c \"\$(curl -fsSL <this script url>)\""
+  warn "Timing server $MQTT_HOST not found right now."
+  note "  That's fine if the server isn't running yet. If it is, this network"
+  note "  probably blocks auto-discovery — run the installer again with its IP:"
+  note "    MQTT_HOST=<ip> bash -c \"\$(curl -fsSL <this script url>)\""
 fi
 
+step "Hostname and clock module"
 REBOOT_NEEDED=0
-
-if [[ "$SET_HOSTNAME" =~ ^[Yy]$ ]]; then
-  echo "-- renaming hostname to $GATE_HOSTNAME --"
-  sudo raspi-config nonint do_hostname "$GATE_HOSTNAME"
+if is_yes "$SET_HOSTNAME"; then
+  run "Renaming this Pi to $GATE_HOSTNAME" sudo raspi-config nonint do_hostname "$GATE_HOSTNAME"
   REBOOT_NEEDED=1
 fi
 
-if [[ "$HAS_RTC" =~ ^[Yy]$ ]]; then
-  echo "-- configuring DS3231 RTC --"
-  quiet sudo apt-get install -y i2c-tools
+if is_yes "$HAS_RTC"; then
+  run "Installing clock module tools" sudo apt-get install -y i2c-tools
 
   grep -q '^dtparam=i2c_arm=on' "$BOOT_CONFIG" || { echo 'dtparam=i2c_arm=on' | sudo tee -a "$BOOT_CONFIG" >/dev/null; REBOOT_NEEDED=1; }
   grep -q '^dtoverlay=i2c-rtc,ds3231' "$BOOT_CONFIG" || { echo 'dtoverlay=i2c-rtc,ds3231' | sudo tee -a "$BOOT_CONFIG" >/dev/null; REBOOT_NEEDED=1; }
@@ -421,22 +565,40 @@ if [[ "$HAS_RTC" =~ ^[Yy]$ ]]; then
   # the corrected time back to the DS3231 — chrony sets it, the RTC holds it
   # through a reboot with no network.
   sudo apt-get purge -y fake-hwclock >/dev/null 2>&1 || true
+  info "DS3231 clock module enabled"
 fi
+is_yes "$SET_HOSTNAME" || is_yes "$HAS_RTC" || info "Nothing to change"
+
+CURRENT_STEP="Installation complete" TASK=""
+if [ "$LIVE" = 1 ]; then
+  area_draw "$TOTAL_STEPS"
+  printf '\e[?25h'
+  AREA=0 LIVE=0
+fi
+CURRENT_STEP=""
 
 echo
-echo "Done. gate-agent ($GATE_ID) is running — logs: journalctl -u rally-gate-agent -f"
-echo "Config UI: http://$GATE_HOSTNAME.local:57439  (change the gate's settings"
-echo "there instead of re-running this script)"
-echo "Clock sync: chronyc tracking  (System time offset should settle under a"
-echo "few ms; the Hardware page's clock column is the same check from the server)"
+echo
+printf '  %s%s Gate %s is installed and running%s\n' "$C_GREEN$C_BOLD" "$G_OK" "$GATE_ID" "$C_RESET"
+rule
+row "Timing server" "$MQTT_HOST ($SERVER_STATUS)"
+row "Settings page" "${C_BOLD}http://$GATE_HOSTNAME.local:57439${C_RESET}"
+note "                   Change the gate's settings there — no need to re-run this."
 if command -v nmcli >/dev/null; then
-  echo "If this gate ever finds no Wi-Fi it raises its own access point within a"
-  echo "minute — join rally-gate-$GATE_HOSTNAME (password $HOTSPOT_PASSWORD) and open"
-  echo "http://$GATE_HOSTNAME.local:57439 to point it at the right network."
+  row "Emergency Wi-Fi" "rally-gate-$GATE_HOSTNAME  /  $HOTSPOT_PASSWORD"
+  note "                   Appears within a minute when no known Wi-Fi is around."
 fi
+echo
+note "For technicians:"
+note "  Logs:        journalctl -u rally-gate-agent -f"
+note "  Clock sync:  chronyc tracking  (offset should settle under a few ms)"
+note "  Clock sources ($MQTT_HOST should be listed):"
+printf '%s\n' "$CHRONY_SOURCES" | sed "s/^/    $C_DIM/; s/\$/$C_RESET/"
 
-if [ "$REBOOT_NEEDED" = "1" ]; then
+if [ "$REBOOT_NEEDED" = 1 ]; then
   echo
-  read -rp "Hostname/RTC changes need a reboot to take effect. Reboot now? [Y/n] " reboot_ok < /dev/tty
-  [[ "${reboot_ok:-y}" =~ ^[Yy]$ ]] && sudo reboot
+  warn "A restart is needed to finish (new name / clock module)."
+  read -rp "  ${C_BOLD}${C_CYAN}?${C_RESET} ${C_BOLD}Restart now?${C_RESET} ${C_DIM}[Y/n]${C_RESET}: " reboot_ok < /dev/tty
+  is_yes "${reboot_ok:-y}" && sudo reboot
 fi
+exit 0
