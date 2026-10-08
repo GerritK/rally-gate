@@ -102,8 +102,10 @@ What exists, with where its reasoning lives. History is in git.
 
 ## Next
 
-OpenStint (below) resumes when the hardware arrives. Nothing else is queued:
-pick the next item from the deferred list.
+- **ESP32 NFC check-in gate** — hardware ordered (XIAO ESP32-S3, PN532),
+  firmware not started. Designed in `esp32-gate.md`; no rally-server change.
+
+OpenStint (below) resumes when the hardware arrives.
 
 ## Deliberately deferred
 

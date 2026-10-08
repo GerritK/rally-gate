@@ -122,10 +122,10 @@ fixes was seconds. Confirm the `-t` timestamp format against real output.
 
 ## Other adapter ideas
 
-- **ESP32 checkpoint gates** for Parc Fermé / pre-start, where presence matters
-  and timing doesn't (RFID reader or a button). A gate is anything that
-  publishes the right JSON to `rally/gates/<gateId>/detections` — no gate-agent
-  needed.
+- **ESP32 checkpoint gates** for check-in, Parc Fermé and pre-start, where
+  presence matters and timing doesn't. A gate is anything that publishes the
+  right JSON to `rally/gates/<gateId>/detections`, so no gate-agent is needed.
+  The NFC one is designed in `esp32-gate.md`.
 
 ### Multiple IDs per entry
 

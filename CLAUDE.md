@@ -14,6 +14,7 @@ Rally Gate: open, modular timing/event management system for RC rally events. Fu
 - `docs/frontend-structure.md` — routes and nav of `apps/web` and why — read before changing routes/nav
 - `docs/design-system.md` — colour, type, layout, status, confirmation and print rules for every web UI — read before building or restyling one
 - `docs/gate-config-ui.md` — the on-gate config service (`apps/gate-config`, port 57439); built, including Wi-Fi + the hotspot fallback — read the "Wi-Fi goes through a wrapper" section before touching anything that shells out to `nmcli`
+- `docs/esp32-gate.md` — planned ESP32 + PN532 NFC check-in gate: hardware choice, firmware mapping of the Pi stack, time without an RTC, flash budget
 - `docs/development-roadmap.md` — standing rules, what's built, what's next, what's deliberately deferred (check this before starting new work)
 
 ## Commands
