@@ -7,7 +7,7 @@ sharing `client.ts`). Audience is marshals and organisers only.
 | Route | Nav | Contents |
 |---|---|---|
 | `/` | — | redirect to `/live` |
-| `/live/:stageId?` | Live Timing | the marshal view, laid out like the stage: its gates on a line in the order a car meets them, each with its health; "Up next" (next car large with Start now, the two after it) beside cars on stage in expected arrival order, each with Finish now (split progress, last split with gap to the best); every entry in start order with its run state, times and corrections (a stage time derives the finish), and Enter time for a car with no run (a missed start: finish and stage time give the start); unidentified passings in On stage, starts included (a car that crossed the start line is on stage), with a suggested entry; Activate / Close; freeze and print the start list; raw detections collapsed. A car not yet scrutineered is marked in Up next and on the list; Freeze and Activate name such cars and ask. No stage picks the active one, else the next |
+| `/live/:stageId?` | Live Timing | the marshal view, laid out like the stage: its gates on a line in the order a car meets them, each with its health; "Up next" (next car large with Start now, the two after it) beside cars on stage in expected arrival order, each with Finish now (split progress, last split with gap to the best); every entry in start order with its run state, times and corrections (a stage time derives the finish), and Enter time for a car with no run (a missed start: finish and stage time give the start); unidentified passings in On stage, starts included (a car that crossed the start line is on stage), with a suggested entry; Activate / Close; freeze and print the start list. A car not yet scrutineered is marked in Up next and on the list; Freeze and Activate name such cars and ask. No stage picks the active one, else the next |
 | `/results/overall` | Results | podium, overall classification, each stage column the time driven, the fastest marked, the gap to it in the tooltip, its header linking to that stage's results, filterable by class; Print / Print all open a PDF (every class's ranking on its own sheets) |
 | `/results/stages/:stageId` | Results | podium, stage classification with a column per split (the time and its rank, the fastest marked, the gap to it in the tooltip), DNF/DNS, filterable by class; Print / Print all open a PDF (every class's ranking on its own sheets) |
 | `/entries` | Entries | registration in a dialog, status, classes; per row the status's next step (Check in, Passed) and ⋮ for the rest (back a step, Withdraw, Disqualify, Reinstate); Check-in in the header; a row opens the entry |
@@ -52,8 +52,8 @@ sharing `client.ts`). Audience is marshals and organisers only.
   assignments read-only, linking to each stage.
 - **Raw detections are on the gate's page**, filtered server-side
   (`GET /events?gateId=`): the unfiltered list is the last 100 of every gate,
-  where a quiet gate's passings would scroll out. Live Timing keeps its
-  stage-wide panel.
+  where a quiet gate's passings would scroll out. Live Timing has none: a
+  marshal there needs runs and unassigned passings, not the feed behind them.
 - **Activation is on Live Timing and per stage** — it is an operational
   mid-event action, like Close. There is no deactivate button; gates turn off by
   closing the stage.

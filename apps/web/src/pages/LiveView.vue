@@ -16,7 +16,6 @@ import {
   dismissEvent,
   fetchAwaitingEvents,
   fetchPendingEvents,
-  fetchRecentEvents,
   retryPendingEvents,
   type DetectionEventRecord,
 } from '../api/events';
@@ -64,11 +63,7 @@ import ClassChip from '../components/ClassChip.vue';
 import CrewName from '../components/CrewName.vue';
 import StartNumber from '../components/StartNumber.vue';
 import { driverName } from '../crew';
-import {
-  formatClockTime,
-  formatStageDuration,
-  useConfirm,
-} from '@rally-gate/ui';
+import { formatStageDuration, useConfirm } from '@rally-gate/ui';
 import { carriersOf, suggestEntries } from '../passing-suggestions';
 import { printPdf, startListPdf } from '../pdf';
 import {
@@ -92,7 +87,6 @@ const gateAssignments = ref<GateAssignment[]>([]);
 const startOrder = ref<StartOrder | null>(null);
 const stageRuns = ref<StageRun[]>([]);
 const splitsByRun = ref<Record<string, StageSplit[]>>({});
-const detections = ref<DetectionEventRecord[]>([]);
 const pendingDetections = ref<DetectionEventRecord[]>([]);
 const awaitingDetections = ref<DetectionEventRecord[]>([]);
 /** Only what a marshal picked by hand; otherwise the suggestion applies. */
@@ -474,15 +468,6 @@ const gateFlow = computed(() => {
     });
 });
 
-const stageDetections = computed(() => {
-  const gateIds = new Set(
-    gateAssignments.value
-      .filter((a) => a.active && a.stageId === props.stageId)
-      .map((a) => a.gateId),
-  );
-  return detections.value.filter((event) => gateIds.has(event.gateId));
-});
-
 function flashGate(gateId: string) {
   flashingGateIds.value[gateId] = true;
   setTimeout(() => {
@@ -801,7 +786,6 @@ onMounted(async () => {
   // reconnect, so a dropped connection doesn't leave the page quietly stale.
   const loadLive = () =>
     Promise.all([
-      fetchRecentEvents().then((d) => (detections.value = d)),
       fetchGates().then((g) => (gates.value = g)),
       fetchPendingEvents().then((p) => (pendingDetections.value = p)),
       fetchAwaitingEvents().then((a) => (awaitingDetections.value = a)),
@@ -809,10 +793,7 @@ onMounted(async () => {
     ]);
   liveSource = openLiveStream(
     {
-      detection: (event) => {
-        detections.value.unshift(event);
-        flashGate(event.gateId);
-      },
+      detection: (event) => flashGate(event.gateId),
       gate: upsertGate,
       'stage-run': upsertStageRun,
       'stage-run-split': upsertSplit,
@@ -1407,40 +1388,6 @@ onUnmounted(() => {
       <TableLegend :marks="anyManual ? ['manual'] : []" />
     </div>
   </v-card>
-
-  <v-expansion-panels v-if="stage">
-    <v-expansion-panel>
-      <v-expansion-panel-title>
-        Raw detections ({{ stageDetections.length }})
-      </v-expansion-panel-title>
-      <v-expansion-panel-text>
-        <v-table density="compact">
-          <thead>
-            <tr>
-              <th>Gate</th>
-              <th>Transponder</th>
-              <th>Entry</th>
-              <th class="rg-time">Gate Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="event in stageDetections" :key="event.eventId">
-              <td>{{ gateName(event.gateId) }}</td>
-              <td>{{ event.transponderId ?? '-' }}</td>
-              <td>
-                {{
-                  event.entryId ? entryName(entries, event.entryId) : 'unknown'
-                }}
-              </td>
-              <td class="rg-timing rg-time">
-                {{ formatClockTime(event.timestampGate) }}
-              </td>
-            </tr>
-          </tbody>
-        </v-table>
-      </v-expansion-panel-text>
-    </v-expansion-panel>
-  </v-expansion-panels>
 
   <RunCorrectionDialog
     v-if="props.stageId"
