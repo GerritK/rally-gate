@@ -11,7 +11,7 @@ import EntryStatusActions from '../components/EntryStatusActions.vue';
 import { ENTRY_STATUS_DISPLAY } from '../format';
 import TransponderFields from '../components/TransponderFields.vue';
 import {
-  formatTransponders,
+  transponderLabels,
   toTransponderDrafts,
   toTransponderInput,
 } from '../entry-status';
@@ -331,7 +331,10 @@ onMounted(refresh);
                   : 'text-medium-emphasis'
               "
             >
-              {{ formatTransponders(selected) ?? '-' }}
+              <div v-for="label in transponderLabels(selected)" :key="label">
+                {{ label }}
+              </div>
+              <template v-if="selected.transponders.length === 0">-</template>
             </dd>
           </template>
         </dl>

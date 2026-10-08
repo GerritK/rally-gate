@@ -15,9 +15,11 @@ const props = defineProps<{
 }>();
 const list = defineModel<TransponderDraft[]>({ required: true });
 
+// Short in the field, which is narrow; spelled out in the list.
 const KIND_OPTIONS = Object.values(TransponderKind).map((value) => ({
   value,
-  title: TRANSPONDER_KINDS[value],
+  title: value,
+  subtitle: TRANSPONDER_KINDS[value],
 }));
 
 const warnings = computed(() =>
@@ -38,35 +40,35 @@ function remove(index: number) {
 
 <template>
   <div class="rg-transponders">
-    <div v-for="(t, i) in list" :key="i" class="rg-transponder">
-      <v-select
-        v-model="t.kind"
-        :items="KIND_OPTIONS"
-        label="Kind"
-        class="rg-transponder-kind"
-      />
-      <v-text-field
-        v-model="t.identifier"
-        label="Transponder ID"
-        :messages="warnings.rows[i]"
-        class="rg-field-warning rg-transponder-id"
-      />
-      <v-text-field
-        v-model="t.label"
-        label="Label (optional)"
-        placeholder="spare car"
-        class="rg-transponder-label"
-      />
-      <v-btn
-        icon="mdi-close"
-        variant="text"
-        size="small"
-        aria-label="Remove transponder"
-        class="mt-2"
-        @click="remove(i)"
-      />
-    </div>
-    <div v-if="warnings.list" class="text-warning text-caption">
+    <template v-for="(t, i) in list" :key="i">
+      <div class="rg-transponder">
+        <v-select
+          v-model="t.kind"
+          :items="KIND_OPTIONS"
+          :item-props="true"
+          label="Kind"
+        />
+        <v-text-field v-model="t.identifier" label="ID" class="rg-timing" />
+        <v-text-field
+          v-model="t.label"
+          label="Label"
+          placeholder="spare car"
+          class="rg-transponder-label"
+        />
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          aria-label="Remove transponder"
+          class="mt-2"
+          @click="remove(i)"
+        />
+      </div>
+      <div v-if="warnings.rows[i]" class="rg-transponder-warning">
+        {{ warnings.rows[i] }}
+      </div>
+    </template>
+    <div v-if="warnings.list" class="rg-transponder-warning">
       {{ warnings.list }}
     </div>
     <div>
@@ -83,22 +85,26 @@ function remove(index: number) {
   flex-direction: column;
   gap: 8px;
 }
-/* Kind and ID side by side; the label wraps under them when the column is
- * narrow (the entry dialog's half), the remove button stays at the end. */
+/* One row per transponder, even in the entry dialog's half column. */
 .rg-transponder {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) minmax(0, 1fr) auto;
   align-items: start;
   column-gap: 8px;
 }
-.rg-transponder-kind {
-  flex: 0 0 150px;
+/* A phone has no room for the label beside the ID: it goes underneath. */
+@media (max-width: 599px) {
+  .rg-transponder {
+    grid-template-columns: 96px minmax(0, 1fr) auto;
+  }
+  .rg-transponder-label {
+    grid-column: 2 / 3;
+    grid-row: 2;
+  }
 }
-.rg-transponder-id {
-  flex: 1 1 140px;
-}
-.rg-transponder-label {
-  flex: 1 1 140px;
-  order: 1;
+.rg-transponder-warning {
+  color: rgb(var(--v-theme-warning));
+  font-size: 0.75rem;
+  margin-top: -4px;
 }
 </style>

@@ -9,7 +9,7 @@ import StartNumber from '../components/StartNumber.vue';
 import EntryDialog from '../components/EntryDialog.vue';
 import EntryStatusActions from '../components/EntryStatusActions.vue';
 import { ENTRY_STATUS_DISPLAY } from '../format';
-import { formatTransponders } from '../entry-status';
+import { transponderLabels } from '../entry-status';
 
 const router = useRouter();
 const entries = ref<Entry[]>([]);
@@ -84,7 +84,7 @@ onMounted(refresh);
             <td><CrewName :crew="entry" /></td>
             <td>{{ entry.body ?? '-' }}</td>
             <td class="rg-timing d-none d-md-table-cell">
-              {{ formatTransponders(entry) ?? '-' }}
+              {{ transponderLabels(entry).join(', ') || '-' }}
             </td>
             <td v-if="classes.length > 0">
               <ClassChip

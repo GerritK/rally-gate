@@ -91,16 +91,13 @@ export const TRANSPONDER_KINDS: Record<TransponderKind, string> = {
   [TransponderKind.NFC]: 'NFC tag',
 };
 
-/** "1234567, NFC 0042 (spare car)" — RC goes without saying. */
-export function formatTransponders(entry: Entry): string | undefined {
-  if (entry.transponders.length === 0) return undefined;
-  return entry.transponders
-    .map(
-      (t) =>
-        `${t.kind === TransponderKind.RC ? '' : `${t.kind} `}${t.identifier}` +
-        (t.label ? ` (${t.label})` : ''),
-    )
-    .join(', ');
+/** "1234567", "NFC 0042 (driver tag)" — RC goes without saying. */
+export function transponderLabels(entry: Entry): string[] {
+  return entry.transponders.map(
+    (t) =>
+      `${t.kind === TransponderKind.RC ? '' : `${t.kind} `}${t.identifier}` +
+      (t.label ? ` (${t.label})` : ''),
+  );
 }
 
 export interface TransponderDraft {
@@ -164,7 +161,7 @@ export function transponderWarnings(
   return {
     rows,
     list: doubled
-      ? `Several ${TRANSPONDER_KINDS[doubled]}s: fine for a spare car, but after a swap remove the old one.`
+      ? `Several ${TRANSPONDER_KINDS[doubled]}s: keep them registered, but only one may be on the car at a time.`
       : undefined,
   };
 }

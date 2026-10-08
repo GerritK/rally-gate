@@ -20,7 +20,7 @@ import StartNumber from '../components/StartNumber.vue';
 import EntryDialog from '../components/EntryDialog.vue';
 import EntryStatusActions from '../components/EntryStatusActions.vue';
 import { flagName, flagUrl } from '../crew';
-import { formatTransponders } from '../entry-status';
+import { transponderLabels } from '../entry-status';
 import {
   formatDuration,
   formatGap,
@@ -245,7 +245,10 @@ onMounted(refresh);
                   : 'text-medium-emphasis'
               "
             >
-              {{ formatTransponders(entry) ?? '-' }}
+              <div v-for="label in transponderLabels(entry)" :key="label">
+                {{ label }}
+              </div>
+              <template v-if="entry.transponders.length === 0">-</template>
             </dd>
           </dl>
         </v-card-text>
