@@ -8,7 +8,6 @@ import {
 import { formatStageDuration } from '@rally-gate/ui';
 import type { GateAssignment } from './api/gate-assignments';
 import type { Gate } from './api/gates';
-import type { Stage } from './api/stages';
 import type { Entry } from './api/entries';
 import { driverName } from './crew';
 
@@ -162,10 +161,6 @@ export function combineDateAndTime(
   const [h, m, s] = timeValue.split(':').map(Number);
   d.setHours(h, m, s ?? 0, 0);
   return d.toISOString();
-}
-
-export function stageName(stages: Stage[], stageId: string): string {
-  return stages.find((stage) => stage.id === stageId)?.name ?? stageId;
 }
 
 export function entryName(entries: Entry[], entryId: string): string {

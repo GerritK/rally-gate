@@ -22,10 +22,6 @@ npm run lint:check   # what CI runs (--fix in CI would repair the tree and repor
 npm run build        # nest build
 ```
 
-`npm run test:e2e` exists and works but is a single smoke test over `GET /api`,
-and **CI does not run it** — CI's test step is `npm test --workspaces`, which is
-jest over `src/`. Treat the `*.spec.ts` files under `src/` as the real suite.
-
 ## Where the reasoning lives
 
 - [docs/architecture.md](../../docs/architecture.md) — event pipeline, gate

@@ -38,10 +38,6 @@ export function fetchEntries(): Promise<Entry[]> {
   return apiFetch('/entries');
 }
 
-export function fetchEntry(id: string): Promise<Entry | null> {
-  return apiFetch(`/entries/${id}`);
-}
-
 export function createEntry(
   input: EntryPatch & { startNumber: number; driverFirstName: string },
 ): Promise<Entry> {
