@@ -24,7 +24,9 @@ function dismiss() {
       </v-card-text>
       <v-card-actions>
         <v-spacer />
-        <v-btn variant="text" @click="answer(false)">Cancel</v-btn>
+        <v-btn variant="text" @click="answer(false)">{{
+          $t('ui.cancel')
+        }}</v-btn>
         <v-btn
           :color="pendingConfirm.options.color ?? 'primary'"
           @click="answer(true)"

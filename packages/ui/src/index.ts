@@ -19,3 +19,11 @@ export {
   type ConfirmOptions,
 } from './feedback';
 export { default as RallyFeedback } from './RallyFeedback.vue';
+export { default as LocaleMenu } from './LocaleMenu.vue';
+export {
+  createRallyI18n,
+  currentLocale,
+  t,
+  LOCALES,
+  type Locale,
+} from './i18n';

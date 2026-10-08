@@ -6,11 +6,9 @@ export type FieldGroup = 'general' | 'decoder';
 
 /** A setting as the browser receives it. Named so the wire contract is
  *  explicit rather than inferred from `as const` specs, whose literal types
- *  are an implementation detail of the server's own checks. */
+ *  are an implementation detail of the server's own checks. Rules only: its
+ *  label, hint and message are the page's, under `fields.<NAME>`. */
 export interface FieldDescriptor {
-  label: string;
-  hint: string;
-  message: string;
   group: FieldGroup;
   /** Shown only while ADAPTER has this value. */
   adapter?: string;
@@ -18,6 +16,18 @@ export interface FieldDescriptor {
   pattern?: string;
   range?: [number, number];
 }
+
+/** Why the server refused a setting; the page words it. `invalid` is the
+ *  field's own rule, so its message is `fields.<NAME>.message`. */
+export type FieldError = 'unknown' | 'notText' | 'lineBreak' | 'invalid';
+
+export type WifiError =
+  | 'ssidMissing'
+  | 'ssidTooLong'
+  | 'lineBreak'
+  | 'leadingHyphen'
+  | 'notText'
+  | 'passwordInvalid';
 
 export interface CommandResult {
   ok: boolean;

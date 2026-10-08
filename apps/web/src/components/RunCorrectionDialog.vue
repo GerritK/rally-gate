@@ -5,6 +5,7 @@ import {
   formatStageDuration,
   openTimePicker,
   parseStageDuration,
+  t,
 } from '@rally-gate/ui';
 import type { Entry } from '../api/entries';
 import {
@@ -60,9 +61,14 @@ defineExpose({ correct, enter });
 
 const title = computed(() =>
   correcting.value
-    ? `Correct ${entryName(props.entries, correcting.value.entryId)}, attempt ${correcting.value.attempt}`
+    ? t('correction.correctTitle', {
+        entry: entryName(props.entries, correcting.value.entryId),
+        attempt: correcting.value.attempt,
+      })
     : enteringEntryId.value
-      ? `Enter time for ${entryName(props.entries, enteringEntryId.value)}`
+      ? t('correction.enterTitle', {
+          entry: entryName(props.entries, enteringEntryId.value),
+        })
       : '',
 );
 
@@ -77,7 +83,7 @@ const stageTimeChanged = computed(
 function stageTimeRule(value: string) {
   return !value.trim() || parseStageDuration(value) !== null
     ? true
-    : 'A time like 3:12.4';
+    : t('correction.stageTimeRule');
 }
 
 /** Start as it will be saved: the stored one, to the millisecond, unless
@@ -154,26 +160,27 @@ async function onSave() {
     :title="title"
     :form="correction"
     :save="onSave"
-    :saved="enteringEntryId ? 'Time entered' : 'Times corrected'"
+    :saved="
+      enteringEntryId ? $t('correction.entered') : $t('correction.corrected')
+    "
   >
     <p class="text-body-2 text-medium-emphasis">
-      Start and finish are times of day, to the second; the stage time is what
-      the stopwatch read.
+      {{ $t('correction.intro') }}
       {{
         enteringEntryId
-          ? 'With a stage time, the start is worked out from the finish.'
-          : 'A changed stage time sets the finish from the start.'
+          ? $t('correction.introEnter')
+          : $t('correction.introCorrect')
       }}
-      Entered times are marked as hand-set.
+      {{ $t('correction.introManual') }}
     </p>
     <v-text-field
       v-if="enteringEntryId && derivedIso"
       :model-value="formatClockTime(derivedIso)"
       type="time"
       step="1"
-      label="Start"
+      :label="$t('gateRole.start')"
       class="rg-timing"
-      hint="Set by the stage time"
+      :hint="$t('correction.setByStageTime')"
       persistent-hint
       disabled
     />
@@ -182,7 +189,7 @@ async function onSave() {
       v-model="correction.start"
       type="time"
       step="1"
-      label="Start"
+      :label="$t('gateRole.start')"
       class="rg-timing"
       append-inner-icon="mdi-clock-outline"
       :rules="enteringEntryId && stageTimeChanged ? [] : [required]"
@@ -193,9 +200,9 @@ async function onSave() {
       :model-value="formatClockTime(derivedIso)"
       type="time"
       step="1"
-      label="Finish"
+      :label="$t('gateRole.finish')"
       class="rg-timing"
-      hint="Set by the stage time"
+      :hint="$t('correction.setByStageTime')"
       persistent-hint
       disabled
     />
@@ -204,9 +211,9 @@ async function onSave() {
       v-model="correction.finish"
       type="time"
       step="1"
-      label="Finish"
+      :label="$t('gateRole.finish')"
       class="rg-timing"
-      :hint="enteringEntryId ? '' : 'Empty while the car is still on stage'"
+      :hint="enteringEntryId ? '' : $t('correction.finishHint')"
       persistent-hint
       :clearable="!enteringEntryId"
       :rules="enteringEntryId ? [required] : []"
@@ -215,7 +222,7 @@ async function onSave() {
     />
     <v-text-field
       v-model="correction.stageTime"
-      label="Stage time"
+      :label="$t('correction.stageTime')"
       placeholder="3:12.4"
       class="rg-timing"
       :rules="[stageTimeRule]"

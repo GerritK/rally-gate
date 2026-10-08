@@ -1,4 +1,5 @@
 import { shallowRef } from 'vue';
+import { t } from './i18n';
 
 export interface ConfirmOptions {
   title: string;
@@ -40,7 +41,7 @@ export function clearNotice() {
 
 export function notifyError(err: unknown) {
   notice.value = {
-    text: err instanceof Error ? err.message : 'Something went wrong',
+    text: err instanceof Error ? err.message : t('ui.somethingWentWrong'),
     error: true,
   };
 }

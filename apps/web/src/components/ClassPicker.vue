@@ -38,7 +38,7 @@ const selected = computed({
     "
     item-title="name"
     item-value="id"
-    label="Classes"
+    :label="$t('classes.classes')"
     multiple
     clearable
     :density="density ?? 'comfortable'"

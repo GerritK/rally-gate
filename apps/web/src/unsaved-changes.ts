@@ -1,6 +1,6 @@
 import { onMounted, onUnmounted } from 'vue';
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router';
-import { useConfirm } from '@rally-gate/ui';
+import { t, useConfirm } from '@rally-gate/ui';
 
 /**
  * Asks before a page form's changes are thrown away by navigating off it,
@@ -15,9 +15,9 @@ export function useUnsavedChanges(form: () => unknown) {
   const guard = async () =>
     !dirty() ||
     confirm({
-      title: 'Leave without saving?',
-      text: 'Your changes on this page are lost.',
-      confirmText: 'Leave',
+      title: t('common.leaveTitle'),
+      text: t('common.leaveText'),
+      confirmText: t('common.leave'),
       color: 'error',
     });
   onBeforeRouteLeave(guard);

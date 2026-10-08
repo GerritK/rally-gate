@@ -17,7 +17,7 @@ const display = (stage: Stage) => STAGE_STATUS_DISPLAY[stage.status];
 </script>
 
 <template>
-  <nav class="rg-stage-track-scroll" aria-label="Stages">
+  <nav class="rg-stage-track-scroll" :aria-label="$t('table.stages')">
     <div
       class="rg-stage-track"
       :class="{ 'rg-stage-track--overall': overall && stages.length > 0 }"
@@ -53,7 +53,7 @@ const display = (stage: Stage) => STAGE_STATUS_DISPLAY[stage.status];
         <span class="rg-stage-dot">
           <v-icon icon="mdi-flag-checkered" size="small" />
         </span>
-        <span class="rg-stage-name">Overall</span>
+        <span class="rg-stage-name">{{ $t('results.overall') }}</span>
       </button>
     </div>
   </nav>

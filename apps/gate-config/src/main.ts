@@ -30,10 +30,10 @@ const PORT = Number(process.env.GATE_CONFIG_PORT ?? GATE_CONFIG_PORT);
 const app = express();
 app.use(express.json({ limit: '16kb' }));
 
-// Field specs travel to the browser so labels, hints, messages and rules have
-// exactly one definition; the page rebuilds input rules from them rather than
-// restating the grammar in Vue, where the two would drift. `validate` is still
-// the boundary and runs on every save regardless.
+// Field rules travel to the browser so they have exactly one definition; the
+// page rebuilds input rules from them rather than restating the grammar in Vue,
+// where the two would drift. `validate` is still the boundary and runs on
+// every save regardless. Errors go out as codes the page words.
 app.get('/api/fields', (_req, res) => {
   res.json(fieldDescriptors());
 });
@@ -62,7 +62,7 @@ app.put('/api/config', async (req, res) => {
   } catch (err) {
     res
       .status(500)
-      .json({ message: `Could not save: ${(err as Error).message}` });
+      .json({ error: 'writeFailed', detail: (err as Error).message });
     return;
   }
 

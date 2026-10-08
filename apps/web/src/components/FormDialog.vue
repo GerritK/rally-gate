@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { useDisplay, type SubmitEventPromise } from 'vuetify';
-import { notify, useConfirm } from '@rally-gate/ui';
+import { notify, t, useConfirm } from '@rally-gate/ui';
 
 const props = defineProps<{
   title: string;
@@ -35,8 +35,8 @@ async function close() {
   if (
     JSON.stringify(props.form) !== opened &&
     !(await confirm({
-      title: 'Discard changes?',
-      confirmText: 'Discard',
+      title: t('common.discardChanges'),
+      confirmText: t('common.discard'),
       color: 'error',
     }))
   )
@@ -53,7 +53,7 @@ async function submit(event: SubmitEventPromise) {
     open.value = false;
     notify(props.saved);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not save';
+    error.value = err instanceof Error ? err.message : t('common.couldNotSave');
   } finally {
     saving.value = false;
   }
@@ -83,9 +83,9 @@ async function submit(event: SubmitEventPromise) {
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" @click="close">Cancel</v-btn>
+          <v-btn variant="text" @click="close">{{ $t('common.cancel') }}</v-btn>
           <v-btn type="submit" color="primary" :loading="saving">
-            {{ saveText ?? 'Save' }}
+            {{ saveText ?? $t('common.save') }}
           </v-btn>
         </v-card-actions>
       </v-card>

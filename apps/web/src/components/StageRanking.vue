@@ -52,8 +52,7 @@ const legendMarks = computed<TimingMark[]>(() =>
       density="compact"
       class="mb-4"
     >
-      Provisional: this stage is still running. Cars still on stage aren't
-      listed yet, and DNF/DNS are only set when it closes.
+      {{ $t('results.provisional') }}
     </v-alert>
     <v-alert
       v-else-if="stage?.status === StageStatus.NOT_STARTED"
@@ -62,25 +61,25 @@ const legendMarks = computed<TimingMark[]>(() =>
       density="compact"
       class="mb-4"
     >
-      This stage hasn't started yet.
+      {{ $t('results.notStartedYet') }}
     </v-alert>
     <ResultsPodium :placings="results.classification" />
     <v-table density="comfortable">
       <thead>
         <tr>
-          <th>Pos</th>
+          <th>{{ $t('table.pos') }}</th>
           <th>#</th>
-          <th>Crew</th>
-          <th>Car</th>
+          <th>{{ $t('table.crew') }}</th>
+          <th>{{ $t('table.car') }}</th>
           <th
             v-for="gate in results.splitGates"
             :key="gate.gateId"
             class="rg-time"
           >
-            Split {{ gate.splitIndex }}
+            {{ $t('gateRole.split', { n: gate.splitIndex }) }}
           </th>
-          <th class="rg-time">Time</th>
-          <th class="rg-time">Gap</th>
+          <th class="rg-time">{{ $t('table.time') }}</th>
+          <th class="rg-time">{{ $t('table.gap') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -104,7 +103,7 @@ const legendMarks = computed<TimingMark[]>(() =>
                 v-tooltip:top="
                   split.gapMs === 0
                     ? ''
-                    : `${formatGap(split.gapMs)} to the fastest`
+                    : $t('results.toFastest', { gap: formatGap(split.gapMs) })
                 "
                 :class="{
                   'text-timing-best font-weight-bold': split.gapMs === 0,
@@ -129,7 +128,7 @@ const legendMarks = computed<TimingMark[]>(() =>
         </tr>
         <tr v-if="results.classification.length === 0">
           <td :colspan="6 + results.splitGates.length" class="rg-empty">
-            Nobody has finished this stage yet.
+            {{ $t('results.noneFinished') }}
           </td>
         </tr>
       </tbody>
@@ -150,9 +149,9 @@ const legendMarks = computed<TimingMark[]>(() =>
       <thead>
         <tr>
           <th>#</th>
-          <th>Crew</th>
-          <th>Car</th>
-          <th>Outcome</th>
+          <th>{{ $t('table.crew') }}</th>
+          <th>{{ $t('table.car') }}</th>
+          <th>{{ $t('table.outcome') }}</th>
         </tr>
       </thead>
       <tbody>

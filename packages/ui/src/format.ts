@@ -1,3 +1,5 @@
+import { t } from './i18n';
+
 /**
  * Rally timing conventions — distinct formats for distinct kinds of value,
  * not one generic "format a duration" function:
@@ -66,9 +68,9 @@ export function parseStageDuration(text: string): number | null {
  */
 export function formatRelativeTime(iso: string, now: number): string {
   const diffSec = Math.floor((now - new Date(iso).getTime()) / 1000);
-  if (diffSec < 5) return 'just now';
-  if (diffSec < 60) return `${diffSec}s ago`;
+  if (diffSec < 5) return t('ui.justNow');
+  if (diffSec < 60) return t('ui.secondsAgo', { n: diffSec });
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
-  return `${Math.floor(diffMin / 60)}h ago`;
+  if (diffMin < 60) return t('ui.minutesAgo', { n: diffMin });
+  return t('ui.hoursAgo', { n: Math.floor(diffMin / 60) });
 }

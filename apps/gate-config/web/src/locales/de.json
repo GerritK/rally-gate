@@ -1,0 +1,122 @@
+{
+  "gateConfig": {
+    "title": "Gate-Konfiguration",
+    "unconfigured": "nicht eingerichtetes Gate",
+    "joinCheck": "Verbinden fehlgeschlagen — siehe unten.",
+    "joined": "Mit {ssid} verbunden.",
+    "joinFailed": "Mit diesem Netz konnte keine Verbindung hergestellt werden.",
+    "lostWhileJoining": "Verbindung zum Gate beim Verbinden mit {ssid} verloren. Das ist zu erwarten, wenn du mit seinem Hotspot verbunden warst — verbinde dich mit {ssid} und öffne diese Seite erneut. Kann das Gate nicht beitreten, startet es seinen Hotspot innerhalb einer Minute wieder.",
+    "resetTitle": "WLAN zurücksetzen?",
+    "resetText": "Das Gate vergisst alle gespeicherten Netze und startet seinen eigenen Hotspot. Verbinde dich mit diesem Hotspot, um diese Seite wieder zu erreichen.",
+    "resetConfirm": "Netze vergessen, Hotspot starten",
+    "resetDone": "Gespeicherte Netze vergessen, Hotspot läuft.",
+    "hotspotFailed": "Der Hotspot konnte nicht gestartet werden.",
+    "lostAfterReset": "Verbindung zum Gate verloren — zu erwarten: es hat dieses Netz verlassen. Verbinde dich mit seinem Hotspot, um diese Seite wieder zu erreichen.",
+    "shutDownTitle": "Dieses Gate herunterfahren?",
+    "shutDownText": "Es muss von Hand wieder eingeschaltet werden.",
+    "shutDownGate": "Gate herunterfahren",
+    "shuttingDown": "Fährt herunter. Warte, bis die grüne LED am Pi nicht mehr blinkt (etwa 10 Sekunden), dann den Strom trennen.",
+    "shutDownFailed": "Herunterfahren fehlgeschlagen.",
+    "notSaved": "Nichts wurde gespeichert — prüfe die Felder unten.",
+    "restartFailed": "der Neustart des gate-agents ({output})",
+    "timeFailed": "das Aktualisieren der Zeitquelle ({output})",
+    "and": " und ",
+    "savedButFailed": "Gespeichert, aber {failed} ist fehlgeschlagen.",
+    "saved": "Gespeichert und angewendet.",
+    "unreachable": "Das Gate ist nicht erreichbar: {error}",
+    "running": "läuft",
+    "unknown": "unbekannt",
+    "settings": "Einstellungen",
+    "gateIdChanged": "Eine geänderte Gate-ID macht dies für den Server zu einem anderen Gate. Seine bisherige Zuordnung und die erfassten Durchfahrten bleiben bei der alten ID.",
+    "decoder": "Decoder",
+    "saveAndApply": "Speichern und anwenden",
+    "network": "Netzwerk",
+    "ownHotspot": "eigener Hotspot",
+    "noWifi": "kein WLAN",
+    "noNetworkManager": "NetworkManager ist auf diesem Gerät nicht verfügbar, daher lässt sich das WLAN hier nicht einrichten. Zu erwarten außerhalb eines Raspberry Pi oder bei einem Gate am Ethernet-Kabel.",
+    "networkHint": "Ein Netz in Reichweite wählen oder den Namen eines versteckten Netzes eintippen.",
+    "wifiPassword": "WLAN-Passwort",
+    "wifiPasswordHint": "Wird von NetworkManager gespeichert, nicht in der Konfigurationsdatei des Gates.",
+    "onHotspot": "Du bist mit dem eigenen Hotspot dieses Gates verbunden. Beim Verbinden mit einem Netz geht der Hotspot aus, diese Seite ist dann nicht mehr erreichbar — das ist zu erwarten. Kann das Gate nicht beitreten, startet es den Hotspot innerhalb einer Minute wieder.",
+    "resetWifi": "WLAN zurücksetzen",
+    "join": "Verbinden",
+    "status": "Status",
+    "version": "Version",
+    "unavailable": "nicht verfügbar",
+    "onGithub": "Rally Gate auf GitHub",
+    "clock": "Uhr",
+    "recentLog": "Letzte Einträge im gate-agent-Log",
+    "shutDown": "Herunterfahren",
+    "writeFailed": "Speichern fehlgeschlagen: {detail}"
+  },
+  "fields": {
+    "GATE_ID": {
+      "label": "Gate-ID",
+      "message": "Nur Buchstaben, Ziffern, Unterstrich und Bindestrich (max. 64).",
+      "hint": "Identität auf dem Server — eine Änderung macht das alte zu einem eigenen Gate."
+    },
+    "MQTT_HOST": {
+      "label": "Adresse des rally-servers",
+      "message": "Einen Hostnamen oder eine IP-Adresse angeben.",
+      "hint": "Der Standard rally-server.local wird per mDNS gefunden; eine Adresse hier hat Vorrang."
+    },
+    "MQTT_PORT": {
+      "label": "MQTT-Port",
+      "message": "Muss ein Port zwischen 1 und 65535 sein.",
+      "hint": "Standard 57431."
+    },
+    "ADAPTER": {
+      "label": "Decoder",
+      "message": "Einen der aufgeführten Decoder wählen.",
+      "hint": "beam: eine Lichtschranke an einem GPIO-Pin — nimmt Durchfahrten, ein Sportwart ordnet das Auto zu."
+    },
+    "BEAM_GPIO": {
+      "label": "GPIO der Lichtschranke",
+      "message": "Ein GPIO-Leitungsname, z. B. GPIO17.",
+      "hint": "BCM-Name des Pins, an dem der Sensorausgang hängt. Standard GPIO17."
+    },
+    "BEAM_EDGE": {
+      "label": "Auslöseflanke der Lichtschranke",
+      "message": "rising oder falling.",
+      "hint": "Welche Flanke „Strahl unterbrochen“ bedeutet — hängt von der Light-ON/Dark-ON-Einstellung des Sensors ab. Standard rising."
+    },
+    "BEAM_LOCKOUT_MS": {
+      "label": "Sperrzeit der Lichtschranke (ms)",
+      "message": "Muss zwischen 50 und 10000 ms liegen.",
+      "hint": "Weitere Auslösungen innerhalb dieser Zeit zählen als dasselbe Auto. Standard 500."
+    },
+    "TRANSPONDERS": {
+      "label": "Simulierte Transponder",
+      "message": "Kommagetrennte Ziffern, z. B. 1234567,7654321.",
+      "hint": "Transponder-IDs, die der Simulator durchläuft."
+    },
+    "SIMULATE_INTERVAL_MS": {
+      "label": "Simulationsintervall (ms)",
+      "message": "Muss zwischen 250 und 3600000 ms liegen.",
+      "hint": "Leer lassen, um keine simulierten Erfassungen zu senden."
+    },
+    "HOTSPOT_PASSWORD": {
+      "label": "Hotspot-Passwort",
+      "message": "Muss 8 bis 63 druckbare Zeichen lang sein.",
+      "hint": "Für das Netz rally-gate-‹Hostname›, das dieses Gate aufspannt, wenn es kein WLAN erreicht. Standard rally-gate."
+    },
+    "HEARTBEAT_INTERVAL_MS": {
+      "label": "Heartbeat-Intervall (ms)",
+      "message": "Muss zwischen 1000 und 30000 ms liegen.",
+      "hint": "Standard 15000. Langsamer als 30000 und der Server hält dieses Gate für offline."
+    }
+  },
+  "fieldError": {
+    "unknown": "Unbekannte Einstellung.",
+    "notText": "Muss Text sein.",
+    "lineBreak": "Darf keine Zeilenumbrüche enthalten."
+  },
+  "wifiError": {
+    "ssidMissing": "Ein Netz wählen oder seinen Namen eintippen.",
+    "ssidTooLong": "Netznamen sind höchstens 32 Byte lang.",
+    "lineBreak": "Darf keine Zeilenumbrüche enthalten.",
+    "leadingHyphen": "Darf nicht mit einem Bindestrich beginnen.",
+    "notText": "Muss Text sein.",
+    "passwordInvalid": "WLAN-Passwörter haben 8 bis 63 druckbare Zeichen."
+  }
+}

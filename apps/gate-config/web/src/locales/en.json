@@ -1,0 +1,122 @@
+{
+  "gateConfig": {
+    "title": "Gate Config",
+    "unconfigured": "unconfigured gate",
+    "joinCheck": "Could not join — check below.",
+    "joined": "Joined {ssid}.",
+    "joinFailed": "Could not join that network.",
+    "lostWhileJoining": "Lost contact with the gate while joining {ssid}. That is expected if you were connected to its hotspot — reconnect to {ssid} and reopen this page. If the gate cannot join, it raises its hotspot again within a minute.",
+    "resetTitle": "Reset Wi-Fi?",
+    "resetText": "The gate forgets every saved network and starts its own hotspot. Join that hotspot to reach this page again.",
+    "resetConfirm": "Forget networks, start hotspot",
+    "resetDone": "Saved networks forgotten, hotspot up.",
+    "hotspotFailed": "Could not start the hotspot.",
+    "lostAfterReset": "Lost contact with the gate — expected: it left this network. Join its hotspot to reach this page again.",
+    "shutDownTitle": "Shut down this gate?",
+    "shutDownText": "It has to be switched back on by hand.",
+    "shutDownGate": "Shut down gate",
+    "shuttingDown": "Shutting down. Wait until the green LED on the Pi has stopped flashing (about 10 seconds), then disconnect power.",
+    "shutDownFailed": "Could not shut down.",
+    "notSaved": "Nothing was saved — check the fields below.",
+    "restartFailed": "restarting gate-agent ({output})",
+    "timeFailed": "updating the time source ({output})",
+    "and": " and ",
+    "savedButFailed": "Saved, but {failed} failed.",
+    "saved": "Saved and applied.",
+    "unreachable": "Could not reach the gate: {error}",
+    "running": "running",
+    "unknown": "unknown",
+    "settings": "Settings",
+    "gateIdChanged": "Changing the Gate ID makes this a different gate to the server. Its existing assignment and recorded detections stay with the old ID.",
+    "decoder": "Decoder",
+    "saveAndApply": "Save and apply",
+    "network": "Network",
+    "ownHotspot": "own hotspot",
+    "noWifi": "no Wi-Fi",
+    "noNetworkManager": "NetworkManager is not available on this machine, so Wi-Fi cannot be configured from here. Expected off a Raspberry Pi, or on a gate wired by Ethernet.",
+    "networkHint": "Pick one in range, or type the name of a hidden network.",
+    "wifiPassword": "Wi-Fi password",
+    "wifiPasswordHint": "Stored by NetworkManager, not in the gate's config file.",
+    "onHotspot": "You are connected to this gate's own hotspot. Joining a network takes the hotspot down, so this page will go unreachable — that is expected. If the gate cannot join, it raises the hotspot again within a minute.",
+    "resetWifi": "Reset Wi-Fi",
+    "join": "Join",
+    "status": "Status",
+    "version": "Version",
+    "unavailable": "unavailable",
+    "onGithub": "Rally Gate on GitHub",
+    "clock": "Clock",
+    "recentLog": "Recent gate-agent log",
+    "shutDown": "Shut down",
+    "writeFailed": "Could not save: {detail}"
+  },
+  "fieldError": {
+    "unknown": "Unknown setting.",
+    "notText": "Must be text.",
+    "lineBreak": "Must not contain line breaks."
+  },
+  "wifiError": {
+    "ssidMissing": "Pick a network or type its name.",
+    "ssidTooLong": "Network names are at most 32 bytes.",
+    "lineBreak": "Must not contain line breaks.",
+    "leadingHyphen": "Cannot start with a hyphen.",
+    "notText": "Must be text.",
+    "passwordInvalid": "Wi-Fi passwords are 8 to 63 printable characters."
+  },
+  "fields": {
+    "GATE_ID": {
+      "label": "Gate ID",
+      "message": "Use letters, digits, underscore and hyphen only (max 64).",
+      "hint": "Identity on the server — changing it makes the old one a separate gate."
+    },
+    "MQTT_HOST": {
+      "label": "rally-server address",
+      "message": "Use a host name or IP address.",
+      "hint": "Default rally-server.local is discovered over mDNS; an address here overrides it."
+    },
+    "MQTT_PORT": {
+      "label": "MQTT port",
+      "message": "Must be a port between 1 and 65535.",
+      "hint": "Default 57431."
+    },
+    "ADAPTER": {
+      "label": "Decoder",
+      "message": "Pick one of the listed decoders.",
+      "hint": "beam: a light barrier on a GPIO pin — times passings, a marshal assigns the car."
+    },
+    "BEAM_GPIO": {
+      "label": "Light barrier GPIO",
+      "message": "A GPIO line name, e.g. GPIO17.",
+      "hint": "BCM name of the pin the sensor output is wired to. Default GPIO17."
+    },
+    "BEAM_EDGE": {
+      "label": "Light barrier trigger edge",
+      "message": "rising or falling.",
+      "hint": "Which edge means \"beam broken\" — depends on the sensor Light-ON/Dark-ON setting. Default rising."
+    },
+    "BEAM_LOCKOUT_MS": {
+      "label": "Light barrier lockout (ms)",
+      "message": "Must be between 50 and 10000 ms.",
+      "hint": "Further triggers within this time count as the same car. Default 500."
+    },
+    "TRANSPONDERS": {
+      "label": "Simulated transponders",
+      "message": "Comma-separated digits, e.g. 1234567,7654321.",
+      "hint": "Transponder ids the simulator cycles through."
+    },
+    "SIMULATE_INTERVAL_MS": {
+      "label": "Simulated interval (ms)",
+      "message": "Must be between 250 and 3600000 ms.",
+      "hint": "Leave empty to publish no simulated detections."
+    },
+    "HOTSPOT_PASSWORD": {
+      "label": "Hotspot password",
+      "message": "Must be 8 to 63 printable characters.",
+      "hint": "For the rally-gate-‹hostname› network this gate raises when it can reach no Wi-Fi. Default rally-gate."
+    },
+    "HEARTBEAT_INTERVAL_MS": {
+      "label": "Heartbeat interval (ms)",
+      "message": "Must be between 1000 and 30000 ms.",
+      "hint": "Default 15000. Slower than 30000 and the server reads this gate as offline."
+    }
+  }
+}

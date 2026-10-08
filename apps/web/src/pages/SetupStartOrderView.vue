@@ -7,24 +7,33 @@ import {
   StartOrderGrouping,
   StartOrderKey,
 } from '@rally-gate/shared';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { fetchSetting, saveSetting } from '../api/settings';
 import { useUnsavedChanges } from '../unsaved-changes';
-import { notify } from '@rally-gate/ui';
+import { notify, t } from '@rally-gate/ui';
 
-const GROUPING_OPTIONS = [
-  { value: StartOrderGrouping.MAIN_CLASS, title: 'By main class' },
-  { value: StartOrderGrouping.NONE, title: 'None — one field' },
-];
-const KEY_OPTIONS = [
-  { value: StartOrderKey.START_NUMBER, title: 'Start number' },
-  { value: StartOrderKey.OVERALL_TIME, title: 'Overall time' },
-  { value: StartOrderKey.LAST_STAGE_TIME, title: 'Last stage time' },
-];
-const DIRECTION_OPTIONS = [
-  { value: StartOrderDirection.FASTEST_FIRST, title: 'Fastest first' },
-  { value: StartOrderDirection.SLOWEST_FIRST, title: 'Slowest first' },
-];
+const groupingOptions = computed(() => [
+  { value: StartOrderGrouping.MAIN_CLASS, title: t('startOrder.byMainClass') },
+  { value: StartOrderGrouping.NONE, title: t('startOrder.noGrouping') },
+]);
+const keyOptions = computed(() => [
+  { value: StartOrderKey.START_NUMBER, title: t('startOrder.startNumber') },
+  { value: StartOrderKey.OVERALL_TIME, title: t('startOrder.overallTime') },
+  {
+    value: StartOrderKey.LAST_STAGE_TIME,
+    title: t('startOrder.lastStageTime'),
+  },
+]);
+const directionOptions = computed(() => [
+  {
+    value: StartOrderDirection.FASTEST_FIRST,
+    title: t('startOrder.fastestFirst'),
+  },
+  {
+    value: StartOrderDirection.SLOWEST_FIRST,
+    title: t('startOrder.slowestFirst'),
+  },
+]);
 
 // Defaults mirror StartOrderService's, which also applies them while unset.
 const grouping = ref(StartOrderGrouping.MAIN_CLASS);
@@ -47,7 +56,7 @@ async function onSave() {
       saveSetting(START_ORDER_DIRECTION_KEY, direction.value),
     ]);
     markSaved();
-    notify('Start order saved');
+    notify(t('startOrder.saved'));
   } finally {
     saving.value = false;
   }
@@ -68,38 +77,38 @@ onMounted(async () => {
 
 <template>
   <v-btn variant="text" prepend-icon="mdi-arrow-left" to="/setup" class="mb-4">
-    Back to Setup
+    {{ $t('setup.back') }}
   </v-btn>
 
   <v-card>
-    <v-card-title>Start order</v-card-title>
+    <v-card-title>{{ $t('startOrder.title') }}</v-card-title>
     <v-card-text>
       <v-alert type="info" variant="tonal" density="comfortable" class="mb-4">
-        Applies to every stage. A stage's list is <strong>frozen</strong> when
-        it is frozen on Live Timing or the stage is first activated — changes
-        here only affect lists not yet frozen. Crews without a time start at the
-        end of their group, and ties go by start number, so "Last stage time" on
-        the first stage is simply start-number order.
+        <i18n-t keypath="startOrder.explain" scope="global">
+          <template #frozen>
+            <strong>{{ $t('startOrder.frozen') }}</strong>
+          </template>
+        </i18n-t>
       </v-alert>
       <form class="d-flex flex-column ga-4" @submit.prevent="onSave">
         <v-select
           v-model="grouping"
-          :items="GROUPING_OPTIONS"
-          label="Grouping"
-          hint="Main classes start one after another, alphabetically; cars without a main class last."
+          :items="groupingOptions"
+          :label="$t('startOrder.grouping')"
+          :hint="$t('startOrder.groupingHint')"
           persistent-hint
           style="max-width: 420px"
         />
         <v-select
           v-model="key"
-          :items="KEY_OPTIONS"
-          label="Order within a group"
+          :items="keyOptions"
+          :label="$t('startOrder.orderWithin')"
           style="max-width: 420px"
         />
         <v-select
           v-model="direction"
-          :items="DIRECTION_OPTIONS"
-          label="Direction"
+          :items="directionOptions"
+          :label="$t('startOrder.direction')"
           :disabled="key === StartOrderKey.START_NUMBER"
           style="max-width: 420px"
         />
@@ -110,7 +119,7 @@ onMounted(async () => {
             :loading="saving"
             prepend-icon="mdi-content-save"
           >
-            Save
+            {{ $t('common.save') }}
           </v-btn>
         </div>
       </form>

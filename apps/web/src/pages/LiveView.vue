@@ -63,7 +63,7 @@ import ClassChip from '../components/ClassChip.vue';
 import CrewName from '../components/CrewName.vue';
 import StartNumber from '../components/StartNumber.vue';
 import { driverName } from '../crew';
-import { formatStageDuration, useConfirm } from '@rally-gate/ui';
+import { formatStageDuration, t, useConfirm } from '@rally-gate/ui';
 import { carriersOf, suggestEntries } from '../passing-suggestions';
 import { printPdf, startListPdf } from '../pdf';
 import {
@@ -125,38 +125,67 @@ interface Row {
   classHeader: string | null;
 }
 
+/** Labels are getters, so each read is in the current language. */
 const ROW_STATE_DISPLAY: Record<
   RowState,
   { label: string; color: string; icon: string }
 > = {
   WAITING: {
-    label: 'Waiting',
+    get label() {
+      return t('rowState.waiting');
+    },
     color: 'timing-idle',
     icon: 'mdi-clock-outline',
   },
-  NEXT: { label: 'Next', color: 'info', icon: 'mdi-arrow-right-bold' },
+  NEXT: {
+    get label() {
+      return t('rowState.next');
+    },
+    color: 'info',
+    icon: 'mdi-arrow-right-bold',
+  },
   ON_STAGE: {
-    label: 'On stage',
+    get label() {
+      return t('runState.onStage');
+    },
     color: runStatusColor(StageRunStatus.STARTED),
     icon: 'mdi-car-sports',
   },
   FINISHED: {
-    label: 'Finished',
+    get label() {
+      return t('rowState.finished');
+    },
     color: runStatusColor(StageRunStatus.FINISHED),
     icon: 'mdi-flag-checkered',
   },
   DNF: {
-    label: 'DNF',
+    get label() {
+      return t('rowState.dnf');
+    },
     color: runStatusColor(StageRunStatus.CANCELLED),
     icon: 'mdi-close',
   },
-  DNS: { label: 'DNS', color: 'warning', icon: 'mdi-minus-circle-outline' },
+  DNS: {
+    get label() {
+      return t('rowState.dns');
+    },
+    color: 'warning',
+    icon: 'mdi-minus-circle-outline',
+  },
   RERUN: {
-    label: 'Voided — re-run',
+    get label() {
+      return t('rowState.rerun');
+    },
     color: runStatusColor(StageRunStatus.VOIDED),
     icon: 'mdi-cancel',
   },
-  OUT: { label: 'Withdrawn', color: 'timing-idle', icon: 'mdi-account-off' },
+  OUT: {
+    get label() {
+      return t('entryStatus.withdrawn');
+    },
+    color: 'timing-idle',
+    icon: 'mdi-account-off',
+  },
 };
 
 const rows = computed<Row[]>(() => {
@@ -204,7 +233,7 @@ const rows = computed<Row[]>(() => {
       order.grouped &&
       (i === 0 ||
         base[i - 1].starter.mainClassName !== row.starter.mainClassName)
-        ? (row.starter.mainClassName ?? 'No main class')
+        ? (row.starter.mainClassName ?? t('live.noMainClass'))
         : null,
   }));
 });
@@ -243,7 +272,10 @@ function formatSplits(runId: string): string {
   const splits = splitsByRun.value[runId];
   if (!splits || splits.length === 0) return '-';
   return splits
-    .map((s) => `S${s.splitIndex}: ${formatStageDuration(s.elapsedMs)}`)
+    .map(
+      (s) =>
+        `${t('live.splitShort', { n: s.splitIndex })}: ${formatStageDuration(s.elapsedMs)}`,
+    )
     .join(', ');
 }
 
@@ -416,9 +448,9 @@ async function onDismissAll(events: DetectionEventRecord[]) {
   const n = events.length;
   if (
     !(await confirm({
-      title: `Dismiss ${n} passing${n === 1 ? '' : 's'}?`,
-      text: `${n === 1 ? 'It is' : 'They are'} discarded as not a car and can't be assigned afterwards. Only do this when no car can have caused ${n === 1 ? 'it' : 'them'}.`,
-      confirmText: `Dismiss ${n}`,
+      title: t('live.dismissTitle', { n }, n),
+      text: t('live.dismissText', { n }, n),
+      confirmText: t('live.dismissConfirm', { n }),
       color: 'error',
     }))
   )
@@ -520,7 +552,8 @@ function unscrutineered(entryId: string): boolean {
 }
 
 /** Freezing or activating with such cars on the list asks first, naming
- *  them: a desk that forgot a click is easier to fix before the start. */
+ *  them: a desk that forgot a click is easier to fix before the start.
+ *  `verb` is the confirm button's message key. */
 async function clearedToStart(verb: string): Promise<boolean> {
   const pending = rows.value.filter(
     (row) => !row.run && unscrutineered(row.starter.entryId),
@@ -528,9 +561,13 @@ async function clearedToStart(verb: string): Promise<boolean> {
   if (pending.length === 0) return true;
   const numbers = pending.map((row) => `#${row.starter.startNumber}`);
   return confirm({
-    title: `${pending.length} ${pending.length === 1 ? 'car hasn' : 'cars haven'}'t passed scrutineering`,
-    text: `${numbers.join(', ')} ${pending.length === 1 ? 'is' : 'are'} on the start list and can start, but ${pending.length === 1 ? "hasn't" : "haven't"} been passed yet. ${verb} anyway?`,
-    confirmText: verb,
+    title: t('live.unscrutineeredTitle', { n: pending.length }, pending.length),
+    text: t(
+      'live.unscrutineeredText',
+      { numbers: numbers.join(', '), verb: t(verb) },
+      pending.length,
+    ),
+    confirmText: t(verb),
   });
 }
 
@@ -567,11 +604,12 @@ const correctionDialog = ref<InstanceType<typeof RunCorrectionDialog> | null>(
 async function onVoidRun(run: StageRun) {
   if (
     !(await confirm({
-      title: `Void ${entryName(entries.value, run.entryId)}'s attempt ${run.attempt}?`,
-      text:
-        'It stays on record but stops counting, and the car can run this stage again — ' +
-        'the start gate will time the new attempt automatically.',
-      confirmText: 'Void attempt',
+      title: t('live.voidTitle', {
+        entry: entryName(entries.value, run.entryId),
+        attempt: run.attempt,
+      }),
+      text: t('live.voidText'),
+      confirmText: t('live.voidConfirm'),
       color: 'error',
     }))
   )
@@ -587,9 +625,12 @@ async function onUnvoidRun(run: StageRun) {
 async function onDeleteRun(run: StageRun) {
   if (
     !(await confirm({
-      title: `Delete ${entryName(entries.value, run.entryId)}'s attempt ${run.attempt}?`,
-      text: 'Unlike voiding, this leaves no record. Use it for a run that never happened.',
-      confirmText: 'Delete attempt',
+      title: t('live.deleteRunTitle', {
+        entry: entryName(entries.value, run.entryId),
+        attempt: run.attempt,
+      }),
+      text: t('live.deleteRunText'),
+      confirmText: t('live.deleteRun'),
       color: 'error',
     }))
   )
@@ -609,8 +650,8 @@ const startListStatus = computed(() =>
   !startOrder.value
     ? ''
     : startOrder.value.frozen
-      ? `Start list published ${frozenAt.value}`
-      : 'Start list provisional',
+      ? t('live.startListPublished', { at: frozenAt.value })
+      : t('live.startListProvisional'),
 );
 
 function stageTitle(stageId: string): string {
@@ -631,7 +672,7 @@ async function refreshStages() {
 
 async function onActivateStage(force = false) {
   if (!props.stageId || activatingStage.value) return;
-  if (!force && !(await clearedToStart('Activate'))) return;
+  if (!force && !(await clearedToStart('live.activate'))) return;
   activatingStage.value = true;
   let conflictingStageIds: string[] | undefined;
   try {
@@ -649,15 +690,15 @@ async function onActivateStage(force = false) {
     activatingStage.value = false;
   }
   if (!conflictingStageIds) return;
-  const plural = conflictingStageIds.length > 1;
   if (
     await confirm({
-      title: 'Gates already active elsewhere',
-      text:
-        `This stage shares gates with the currently active ${plural ? 'stages' : 'stage'}: ` +
-        `${conflictingStageIds.map(stageTitle).join(', ')}. Activating anyway will close ` +
-        `${plural ? 'those stages' : 'that stage'} — any of its cars still on course will be marked DNF.`,
-      confirmText: 'Activate anyway',
+      title: t('live.conflictTitle'),
+      text: t(
+        'live.conflictText',
+        { stages: conflictingStageIds.map(stageTitle).join(', ') },
+        conflictingStageIds.length,
+      ),
+      confirmText: t('live.activateAnyway'),
       color: 'error',
     })
   )
@@ -669,13 +710,13 @@ async function onCloseStage() {
   const unassigned = passingsByStage.value.here.length;
   if (
     !(await confirm({
-      title: 'Close this stage?',
+      title: t('live.closeTitle'),
       text:
-        'Its gates stop timing, cars still on stage become DNF and cars that never started DNS. Closing cannot be undone.' +
+        t('live.closeText') +
         (unassigned > 0
-          ? `\n\n${unassigned} unassigned passing${unassigned === 1 ? '' : 's'} will be discarded: a car may be missing a time. Assign ${unassigned === 1 ? 'it' : 'them'} first.`
+          ? `\n\n${t('live.closeUnassigned', { n: unassigned }, unassigned)}`
           : ''),
-      confirmText: 'Close stage',
+      confirmText: t('live.closeStage'),
       color: 'error',
     }))
   )
@@ -692,7 +733,7 @@ async function onCloseStage() {
 
 async function onFreeze() {
   if (!props.stageId) return;
-  if (!(await clearedToStart('Freeze'))) return;
+  if (!(await clearedToStart('live.freeze'))) return;
   startOrder.value = await freezeStartOrder(props.stageId);
   stages.value = await fetchStages();
 }
@@ -701,9 +742,9 @@ async function onUnfreeze() {
   if (!props.stageId) return;
   if (
     !(await confirm({
-      title: 'Unfreeze this start list?',
-      text: 'It is computed live again, so a posted copy may stop matching it.',
-      confirmText: 'Unfreeze',
+      title: t('live.unfreezeTitle'),
+      text: t('live.unfreezeText'),
+      confirmText: t('live.unfreeze'),
     }))
   )
     return;
@@ -718,13 +759,15 @@ function printStartList() {
   void printPdf(async () => ({
     sections: [
       startListPdf(
-        `Start list — ${id} · ${name}`,
+        `${t('live.startList')} — ${id} · ${name}`,
         order.frozen ? frozenAt.value : null,
         rows.value,
         order.grouped,
       ),
     ],
-    fileName: [rallyName.value, id, 'Start list'].filter(Boolean).join(' - '),
+    fileName: [rallyName.value, id, t('live.startList')]
+      .filter(Boolean)
+      .join(' - '),
   }));
 }
 
@@ -825,17 +868,23 @@ onUnmounted(() => {
     <div class="d-flex flex-wrap align-center ga-4">
       <div>
         <strong>
-          {{ pendingDetections.length }} detection{{
-            pendingDetections.length === 1 ? '' : 's'
+          {{
+            $t(
+              'live.pendingTitle',
+              { n: pendingDetections.length },
+              pendingDetections.length,
+            )
           }}
-          recorded but not timed.
         </strong>
-        These passings are stored, but the run they belong to was not updated —
-        so a start or finish is missing from the results. The server keeps
-        retrying; if the count doesn't clear, fix the run by hand below.
+        {{ $t('live.pendingText') }}
         <div class="text-caption mt-1">
-          Gates affected:
-          {{ [...new Set(pendingDetections.map((d) => d.gateId))].join(', ') }}
+          {{
+            $t('live.gatesAffected', {
+              gates: [...new Set(pendingDetections.map((d) => d.gateId))].join(
+                ', ',
+              ),
+            })
+          }}
         </div>
       </div>
       <v-spacer />
@@ -845,7 +894,7 @@ onUnmounted(() => {
         prepend-icon="mdi-refresh"
         @click="onRetryPending"
       >
-        Retry now
+        {{ $t('live.retryNow') }}
       </v-btn>
     </div>
   </v-alert>
@@ -863,9 +912,13 @@ onUnmounted(() => {
     variant="tonal"
     density="comfortable"
   >
-    No stages yet — create them under
-    <router-link to="/setup/stages" class="rg-link">Setup → Stages</router-link
-    >.
+    <i18n-t keypath="live.noStages" scope="global">
+      <template #link>
+        <router-link to="/setup/stages" class="rg-link"
+          >{{ $t('nav.setup') }} → {{ $t('stages.title') }}</router-link
+        >
+      </template>
+    </i18n-t>
   </v-alert>
 
   <v-card v-if="stage" class="mb-4">
@@ -884,7 +937,7 @@ onUnmounted(() => {
             prepend-icon="mdi-lock"
             @click="onFreeze"
           >
-            Freeze start list
+            {{ $t('live.freezeStartList') }}
           </v-btn>
           <v-btn
             v-if="
@@ -894,7 +947,7 @@ onUnmounted(() => {
             prepend-icon="mdi-lock-open-variant"
             @click="onUnfreeze"
           >
-            Unfreeze
+            {{ $t('live.unfreeze') }}
           </v-btn>
           <v-btn
             variant="tonal"
@@ -902,7 +955,7 @@ onUnmounted(() => {
             :disabled="!startOrder"
             @click="printStartList"
           >
-            Print start list
+            {{ $t('live.printStartList') }}
           </v-btn>
           <v-btn
             v-if="stage.status === StageStatus.NOT_STARTED"
@@ -912,7 +965,7 @@ onUnmounted(() => {
             prepend-icon="mdi-play"
             @click="onActivateStage()"
           >
-            Activate stage
+            {{ $t('live.activateStage') }}
           </v-btn>
           <v-btn
             v-if="stage.status === StageStatus.ACTIVE"
@@ -922,7 +975,7 @@ onUnmounted(() => {
             prepend-icon="mdi-flag-checkered"
             @click="onCloseStage"
           >
-            Close stage
+            {{ $t('live.closeStage') }}
           </v-btn>
         </div>
       </template>
@@ -948,13 +1001,16 @@ onUnmounted(() => {
         density="compact"
         class="mt-4"
       >
-        The start list is computed live, so a time correction on an earlier
-        stage can still move it.
-        <strong>Freeze it when you post or announce it</strong> — activating the
-        stage freezes it otherwise. Order rules are under
-        <router-link to="/setup/start-order" class="rg-link"
-          >Setup → Start order</router-link
-        >.
+        <i18n-t keypath="live.liveStartList" scope="global">
+          <template #freeze>
+            <strong>{{ $t('live.freezeWhenPosted') }}</strong>
+          </template>
+          <template #link>
+            <router-link to="/setup/start-order" class="rg-link"
+              >{{ $t('nav.setup') }} → {{ $t('startOrder.title') }}</router-link
+            >
+          </template>
+        </i18n-t>
       </v-alert>
     </v-card-text>
   </v-card>
@@ -967,10 +1023,14 @@ onUnmounted(() => {
     class="mb-4"
   >
     <div v-for="{ stageId, count } in passingsByStage.elsewhere" :key="stageId">
-      {{ count }} unassigned passing{{ count === 1 ? '' : 's' }} on
-      <router-link :to="`/live/${stageId}`" class="rg-link">{{
-        stageTitle(stageId)
-      }}</router-link>
+      <i18n-t keypath="live.unassignedOn" :plural="count" scope="global">
+        <template #num>{{ count }}</template>
+        <template #stage>
+          <router-link :to="`/live/${stageId}`" class="rg-link">{{
+            stageTitle(stageId)
+          }}</router-link>
+        </template>
+      </i18n-t>
     </div>
   </v-alert>
 
@@ -983,7 +1043,9 @@ onUnmounted(() => {
         <v-card-item>
           <v-card-title>
             {{
-              stage.status === StageStatus.ACTIVE ? 'Up next' : 'First to start'
+              stage.status === StageStatus.ACTIVE
+                ? $t('live.upNext')
+                : $t('live.firstToStart')
             }}
           </v-card-title>
         </v-card-item>
@@ -998,7 +1060,7 @@ onUnmounted(() => {
               color="warning"
               prepend-icon="mdi-clipboard-alert-outline"
             >
-              Not scrutineered
+              {{ $t('live.notScrutineered') }}
             </v-chip>
             <ClassChip
               v-if="dueToStart[0].starter.mainClassName"
@@ -1017,11 +1079,13 @@ onUnmounted(() => {
             :loading="startingEntryId === dueToStart[0].starter.entryId"
             @click="onStartNow(dueToStart[0].starter.entryId)"
           >
-            Start now
+            {{ $t('live.startNow') }}
           </v-btn>
           <template v-if="dueToStart.length > 1">
             <v-divider class="mt-4 mb-2" />
-            <div class="text-overline text-medium-emphasis">Then</div>
+            <div class="text-overline text-medium-emphasis">
+              {{ $t('live.then') }}
+            </div>
             <div class="rg-then-grid">
               <div
                 v-for="row in dueToStart.slice(1, 3)"
@@ -1043,7 +1107,7 @@ onUnmounted(() => {
           </template>
         </v-card-text>
         <v-card-text v-else class="rg-empty">
-          Everyone has started.
+          {{ $t('live.allStarted') }}
         </v-card-text>
       </v-card>
     </div>
@@ -1052,7 +1116,7 @@ onUnmounted(() => {
       <v-card class="h-100">
         <v-card-item>
           <v-card-title class="d-flex align-center ga-2">
-            On stage
+            {{ $t('runState.onStage') }}
             <v-chip
               size="small"
               :color="runStatusColor(StageRunStatus.STARTED)"
@@ -1060,7 +1124,7 @@ onUnmounted(() => {
               {{ onStage.length }}
             </v-chip>
           </v-card-title>
-          <v-card-subtitle>Expected order at the next gate</v-card-subtitle>
+          <v-card-subtitle>{{ $t('live.expectedOrder') }}</v-card-subtitle>
         </v-card-item>
         <!-- Every unidentified passing, a start included: a car that crossed
              the start line is on stage, and Up next stays still while the
@@ -1096,23 +1160,23 @@ onUnmounted(() => {
                     car.passed.has(index) ? 'mdi-circle' : 'mdi-circle-outline'
                   "
                   :color="car.passed.has(index) ? 'success' : undefined"
-                  v-tooltip:top="`Split ${index}`"
+                  v-tooltip:top="$t('gateRole.split', { n: index })"
                   size="x-small"
                   class="mr-1"
                 />
                 <v-icon
                   icon="mdi-flag-checkered"
                   size="x-small"
-                  v-tooltip:top="'Finish'"
+                  v-tooltip:top="$t('gateRole.finish')"
                   class="text-medium-emphasis"
                 />
               </td>
               <td class="rg-timing rg-time text-no-wrap">
                 <template v-if="car.last">
-                  S{{ car.last.splitIndex }}
+                  {{ $t('live.splitShort', { n: car.last.splitIndex }) }}
                   {{ formatStageDuration(car.last.elapsedMs) }}
                   <span class="text-medium-emphasis">
-                    {{ car.gapMs ? formatGap(car.gapMs) : 'best' }}
+                    {{ car.gapMs ? formatGap(car.gapMs) : $t('live.best') }}
                   </span>
                 </template>
               </td>
@@ -1132,7 +1196,7 @@ onUnmounted(() => {
                   color="warning"
                   prepend-icon="mdi-timer-alert-outline"
                 >
-                  Overdue
+                  {{ $t('live.overdue') }}
                 </v-chip>
               </td>
               <td class="text-right" style="width: 1%">
@@ -1143,7 +1207,7 @@ onUnmounted(() => {
                   :loading="finishingRunId === car.run.id"
                   @click="onFinishNow(car.run)"
                 >
-                  Finish now
+                  {{ $t('live.finishNow') }}
                 </v-btn>
               </td>
             </tr>
@@ -1152,8 +1216,8 @@ onUnmounted(() => {
         <v-card-text v-if="onStage.length === 0" class="rg-empty">
           {{
             stage.status === StageStatus.ACTIVE
-              ? 'No car on stage.'
-              : 'Stage not active yet — cars appear here once they start.'
+              ? $t('live.noneOnStage')
+              : $t('live.notActiveYet')
           }}
         </v-card-text>
       </v-card>
@@ -1164,15 +1228,19 @@ onUnmounted(() => {
     <v-table density="comfortable" class="rg-marshal-table">
       <thead>
         <tr>
-          <th style="width: 56px">Pos</th>
+          <th style="width: 56px">{{ $t('table.pos') }}</th>
           <th style="width: 72px">#</th>
-          <th>Crew</th>
-          <th v-if="!startOrder.grouped">Class</th>
-          <th>Status</th>
-          <th class="rg-time">Start<span class="rg-time-mark" /></th>
-          <th class="rg-time">Splits</th>
-          <th class="rg-time">Finish<span class="rg-time-mark" /></th>
-          <th class="rg-time">Time</th>
+          <th>{{ $t('table.crew') }}</th>
+          <th v-if="!startOrder.grouped">{{ $t('classes.class') }}</th>
+          <th>{{ $t('table.status') }}</th>
+          <th class="rg-time">
+            {{ $t('gateRole.start') }}<span class="rg-time-mark" />
+          </th>
+          <th class="rg-time">{{ $t('live.splits') }}</th>
+          <th class="rg-time">
+            {{ $t('gateRole.finish') }}<span class="rg-time-mark" />
+          </th>
+          <th class="rg-time">{{ $t('table.time') }}</th>
           <th></th>
         </tr>
       </thead>
@@ -1203,7 +1271,7 @@ onUnmounted(() => {
                 prepend-icon="mdi-timer-alert-outline"
                 class="ml-1"
               >
-                Overdue
+                {{ $t('live.overdue') }}
               </v-chip>
               <v-chip
                 v-if="!row.run && unscrutineered(row.starter.entryId)"
@@ -1213,13 +1281,13 @@ onUnmounted(() => {
                 prepend-icon="mdi-clipboard-alert-outline"
                 class="ml-1"
               >
-                Not scrutineered
+                {{ $t('live.notScrutineered') }}
               </v-chip>
               <span
                 v-if="row.run && row.run.attempt > 1"
                 class="text-caption text-medium-emphasis ml-1"
               >
-                attempt {{ row.run.attempt }}
+                {{ $t('live.attempt', { n: row.run.attempt }) }}
               </span>
             </td>
             <td class="rg-time">
@@ -1256,7 +1324,7 @@ onUnmounted(() => {
                 prepend-icon="mdi-pencil"
                 @click="correctionDialog?.correct(row.run)"
               >
-                Correct
+                {{ $t('live.correct') }}
               </v-btn>
               <v-btn
                 v-else-if="canStart(row)"
@@ -1266,7 +1334,7 @@ onUnmounted(() => {
                 :loading="startingEntryId === row.starter.entryId"
                 @click="onStartNow(row.starter.entryId)"
               >
-                Start now
+                {{ $t('live.startNow') }}
               </v-btn>
               <v-menu
                 v-if="!row.run && stage.status !== StageStatus.NOT_STARTED"
@@ -1277,13 +1345,13 @@ onUnmounted(() => {
                     size="small"
                     variant="text"
                     icon="mdi-dots-vertical"
-                    aria-label="More actions"
+                    :aria-label="$t('common.moreActions')"
                   />
                 </template>
                 <v-list density="compact">
                   <v-list-item
                     prepend-icon="mdi-timer-edit-outline"
-                    title="Enter time (missed start)"
+                    :title="$t('live.enterTime')"
                     @click="correctionDialog?.enter(row.starter.entryId)"
                   />
                 </v-list>
@@ -1295,18 +1363,18 @@ onUnmounted(() => {
                     size="small"
                     variant="text"
                     icon="mdi-dots-vertical"
-                    aria-label="More actions"
+                    :aria-label="$t('common.moreActions')"
                   />
                 </template>
                 <v-list density="compact">
                   <v-list-item
                     prepend-icon="mdi-cancel"
-                    title="Void attempt (red flag)"
+                    :title="$t('live.voidAttempt')"
                     @click="onVoidRun(row.run!)"
                   />
                   <v-list-item
                     prepend-icon="mdi-delete"
-                    title="Delete attempt"
+                    :title="$t('live.deleteRun')"
                     base-color="error"
                     @click="onDeleteRun(row.run!)"
                   />
@@ -1323,11 +1391,11 @@ onUnmounted(() => {
             <td v-if="!startOrder.grouped"></td>
             <td class="text-no-wrap">
               <v-chip size="small" variant="outlined" prepend-icon="mdi-cancel">
-                Voided
+                {{ $t('live.voided') }}
               </v-chip>
-              <span class="text-caption ml-1"
-                >attempt {{ voided.attempt }}</span
-              >
+              <span class="text-caption ml-1">{{
+                $t('live.attempt', { n: voided.attempt })
+              }}</span>
             </td>
             <td class="rg-time">
               <ClockTime
@@ -1353,7 +1421,7 @@ onUnmounted(() => {
                 prepend-icon="mdi-restore"
                 @click="onUnvoidRun(voided)"
               >
-                Restore
+                {{ $t('live.restore') }}
               </v-btn>
               <v-menu>
                 <template #activator="{ props: menu }">
@@ -1362,13 +1430,13 @@ onUnmounted(() => {
                     size="small"
                     variant="text"
                     icon="mdi-dots-vertical"
-                    aria-label="More actions"
+                    :aria-label="$t('common.moreActions')"
                   />
                 </template>
                 <v-list density="compact">
                   <v-list-item
                     prepend-icon="mdi-delete"
-                    title="Delete attempt"
+                    :title="$t('live.deleteRun')"
                     base-color="error"
                     @click="onDeleteRun(voided)"
                   />
@@ -1379,7 +1447,7 @@ onUnmounted(() => {
         </template>
         <tr v-if="rows.length === 0">
           <td colspan="10" class="rg-empty">
-            No entries yet — add them under Entries.
+            {{ $t('live.noEntries') }}
           </td>
         </tr>
       </tbody>

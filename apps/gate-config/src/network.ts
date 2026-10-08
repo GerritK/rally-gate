@@ -8,7 +8,7 @@
  * panel shows verbatim (see docs/gate-config-ui.md, "What the page shows").
  */
 
-import type { DeviceStatus, WifiNetwork } from './api-types';
+import type { DeviceStatus, WifiError, WifiNetwork } from './api-types';
 
 /**
  * `nmcli -t` separates fields with `:` and backslash-escapes any `:` that
@@ -102,26 +102,26 @@ export function parseWifiList(output: string): WifiNetwork[] {
 export function validateWifi(input: {
   ssid?: unknown;
   password?: unknown;
-}): Record<string, string> {
-  const errors: Record<string, string> = {};
+}): Record<string, WifiError> {
+  const errors: Record<string, WifiError> = {};
   const { ssid, password } = input;
 
   if (typeof ssid !== 'string' || ssid === '') {
-    errors.ssid = 'Pick a network or type its name.';
+    errors.ssid = 'ssidMissing';
   } else if (Buffer.byteLength(ssid, 'utf8') > 32) {
-    errors.ssid = 'Network names are at most 32 bytes.';
+    errors.ssid = 'ssidTooLong';
   } else if (/[\r\n\0]/.test(ssid)) {
-    errors.ssid = 'Must not contain line breaks.';
+    errors.ssid = 'lineBreak';
   } else if (ssid.startsWith('-')) {
-    errors.ssid = 'Cannot start with a hyphen.';
+    errors.ssid = 'leadingHyphen';
   }
 
   // Empty means an open network, which is a real thing to join.
   if (password !== undefined && password !== '') {
     if (typeof password !== 'string') {
-      errors.password = 'Must be text.';
+      errors.password = 'notText';
     } else if (!/^[\x20-\x7e]{8,63}$/.test(password)) {
-      errors.password = 'Wi-Fi passwords are 8 to 63 printable characters.';
+      errors.password = 'passwordInvalid';
     }
   }
 

@@ -99,8 +99,14 @@ What exists, with where its reasoning lives. History is in git.
   result is a plain table (`design-system.md`).
 - **CI:** build, format, lint, tests, and a headless-stack job against real
   Postgres (`CLAUDE.md`).
+- **English and German** in both web UIs (vue-i18n, Vuetify's own texts
+  included), picked per browser: its language, or the viewer's choice in the
+  app bar. Printed PDFs follow it. Server error messages are still English.
 
 ## Next
+
+- **Server errors as codes**, so the UIs can translate them: today a 409's
+  English `message` reaches the snackbar as-is.
 
 - **ESP32 NFC check-in gate** — firmware in `firmware/esp32-gate` builds,
   untested on hardware (ordered: XIAO ESP32-S3, PN532). Then: a server-side

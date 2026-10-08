@@ -31,9 +31,11 @@ const selectedCategories = computed({
 <template>
   <div v-if="classes.length > 0" class="rg-class-filter">
     <template v-if="mains.length > 0">
-      <span class="text-medium-emphasis">Class</span>
+      <span class="text-medium-emphasis">{{ $t('classes.class') }}</span>
       <v-chip-group v-model="main" mandatory color="secondary">
-        <v-chip :value="ALL" filter variant="outlined">All</v-chip>
+        <v-chip :value="ALL" filter variant="outlined">{{
+          $t('common.all')
+        }}</v-chip>
         <v-chip
           v-for="c in mains"
           :key="c.id"
@@ -47,7 +49,7 @@ const selectedCategories = computed({
       </v-chip-group>
     </template>
     <template v-if="categories.length > 0">
-      <span class="text-medium-emphasis">Category</span>
+      <span class="text-medium-emphasis">{{ $t('classes.category') }}</span>
       <v-chip-group v-model="selectedCategories" multiple color="secondary">
         <v-chip
           v-for="c in categories"

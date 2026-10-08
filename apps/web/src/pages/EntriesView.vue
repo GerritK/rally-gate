@@ -35,7 +35,7 @@ onMounted(refresh);
 <template>
   <v-card>
     <v-card-title class="d-flex align-center">
-      Entries
+      {{ $t('nav.entries') }}
       <v-spacer />
       <div class="d-flex flex-wrap justify-end ga-2">
         <v-btn
@@ -43,14 +43,14 @@ onMounted(refresh);
           prepend-icon="mdi-clipboard-check-outline"
           to="/entries/check-in"
         >
-          Check-in
+          {{ $t('checkIn.title') }}
         </v-btn>
         <v-btn
           color="primary"
           prepend-icon="mdi-plus"
           @click="dialogOpen = true"
         >
-          Add Entry
+          {{ $t('entries.add') }}
         </v-btn>
       </div>
     </v-card-title>
@@ -59,13 +59,15 @@ onMounted(refresh);
         <thead>
           <tr>
             <th>#</th>
-            <th>Crew</th>
-            <th>Car</th>
+            <th>{{ $t('table.crew') }}</th>
+            <th>{{ $t('table.car') }}</th>
             <!-- Off a tablet's width, so the status actions stay on screen; the
                  entry page and Check-in show it. -->
-            <th class="d-none d-md-table-cell">Transponder</th>
-            <th v-if="classes.length > 0">Classes</th>
-            <th>Status</th>
+            <th class="d-none d-md-table-cell">
+              {{ $t('entries.transponder') }}
+            </th>
+            <th v-if="classes.length > 0">{{ $t('classes.classes') }}</th>
+            <th>{{ $t('table.status') }}</th>
             <th width="1%"></th>
           </tr>
         </thead>
@@ -100,7 +102,7 @@ onMounted(refresh);
           </tr>
           <tr v-if="entries.length === 0">
             <td colspan="7" class="rg-empty">
-              No entries yet. Add one with + Add Entry.
+              {{ $t('entries.empty', { action: $t('entries.add') }) }}
             </td>
           </tr>
         </tbody>

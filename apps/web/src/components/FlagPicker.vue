@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { FLAG_OPTIONS, flagUrl } from '../crew';
+import { computed } from 'vue';
+import { flagOptions, flagUrl } from '../crew';
 
 const flag = defineModel<string | null>({ required: true });
+const options = computed(flagOptions);
 
 /** Tabbing into a picked flag and typing should search, not append to the
  *  flag's name. Vuetify writes the name into the input after focus, so the
@@ -15,9 +17,9 @@ function selectText(e: FocusEvent) {
 <template>
   <v-autocomplete
     v-model="flag"
-    :items="FLAG_OPTIONS"
-    label="Flag"
-    placeholder="None (chequered flag)"
+    :items="options"
+    :label="$t('crew.flag')"
+    :placeholder="$t('crew.noFlag')"
     persistent-placeholder
     clearable
     auto-select-first

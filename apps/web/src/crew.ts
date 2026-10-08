@@ -7,6 +7,7 @@ import {
 } from '@rally-gate/shared';
 import countries from 'flag-icons/country.json';
 import { inject, reactive, type InjectionKey } from 'vue';
+import { currentLocale } from '@rally-gate/ui';
 import { fetchSetting } from './api/settings';
 import chequered from './assets/flags/chequered.svg';
 import pride from './assets/flags/x-pride.svg';
@@ -90,20 +91,42 @@ const NOT_FOR_A_PERSON = new Set([
   'xx',
 ]);
 
+/** Country names in the current language where `Intl` knows the code;
+ * flag-icons' English name for the rest (gb-eng, eu-style organisations). */
+function countryName(code: string, name: string, regions: Intl.DisplayNames) {
+  try {
+    return /^[a-z]{2}$/.test(code)
+      ? (regions.of(code.toUpperCase()) ?? name)
+      : name;
+  } catch {
+    return name;
+  }
+}
+
 // No "None" item: one with a null value would count as selected on an empty
 // field, its title sitting in the input so typing appends to it.
-export const FLAG_OPTIONS: { value: string; title: string }[] = [
-  ...OWN_FLAGS,
-  ...countries
-    .filter((c) => !NOT_FOR_A_PERSON.has(c.code))
-    .map((c) => ({ value: c.code, title: c.name }))
-    .sort((a, b) => a.title.localeCompare(b.title)),
-];
+export function flagOptions(): { value: string; title: string }[] {
+  const locale = currentLocale();
+  const regions = new Intl.DisplayNames(locale, {
+    type: 'region',
+    fallback: 'none',
+  });
+  return [
+    ...OWN_FLAGS,
+    ...countries
+      .filter((c) => !NOT_FOR_A_PERSON.has(c.code))
+      .map((c) => ({
+        value: c.code,
+        title: countryName(c.code, c.name, regions),
+      }))
+      .sort((a, b) => a.title.localeCompare(b.title, locale)),
+  ];
+}
 
 /** The flag's name as the picker lists it; null when none is chosen. */
 export function flagName(flag: string | null): string | null {
   return flag
-    ? (FLAG_OPTIONS.find((f) => f.value === flag)?.title ?? flag)
+    ? (flagOptions().find((f) => f.value === flag)?.title ?? flag)
     : null;
 }
 

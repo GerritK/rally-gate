@@ -24,10 +24,12 @@ const props = defineProps<{
 const emit = defineEmits<{ saved: [entry: Entry] }>();
 const open = defineModel<boolean>({ required: true });
 
-const STATUS_OPTIONS = Object.values(EntryStatus).map((value) => ({
-  value,
-  title: ENTRY_STATUS_DISPLAY[value].label,
-}));
+const statusOptions = computed(() =>
+  Object.values(EntryStatus).map((value) => ({
+    value,
+    title: ENTRY_STATUS_DISPLAY[value].label,
+  })),
+);
 
 const draft = ref(toDraft(null));
 watch(open, (isOpen) => {
@@ -84,16 +86,20 @@ async function onSave() {
 <template>
   <FormDialog
     v-model="open"
-    :title="entry ? `Edit entry ${entry.startNumber}` : 'Add entry'"
+    :title="
+      entry
+        ? $t('entryForm.editTitle', { nr: entry.startNumber })
+        : $t('entryForm.add')
+    "
     :form="draft"
     :save="onSave"
-    :saved="entry ? 'Entry saved' : 'Entry added'"
-    :save-text="entry ? 'Save' : 'Add entry'"
+    :saved="entry ? $t('entryForm.saved') : $t('entryForm.added')"
+    :save-text="entry ? $t('common.save') : $t('entryForm.add')"
     :max-width="880"
   >
     <v-text-field
       v-model.number="draft.startNumber"
-      label="Start #"
+      :label="$t('entry.startNumber')"
       type="number"
       min="1"
       :rules="[required]"
@@ -102,44 +108,55 @@ async function onSave() {
     />
     <div class="rg-columns">
       <section>
-        <div class="rg-section-title">Driver</div>
+        <div class="rg-section-title">{{ $t('entry.driver') }}</div>
         <div class="rg-pair">
           <v-text-field
             v-model="draft.driverFirstName"
-            label="First name"
+            :label="$t('entry.firstName')"
             :rules="[required]"
           />
-          <v-text-field v-model="draft.driverLastName" label="Last name" />
+          <v-text-field
+            v-model="draft.driverLastName"
+            :label="$t('entry.lastName')"
+          />
         </div>
         <FlagPicker v-model="draft.driverFlag" />
       </section>
       <section>
-        <div class="rg-section-title">Co-driver (optional)</div>
+        <div class="rg-section-title">
+          {{ $t('entryForm.coDriverOptional') }}
+        </div>
         <div class="rg-pair">
-          <v-text-field v-model="draft.coDriverFirstName" label="First name" />
-          <v-text-field v-model="draft.coDriverLastName" label="Last name" />
+          <v-text-field
+            v-model="draft.coDriverFirstName"
+            :label="$t('entry.firstName')"
+          />
+          <v-text-field
+            v-model="draft.coDriverLastName"
+            :label="$t('entry.lastName')"
+          />
         </div>
         <FlagPicker v-model="draft.coDriverFlag" />
       </section>
     </div>
     <div class="rg-columns">
       <section>
-        <div class="rg-section-title">Car</div>
+        <div class="rg-section-title">{{ $t('entry.car') }}</div>
         <v-combobox
           v-model="draft.body"
           :items="bodies"
-          label="Body (optional)"
+          :label="$t('entryForm.bodyOptional')"
           placeholder="Ford Focus"
         />
         <v-combobox
           v-model="draft.chassis"
           :items="chassis"
-          label="Chassis (optional)"
+          :label="$t('entryForm.chassisOptional')"
           placeholder="HPI WR8"
         />
       </section>
       <section>
-        <div class="rg-section-title">Registration</div>
+        <div class="rg-section-title">{{ $t('entryForm.registration') }}</div>
         <TransponderFields
           v-model="draft.transponders"
           :entries="entries"
@@ -152,8 +169,8 @@ async function onSave() {
         />
         <v-select
           v-model="draft.status"
-          :items="STATUS_OPTIONS"
-          label="Status"
+          :items="statusOptions"
+          :label="$t('entry.status')"
         />
       </section>
     </div>

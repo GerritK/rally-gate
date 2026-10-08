@@ -1,11 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue';
-import { logoUrl, RallyFeedback, REPO_URL, useConfirm } from '@rally-gate/ui';
+import { useI18n } from 'vue-i18n';
+import {
+  LocaleMenu,
+  logoUrl,
+  RallyFeedback,
+  REPO_URL,
+  useConfirm,
+} from '@rally-gate/ui';
 
 import type {
   CommandResult,
   DeviceStatus,
   FieldDescriptor as FieldSpec,
+  FieldError,
+  WifiError,
   WifiNetwork,
 } from '../../src/api-types';
 
@@ -17,7 +26,7 @@ interface NetworkState {
 
 const fields = ref<Record<string, FieldSpec>>({});
 const values = ref<Record<string, string>>({});
-const errors = ref<Record<string, string>>({});
+const errors = ref<Record<string, FieldError>>({});
 const status = ref<{
   agent: CommandResult;
   clock: CommandResult;
@@ -39,9 +48,25 @@ const network = ref<NetworkState | null>(null);
 const joinSsid = ref('');
 const joinPassword = ref('');
 const joining = ref(false);
-const wifiErrors = ref<Record<string, string>>({});
+const wifiErrors = ref<Record<string, WifiError>>({});
 
 const confirm = useConfirm();
+const { t } = useI18n();
+
+/** The server sends a field's rules only; its words are here, by name. */
+const fieldText = (name: string, part: 'label' | 'hint' | 'message') =>
+  t(`fields.${name}.${part}`);
+
+function serverError(name: string): string | undefined {
+  const code = errors.value[name];
+  if (!code) return undefined;
+  return code === 'invalid'
+    ? fieldText(name, 'message')
+    : t(`fieldError.${code}`);
+}
+
+const wifiError = (field: 'ssid' | 'password') =>
+  wifiErrors.value[field] && t(`wifiError.${wifiErrors.value[field]}`);
 
 let statusTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -51,15 +76,17 @@ const agentOnline = computed(() => status.value?.agent.output === 'active');
 // names which gate you are looking at, and following keystrokes would claim the
 // gate had been renamed before it was. The pending change is shown by the
 // warning below instead.
-const gateName = computed(() => originalGateId.value || 'unconfigured gate');
+const gateName = computed(
+  () => originalGateId.value || t('gateConfig.unconfigured'),
+);
 
 // A marshal opens one of these per gate, so several tabs end up side by side
 // with otherwise identical titles. Gate first, since a narrow tab truncates the
 // end.
 watchEffect(() => {
   document.title = originalGateId.value
-    ? `${originalGateId.value} · Gate Config`
-    : 'Gate Config';
+    ? `${originalGateId.value} · ${t('gateConfig.title')}`
+    : t('gateConfig.title');
 });
 
 // Which card a setting belongs in is decided in config-file.ts, not here, so a
@@ -118,7 +145,8 @@ type Rule = (value: unknown) => true | string;
  * config-file.ts. An empty value passes: absent means "leave unset", and which
  * fields are required is not a grammar question.
  */
-function rulesFor(spec: FieldSpec): Rule[] {
+function rulesFor(name: string, spec: FieldSpec): Rule[] {
+  const message = () => fieldText(name, 'message');
   const pattern = spec.pattern ? new RegExp(spec.pattern) : undefined;
   return [
     (value: unknown) => {
@@ -127,16 +155,16 @@ function rulesFor(spec: FieldSpec): Rule[] {
         return true;
       }
       if (pattern && !pattern.test(text)) {
-        return spec.message;
+        return message();
       }
       if (spec.oneOf && !spec.oneOf.includes(text)) {
-        return spec.message;
+        return message();
       }
       if (spec.range) {
         const parsed = Number(text);
         const [min, max] = spec.range;
         if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
-          return spec.message;
+          return message();
         }
       }
       return true;
@@ -184,14 +212,17 @@ async function join() {
     const result = await response.json();
     if (!response.ok) {
       wifiErrors.value = result.errors ?? {};
-      notice.value = { type: 'error', text: 'Could not join — check below.' };
+      notice.value = { type: 'error', text: t('gateConfig.joinCheck') };
       return;
     }
     notice.value = result.joined
-      ? { type: 'success', text: `Joined ${joinSsid.value}.` }
+      ? {
+          type: 'success',
+          text: t('gateConfig.joined', { ssid: joinSsid.value }),
+        }
       : {
           type: 'error',
-          text: result.output || 'Could not join that network.',
+          text: result.output || t('gateConfig.joinFailed'),
         };
     joinPassword.value = '';
     await loadNetwork();
@@ -202,7 +233,7 @@ async function join() {
     // being used.
     notice.value = {
       type: 'warning',
-      text: `Lost contact with the gate while joining ${joinSsid.value}. That is expected if you were connected to its hotspot — reconnect to ${joinSsid.value} and reopen this page. If the gate cannot join, it raises its hotspot again within a minute.`,
+      text: t('gateConfig.lostWhileJoining', { ssid: joinSsid.value }),
     };
   } finally {
     joining.value = false;
@@ -212,9 +243,9 @@ async function join() {
 async function resetWifi() {
   if (
     !(await confirm({
-      title: 'Reset Wi-Fi?',
-      text: 'The gate forgets every saved network and starts its own hotspot. Join that hotspot to reach this page again.',
-      confirmText: 'Forget networks, start hotspot',
+      title: t('gateConfig.resetTitle'),
+      text: t('gateConfig.resetText'),
+      confirmText: t('gateConfig.resetConfirm'),
       color: 'error',
     }))
   )
@@ -225,16 +256,16 @@ async function resetWifi() {
       await fetch('/api/network/reset', { method: 'POST' })
     ).json();
     notice.value = result.started
-      ? { type: 'success', text: 'Saved networks forgotten, hotspot up.' }
+      ? { type: 'success', text: t('gateConfig.resetDone') }
       : {
           type: 'error',
-          text: result.output || 'Could not start the hotspot.',
+          text: result.output || t('gateConfig.hotspotFailed'),
         };
     await loadNetwork();
   } catch {
     notice.value = {
       type: 'warning',
-      text: 'Lost contact with the gate — expected: it left this network. Join its hotspot to reach this page again.',
+      text: t('gateConfig.lostAfterReset'),
     };
   }
 }
@@ -242,9 +273,9 @@ async function resetWifi() {
 async function powerOff() {
   if (
     !(await confirm({
-      title: 'Shut down this gate?',
-      text: 'It has to be switched back on by hand.',
-      confirmText: 'Shut down gate',
+      title: t('gateConfig.shutDownTitle'),
+      text: t('gateConfig.shutDownText'),
+      confirmText: t('gateConfig.shutDownGate'),
       color: 'error',
     }))
   )
@@ -252,7 +283,7 @@ async function powerOff() {
   notice.value = null;
   const done = {
     type: 'success' as const,
-    text: 'Shutting down. Wait until the green LED on the Pi has stopped flashing (about 10 seconds), then disconnect power.',
+    text: t('gateConfig.shuttingDown'),
   };
   try {
     const result = await (
@@ -261,7 +292,7 @@ async function powerOff() {
     if (!result.started) {
       notice.value = {
         type: 'error',
-        text: result.output || 'Could not shut down.',
+        text: result.output || t('gateConfig.shutDownFailed'),
       };
       return;
     }
@@ -297,7 +328,10 @@ async function save() {
       errors.value = result.errors ?? {};
       notice.value = {
         type: 'error',
-        text: result.message ?? 'Nothing was saved — check the fields below.',
+        text:
+          result.error === 'writeFailed'
+            ? t('gateConfig.writeFailed', { detail: result.detail })
+            : t('gateConfig.notSaved'),
       };
       return;
     }
@@ -306,19 +340,27 @@ async function save() {
     // send them to re-enter values that are in fact stored.
     const failed = [
       !result.restart.ok
-        ? `restarting gate-agent (${result.restart.output})`
+        ? t('gateConfig.restartFailed', { output: result.restart.output })
         : null,
       !result.time.ok
-        ? `updating the time source (${result.time.output})`
+        ? t('gateConfig.timeFailed', { output: result.time.output })
         : null,
     ].filter(Boolean);
     notice.value = failed.length
-      ? { type: 'warning', text: `Saved, but ${failed.join(' and ')} failed.` }
-      : { type: 'success', text: 'Saved and applied.' };
+      ? {
+          type: 'warning',
+          text: t('gateConfig.savedButFailed', {
+            failed: failed.join(t('gateConfig.and')),
+          }),
+        }
+      : { type: 'success', text: t('gateConfig.saved') };
     originalGateId.value = values.value.GATE_ID ?? '';
     await loadStatus();
   } catch (err) {
-    notice.value = { type: 'error', text: `Could not reach the gate: ${err}` };
+    notice.value = {
+      type: 'error',
+      text: t('gateConfig.unreachable', { error: String(err) }),
+    };
   } finally {
     saving.value = false;
   }
@@ -340,7 +382,7 @@ onUnmounted(() => clearInterval(statusTimer));
           <img :src="logoUrl" alt="" class="app-bar-logo" />
           <div class="app-bar-text">
             <div class="text-caption text-medium-emphasis app-bar-label">
-              Gate Config
+              {{ t('gateConfig.title') }}
             </div>
             <div class="text-subtitle-1 font-weight-medium app-bar-gate">
               {{ gateName }}
@@ -349,6 +391,7 @@ onUnmounted(() => clearInterval(statusTimer));
         </div>
       </v-app-bar-title>
       <template #append>
+        <LocaleMenu />
         <!-- Paired with text, not colour alone: the same colourblind rule the
              timing values follow (see packages/ui/theme.ts). -->
         <v-chip
@@ -357,7 +400,11 @@ onUnmounted(() => clearInterval(statusTimer));
           size="small"
           variant="flat"
         >
-          {{ agentOnline ? 'running' : (status?.agent.output ?? 'unknown') }}
+          {{
+            agentOnline
+              ? t('gateConfig.running')
+              : (status?.agent.output ?? t('gateConfig.unknown'))
+          }}
         </v-chip>
       </template>
     </v-app-bar>
@@ -377,15 +424,15 @@ onUnmounted(() => clearInterval(statusTimer));
              the save button sits after them rather than in either one. -->
         <v-form v-model="formValid">
           <v-card class="mb-6">
-            <v-card-title>Settings</v-card-title>
+            <v-card-title>{{ t('gateConfig.settings') }}</v-card-title>
             <v-card-text>
               <template v-for="[name, spec] in fieldsIn('general')" :key="name">
                 <v-text-field
                   v-model="values[name]"
-                  :label="spec.label"
-                  :hint="spec.hint"
-                  :rules="rulesFor(spec)"
-                  :error-messages="errors[name]"
+                  :label="fieldText(name, 'label')"
+                  :hint="fieldText(name, 'hint')"
+                  :rules="rulesFor(name, spec)"
+                  :error-messages="serverError(name)"
                   persistent-hint
                   class="mb-4"
                   @update:model-value="clearServerError(name)"
@@ -397,8 +444,7 @@ onUnmounted(() => clearInterval(statusTimer));
                 type="warning"
                 variant="tonal"
                 density="comfortable"
-                text="Changing the Gate ID makes this a different gate to the server. Its
-                      existing assignment and recorded detections stay with the old ID."
+                :text="t('gateConfig.gateIdChanged')"
               />
             </v-card-text>
           </v-card>
@@ -406,17 +452,17 @@ onUnmounted(() => clearInterval(statusTimer));
           <!-- Separate from the settings above because it is the one group that
                changes with the hardware in the box rather than with the rally. -->
           <v-card class="mb-6">
-            <v-card-title>Decoder</v-card-title>
+            <v-card-title>{{ t('gateConfig.decoder') }}</v-card-title>
             <v-card-text>
               <template v-for="[name, spec] in fieldsIn('decoder')" :key="name">
                 <v-select
                   v-if="spec.oneOf"
                   v-model="values[name]"
                   :items="spec.oneOf"
-                  :label="spec.label"
-                  :hint="spec.hint"
-                  :rules="rulesFor(spec)"
-                  :error-messages="errors[name]"
+                  :label="fieldText(name, 'label')"
+                  :hint="fieldText(name, 'hint')"
+                  :rules="rulesFor(name, spec)"
+                  :error-messages="serverError(name)"
                   persistent-hint
                   class="mb-4"
                   @update:model-value="clearServerError(name)"
@@ -424,10 +470,10 @@ onUnmounted(() => clearInterval(statusTimer));
                 <v-text-field
                   v-else
                   v-model="values[name]"
-                  :label="spec.label"
-                  :hint="spec.hint"
-                  :rules="rulesFor(spec)"
-                  :error-messages="errors[name]"
+                  :label="fieldText(name, 'label')"
+                  :hint="fieldText(name, 'hint')"
+                  :rules="rulesFor(name, spec)"
+                  :error-messages="serverError(name)"
                   persistent-hint
                   class="mb-4"
                   @update:model-value="clearServerError(name)"
@@ -444,14 +490,14 @@ onUnmounted(() => clearInterval(statusTimer));
               variant="flat"
               @click="save"
             >
-              Save and apply
+              {{ t('gateConfig.saveAndApply') }}
             </v-btn>
           </div>
         </v-form>
 
         <v-card class="mb-6">
           <v-card-title class="d-flex align-center">
-            Network
+            {{ t('gateConfig.network') }}
             <v-spacer />
             <v-chip
               v-if="wifiConnection"
@@ -460,7 +506,7 @@ onUnmounted(() => clearInterval(statusTimer));
               size="small"
               variant="flat"
             >
-              {{ onHotspot ? 'own hotspot' : wifiConnection }}
+              {{ onHotspot ? t('gateConfig.ownHotspot') : wifiConnection }}
             </v-chip>
             <v-chip
               v-else
@@ -469,7 +515,7 @@ onUnmounted(() => clearInterval(statusTimer));
               size="small"
               variant="flat"
             >
-              no Wi-Fi
+              {{ t('gateConfig.noWifi') }}
             </v-chip>
           </v-card-title>
           <v-card-text>
@@ -478,9 +524,7 @@ onUnmounted(() => clearInterval(statusTimer));
               type="info"
               variant="tonal"
               density="comfortable"
-              text="NetworkManager is not available on this machine, so Wi-Fi cannot be
-                    configured from here. Expected off a Raspberry Pi, or on a gate
-                    wired by Ethernet."
+              :text="t('gateConfig.noNetworkManager')"
               class="mb-2"
             />
             <template v-else>
@@ -489,20 +533,20 @@ onUnmounted(() => clearInterval(statusTimer));
               <v-combobox
                 v-model="joinSsid"
                 :items="network?.networks.map((n) => n.ssid) ?? []"
-                :error-messages="wifiErrors.ssid"
-                label="Network"
-                hint="Pick one in range, or type the name of a hidden network."
+                :error-messages="wifiError('ssid')"
+                :label="t('gateConfig.network')"
+                :hint="t('gateConfig.networkHint')"
                 persistent-hint
                 class="mb-4"
               />
               <v-text-field
                 v-if="selectedSecured"
                 v-model="joinPassword"
-                :error-messages="wifiErrors.password"
-                label="Wi-Fi password"
+                :error-messages="wifiError('password')"
+                :label="t('gateConfig.wifiPassword')"
                 type="password"
                 autocomplete="off"
-                hint="Stored by NetworkManager, not in the gate's config file."
+                :hint="t('gateConfig.wifiPasswordHint')"
                 persistent-hint
                 class="mb-4"
               />
@@ -512,10 +556,7 @@ onUnmounted(() => clearInterval(statusTimer));
                 type="info"
                 variant="tonal"
                 density="comfortable"
-                text="You are connected to this gate's own hotspot. Joining a network
-                      takes the hotspot down, so this page will go unreachable — that
-                      is expected. If the gate cannot join, it raises the hotspot
-                      again within a minute."
+                :text="t('gateConfig.onHotspot')"
               />
             </template>
           </v-card-text>
@@ -525,7 +566,7 @@ onUnmounted(() => clearInterval(statusTimer));
               prepend-icon="mdi-wifi-remove"
               @click="resetWifi"
             >
-              Reset Wi-Fi
+              {{ t('gateConfig.resetWifi') }}
             </v-btn>
             <v-spacer />
             <v-btn
@@ -535,42 +576,46 @@ onUnmounted(() => clearInterval(statusTimer));
               variant="flat"
               @click="join"
             >
-              Join
+              {{ t('gateConfig.join') }}
             </v-btn>
           </v-card-actions>
         </v-card>
 
         <v-card>
-          <v-card-title>Status</v-card-title>
+          <v-card-title>{{ t('gateConfig.status') }}</v-card-title>
           <v-card-text>
-            <div class="text-medium-emphasis text-caption mb-1">Version</div>
+            <div class="text-medium-emphasis text-caption mb-1">
+              {{ t('gateConfig.version') }}
+            </div>
             <div class="rg-timing mb-4">
-              {{ status?.version ?? 'unavailable' }}
+              {{ status?.version ?? t('gateConfig.unavailable') }}
               <a
                 :href="REPO_URL"
                 target="_blank"
                 class="text-medium-emphasis ml-2"
-                aria-label="Rally Gate on GitHub"
+                :aria-label="t('gateConfig.onGithub')"
               >
                 <v-icon icon="mdi-github" size="small" />
               </a>
             </div>
 
-            <div class="text-medium-emphasis text-caption mb-1">Clock</div>
+            <div class="text-medium-emphasis text-caption mb-1">
+              {{ t('gateConfig.clock') }}
+            </div>
             <pre class="rg-timing status-block mb-4">{{
-              status?.clock.output || 'unavailable'
+              status?.clock.output || t('gateConfig.unavailable')
             }}</pre>
 
             <div class="text-medium-emphasis text-caption mb-1">
-              Recent gate-agent log
+              {{ t('gateConfig.recentLog') }}
             </div>
             <pre class="status-block">{{
-              status?.log.output || 'unavailable'
+              status?.log.output || t('gateConfig.unavailable')
             }}</pre>
           </v-card-text>
           <v-card-actions>
             <v-btn variant="text" prepend-icon="mdi-power" @click="powerOff">
-              Shut down
+              {{ t('gateConfig.shutDown') }}
             </v-btn>
           </v-card-actions>
         </v-card>

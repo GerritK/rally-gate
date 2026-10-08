@@ -8,6 +8,7 @@ import {
   type StageResults,
 } from '../api/classification';
 import { StageStatus } from '@rally-gate/shared';
+import { t } from '@rally-gate/ui';
 import {
   classFilterLabel,
   rankingClassIds,
@@ -45,12 +46,12 @@ const printing = ref(false);
 const stage = computed(() => stages.value.find((s) => s.id === props.stageId));
 
 const heading = computed(() => {
-  if (!props.stageId) return 'Overall Classification';
+  if (!props.stageId) return t('results.overallTitle');
   const s = stage.value;
   return [
-    'Stage Classification',
+    t('results.stageTitle'),
     s && ` — ${s.id} · ${s.name}`,
-    s?.status === StageStatus.ACTIVE && ' (Provisional)',
+    s?.status === StageStatus.ACTIVE && ` (${t('pdf.provisional')})`,
   ]
     .filter(Boolean)
     .join('');
@@ -87,8 +88,8 @@ async function print(all: boolean) {
       ),
       fileName: [
         rallyName.value,
-        props.stageId ?? 'Overall',
-        all ? 'All rankings' : label(rankings[0]),
+        props.stageId ?? t('results.overall'),
+        all ? t('results.allRankings') : label(rankings[0]),
       ]
         .filter(Boolean)
         .join(' - '),
@@ -140,24 +141,22 @@ function onStageChange(stageId: string) {
         <div class="d-flex flex-wrap justify-end ga-2">
           <v-btn
             v-if="classes.length > 0"
-            v-tooltip:top="
-              'A PDF: All classes, then each class on its own sheets'
-            "
+            v-tooltip:top="$t('results.printAllHint')"
             variant="tonal"
             prepend-icon="mdi-file-document-multiple"
             :loading="printing"
             @click="print(true)"
           >
-            Print all
+            {{ $t('results.printAll') }}
           </v-btn>
           <v-btn
-            v-tooltip:top="'A PDF of this ranking, to print or share'"
+            v-tooltip:top="$t('results.printHint')"
             variant="tonal"
             prepend-icon="mdi-printer"
             :loading="printing"
             @click="print(false)"
           >
-            Print
+            {{ $t('results.print') }}
           </v-btn>
         </div>
       </template>

@@ -14,6 +14,6 @@ const online = computed(() => isOnline(props.gate, serverNow.value));
     :color="online ? 'success' : 'error'"
     :prepend-icon="online ? 'mdi-lan-connect' : 'mdi-lan-disconnect'"
   >
-    {{ online ? 'online' : 'offline' }}
+    {{ online ? $t('gate.online') : $t('gate.offline') }}
   </v-chip>
 </template>

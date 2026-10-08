@@ -29,7 +29,11 @@ defineEmits<{
         <v-icon icon="mdi-account-question" color="warning" />
         <div class="rg-passing-what">
           <div class="font-weight-bold">
-            Unidentified {{ role?.toLowerCase() ?? 'passing' }}
+            {{
+              role
+                ? $t('passing.unidentifiedAt', { role })
+                : $t('passing.unidentified')
+            }}
             <span class="rg-timing ml-1">
               {{ formatClockTime(passing.timestampGate) }}
             </span>
@@ -38,9 +42,11 @@ defineEmits<{
             {{ gateName }}
           </div>
           <div v-if="passing.transponderId" class="text-caption text-warning">
-            Transponder
-            <span class="rg-timing">{{ passing.transponderId }}</span>
-            is on several cars
+            <i18n-t keypath="passing.sharedTransponder" scope="global">
+              <template #id>
+                <span class="rg-timing">{{ passing.transponderId }}</span>
+              </template>
+            </i18n-t>
           </div>
         </div>
       </div>
@@ -53,7 +59,7 @@ defineEmits<{
           :items="entryOptions"
           item-title="title"
           item-value="id"
-          placeholder="Pick an entry"
+          :placeholder="$t('passing.pickEntry')"
           density="compact"
           variant="outlined"
           hide-details
@@ -66,7 +72,7 @@ defineEmits<{
           :disabled="!entryId"
           @click="$emit('assign')"
         >
-          Assign
+          {{ $t('passing.assign') }}
         </v-btn>
         <v-menu>
           <template #activator="{ props: menu }">
@@ -75,14 +81,14 @@ defineEmits<{
               size="small"
               variant="text"
               icon="mdi-dots-vertical"
-              aria-label="More actions"
+              :aria-label="$t('common.moreActions')"
             />
           </template>
           <v-list density="compact">
             <v-list-item
               prepend-icon="mdi-close"
-              title="Not a car"
-              subtitle="Dismiss this passing"
+              :title="$t('passing.notACar')"
+              :subtitle="$t('passing.dismiss')"
               @click="$emit('dismiss')"
             />
           </v-list>
@@ -94,8 +100,7 @@ defineEmits<{
       class="rg-passing-queued d-flex align-center flex-wrap ga-2"
     >
       <span class="text-medium-emphasis">
-        {{ queued.length }} more
-        {{ queued.length === 1 ? 'passing' : 'passings' }} waiting ·
+        {{ $t('passing.moreWaiting', queued.length) }} ·
         <span class="rg-timing">
           {{ formatClockTime(queued[0].timestampGate) }}
           <template v-if="queued.length > 1">
@@ -110,7 +115,7 @@ defineEmits<{
         prepend-icon="mdi-close"
         @click="$emit('dismissAll')"
       >
-        Dismiss all {{ queued.length + 1 }}
+        {{ $t('passing.dismissAll', { n: queued.length + 1 }) }}
       </v-btn>
     </div>
   </div>

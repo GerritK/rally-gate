@@ -10,7 +10,7 @@ import {
 import { fetchEntries, type Entry } from '../api/entries';
 import FormDialog from '../components/FormDialog.vue';
 import { required } from '../format';
-import { notify, useConfirm } from '@rally-gate/ui';
+import { notify, t, useConfirm } from '@rally-gate/ui';
 
 const confirm = useConfirm();
 
@@ -60,19 +60,19 @@ async function onDeleteClass(entryClass: EntryClass) {
   const count = countOf(entryClass);
   if (
     !(await confirm({
-      title: `Delete class "${entryClass.name}"?`,
+      title: t('classes.deleteTitle', { name: entryClass.name }),
       text:
         count > 0
-          ? `${count} entry${count === 1 ? '' : 's'} will leave it; the entries themselves are kept.`
-          : 'No entry is in it.',
-      confirmText: 'Delete class',
+          ? t('classes.deleteText', { n: count }, count)
+          : t('classes.deleteEmpty'),
+      confirmText: t('classes.delete'),
       color: 'error',
     }))
   )
     return;
   await deleteEntryClass(entryClass.id);
   await refresh();
-  notify('Class deleted');
+  notify(t('classes.deleted'));
 }
 
 onMounted(refresh);
@@ -80,32 +80,34 @@ onMounted(refresh);
 
 <template>
   <v-btn variant="text" prepend-icon="mdi-arrow-left" to="/setup" class="mb-4">
-    Back to Setup
+    {{ $t('setup.back') }}
   </v-btn>
 
   <v-card>
     <v-card-title class="d-flex align-center">
-      Classes
+      {{ $t('classes.classes') }}
       <v-spacer />
       <v-btn variant="tonal" prepend-icon="mdi-plus" @click="openDialog(null)">
-        Add Class
+        {{ $t('classes.add') }}
       </v-btn>
     </v-card-title>
     <v-card-text>
       <p class="mb-4">
-        <strong>Main classes</strong> (4WD, 2WD) split the field — an entry has
-        one. <strong>Categories</strong> (Rookie, Stock) cut across them — a
-        entry has any number. Results combine any of them, e.g. Stock Rookie
-        2WD, with positions, gaps and notional times computed within that group.
-        Assign them on the Entries page; the overall ranking always includes
-        everyone.
+        <i18n-t keypath="classes.explain" scope="global">
+          <template #mainClasses>
+            <strong>{{ $t('classes.mainClasses') }}</strong>
+          </template>
+          <template #categories>
+            <strong>{{ $t('classes.categories') }}</strong>
+          </template>
+        </i18n-t>
       </p>
       <v-table density="comfortable">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Kind</th>
-            <th>Entries</th>
+            <th>{{ $t('stages.name') }}</th>
+            <th>{{ $t('transponder.kind') }}</th>
+            <th>{{ $t('nav.entries') }}</th>
             <th width="1%"></th>
           </tr>
         </thead>
@@ -118,7 +120,11 @@ onMounted(refresh);
                 :color="entryClass.main ? 'secondary' : undefined"
                 :prepend-icon="entryClass.main ? 'mdi-star' : 'mdi-tag'"
               >
-                {{ entryClass.main ? 'Main class' : 'Category' }}
+                {{
+                  entryClass.main
+                    ? $t('classes.mainClass')
+                    : $t('classes.category')
+                }}
               </v-chip>
             </td>
             <td>{{ countOf(entryClass) }}</td>
@@ -129,7 +135,7 @@ onMounted(refresh);
                 prepend-icon="mdi-pencil"
                 @click="openDialog(entryClass)"
               >
-                Edit
+                {{ $t('common.edit') }}
               </v-btn>
               <v-menu>
                 <template #activator="{ props: menu }">
@@ -138,13 +144,15 @@ onMounted(refresh);
                     icon="mdi-dots-vertical"
                     size="small"
                     variant="text"
-                    :aria-label="`More for ${entryClass.name}`"
+                    :aria-label="
+                      $t('common.moreFor', { name: entryClass.name })
+                    "
                   />
                 </template>
                 <v-list density="compact">
                   <v-list-item
                     prepend-icon="mdi-delete-outline"
-                    title="Delete"
+                    :title="$t('common.delete')"
                     base-color="error"
                     @click="onDeleteClass(entryClass)"
                   />
@@ -154,8 +162,7 @@ onMounted(refresh);
           </tr>
           <tr v-if="classes.length === 0">
             <td colspan="4" class="rg-empty">
-              No classes yet. Without any, results are one overall ranking. Add
-              one with + Add Class.
+              {{ $t('classes.empty', { action: $t('classes.add') }) }}
             </td>
           </tr>
         </tbody>
@@ -165,21 +172,25 @@ onMounted(refresh);
 
   <FormDialog
     v-model="dialogOpen"
-    :title="editing ? `Edit class ${editing.name}` : 'Add class'"
+    :title="
+      editing
+        ? $t('classes.editTitle', { name: editing.name })
+        : $t('classes.add')
+    "
     :form="draft"
     :save="onSave"
-    :saved="editing ? 'Class saved' : 'Class added'"
-    :save-text="editing ? 'Save' : 'Add class'"
+    :saved="editing ? $t('classes.saved') : $t('classes.added')"
+    :save-text="editing ? $t('common.save') : $t('classes.add')"
   >
     <v-text-field
       v-model="draft.name"
-      label="Name"
+      :label="$t('stages.name')"
       :rules="[required]"
       autofocus
     />
     <v-switch
       v-model="draft.main"
-      label="Main class (an entry has one)"
+      :label="$t('classes.mainSwitch')"
       color="secondary"
       hide-details
     />

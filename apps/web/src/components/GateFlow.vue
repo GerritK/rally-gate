@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@rally-gate/ui';
 import type { Gate } from '../api/gates';
 import { serverNow } from '../api/time';
 import { gateStatusColor, gateStatusIcon, isOnline, isReady } from '../format';
@@ -12,8 +13,8 @@ defineProps<{
 }>();
 
 function statusText(gate: Gate): string {
-  if (!isOnline(gate, serverNow.value)) return 'Offline';
-  return isReady(gate, serverNow.value) ? ' ' : 'Clock not synced';
+  if (!isOnline(gate, serverNow.value)) return t('gate.offlineTitle');
+  return isReady(gate, serverNow.value) ? ' ' : t('gate.clockNotSynced');
 }
 </script>
 
@@ -45,7 +46,7 @@ function statusText(gate: Gate): string {
       </div>
     </div>
   </div>
-  <div v-else class="rg-empty">No gates assigned to this stage yet.</div>
+  <div v-else class="rg-empty">{{ $t('gate.noneOnStage') }}</div>
 </template>
 
 <style scoped>

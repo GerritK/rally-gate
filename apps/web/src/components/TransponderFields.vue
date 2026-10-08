@@ -16,11 +16,13 @@ const props = defineProps<{
 const list = defineModel<TransponderDraft[]>({ required: true });
 
 // Short in the field, which is narrow; spelled out in the list.
-const KIND_OPTIONS = Object.values(TransponderKind).map((value) => ({
-  value,
-  title: value,
-  subtitle: TRANSPONDER_KINDS[value],
-}));
+const kindOptions = computed(() =>
+  Object.values(TransponderKind).map((value) => ({
+    value,
+    title: value,
+    subtitle: TRANSPONDER_KINDS[value],
+  })),
+);
 
 const warnings = computed(() =>
   transponderWarnings(props.entries, list.value, props.selfId),
@@ -44,22 +46,26 @@ function remove(index: number) {
       <div class="rg-transponder">
         <v-select
           v-model="t.kind"
-          :items="KIND_OPTIONS"
+          :items="kindOptions"
           :item-props="true"
-          label="Kind"
+          :label="$t('transponder.kind')"
         />
-        <v-text-field v-model="t.identifier" label="ID" class="rg-timing" />
+        <v-text-field
+          v-model="t.identifier"
+          :label="$t('transponder.id')"
+          class="rg-timing"
+        />
         <v-text-field
           v-model="t.label"
-          label="Label"
-          placeholder="spare car"
+          :label="$t('transponder.label')"
+          :placeholder="$t('transponder.labelPlaceholder')"
           class="rg-transponder-label"
         />
         <v-btn
           icon="mdi-close"
           variant="text"
           size="small"
-          aria-label="Remove transponder"
+          :aria-label="$t('transponder.remove')"
           class="mt-2"
           @click="remove(i)"
         />
@@ -73,7 +79,7 @@ function remove(index: number) {
     </div>
     <div>
       <v-btn variant="text" prepend-icon="mdi-plus" @click="add">
-        Add transponder
+        {{ $t('transponder.add') }}
       </v-btn>
     </div>
   </div>

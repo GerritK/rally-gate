@@ -1,5 +1,5 @@
 import { EntryStatus, TransponderKind } from '@rally-gate/shared';
-import { notify, useConfirm } from '@rally-gate/ui';
+import { notify, t, useConfirm } from '@rally-gate/ui';
 import {
   updateEntry,
   type Entry,
@@ -32,11 +32,15 @@ function action(from: EntryStatus, to: EntryStatus): StatusAction | null {
   switch (to) {
     case CHECKED_IN:
       if (from === REGISTERED)
-        return { to, label: 'Check in', icon: 'mdi-clipboard-check-outline' };
+        return {
+          to,
+          label: t('entryAction.checkIn'),
+          icon: 'mdi-clipboard-check-outline',
+        };
       if (from === SCRUTINEERED)
         return {
           to,
-          label: 'Undo scrutineering',
+          label: t('entryAction.undoScrutineering'),
           icon: 'mdi-decagram-outline',
         };
       return null;
@@ -44,31 +48,36 @@ function action(from: EntryStatus, to: EntryStatus): StatusAction | null {
       if (from === CHECKED_IN)
         return {
           to,
-          label: 'Passed scrutineering',
-          short: 'Passed',
+          label: t('entryAction.passScrutineering'),
+          short: t('entryAction.passShort'),
           icon: 'mdi-check-decagram',
         };
       // A small event without a technical check does both at the desk.
       if (from === REGISTERED)
-        return { to, label: 'Check in and pass', icon: 'mdi-check-decagram' };
+        return {
+          to,
+          label: t('entryAction.checkInAndPass'),
+          icon: 'mdi-check-decagram',
+        };
       return null;
     case REGISTERED:
-      if (out) return { to, label: 'Reinstate', icon: 'mdi-restore' };
+      if (out)
+        return { to, label: t('entryAction.reinstate'), icon: 'mdi-restore' };
       if (from !== REGISTERED)
         return {
           to,
-          label: 'Undo check-in',
+          label: t('entryAction.undoCheckIn'),
           icon: 'mdi-clipboard-remove-outline',
         };
       return null;
     case WITHDRAWN:
       return from === WITHDRAWN
         ? null
-        : { to, label: 'Withdraw', icon: 'mdi-flag-remove' };
+        : { to, label: t('entryAction.withdraw'), icon: 'mdi-flag-remove' };
     case DISQUALIFIED:
       return from === DISQUALIFIED
         ? null
-        : { to, label: 'Disqualify', icon: 'mdi-cancel' };
+        : { to, label: t('entryAction.disqualify'), icon: 'mdi-cancel' };
   }
 }
 
@@ -87,16 +96,21 @@ export function statusActions(status: EntryStatus): {
 }
 
 const DONE: Record<EntryStatus, string> = {
-  [REGISTERED]: 'registered',
-  [CHECKED_IN]: 'checked in',
-  [SCRUTINEERED]: 'passed scrutineering',
-  [WITHDRAWN]: 'withdrawn',
-  [DISQUALIFIED]: 'disqualified',
+  [REGISTERED]: 'entryAction.done.registered',
+  [CHECKED_IN]: 'entryAction.done.checkedIn',
+  [SCRUTINEERED]: 'entryAction.done.scrutineered',
+  [WITHDRAWN]: 'entryAction.done.withdrawn',
+  [DISQUALIFIED]: 'entryAction.done.disqualified',
 };
 
+/** Getters, so each read is in the current language. */
 export const TRANSPONDER_KINDS: Record<TransponderKind, string> = {
-  [TransponderKind.RC]: 'RC transponder',
-  [TransponderKind.NFC]: 'NFC tag',
+  get [TransponderKind.RC]() {
+    return t('transponder.rc');
+  },
+  get [TransponderKind.NFC]() {
+    return t('transponder.nfc');
+  },
 };
 
 /** "1234567", "NFC 0042 (driver tag)" — RC goes without saying. */
@@ -160,7 +174,7 @@ export function transponderWarnings(
       : [];
     if (others.length === 0) return undefined;
     const on = others.map((v) => `#${v.startNumber}`).join(', ');
-    return `Also on ${on}: its passings wait for a marshal to pick the car.`;
+    return t('transponder.alsoOn', { on });
   });
   const kinds = toTransponderInput(drafts).map((t) => t.kind);
   const doubled = Object.values(TransponderKind).find(
@@ -169,7 +183,9 @@ export function transponderWarnings(
   return {
     rows,
     list: doubled
-      ? `Several ${TRANSPONDER_KINDS[doubled]}s: keep them registered, but only one may be on the car at a time.`
+      ? t('transponder.several', {
+          kinds: t(`transponder.${doubled.toLowerCase()}Plural`),
+        })
       : undefined,
   };
 }
@@ -193,15 +209,15 @@ export function useEntryStatus() {
     if (
       to === DISQUALIFIED &&
       !(await confirm({
-        title: `Disqualify #${entry.startNumber}?`,
-        text: 'It leaves every result and the cars behind it move up. Its times stay stored; Reinstate brings it back.',
-        confirmText: 'Disqualify',
+        title: t('entryAction.disqualifyTitle', { nr: entry.startNumber }),
+        text: t('entryAction.disqualifyText'),
+        confirmText: t('entryAction.disqualify'),
         color: 'error',
       }))
     )
       return null;
     const saved = await updateEntry(entry.id, { ...extra, status: to });
-    notify(`#${entry.startNumber} ${DONE[to]}`);
+    notify(t(DONE[to], { nr: entry.startNumber }));
     return saved;
   };
 }

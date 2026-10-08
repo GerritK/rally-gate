@@ -1,12 +1,13 @@
 import { clearNotice } from '@rally-gate/ui';
 import { createRouter, createWebHistory } from 'vue-router';
 
+/** `label` is a message key. */
 export const NAV_ITEMS = [
-  { to: '/live', label: 'Live Timing', icon: 'mdi-timer-outline' },
-  { to: '/results/overall', label: 'Results', icon: 'mdi-podium' },
-  { to: '/entries', label: 'Entries', icon: 'mdi-car' },
-  { to: '/hardware', label: 'Hardware', icon: 'mdi-router-wireless' },
-  { to: '/setup', label: 'Setup', icon: 'mdi-cog-outline' },
+  { to: '/live', label: 'nav.live', icon: 'mdi-timer-outline' },
+  { to: '/results/overall', label: 'nav.results', icon: 'mdi-podium' },
+  { to: '/entries', label: 'nav.entries', icon: 'mdi-car' },
+  { to: '/hardware', label: 'nav.hardware', icon: 'mdi-router-wireless' },
+  { to: '/setup', label: 'nav.setup', icon: 'mdi-cog-outline' },
 ];
 
 export const router = createRouter({

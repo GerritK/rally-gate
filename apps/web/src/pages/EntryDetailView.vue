@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { StageRunStatus, StageStatus, EntryStatus } from '@rally-gate/shared';
+import { t } from '@rally-gate/ui';
 import {
   fetchOverallClassification,
   fetchStageClassification,
@@ -59,12 +60,12 @@ const people = computed(() => {
     [first, last].filter(Boolean).join(' ');
   return [
     {
-      role: 'Driver',
+      role: t('entry.driver'),
       name: full(v.driverFirstName, v.driverLastName),
       flag: v.driverFlag,
     },
     {
-      role: 'Co-driver',
+      role: t('entry.coDriver'),
       name: full(v.coDriverFirstName, v.coDriverLastName),
       flag: v.coDriverFlag,
     },
@@ -91,7 +92,7 @@ const stageRows = computed(() =>
       let state: { label: string; color?: string } | null = null;
       if (run?.status === StageRunStatus.STARTED) {
         state = {
-          label: 'On stage',
+          label: t('runState.onStage'),
           color: runStatusColor(StageRunStatus.STARTED),
         };
       } else if (run?.status === StageRunStatus.CANCELLED) {
@@ -104,7 +105,9 @@ const stageRows = computed(() =>
       } else if (!run) {
         state = {
           label:
-            stage.status === StageStatus.ACTIVE ? 'Waiting' : 'Not started',
+            stage.status === StageStatus.ACTIVE
+              ? t('runState.waiting')
+              : t('stageStatus.notStarted'),
         };
       }
       // What a stage without a finish costs in the overall, so the rows
@@ -158,11 +161,11 @@ onMounted(refresh);
     to="/entries"
     class="mb-4"
   >
-    Back to Entries
+    {{ $t('checkIn.back') }}
   </v-btn>
 
   <v-alert v-if="loaded && !entry" type="info" variant="tonal">
-    No such entry in this event.
+    {{ $t('entryDetail.notFound') }}
   </v-alert>
 
   <template v-if="entry">
@@ -181,7 +184,7 @@ onMounted(refresh);
             prepend-icon="mdi-pencil"
             @click="dialogOpen = true"
           >
-            Edit
+            {{ $t('common.edit') }}
           </v-btn>
         </template>
       </v-card-item>
@@ -189,7 +192,7 @@ onMounted(refresh);
 
     <!-- The same parts as the edit dialog, so a value is where it was set. -->
     <div class="rg-entry-grid">
-      <v-card title="Crew">
+      <v-card :title="$t('table.crew')">
         <v-card-text>
           <dl class="rg-facts">
             <template v-for="person in people" :key="person.role">
@@ -200,7 +203,7 @@ onMounted(refresh);
                   {{ person.name }}
                 </div>
                 <div class="text-caption text-medium-emphasis">
-                  {{ flagName(person.flag) ?? 'No flag' }}
+                  {{ flagName(person.flag) ?? $t('entryDetail.noFlag') }}
                 </div>
               </dd>
               <dd v-else class="text-medium-emphasis">-</dd>
@@ -209,26 +212,26 @@ onMounted(refresh);
         </v-card-text>
       </v-card>
 
-      <v-card title="Car">
+      <v-card :title="$t('table.car')">
         <v-card-text>
           <dl class="rg-facts">
-            <dt>Body</dt>
+            <dt>{{ $t('entryDetail.body') }}</dt>
             <dd>{{ entry.body ?? '-' }}</dd>
-            <dt>Chassis</dt>
+            <dt>{{ $t('entryDetail.chassis') }}</dt>
             <dd>{{ entry.chassis ?? '-' }}</dd>
           </dl>
         </v-card-text>
       </v-card>
 
-      <v-card title="Registration">
+      <v-card :title="$t('entryForm.registration')">
         <v-card-text>
           <dl class="rg-facts">
-            <dt>Status</dt>
+            <dt>{{ $t('table.status') }}</dt>
             <dd class="d-flex flex-wrap align-center ga-1">
               <StatusChip :display="ENTRY_STATUS_DISPLAY[entry.status]" />
               <EntryStatusActions :entry="entry" @saved="refresh" />
             </dd>
-            <dt>Classes</dt>
+            <dt>{{ $t('classes.classes') }}</dt>
             <dd v-if="ownClasses.length > 0" class="d-flex flex-wrap ga-1">
               <ClassChip
                 v-for="c in ownClasses"
@@ -238,7 +241,7 @@ onMounted(refresh);
               />
             </dd>
             <dd v-else class="text-medium-emphasis">-</dd>
-            <dt>Transponder</dt>
+            <dt>{{ $t('entries.transponder') }}</dt>
             <TransponderList :entry="entry" />
           </dl>
         </v-card-text>
@@ -247,43 +250,49 @@ onMounted(refresh);
 
     <v-card class="mt-4">
       <v-card-item>
-        <v-card-title>Times</v-card-title>
+        <v-card-title>{{ $t('entryDetail.times') }}</v-card-title>
       </v-card-item>
       <!-- The standing is what this card is read for; the stages explain it. -->
       <v-card-text>
         <dl v-if="standing" class="rg-standing">
           <div>
-            <dt>Overall</dt>
+            <dt>{{ $t('results.overall') }}</dt>
             <dd class="rg-timing">{{ standing.position }}</dd>
           </div>
           <div>
-            <dt>Total</dt>
+            <dt>{{ $t('pdf.total') }}</dt>
             <dd class="rg-timing">{{ formatDuration(standing.durationMs) }}</dd>
           </div>
           <div>
-            <dt>Gap</dt>
+            <dt>{{ $t('table.gap') }}</dt>
             <dd class="rg-timing">{{ formatGap(standing.gapMs) }}</dd>
           </div>
         </dl>
         <div v-else class="rg-empty">
           {{
             entry?.status === EntryStatus.WITHDRAWN
-              ? 'Retired: withdrawn, so not in the overall.'
+              ? $t('entryDetail.withdrawn')
               : entry?.status === EntryStatus.DISQUALIFIED
-                ? 'Disqualified: not in any result.'
-                : 'Not in the overall yet: no completed stage that counts.'
+                ? $t('entryDetail.disqualified')
+                : $t('entryDetail.notInOverall')
           }}
         </div>
       </v-card-text>
       <v-table density="comfortable">
         <thead>
           <tr>
-            <th>Stage</th>
-            <th class="rg-time">Start<span class="rg-time-mark" /></th>
-            <th class="rg-time">Finish<span class="rg-time-mark" /></th>
-            <th class="rg-time">Time<span class="rg-time-mark" /></th>
-            <th class="rg-time">Pos</th>
-            <th class="rg-time">Gap</th>
+            <th>{{ $t('entryDetail.stage') }}</th>
+            <th class="rg-time">
+              {{ $t('gateRole.start') }}<span class="rg-time-mark" />
+            </th>
+            <th class="rg-time">
+              {{ $t('gateRole.finish') }}<span class="rg-time-mark" />
+            </th>
+            <th class="rg-time">
+              {{ $t('table.time') }}<span class="rg-time-mark" />
+            </th>
+            <th class="rg-time">{{ $t('table.pos') }}</th>
+            <th class="rg-time">{{ $t('table.gap') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -356,7 +365,9 @@ onMounted(refresh);
             </td>
           </tr>
           <tr v-if="stageRows.length === 0">
-            <td colspan="6" class="rg-empty">No stages yet.</td>
+            <td colspan="6" class="rg-empty">
+              {{ $t('entryDetail.noStages') }}
+            </td>
           </tr>
         </tbody>
         <tfoot v-if="legendMarks.length > 0">

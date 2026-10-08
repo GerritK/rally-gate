@@ -34,31 +34,32 @@ import { useRouter } from 'vue-router';
 const props = defineProps<{ gateId: string }>();
 const router = useRouter();
 
-/** One mapping for a detection's fate, so the column reads at a glance. */
+/** One mapping for a detection's fate, so the column reads at a glance.
+ *  `label` and `hint` are message keys. */
 const DETECTION_STATE_DISPLAY = {
   pending: {
-    label: 'Rules failed',
+    label: 'detection.pending',
     color: 'error',
     icon: 'mdi-alert',
-    hint: 'Stored but not timed yet; the server retries every 30 s.',
+    hint: 'detection.pendingHint',
   },
   awaiting: {
-    label: 'Unassigned',
+    label: 'detection.awaiting',
     color: 'warning',
     icon: 'mdi-account-question',
-    hint: 'No transponder, or one on several cars: waiting for a marshal on Live Timing.',
+    hint: 'detection.awaitingHint',
   },
   unknown: {
-    label: 'Unknown car',
+    label: 'detection.unknown',
     color: 'timing-idle',
     icon: 'mdi-help-circle-outline',
-    hint: 'Matched to no entry, so nothing was timed.',
+    hint: 'detection.unknownHint',
   },
   processed: {
-    label: 'Processed',
+    label: 'detection.processed',
     color: 'success',
     icon: 'mdi-check',
-    hint: 'Handed to the stage rules.',
+    hint: 'detection.processedHint',
   },
 } as const;
 
@@ -173,12 +174,11 @@ onUnmounted(() => {
     to="/hardware"
     class="mb-4"
   >
-    Back to Hardware
+    {{ $t('gateDetail.back') }}
   </v-btn>
 
   <v-alert v-if="loaded && !gate" type="info" variant="tonal">
-    No gate {{ gateId }} in this event. It appears once it sends a heartbeat, or
-    add it on Hardware.
+    {{ $t('gateDetail.notFound', { id: gateId }) }}
   </v-alert>
 
   <template v-if="gate">
@@ -193,13 +193,13 @@ onUnmounted(() => {
               prepend-icon="mdi-pencil"
               @click="openRename"
             >
-              Rename
+              {{ $t('gateDetail.rename') }}
             </v-btn>
           </template>
         </v-card-item>
         <v-card-text>
           <dl class="rg-facts">
-            <dt>Status</dt>
+            <dt>{{ $t('table.status') }}</dt>
             <dd>
               <GateOnlineChip :gate="gate" />
               <span
@@ -212,13 +212,18 @@ onUnmounted(() => {
               >
                 {{
                   gate.lastHeartbeatAt
-                    ? `heartbeat ${formatRelativeTime(gate.lastHeartbeatAt, serverNow)}`
-                    : 'never seen'
+                    ? $t('gateDetail.heartbeat', {
+                        ago: formatRelativeTime(
+                          gate.lastHeartbeatAt,
+                          serverNow,
+                        ),
+                      })
+                    : $t('gateDetail.neverSeen')
                 }}
               </span>
             </dd>
 
-            <dt>Clock</dt>
+            <dt>{{ $t('gate.clock') }}</dt>
             <dd>
               <GateClockChips
                 :gate="gate"
@@ -226,7 +231,7 @@ onUnmounted(() => {
               />
             </dd>
 
-            <dt>Address</dt>
+            <dt>{{ $t('gateDetail.address') }}</dt>
             <dd>
               <template v-if="gate.address">
                 <span class="rg-timing">{{ gate.address }}</span>
@@ -239,32 +244,32 @@ onUnmounted(() => {
                   append-icon="mdi-open-in-new"
                   class="ml-2"
                 >
-                  Gate config
+                  {{ $t('gateDetail.gateConfig') }}
                 </v-btn>
               </template>
               <span v-else>-</span>
             </dd>
 
-            <dt>Version</dt>
+            <dt>{{ $t('gate.version') }}</dt>
             <dd><GateVersion :gate="gate" /></dd>
 
-            <dt>Capabilities</dt>
+            <dt>{{ $t('gate.capabilities') }}</dt>
             <dd>{{ gate.capabilities ?? '-' }}</dd>
           </dl>
         </v-card-text>
       </v-card>
 
       <v-card>
-        <v-card-title>Assignments</v-card-title>
-        <v-card-subtitle
-          >Planned on each stage's page; a row opens it.</v-card-subtitle
-        >
+        <v-card-title>{{ $t('gateDetail.assignments') }}</v-card-title>
+        <v-card-subtitle>{{
+          $t('gateDetail.assignmentsHint')
+        }}</v-card-subtitle>
         <v-table density="comfortable" hover>
           <thead>
             <tr>
-              <th>Stage</th>
-              <th>Role</th>
-              <th>Stage status</th>
+              <th>{{ $t('entryDetail.stage') }}</th>
+              <th>{{ $t('stage.role') }}</th>
+              <th>{{ $t('gateDetail.stageStatus') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -287,7 +292,9 @@ onUnmounted(() => {
               </td>
             </tr>
             <tr v-if="gateAssignments.length === 0">
-              <td colspan="3" class="rg-empty">Not assigned to any stage.</td>
+              <td colspan="3" class="rg-empty">
+                {{ $t('gateDetail.noAssignments') }}
+              </td>
             </tr>
           </tbody>
         </v-table>
@@ -295,20 +302,19 @@ onUnmounted(() => {
     </div>
 
     <v-card>
-      <v-card-title>Detections</v-card-title>
+      <v-card-title>{{ $t('gateDetail.detections') }}</v-card-title>
       <v-card-subtitle>
-        The last {{ detections.length }} this gate reported, newest first.
-        Corrected time = gate time + correction.
+        {{ $t('gateDetail.detectionsHint', { n: detections.length }) }}
       </v-card-subtitle>
       <v-table density="compact">
         <thead>
           <tr>
-            <th class="rg-time">Gate time</th>
-            <th class="rg-time">Correction</th>
-            <th class="rg-time">Received</th>
-            <th>Transponder</th>
-            <th>Entry</th>
-            <th>State</th>
+            <th class="rg-time">{{ $t('gateDetail.gateTime') }}</th>
+            <th class="rg-time">{{ $t('gateDetail.correction') }}</th>
+            <th class="rg-time">{{ $t('gateDetail.received') }}</th>
+            <th>{{ $t('entries.transponder') }}</th>
+            <th>{{ $t('gateDetail.entry') }}</th>
+            <th>{{ $t('gateDetail.state') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -335,14 +341,16 @@ onUnmounted(() => {
                 size="small"
                 :color="detectionState(event).color"
                 :prepend-icon="detectionState(event).icon"
-                v-tooltip:top="detectionState(event).hint"
+                v-tooltip:top="$t(detectionState(event).hint)"
               >
-                {{ detectionState(event).label }}
+                {{ $t(detectionState(event).label) }}
               </v-chip>
             </td>
           </tr>
           <tr v-if="detections.length === 0">
-            <td colspan="6" class="rg-empty">No detections yet.</td>
+            <td colspan="6" class="rg-empty">
+              {{ $t('gateDetail.noDetections') }}
+            </td>
           </tr>
         </tbody>
       </v-table>
@@ -351,15 +359,15 @@ onUnmounted(() => {
 
   <FormDialog
     v-model="renameOpen"
-    :title="`Rename gate ${gateId}`"
+    :title="$t('gateDetail.renameTitle', { id: gateId })"
     :form="renameDraft"
     :save="onRename"
-    saved="Gate renamed"
-    save-text="Rename"
+    :saved="$t('gateDetail.renamed')"
+    :save-text="$t('gateDetail.rename')"
   >
     <v-text-field
       v-model="renameDraft.name"
-      label="Name"
+      :label="$t('stages.name')"
       :rules="[required]"
       autofocus
     />

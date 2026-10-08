@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { onMounted, ref, watchEffect } from 'vue';
-import { logoUrl, RallyFeedback, REPO_URL, SUPPORT_URL } from '@rally-gate/ui';
+import {
+  currentLocale,
+  LocaleMenu,
+  logoUrl,
+  RallyFeedback,
+  REPO_URL,
+  SUPPORT_URL,
+  t,
+} from '@rally-gate/ui';
 import { fetchEventInfo } from './api/event';
 import { fetchRallyInfo, rallyName } from './api/rally-info';
 import { liveStatus } from './api/live';
@@ -26,9 +34,17 @@ watchEffect(() => {
 });
 
 const LIVE_DISPLAY = {
-  connecting: { label: 'Connecting', color: 'timing-idle', icon: 'mdi-sync' },
-  live: { label: 'Live', color: 'success', icon: 'mdi-circle' },
-  offline: { label: 'Offline', color: 'error', icon: 'mdi-lan-disconnect' },
+  connecting: {
+    label: 'live.connecting',
+    color: 'timing-idle',
+    icon: 'mdi-sync',
+  },
+  live: { label: 'live.live', color: 'success', icon: 'mdi-circle' },
+  offline: {
+    label: 'live.offline',
+    color: 'error',
+    icon: 'mdi-lan-disconnect',
+  },
 } as const;
 
 onMounted(async () => {
@@ -65,16 +81,13 @@ onMounted(async () => {
           size="small"
           variant="tonal"
         >
-          {{ LIVE_DISPLAY[liveStatus].label }}
+          {{ t(LIVE_DISPLAY[liveStatus].label) }}
         </v-chip>
         <v-divider v-if="liveStatus" vertical inset class="mx-4" />
-        <div
-          v-tooltip:bottom="'Server time — the clock the gates are synced to'"
-          class="text-center"
-        >
+        <div v-tooltip:bottom="t('app.serverTime')" class="text-center">
           <div class="rg-timing app-bar-clock">
             {{
-              new Date(serverNow).toLocaleTimeString([], {
+              new Date(serverNow).toLocaleTimeString(currentLocale(), {
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit',
@@ -83,7 +96,7 @@ onMounted(async () => {
           </div>
           <div class="text-caption text-medium-emphasis app-bar-label">
             {{
-              new Date(serverNow).toLocaleDateString([], {
+              new Date(serverNow).toLocaleDateString(currentLocale(), {
                 day: '2-digit',
                 month: '2-digit',
                 year: 'numeric',
@@ -92,14 +105,15 @@ onMounted(async () => {
           </div>
         </div>
         <v-divider vertical inset class="mx-4" />
+        <LocaleMenu />
         <!-- No active state: the drawer already marks Setup, and a lit cog
              in the app bar reads as a pressed button. -->
         <v-btn
           to="/setup"
           :active="false"
           icon="mdi-cog-outline"
-          v-tooltip:bottom="'Setup'"
-          aria-label="Setup"
+          v-tooltip:bottom="t('nav.setup')"
+          :aria-label="t('nav.setup')"
         />
       </template>
     </v-app-bar>
@@ -111,7 +125,7 @@ onMounted(async () => {
           :to="item.to"
           :active="section(route.path) === section(item.to)"
           :prepend-icon="item.icon"
-          :title="item.label"
+          :title="t(item.label)"
         />
       </v-list>
       <template #append>
@@ -126,11 +140,11 @@ onMounted(async () => {
             :href="SUPPORT_URL"
             target="_blank"
             prepend-icon="mdi-heart-outline"
-            title="Support the project"
+            :title="t('app.support')"
           />
         </v-list>
         <div class="text-center text-disabled pa-3" style="font-size: 0.7rem">
-          Version {{ serverVersion }}
+          {{ t('app.version', { version: serverVersion }) }}
         </div>
       </template>
     </v-navigation-drawer>

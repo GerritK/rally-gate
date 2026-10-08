@@ -1,4 +1,5 @@
 import { computed } from 'vue';
+import { t } from '@rally-gate/ui';
 import { useRoute, useRouter } from 'vue-router';
 import type { EntryClass } from './api/entry-classes';
 import type { Entry } from './api/entries';
@@ -36,7 +37,7 @@ export function classFilterLabel(
   const names = classes
     .filter((c) => classIds.includes(c.id))
     .map((c) => c.name);
-  return names.length > 0 ? names.join(' · ') : 'All classes';
+  return names.length > 0 ? names.join(' · ') : t('classes.allClasses');
 }
 
 /** What "Print all" prints: All classes, then each class on its own. A

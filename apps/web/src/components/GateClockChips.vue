@@ -38,15 +38,13 @@ defineProps<{ gate: Gate; correctionThresholdMs: number }>();
     :color="gate.chronySynced ? 'success' : 'error'"
     :prepend-icon="gate.chronySynced ? 'mdi-sync' : 'mdi-sync-alert'"
     v-tooltip:top="
-      gate.chronySynced
-        ? 'chrony on the gate is synced'
-        : 'chrony on the gate is not synced — its times are not comparable with other gates'
+      gate.chronySynced ? $t('gate.chronySynced') : $t('gate.chronyNotSynced')
     "
   >
     {{
       gate.chronySynced
-        ? `NTP ${(gate.chronyOffsetMs ?? 0).toFixed(1)} ms`
-        : 'NTP not synced'
+        ? $t('gate.ntpOffset', { ms: (gate.chronyOffsetMs ?? 0).toFixed(1) })
+        : $t('gate.ntpNotSynced')
     }}
   </v-chip>
 </template>

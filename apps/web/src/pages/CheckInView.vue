@@ -25,6 +25,7 @@ type Station = 'desk' | 'scrutineering';
 const STATIONS: Record<
   Station,
   {
+    /** Message keys, like `listTitle` and `allDone`. */
     label: string;
     icon: string;
     /** Still to be done here. */
@@ -36,20 +37,20 @@ const STATIONS: Record<
   }
 > = {
   desk: {
-    label: 'Desk',
+    label: 'checkIn.desk',
     icon: 'mdi-clipboard-check-outline',
     open: EntryStatus.REGISTERED,
-    listTitle: 'To check in',
-    allDone: 'Every car is checked in.',
+    listTitle: 'checkIn.toCheckIn',
+    allDone: 'checkIn.allCheckedIn',
     // An event without a technical check passes cars at the desk.
     alsoShow: [EntryStatus.SCRUTINEERED],
   },
   scrutineering: {
-    label: 'Scrutineering',
+    label: 'checkIn.scrutineering',
     icon: 'mdi-check-decagram',
     open: EntryStatus.CHECKED_IN,
-    listTitle: 'To scrutineer',
-    allDone: 'No checked-in car is waiting for scrutineering.',
+    listTitle: 'checkIn.toScrutineer',
+    allDone: 'checkIn.allScrutineered',
     alsoShow: [],
   },
 };
@@ -199,15 +200,14 @@ onMounted(refresh);
     to="/entries"
     class="mb-4"
   >
-    Back to Entries
+    {{ $t('checkIn.back') }}
   </v-btn>
 
   <v-card class="mb-4">
     <v-card-item>
-      <v-card-title>Check-in</v-card-title>
+      <v-card-title>{{ $t('checkIn.title') }}</v-card-title>
       <v-card-subtitle>
-        {{ counts.checkedIn }} of {{ counts.starters }} checked in ·
-        {{ counts.scrutineered }} scrutineered
+        {{ $t('checkIn.counts', counts) }}
       </v-card-subtitle>
       <template #append>
         <v-btn-toggle
@@ -224,7 +224,7 @@ onMounted(refresh);
             :value="key"
             :prepend-icon="s.icon"
           >
-            {{ s.label }}
+            {{ $t(s.label) }}
           </v-btn>
         </v-btn-toggle>
       </template>
@@ -233,9 +233,9 @@ onMounted(refresh);
       <v-text-field
         ref="search"
         v-model="query"
-        label="Start number or name"
+        :label="$t('checkIn.search')"
         prepend-inner-icon="mdi-magnify"
-        hint="Enter picks the first match. A search finds every car, done or not."
+        :hint="$t('checkIn.searchHint')"
         persistent-hint
         clearable
         autofocus
@@ -249,7 +249,9 @@ onMounted(refresh);
     <v-card>
       <v-card-item>
         <v-card-title class="text-subtitle-1">
-          {{ query ? 'Matches' : here.listTitle }} ({{ shown.length }})
+          {{ query ? $t('checkIn.matches') : $t(here.listTitle) }} ({{
+            shown.length
+          }})
         </v-card-title>
       </v-card-item>
       <v-list v-if="shown.length > 0" density="compact" class="pt-0">
@@ -269,7 +271,7 @@ onMounted(refresh);
         </v-list-item>
       </v-list>
       <v-card-text v-else class="rg-empty">
-        {{ query ? 'No car matches.' : here.allDone }}
+        {{ query ? $t('checkIn.noMatch') : $t(here.allDone) }}
       </v-card-text>
     </v-card>
 
@@ -286,18 +288,18 @@ onMounted(refresh);
       </v-card-item>
       <v-card-text>
         <dl class="rg-facts">
-          <dt>Status</dt>
+          <dt>{{ $t('table.status') }}</dt>
           <dd>
             <StatusChip :display="ENTRY_STATUS_DISPLAY[selected.status]" />
           </dd>
-          <dt>Car</dt>
+          <dt>{{ $t('table.car') }}</dt>
           <dd>
             {{
               [selected.body, selected.chassis].filter(Boolean).join(' · ') ||
               '-'
             }}
           </dd>
-          <dt>Classes</dt>
+          <dt>{{ $t('classes.classes') }}</dt>
           <dd v-if="selectedClasses.length > 0" class="d-flex flex-wrap ga-1">
             <ClassChip
               v-for="c in selectedClasses"
@@ -308,7 +310,7 @@ onMounted(refresh);
           </dd>
           <dd v-else class="text-medium-emphasis">-</dd>
           <template v-if="!transponderAtDesk">
-            <dt>Transponder</dt>
+            <dt>{{ $t('entries.transponder') }}</dt>
             <TransponderList :entry="selected" />
           </template>
         </dl>
@@ -333,14 +335,14 @@ onMounted(refresh);
             prepend-icon="mdi-pencil"
             @click="dialogOpen = true"
           >
-            Edit
+            {{ $t('common.edit') }}
           </v-btn>
         </EntryStatusActions>
       </v-card-actions>
     </v-card>
     <v-card v-else class="rg-checkin-car">
       <v-card-text class="rg-empty">
-        Type a start number and press Enter, or pick a car from the list.
+        {{ $t('checkIn.nothingPicked') }}
       </v-card-text>
     </v-card>
   </div>

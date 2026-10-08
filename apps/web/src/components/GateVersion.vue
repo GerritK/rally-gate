@@ -10,7 +10,7 @@ defineProps<{ gate: Gate }>();
        before the event, not a curiosity. -->
   <v-chip
     v-if="gate.version && serverVersion && gate.version !== serverVersion"
-    v-tooltip:top="`Server runs ${serverVersion}`"
+    v-tooltip:top="$t('gate.serverRuns', { version: serverVersion })"
     size="small"
     color="warning"
     prepend-icon="mdi-alert"

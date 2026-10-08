@@ -6,7 +6,7 @@ import {
   PODIUM_SHOWN_KEY,
   type Crew,
 } from '@rally-gate/shared';
-import { notify } from '@rally-gate/ui';
+import { notify, t } from '@rally-gate/ui';
 import { onMounted, provide, reactive, ref } from 'vue';
 import { saveSetting } from '../api/settings';
 import { DISPLAY, display, loadDisplaySettings } from '../crew';
@@ -49,7 +49,7 @@ async function onSave() {
     ]);
     Object.assign(display, form);
     markSaved();
-    notify('Display saved');
+    notify(t('displaySetup.saved'));
   } finally {
     saving.value = false;
   }
@@ -64,33 +64,33 @@ onMounted(async () => {
 
 <template>
   <v-btn variant="text" prepend-icon="mdi-arrow-left" to="/setup" class="mb-4">
-    Back to Setup
+    {{ $t('setup.back') }}
   </v-btn>
 
   <v-card>
-    <v-card-title>Display</v-card-title>
+    <v-card-title>{{ $t('displaySetup.title') }}</v-card-title>
     <v-card-text>
       <form class="rg-display-form" @submit.prevent="onSave">
-        <div class="rg-section-title">Crew</div>
+        <div class="rg-section-title">{{ $t('table.crew') }}</div>
         <div class="rg-display-crew">
           <div class="rg-display-fields">
             <v-select
               v-model="form.nameFormat"
               :items="NAME_FORMATS"
-              label="Name format"
+              :label="$t('displaySetup.nameFormat')"
               hide-details
             />
             <v-switch
               v-model="form.flags"
-              label="Show flags beside crew names"
+              :label="$t('displaySetup.flags')"
               color="secondary"
               persistent-hint
-              hint="Printed start lists and results never show flags."
+              :hint="$t('displaySetup.flagsHint')"
             />
           </div>
           <div>
             <div class="text-caption text-medium-emphasis mb-1">
-              As it appears in Live Timing and Results
+              {{ $t('displaySetup.example') }}
             </div>
             <v-sheet border rounded class="d-flex align-center ga-3 pa-3">
               <StartNumber :number="7" />
@@ -99,13 +99,13 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div class="rg-section-title">Results</div>
+        <div class="rg-section-title">{{ $t('nav.results') }}</div>
         <v-switch
           v-model="form.podium"
-          label="Show the podium above results"
+          :label="$t('displaySetup.podium')"
           color="secondary"
           persistent-hint
-          hint="Printed results never show the podium."
+          :hint="$t('displaySetup.podiumHint')"
           class="rg-display-fields"
         />
         <div>
@@ -115,7 +115,7 @@ onMounted(async () => {
             :loading="saving"
             prepend-icon="mdi-content-save"
           >
-            Save
+            {{ $t('common.save') }}
           </v-btn>
         </div>
       </form>

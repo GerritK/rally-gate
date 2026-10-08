@@ -6,7 +6,7 @@ import {
 import { onMounted, ref } from 'vue';
 import { fetchSetting, saveSetting } from '../api/settings';
 import { useUnsavedChanges } from '../unsaved-changes';
-import { notify } from '@rally-gate/ui';
+import { notify, t } from '@rally-gate/ui';
 
 const notionalPenaltyS = ref(DEFAULT_NOTIONAL_PENALTY_MS / 1000);
 const savingPenalty = ref(false);
@@ -21,7 +21,7 @@ async function onSavePenalty() {
       String(Math.round(notionalPenaltyS.value * 1000)),
     );
     markSaved();
-    notify('Penalty saved');
+    notify(t('scoring.saved'));
   } finally {
     savingPenalty.value = false;
   }
@@ -38,22 +38,24 @@ onMounted(async () => {
 
 <template>
   <v-btn variant="text" prepend-icon="mdi-arrow-left" to="/setup" class="mb-4">
-    Back to Setup
+    {{ $t('setup.back') }}
   </v-btn>
 
   <v-card>
-    <v-card-title>Notional times</v-card-title>
+    <v-card-title>{{ $t('scoring.title') }}</v-card-title>
     <v-card-text>
       <v-alert type="info" variant="tonal" density="comfortable" class="mb-4">
-        A crew that doesn't complete a closed stage is charged a
-        <strong>notional time</strong> for it: the slowest time anyone set on
-        that stage, plus this penalty. Without it, retiring early would look
-        like winning — a shorter total is otherwise just the result of driving
-        less. <br /><br />
-        Rule of thumb: set it to roughly <strong>one stage duration</strong>.
-        The penalty only has to be big enough to outweigh the advantage a crew
-        built on the stages it <em>did</em> finish — set it too low and a quick
-        car can retire and still lead the rally.
+        <i18n-t keypath="scoring.explain" tag="p" scope="global">
+          <template #notionalTime>
+            <strong>{{ $t('scoring.notionalTime') }}</strong>
+          </template>
+        </i18n-t>
+        <br />
+        <i18n-t keypath="scoring.ruleOfThumb" tag="p" scope="global">
+          <template #oneStage>
+            <strong>{{ $t('scoring.oneStage') }}</strong>
+          </template>
+        </i18n-t>
       </v-alert>
       <form
         class="d-flex flex-wrap align-center ga-3"
@@ -64,7 +66,7 @@ onMounted(async () => {
           type="number"
           min="0"
           step="1"
-          label="Notional time penalty (seconds)"
+          :label="$t('scoring.penaltyLabel')"
           density="comfortable"
           hide-details
           style="max-width: 260px"
@@ -75,7 +77,7 @@ onMounted(async () => {
           :loading="savingPenalty"
           prepend-icon="mdi-content-save"
         >
-          Save
+          {{ $t('common.save') }}
         </v-btn>
       </form>
     </v-card-text>

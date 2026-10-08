@@ -81,19 +81,24 @@ const runningStages = computed(() =>
       density="compact"
       class="mb-4"
     >
-      {{ runningStages.map((s) => `${s.id} · ${s.name}`).join(', ') }}
-      {{ runningStages.length === 1 ? 'is' : 'are' }} still running and not
-      counted yet. The standings change when
-      {{ runningStages.length === 1 ? 'it closes' : 'they close' }}.
+      {{
+        $t(
+          'results.stillRunning',
+          {
+            stages: runningStages.map((s) => `${s.id} · ${s.name}`).join(', '),
+          },
+          runningStages.length,
+        )
+      }}
     </v-alert>
     <ResultsPodium :placings="placings" />
     <v-table density="comfortable">
       <thead>
         <tr>
-          <th>Pos</th>
+          <th>{{ $t('table.pos') }}</th>
           <th>#</th>
-          <th>Crew</th>
-          <th>Car</th>
+          <th>{{ $t('table.crew') }}</th>
+          <th>{{ $t('table.car') }}</th>
           <th v-for="stage in countedStages" :key="stage.id" class="rg-time">
             <router-link
               :to="{
@@ -105,9 +110,9 @@ const runningStages = computed(() =>
               {{ stage.id }} </router-link
             ><span class="rg-time-mark" />
           </th>
-          <th class="rg-time">Total Time</th>
-          <th class="rg-time">Gap</th>
-          <th>Stages</th>
+          <th class="rg-time">{{ $t('table.totalTime') }}</th>
+          <th class="rg-time">{{ $t('table.gap') }}</th>
+          <th>{{ $t('table.stages') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -128,7 +133,9 @@ const runningStages = computed(() =>
           >
             <span
               v-if="time.notional"
-              v-tooltip:top="`${formatGap(stageGapMs(time))} to the fastest`"
+              v-tooltip:top="
+                $t('results.toFastest', { gap: formatGap(stageGapMs(time)) })
+              "
               class="text-medium-emphasis"
             >
               {{ formatDuration(time.durationMs)
@@ -147,7 +154,9 @@ const runningStages = computed(() =>
             </span>
             <span
               v-else
-              v-tooltip:top="`${formatGap(stageGapMs(time))} to the fastest`"
+              v-tooltip:top="
+                $t('results.toFastest', { gap: formatGap(stageGapMs(time)) })
+              "
             >
               {{ formatDuration(time.durationMs) }}<span class="rg-time-mark" />
             </span>
@@ -169,7 +178,7 @@ const runningStages = computed(() =>
         </tr>
         <tr v-if="placings.length === 0">
           <td :colspan="7 + countedStages.length" class="rg-empty">
-            No crew has completed a closed stage yet.
+            {{ $t('results.noneCompleted') }}
           </td>
         </tr>
       </tbody>
@@ -183,17 +192,19 @@ const runningStages = computed(() =>
     </v-table>
 
     <template v-if="notClassified.length > 0">
-      <div class="text-subtitle-2 mt-6 mb-1">Not classified</div>
+      <div class="text-subtitle-2 mt-6 mb-1">
+        {{ $t('results.notClassified') }}
+      </div>
       <div class="text-caption text-medium-emphasis mb-2">
-        No completed stage that counts yet, withdrawn or disqualified.
+        {{ $t('results.notClassifiedHint') }}
       </div>
       <v-table density="comfortable">
         <thead>
           <tr>
             <th>#</th>
-            <th>Crew</th>
-            <th>Car</th>
-            <th>Status</th>
+            <th>{{ $t('table.crew') }}</th>
+            <th>{{ $t('table.car') }}</th>
+            <th>{{ $t('table.status') }}</th>
           </tr>
         </thead>
         <tbody>

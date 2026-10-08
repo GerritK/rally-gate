@@ -3,9 +3,12 @@ import '@mdi/font/css/materialdesignicons.css';
 import './fonts';
 import './utilities.css';
 import { createVuetify } from 'vuetify';
+import { createVueI18nAdapter } from 'vuetify/locale/adapters/vue-i18n';
+import { useI18n } from 'vue-i18n';
 import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
 import { rallyGateDark } from './theme';
+import type { RallyI18n } from './i18n';
 
 /**
  * Shared Vuetify setup for every rally-gate web interface (dashboard today,
@@ -15,8 +18,9 @@ import { rallyGateDark } from './theme';
  * are registered in full so this works the same in any Vite app without
  * per-app build config; revisit if bundle size ever becomes a problem.
  */
-export function createRallyVuetify() {
+export function createRallyVuetify(i18n: RallyI18n) {
   return createVuetify({
+    locale: { adapter: createVueI18nAdapter({ i18n, useI18n }) },
     components,
     directives,
     icons: {

@@ -38,6 +38,7 @@ import {
   formatRelativeTime,
   notify,
   notifyError,
+  t,
   useConfirm,
 } from '@rally-gate/ui';
 import FormDialog from '../components/FormDialog.vue';
@@ -71,7 +72,7 @@ const stageActive = computed(() =>
 /** Never disabled: a disabled button can't say why, so it says it here. */
 function onShutDownAll() {
   if (stageActive.value) {
-    notifyError(new Error('A stage is active — close it first'));
+    notifyError(new Error(t('hardware.stageActive')));
     return;
   }
   confirmingPowerOff.value = true;
@@ -134,7 +135,7 @@ async function onDeleteGate(gate: Gate, force = false) {
   try {
     await deleteGate(gate.id, force);
     gates.value = gates.value.filter((g) => g.id !== gate.id);
-    notify('Gate deleted');
+    notify(t('hardware.deleted'));
   } catch (err) {
     const conflict = err instanceof ApiError && err.status === 409 ? err : null;
     const assignmentCount = (
@@ -143,9 +144,13 @@ async function onDeleteGate(gate: Gate, force = false) {
     if (!conflict || !assignmentCount) throw err;
     if (
       await confirm({
-        title: 'Delete gate and its assignments?',
-        text: conflict.message,
-        confirmText: 'Delete gate and assignments',
+        title: t('hardware.deleteWithAssignmentsTitle'),
+        text: t(
+          'hardware.deleteWithAssignmentsText',
+          { id: gate.id, n: assignmentCount },
+          assignmentCount,
+        ),
+        confirmText: t('hardware.deleteWithAssignments'),
         color: 'error',
       })
     )
@@ -196,16 +201,16 @@ onUnmounted(() => {
 <template>
   <v-card class="mb-6">
     <v-card-title class="d-flex align-center">
-      Gates
+      {{ $t('hardware.gates') }}
       <v-spacer />
       <v-btn variant="tonal" prepend-icon="mdi-plus" @click="openGateDialog">
-        Add Gate
+        {{ $t('hardware.addGate') }}
       </v-btn>
     </v-card-title>
     <v-card-text>
       <v-switch
         :model-value="autoDiscover"
-        label="Auto-discover new gates from their first heartbeat"
+        :label="$t('hardware.autoDiscover')"
         color="primary"
         density="comfortable"
         hide-details
@@ -215,13 +220,13 @@ onUnmounted(() => {
       <v-table density="comfortable">
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Online</th>
-            <th>Last Heartbeat</th>
-            <th>Clock</th>
-            <th>Capabilities</th>
-            <th>Version</th>
+            <th>{{ $t('stages.id') }}</th>
+            <th>{{ $t('stages.name') }}</th>
+            <th>{{ $t('hardware.online') }}</th>
+            <th>{{ $t('hardware.lastHeartbeat') }}</th>
+            <th>{{ $t('gate.clock') }}</th>
+            <th>{{ $t('gate.capabilities') }}</th>
+            <th>{{ $t('gate.version') }}</th>
             <th width="1%"></th>
           </tr>
         </thead>
@@ -245,7 +250,7 @@ onUnmounted(() => {
               {{
                 gate.lastHeartbeatAt
                   ? formatRelativeTime(gate.lastHeartbeatAt, serverNow)
-                  : 'never'
+                  : $t('hardware.never')
               }}
             </td>
             <td class="text-no-wrap">
@@ -264,18 +269,18 @@ onUnmounted(() => {
                     icon="mdi-dots-vertical"
                     size="small"
                     variant="text"
-                    :aria-label="`More for ${gate.id}`"
+                    :aria-label="$t('common.moreFor', { name: gate.id })"
                     @click.stop
                   />
                 </template>
                 <v-list density="compact">
                   <v-list-item
                     prepend-icon="mdi-open-in-new"
-                    title="Open gate config"
+                    :title="$t('hardware.openGateConfig')"
                     :subtitle="
                       gate.address && isOnline(gate, serverNow)
                         ? gate.address
-                        : 'Gate offline'
+                        : $t('hardware.gateOffline')
                     "
                     :href="
                       gate.address && isOnline(gate, serverNow)
@@ -287,10 +292,10 @@ onUnmounted(() => {
                   />
                   <v-list-item
                     prepend-icon="mdi-delete-outline"
-                    title="Delete"
+                    :title="$t('common.delete')"
                     :subtitle="
                       lockedGateIds.has(gate.id)
-                        ? 'Used by a running or closed stage'
+                        ? $t('hardware.locked')
                         : undefined
                     "
                     base-color="error"
@@ -303,14 +308,13 @@ onUnmounted(() => {
           </tr>
           <tr v-if="gates.length === 0">
             <td colspan="8" class="rg-empty">
-              No gates yet — waiting for a gate-agent heartbeat.
+              {{ $t('hardware.empty') }}
             </td>
           </tr>
         </tbody>
       </v-table>
       <v-alert v-if="!autoDiscover" type="warning" variant="tonal" class="mt-4">
-        Auto-discovery is off — heartbeats from gates not listed here are
-        ignored until you add them with + Add Gate.
+        {{ $t('hardware.autoDiscoverOff', { action: $t('hardware.addGate') }) }}
       </v-alert>
     </v-card-text>
     <v-card-actions>
@@ -320,22 +324,21 @@ onUnmounted(() => {
         prepend-icon="mdi-power"
         @click="onShutDownAll"
       >
-        Shut down all gates
+        {{ $t('hardware.shutDownAll') }}
       </v-btn>
     </v-card-actions>
   </v-card>
 
   <v-card v-if="knownGates">
-    <v-card-title>Known on This Computer</v-card-title>
+    <v-card-title>{{ $t('hardware.known') }}</v-card-title>
     <v-card-subtitle>
-      Every gate this computer has seen, across all events. Add the ones this
-      event uses; forgetting one leaves the open event as it is.
+      {{ $t('hardware.knownHint') }}
     </v-card-subtitle>
     <v-table density="comfortable">
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Name</th>
+          <th>{{ $t('stages.id') }}</th>
+          <th>{{ $t('stages.name') }}</th>
           <th width="1%"></th>
         </tr>
       </thead>
@@ -345,7 +348,7 @@ onUnmounted(() => {
           <td>{{ gate.name }}</td>
           <td class="text-no-wrap text-right">
             <v-chip v-if="gateIds.has(gate.id)" size="small" class="mr-2">
-              in this event
+              {{ $t('hardware.inThisEvent') }}
             </v-chip>
             <v-btn
               v-else
@@ -354,7 +357,7 @@ onUnmounted(() => {
               prepend-icon="mdi-plus"
               @click="onAddKnownGate(gate)"
             >
-              Add
+              {{ $t('hardware.add') }}
             </v-btn>
             <v-menu>
               <template #activator="{ props: menu }">
@@ -363,13 +366,13 @@ onUnmounted(() => {
                   icon="mdi-dots-vertical"
                   size="small"
                   variant="text"
-                  :aria-label="`More for ${gate.id}`"
+                  :aria-label="$t('common.moreFor', { name: gate.id })"
                 />
               </template>
               <v-list density="compact">
                 <v-list-item
                   prepend-icon="mdi-close"
-                  title="Forget on this computer"
+                  :title="$t('hardware.forget')"
                   @click="onForgetKnownGate(gate.id)"
                 />
               </v-list>
@@ -378,8 +381,7 @@ onUnmounted(() => {
         </tr>
         <tr v-if="knownGates.length === 0">
           <td colspan="3" class="rg-empty">
-            None yet — every gate that sends a heartbeat or is added above is
-            remembered.
+            {{ $t('hardware.knownEmpty') }}
           </td>
         </tr>
       </tbody>
@@ -388,51 +390,59 @@ onUnmounted(() => {
 
   <v-dialog :model-value="confirmingPowerOff" max-width="480" persistent>
     <v-card>
-      <v-card-title>Shut down all gates?</v-card-title>
+      <v-card-title>{{ $t('hardware.shutDownTitle') }}</v-card-title>
       <v-card-text v-if="!powerOffResults">
-        Every online gate powers off and has to be switched back on by hand. Use
-        this after the event, before pulling their power.
+        {{ $t('hardware.shutDownText') }}
       </v-card-text>
       <v-card-text v-else>
-        <div v-if="powerOffResults.length === 0">No gate was online.</div>
+        <div v-if="powerOffResults.length === 0">
+          {{ $t('hardware.noneOnline') }}
+        </div>
         <div v-for="r in powerOffResults" :key="r.gateId">
           <v-icon
             :icon="r.ok ? 'mdi-check' : 'mdi-alert'"
             :color="r.ok ? 'success' : 'error'"
             size="small"
           />
-          {{ r.gateId }}: {{ r.ok ? 'shutting down' : r.message }}
+          {{ r.gateId }}: {{ r.ok ? $t('hardware.shuttingDown') : r.message }}
         </div>
       </v-card-text>
       <v-card-actions>
         <v-spacer />
         <template v-if="!powerOffResults">
-          <v-btn variant="text" @click="closePowerOff">Cancel</v-btn>
+          <v-btn variant="text" @click="closePowerOff">
+            {{ $t('common.cancel') }}
+          </v-btn>
           <v-btn color="error" :loading="poweringOff" @click="onPowerOffAll">
-            Shut down
+            {{ $t('hardware.shutDown') }}
           </v-btn>
         </template>
-        <v-btn v-else variant="text" @click="closePowerOff">Close</v-btn>
+        <v-btn v-else variant="text" @click="closePowerOff">
+          {{ $t('common.close') }}
+        </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
 
   <FormDialog
     v-model="gateDialogOpen"
-    title="Add gate"
+    :title="$t('hardware.addGate')"
     :form="gateDraft"
     :save="onSaveGate"
-    saved="Gate added"
-    save-text="Add gate"
+    :saved="$t('hardware.added')"
+    :save-text="$t('hardware.addGate')"
   >
     <v-text-field
       v-model="gateDraft.id"
-      label="Gate ID"
-      hint="Its GATE_ID, e.g. START_WP2"
+      :label="$t('hardware.gateId')"
+      :hint="$t('hardware.gateIdHint')"
       persistent-hint
       :rules="[required]"
       autofocus
     />
-    <v-text-field v-model="gateDraft.name" label="Name (optional)" />
+    <v-text-field
+      v-model="gateDraft.name"
+      :label="$t('hardware.nameOptional')"
+    />
   </FormDialog>
 </template>

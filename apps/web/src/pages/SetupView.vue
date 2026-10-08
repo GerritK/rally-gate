@@ -15,7 +15,7 @@ import {
 import FormDialog from '../components/FormDialog.vue';
 import { eventName, required } from '../format';
 import { useUnsavedChanges } from '../unsaved-changes';
-import { notify } from '@rally-gate/ui';
+import { currentLocale, notify, t } from '@rally-gate/ui';
 
 function today(): string {
   const d = new Date();
@@ -38,7 +38,7 @@ async function onSave() {
   try {
     rallyInfo.value = await saveRallyInfo(rallyInfo.value);
     markSaved();
-    notify('Rally details saved');
+    notify(t('setup.rallySaved'));
   } finally {
     saving.value = false;
   }
@@ -78,21 +78,21 @@ onMounted(async () => {
 <template>
   <v-card class="mb-6">
     <v-card-item>
-      <v-card-title>Event</v-card-title>
+      <v-card-title>{{ $t('setup.event') }}</v-card-title>
       <v-card-subtitle v-if="eventInfo">
         <v-icon icon="mdi-file-outline" size="small" />
         {{ eventInfo.file }}
       </v-card-subtitle>
       <template v-if="eventInfo?.switchable" #append>
         <v-btn variant="text" prepend-icon="mdi-plus" @click="openNew">
-          New Event
+          {{ $t('setup.newEvent') }}
         </v-btn>
         <v-btn
           variant="text"
           prepend-icon="mdi-folder-open-outline"
           @click="openDialog = true"
         >
-          Open Event
+          {{ $t('setup.openEvent') }}
         </v-btn>
       </template>
     </v-card-item>
@@ -100,21 +100,21 @@ onMounted(async () => {
       <form class="d-flex flex-wrap align-center ga-3" @submit.prevent="onSave">
         <v-text-field
           v-model="rallyInfo.name"
-          label="Rally name"
+          :label="$t('setup.rallyName')"
           density="comfortable"
           hide-details
           style="min-width: 260px"
         />
         <v-text-field
           v-model="rallyInfo.date"
-          label="Date (optional)"
+          :label="$t('setup.dateOptional')"
           density="comfortable"
           hide-details
           style="min-width: 180px"
         />
         <v-text-field
           v-model="rallyInfo.location"
-          label="Location (optional)"
+          :label="$t('setup.locationOptional')"
           density="comfortable"
           hide-details
           style="min-width: 220px"
@@ -125,7 +125,7 @@ onMounted(async () => {
           :loading="saving"
           prepend-icon="mdi-content-save"
         >
-          Save
+          {{ $t('common.save') }}
         </v-btn>
       </form>
     </v-card-text>
@@ -134,84 +134,84 @@ onMounted(async () => {
   <v-row>
     <v-col cols="12" sm="4">
       <v-card to="/setup/stages" prepend-icon="mdi-flag-checkered">
-        <v-card-title>Stages</v-card-title>
-        <v-card-text>Create stages and assign gates to them.</v-card-text>
+        <v-card-title>{{ $t('stages.title') }}</v-card-title>
+        <v-card-text>{{ $t('setup.stagesHint') }}</v-card-text>
       </v-card>
     </v-col>
     <v-col cols="12" sm="4">
       <v-card to="/setup/classes" prepend-icon="mdi-shape-outline">
-        <v-card-title>Classes</v-card-title>
-        <v-card-text
-          >Main classes and categories results can be split by.</v-card-text
-        >
+        <v-card-title>{{ $t('classes.classes') }}</v-card-title>
+        <v-card-text>{{ $t('setup.classesHint') }}</v-card-text>
       </v-card>
     </v-col>
     <v-col cols="12" sm="4">
       <v-card to="/setup/start-order" prepend-icon="mdi-sort-numeric-ascending">
-        <v-card-title>Start order</v-card-title>
-        <v-card-text>Who starts when on each stage.</v-card-text>
+        <v-card-title>{{ $t('startOrder.title') }}</v-card-title>
+        <v-card-text>{{ $t('setup.startOrderHint') }}</v-card-text>
       </v-card>
     </v-col>
     <v-col cols="12" sm="4">
       <v-card to="/setup/scoring" prepend-icon="mdi-calculator-variant-outline">
-        <v-card-title>Scoring</v-card-title>
-        <v-card-text> How a stage a crew didn't finish is scored. </v-card-text>
+        <v-card-title>{{ $t('setup.scoring') }}</v-card-title>
+        <v-card-text>{{ $t('setup.scoringHint') }}</v-card-text>
       </v-card>
     </v-col>
     <v-col cols="12" sm="4">
       <v-card to="/setup/display" prepend-icon="mdi-palette-outline">
-        <v-card-title>Display</v-card-title>
-        <v-card-text>Crew names, flags and the podium.</v-card-text>
+        <v-card-title>{{ $t('displaySetup.title') }}</v-card-title>
+        <v-card-text>{{ $t('setup.displayHint') }}</v-card-text>
       </v-card>
     </v-col>
   </v-row>
 
   <FormDialog
     v-model="newDialog"
-    title="New event"
+    :title="$t('setup.newEvent')"
     :form="newEvent"
     :save="() => switchEvent(() => createEvent(newEvent))"
-    saved="Event created"
-    save-text="Create and open"
+    :saved="$t('setup.eventCreated')"
+    :save-text="$t('setup.createAndOpen')"
   >
     <p class="text-body-2 text-medium-emphasis">
-      A new, empty event file. The current one stays as it is.
+      {{ $t('setup.newEventHint') }}
     </p>
     <v-text-field
       v-model="newEvent.name"
-      label="Rally name"
+      :label="$t('setup.rallyName')"
       :rules="[required]"
       autofocus
     />
     <v-text-field
       v-model="newEvent.date"
       type="date"
-      label="Date"
+      :label="$t('setup.date')"
       :rules="[required]"
     />
   </FormDialog>
 
   <v-dialog v-model="openDialog" max-width="600">
     <v-card v-if="eventInfo">
-      <v-card-title>Open Event</v-card-title>
+      <v-card-title>{{ $t('setup.openEvent') }}</v-card-title>
       <v-card-subtitle>
-        {{ eventInfo.events.length }} on this computer
+        {{ $t('setup.onThisComputer', { n: eventInfo.events.length }) }}
       </v-card-subtitle>
       <v-table density="comfortable">
         <thead>
           <tr>
-            <th>Event</th>
-            <th>Last changed</th>
+            <th>{{ $t('setup.event') }}</th>
+            <th>{{ $t('setup.lastChanged') }}</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="event in eventInfo.events" :key="event.file">
             <td>{{ eventName(event.file) }}</td>
-            <td>{{ new Date(event.modifiedAt).toLocaleString() }}</td>
+            <td>
+              {{ new Date(event.modifiedAt).toLocaleString(currentLocale()) }}
+            </td>
             <td class="text-right">
               <v-chip v-if="event.file === eventInfo.file" size="small">
-                open
+                {{ $t('setup.isOpen') }}
               </v-chip>
               <v-btn
                 v-else
@@ -220,7 +220,7 @@ onMounted(async () => {
                 prepend-icon="mdi-folder-open-outline"
                 @click="onOpen(event.file)"
               >
-                Open
+                {{ $t('setup.open') }}
               </v-btn>
             </td>
           </tr>
@@ -228,7 +228,9 @@ onMounted(async () => {
       </v-table>
       <v-card-actions>
         <v-spacer />
-        <v-btn variant="text" @click="openDialog = false">Close</v-btn>
+        <v-btn variant="text" @click="openDialog = false">
+          {{ $t('common.close') }}
+        </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -240,7 +242,7 @@ onMounted(async () => {
   >
     <v-card class="pa-6 d-flex align-center ga-4">
       <v-progress-circular indeterminate color="primary" />
-      Opening {{ switchingTo && eventName(switchingTo) }}…
+      {{ $t('setup.opening', { name: switchingTo && eventName(switchingTo) }) }}
     </v-card>
   </v-overlay>
 </template>

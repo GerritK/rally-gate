@@ -99,7 +99,7 @@ async function apply(to: EntryStatus) {
           :size="large ? 'default' : 'small'"
           variant="text"
           icon="mdi-dots-vertical"
-          aria-label="More status changes"
+          :aria-label="$t('entryAction.more')"
         />
       </template>
       <v-list density="compact">

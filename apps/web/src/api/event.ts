@@ -1,3 +1,4 @@
+import { t } from '@rally-gate/ui';
 import { apiFetch, deleteRequest, postJson } from './client';
 
 export interface EventFile {
@@ -41,7 +42,7 @@ export async function waitForEvent(file: string): Promise<void> {
       // still restarting
     }
   }
-  throw new Error(`The server did not come back with ${file}`);
+  throw new Error(t('setup.serverNotBack', { file }));
 }
 
 /** Gates this computer remembers across events (standalone only). */

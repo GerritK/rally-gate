@@ -18,7 +18,7 @@ import {
   ENTRY_STATUS_DISPLAY,
 } from './format';
 import type { Crew, Starter } from '@rally-gate/shared';
-import { logoUrl, notifyError } from '@rally-gate/ui';
+import { logoUrl, notifyError, t } from '@rally-gate/ui';
 import barlowBoldUrl from './assets/fonts/Barlow-Bold.ttf?url';
 import barlowRegularUrl from './assets/fonts/Barlow-Regular.ttf?url';
 import monoBoldUrl from './assets/fonts/JetBrainsMono-Bold.ttf?url';
@@ -76,13 +76,13 @@ export function overallPdf(
     heading,
     subtitle,
     head: [
-      'Pos',
+      t('table.pos'),
       '#',
-      'Crew',
-      'Car',
-      'Total',
-      'Gap',
-      'Stages',
+      t('table.crew'),
+      t('table.car'),
+      t('pdf.total'),
+      t('table.gap'),
+      t('table.stages'),
       ...(placings[0]?.stageTimes ?? []).map((t) => t.stageId),
     ],
     body: placings.map((e) => [
@@ -105,17 +105,18 @@ export function overallPdf(
     repeat: 7,
     rightFrom: 4,
     legend: [
-      times.some((t) => !t.notional) && `Bold: ${TIMING_MARKS.best.label}`,
-      times.some((t) => t.notional) && `(...): ${TIMING_MARKS.notional.label}`,
+      times.some((v) => !v.notional) &&
+        t('pdf.bold', { label: TIMING_MARKS.best.label }),
+      times.some((v) => v.notional) &&
+        t('pdf.parenthesised', { label: TIMING_MARKS.notional.label }),
     ]
       .filter(Boolean)
       .join('   '),
     extra:
       unranked.length > 0
         ? {
-            title:
-              'Not classified: no completed stage that counts yet, withdrawn or disqualified',
-            head: ['#', 'Crew', 'Car', 'Status'],
+            title: t('pdf.notClassified'),
+            head: ['#', t('table.crew'), t('table.car'), t('table.status')],
             body: unranked.map((v) => [
               String(v.startNumber),
               crewCell(v),
@@ -156,18 +157,20 @@ export function stagePdf(
     heading,
     subtitle,
     head: [
-      'Pos',
+      t('table.pos'),
       '#',
-      'Crew',
-      'Car',
-      'Time',
-      'Gap',
-      ...results.splitGates.map((g) => `Split ${g.splitIndex}`),
+      t('table.crew'),
+      t('table.car'),
+      t('table.time'),
+      t('table.gap'),
+      ...results.splitGates.map((g) =>
+        t('gateRole.split', { n: g.splitIndex }),
+      ),
     ],
     body,
     repeat: 6,
     rightFrom: 4,
-    legend: anyBest ? `Bold: ${TIMING_MARKS.best.label}` : '',
+    legend: anyBest ? t('pdf.bold', { label: TIMING_MARKS.best.label }) : '',
     extra:
       results.nonFinishers.length > 0
         ? {
@@ -175,7 +178,7 @@ export function stagePdf(
             title: [
               ...new Set(results.nonFinishers.map((e) => e.outcome)),
             ].join(' / '),
-            head: ['#', 'Crew', 'Car', 'Outcome'],
+            head: ['#', t('table.crew'), t('table.car'), t('table.outcome')],
             body: results.nonFinishers.map((e) => [
               String(e.startNumber),
               crewCell(e),
@@ -196,11 +199,17 @@ export function startListPdf(
   rows: { starter: Starter; classHeader: string | null }[],
   grouped: boolean,
 ): PdfSection {
-  const head = ['Pos', '#', 'Crew', 'Car', ...(grouped ? [] : ['Class'])];
+  const head = [
+    t('table.pos'),
+    '#',
+    t('table.crew'),
+    t('table.car'),
+    ...(grouped ? [] : [t('classes.class')]),
+  ];
   return {
     heading,
-    subtitle: published ? '' : 'Provisional',
-    note: published ? `Published ${published}` : undefined,
+    subtitle: published ? '' : t('pdf.provisional'),
+    note: published ? t('pdf.published', { at: published }) : undefined,
     head,
     body: rows.flatMap(({ starter, classHeader }) => [
       ...(classHeader
@@ -368,7 +377,7 @@ function columnWidths(
   repeat: number,
   usable: number,
 ) {
-  const flexible = (h: string) => h === 'Crew' || h === 'Car';
+  const flexible = (h: string) => h === t('table.crew') || h === t('table.car');
   if (sum(measured) > usable) {
     const fixed = sum(measured.slice(0, repeat));
     const rest = measured.slice(repeat);
@@ -568,7 +577,9 @@ async function openPdf(
       doc.setPage(first + k);
       const sheet = `${k + 1} / ${count}`;
       const what = [
-        rowsVary && part.rows.length > 0 && `Pos ${range(part.rows)}`,
+        rowsVary &&
+          part.rows.length > 0 &&
+          `${t('table.pos')} ${range(part.rows)}`,
         colsVary && range(part.cols),
       ];
       const details = [rallyName.value, sec.subtitle, ...what]
@@ -613,7 +624,9 @@ async function openPdf(
       doc.text('Rally Gate', MARGIN.left + logoWidth + 1.5, bottom);
       doc.setFont(FONT, 'normal');
       doc.text(
-        [sec.note, `Printed ${printedAt}`].filter(Boolean).join(' · '),
+        [sec.note, t('pdf.printed', { at: printedAt })]
+          .filter(Boolean)
+          .join(' · '),
         width - MARGIN.right,
         bottom,
         { align: 'right' },
