@@ -30,6 +30,7 @@ export function crewOf(entry: Entry | undefined): Crew {
     coDriverFirstName: entry?.coDriverFirstName ?? null,
     coDriverLastName: entry?.coDriverLastName ?? null,
     coDriverFlag: entry?.coDriverFlag ?? null,
+    chassis: entry?.chassis ?? null,
     body: entry?.body ?? null,
   };
 }

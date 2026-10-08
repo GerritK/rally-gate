@@ -10,6 +10,7 @@ import { StageStatus, type OverallStageTime } from '@rally-gate/shared';
 import type { Stage } from '../api/stages';
 import type { Entry } from '../api/entries';
 import TableLegend from './TableLegend.vue';
+import CarName from './CarName.vue';
 import CrewName from './CrewName.vue';
 import ResultsPodium from './ResultsPodium.vue';
 import StartNumber from './StartNumber.vue';
@@ -91,6 +92,7 @@ const runningStages = computed(() =>
           <th>Pos</th>
           <th>#</th>
           <th>Crew</th>
+          <th>Car</th>
           <th v-for="stage in countedStages" :key="stage.id" class="rg-time">
             <router-link
               :to="{
@@ -117,6 +119,7 @@ const runningStages = computed(() =>
           <td>{{ placing.position }}</td>
           <td><StartNumber :number="placing.startNumber" /></td>
           <td><CrewName :crew="placing" /></td>
+          <td><CarName :car="placing" /></td>
           <td
             v-for="time in placing.stageTimes"
             :key="time.stageId"
@@ -164,14 +167,14 @@ const runningStages = computed(() =>
           </td>
         </tr>
         <tr v-if="placings.length === 0">
-          <td colspan="7" class="rg-empty">
+          <td :colspan="7 + countedStages.length" class="rg-empty">
             No crew has completed a closed stage yet.
           </td>
         </tr>
       </tbody>
       <tfoot v-if="legendMarks.length > 0">
         <tr>
-          <td :colspan="6 + countedStages.length">
+          <td :colspan="7 + countedStages.length">
             <TableLegend :marks="legendMarks" />
           </td>
         </tr>
@@ -188,6 +191,7 @@ const runningStages = computed(() =>
           <tr>
             <th>#</th>
             <th>Crew</th>
+            <th>Car</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -200,6 +204,7 @@ const runningStages = computed(() =>
           >
             <td><StartNumber :number="entry.startNumber" /></td>
             <td><CrewName :crew="entry" /></td>
+            <td><CarName :car="entry" /></td>
             <td>
               <v-chip
                 size="small"

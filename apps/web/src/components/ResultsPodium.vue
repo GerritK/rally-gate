@@ -4,6 +4,7 @@ import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { display } from '../crew';
 import { formatDuration, formatGap } from '../format';
+import CarName from './CarName.vue';
 import CrewName from './CrewName.vue';
 import StartNumber from './StartNumber.vue';
 
@@ -46,9 +47,7 @@ const steps = computed(() =>
             class="rg-podium-number"
           />
           <CrewName :crew="step.placing" class="rg-podium-crew" />
-          <div v-if="step.placing.body" class="text-medium-emphasis">
-            {{ step.placing.body }}
-          </div>
+          <CarName :car="step.placing" class="text-medium-emphasis" />
           <div class="rg-timing font-weight-bold">
             {{ formatDuration(step.placing.durationMs) }}
           </div>

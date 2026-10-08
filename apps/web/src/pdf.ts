@@ -58,6 +58,8 @@ const time = (content: string, bold = false) => ({
 });
 const crewCell = (crew: Crew) =>
   [driverName(crew), coDriverName(crew)].filter(Boolean).join('\n');
+const carCell = (crew: Crew) =>
+  [crew.body, crew.chassis].filter(Boolean).join('\n');
 
 export function overallPdf(
   heading: string,
@@ -76,6 +78,7 @@ export function overallPdf(
       'Pos',
       '#',
       'Crew',
+      'Car',
       'Total',
       'Gap',
       'Stages',
@@ -85,6 +88,7 @@ export function overallPdf(
       String(e.position),
       String(e.startNumber),
       crewCell(e),
+      carCell(e),
       time(formatDuration(e.durationMs), true),
       time(formatGap(e.gapMs)),
       String(e.stagesCompleted),
@@ -97,7 +101,8 @@ export function overallPdf(
             ),
       ),
     ]),
-    repeat: 6,
+    repeat: 7,
+    rightFrom: 4,
     legend: [
       times.some((t) => !t.notional) && `Bold: ${TIMING_MARKS.best.label}`,
       times.some((t) => t.notional) && `(...): ${TIMING_MARKS.notional.label}`,
@@ -109,10 +114,11 @@ export function overallPdf(
         ? {
             title:
               'Not classified: no completed stage that counts yet, withdrawn or disqualified',
-            head: ['#', 'Crew', 'Status'],
+            head: ['#', 'Crew', 'Car', 'Status'],
             body: unranked.map((v) => [
               String(v.startNumber),
               crewCell(v),
+              carCell(v),
               ENTRY_STATUS_DISPLAY[v.status].label,
             ]),
           }
@@ -129,6 +135,7 @@ export function stagePdf(
     String(e.position),
     String(e.startNumber),
     crewCell(e),
+    carCell(e),
     time(formatDuration(e.durationMs)),
     time(formatGap(e.gapMs)),
     ...results.splitsByGate.map((splits) => {
@@ -151,12 +158,14 @@ export function stagePdf(
       'Pos',
       '#',
       'Crew',
+      'Car',
       'Time',
       'Gap',
       ...results.splitGates.map((g) => `Split ${g.splitIndex}`),
     ],
     body,
-    repeat: 5,
+    repeat: 6,
+    rightFrom: 4,
     legend: anyBest ? `Bold: ${TIMING_MARKS.best.label}` : '',
     extra:
       results.nonFinishers.length > 0
@@ -165,10 +174,11 @@ export function stagePdf(
             title: [
               ...new Set(results.nonFinishers.map((e) => e.outcome)),
             ].join(' / '),
-            head: ['#', 'Crew', 'Outcome'],
+            head: ['#', 'Crew', 'Car', 'Outcome'],
             body: results.nonFinishers.map((e) => [
               String(e.startNumber),
               crewCell(e),
+              carCell(e),
               e.outcome,
             ]),
           }
@@ -182,11 +192,7 @@ export function startListPdf(
   heading: string,
   /** When it was frozen, formatted; null while it is still provisional. */
   published: string | null,
-  rows: {
-    starter: Starter;
-    classHeader: string | null;
-    car?: { body: string | null; chassis: string | null };
-  }[],
+  rows: { starter: Starter; classHeader: string | null }[],
   grouped: boolean,
 ): PdfSection {
   const head = ['Pos', '#', 'Crew', 'Car', ...(grouped ? [] : ['Class'])];
@@ -195,7 +201,7 @@ export function startListPdf(
     subtitle: published ? '' : 'Provisional',
     note: published ? `Published ${published}` : undefined,
     head,
-    body: rows.flatMap(({ starter, classHeader, car }) => [
+    body: rows.flatMap(({ starter, classHeader }) => [
       ...(classHeader
         ? [
             [
@@ -211,7 +217,7 @@ export function startListPdf(
         String(starter.position),
         String(starter.startNumber),
         crewCell(starter),
-        [car?.body, car?.chassis].filter(Boolean).join('\n'),
+        carCell(starter),
         ...(grouped ? [] : [starter.mainClassName ?? '']),
       ],
     ]),

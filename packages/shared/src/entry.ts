@@ -23,7 +23,7 @@ export const isScrutineered = (status: EntryStatus) =>
   status === EntryStatus.SCRUTINEERED;
 
 /**
- * Who is in the car and the car they look like (`body`), carried by every
+ * Who is in the car and the car itself (`body`, `chassis`), carried by every
  * listing so any page can show the crew as the Display settings ask. A flag is a `flag-icons` code (`de`, `gb-eng`)
  * or one of our own (`x-pride` …); `null` shows the neutral default.
  */
@@ -34,5 +34,6 @@ export interface Crew {
   coDriverFirstName: string | null;
   coDriverLastName: string | null;
   coDriverFlag: string | null;
+  chassis: string | null;
   body: string | null;
 }

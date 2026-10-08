@@ -11,8 +11,6 @@ export { EntryStatus };
 export interface Entry extends Crew {
   id: string;
   startNumber: number;
-  chassis: string | null;
-  body: string | null;
   transponders: EntryTransponder[];
   status: EntryStatus;
   classes: EntryClass[];

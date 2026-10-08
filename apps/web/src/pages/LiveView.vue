@@ -936,10 +936,7 @@ async function printStartList() {
         startListPdf(
           `Start list — ${id} · ${name}`,
           startOrder.value.frozen ? frozenAt.value : null,
-          rows.value.map((row) => ({
-            ...row,
-            car: entryById.value.get(row.starter.entryId),
-          })),
+          rows.value,
           startOrder.value.grouped,
         ),
       ],

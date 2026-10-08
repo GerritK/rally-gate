@@ -5,6 +5,7 @@ import type { StageResults } from '../api/classification';
 import { StageStatus } from '@rally-gate/shared';
 import type { Stage } from '../api/stages';
 import TableLegend from './TableLegend.vue';
+import CarName from './CarName.vue';
 import CrewName from './CrewName.vue';
 import ResultsPodium from './ResultsPodium.vue';
 import StartNumber from './StartNumber.vue';
@@ -62,6 +63,7 @@ const legendMarks = computed<TimingMark[]>(() =>
           <th>Pos</th>
           <th>#</th>
           <th>Crew</th>
+          <th>Car</th>
           <th
             v-for="gate in results.splitGates"
             :key="gate.gateId"
@@ -83,6 +85,7 @@ const legendMarks = computed<TimingMark[]>(() =>
           <td>{{ placing.position }}</td>
           <td><StartNumber :number="placing.startNumber" /></td>
           <td><CrewName :crew="placing" /></td>
+          <td><CarName :car="placing" /></td>
           <td
             v-for="(splits, i) in results.splitsByGate"
             :key="results.splitGates[i].gateId"
@@ -120,14 +123,14 @@ const legendMarks = computed<TimingMark[]>(() =>
           <td class="rg-timing rg-time">{{ formatGap(placing.gapMs) }}</td>
         </tr>
         <tr v-if="results.classification.length === 0">
-          <td :colspan="5 + results.splitGates.length" class="rg-empty">
+          <td :colspan="6 + results.splitGates.length" class="rg-empty">
             Nobody has finished this stage yet.
           </td>
         </tr>
       </tbody>
       <tfoot v-if="legendMarks.length > 0">
         <tr>
-          <td :colspan="5 + results.splitGates.length">
+          <td :colspan="6 + results.splitGates.length">
             <TableLegend :marks="legendMarks" />
           </td>
         </tr>
@@ -143,6 +146,7 @@ const legendMarks = computed<TimingMark[]>(() =>
         <tr>
           <th>#</th>
           <th>Crew</th>
+          <th>Car</th>
           <th>Outcome</th>
         </tr>
       </thead>
@@ -155,6 +159,7 @@ const legendMarks = computed<TimingMark[]>(() =>
         >
           <td><StartNumber :number="row.startNumber" /></td>
           <td><CrewName :crew="row" /></td>
+          <td><CarName :car="row" /></td>
           <td>
             <v-chip size="small" :color="outcomeColor(row.outcome)">
               {{ row.outcome }}

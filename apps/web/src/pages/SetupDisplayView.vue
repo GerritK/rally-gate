@@ -28,6 +28,7 @@ const EXAMPLE: Crew = {
   coDriverFirstName: 'Erika',
   coDriverLastName: 'Musterfrau',
   coDriverFlag: 'at',
+  chassis: null,
   body: null,
 };
 
