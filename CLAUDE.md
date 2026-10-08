@@ -7,7 +7,7 @@ Rally Gate: open, modular timing and event management for RC rally events. Backg
 This file holds what spans projects. **Each project has its own `CLAUDE.md` — read it before changing anything there**, including when only planning a change:
 
 - `apps/rally-server/CLAUDE.md` — **before any entity, DTO or event-handler change**: TypeORM column types valid in both drivers, `null` not `undefined`, DTO whitelist and server-owned fields, `@OnEvent` swallows errors, `/api` prefix, rolldown bundle pitfalls
-- `apps/web/CLAUDE.md` — no tests (only `vue-tsc`), Vuetify-only, time-only corrections, PDF fonts, Vite `optimizeDeps`
+- `apps/web/CLAUDE.md` — tests only for plain `.ts` modules (`node --test`), shared components and clock, Vuetify-only, time-only corrections, PDF fonts, Vite `optimizeDeps`
 - `packages/ui/CLAUDE.md` — theme and defaults, self-hosted fonts, no build step, keep it out of `optimizeDeps`
 - `apps/gate-agent/CLAUDE.md` — `DecoderAdapter`, why the MQTT session options matter, `node:test`
 - `apps/gate-config/CLAUDE.md` — OS calls only in `system.ts`, `FIELDS` is the security boundary

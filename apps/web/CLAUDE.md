@@ -2,7 +2,9 @@
 
 The Vue 3 dashboard. Read `docs/frontend-structure.md` before changing routes or nav, and `docs/design-system.md` before building or restyling a page. Theme and shared components live in `packages/ui` (its own `CLAUDE.md`).
 
-- **No test suite.** The only check is `vue-tsc` in `npm run build` (locally or CI's build step) — a type error surfaces nowhere else.
+- **Type errors surface only in `vue-tsc`**, i.e. `npm run build` (locally or CI's build step).
+- **Tests run on `node --test`** (`npm test -w apps/web`), on Node's own type stripping — no Vite, no DOM. So logic worth a test goes in a plain `.ts` module with structural types and no imports from `api/*` (which need Vite's `import.meta.env`), like `passing-suggestions.ts`. Specs are typechecked by `tsconfig.node.json` and excluded from `tsconfig.app.json`; relative imports in them carry the `.ts` extension.
+- **Repeated UI is a component already**: `StatusChip` (any `*_DISPLAY` map), `ClockTime` (a start/finish with its hand-set mark), `GateOnlineChip`, `GateVersion`, `FlagPicker`, `TransponderList`. One app-wide clock: `serverNow` (`api/time.ts`), never a page's own timer. Print through `printPdf`, which opens the tab before anything is awaited.
 - **Fully Vuetify**: `v-table`/`v-select`/`v-btn`/`v-chip`, never raw `<table>`/`<select>`/`<button>`; status values are `v-chip`s. `App.vue` is the nav shell, pages are `src/pages/*.vue`.
 - Every timing value gets `.rg-timing` (tabular JetBrains Mono, slashed zero).
 - **Time corrections are time-only**, no date field: `combineDateAndTime()` (`format.ts`) takes the date from context — the run's own, or today. `VTimePicker` was rejected: no seconds. A `v-text-field[type=time]` gets `append-inner-icon="mdi-clock-outline"` with `openTimePicker` (`@rally-gate/ui`) on `@click:append-inner`.
