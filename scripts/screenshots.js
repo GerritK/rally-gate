@@ -13,6 +13,9 @@ const ROOT = path.resolve(__dirname, '..');
 const ORIGIN = 'http://localhost:57430';
 const API = `${ORIGIN}/api`;
 const OUT = path.join(ROOT, 'docs/images');
+// Not the field port 57431: a real gate on this network would heartbeat into
+// the throwaway event, auto-register and end up in the README.
+const MQTT_PORT = 58431;
 const SHOTS = [
   ['/live/WP2', 'live'],
   ['/results/overall', 'results'],
@@ -297,7 +300,8 @@ function screenshot(route, name) {
     [
       'npx --yes playwright screenshot',
       channel ? `--channel=${channel}` : '',
-      '--viewport-size=1440,900 --color-scheme=dark --wait-for-timeout=2500',
+      // English whatever this machine's language: the README is English.
+      '--viewport-size=1440,900 --color-scheme=dark --lang=en --wait-for-timeout=2500',
       ORIGIN + route,
       JSON.stringify(path.join(OUT, `${name}.png`)),
     ].join(' '),
@@ -327,12 +331,13 @@ async function main() {
       ...process.env,
       DB_TYPE: 'sqlite',
       DB_PATH: dbPath,
+      MQTT_PORT: String(MQTT_PORT),
       MDNS_DISABLE: '1',
       LOG_LEVEL: 'warn',
     },
     stdio: 'inherit',
   });
-  const client = mqtt.connect('mqtt://localhost:57431', {
+  const client = mqtt.connect(`mqtt://localhost:${MQTT_PORT}`, {
     reconnectPeriod: 500,
   });
   try {

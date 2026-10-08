@@ -164,6 +164,8 @@ export function formatStamp(time: string | number): string {
     weekday: 'short',
     day: '2-digit',
     month: '2-digit',
+    // 24h in every language: "en" alone reads as en-US, which says AM/PM.
+    hourCycle: 'h23',
     hour: '2-digit',
     minute: '2-digit',
   });

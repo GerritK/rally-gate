@@ -88,6 +88,7 @@ onMounted(async () => {
           <div class="rg-timing app-bar-clock">
             {{
               new Date(serverNow).toLocaleTimeString(currentLocale(), {
+                hourCycle: 'h23',
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit',
