@@ -13,12 +13,22 @@ the rally's own closed Wi-Fi.
 > supported yet (see [What works today](#what-works-today)). Don't time a real
 > event without a paper backup.
 
+![Live Timing: who's up next, who's on stage, and every time as it comes in](docs/images/live.png)
+
 ## How it works
 
-```
- gate (Pi + sensor)  ─┐
- gate (Pi + sensor)  ─┼─ Wi-Fi ──►  rally server (laptop or Pi)  ──►  dashboard in the browser
- gate (Pi + sensor)  ─┘
+```mermaid
+flowchart LR
+    subgraph stage["On the stage"]
+        S["🚦 Start gate<br/>Pi + light barrier"]
+        P["⏱️ Split gate"]
+        F["🏁 Finish gate"]
+    end
+    R["💻 Rally server<br/>laptop or Pi"]
+    D["📱 Dashboard<br/>any browser"]
+    S & P & F -- "passings over Wi-Fi" --> R
+    R -. "clock sync" .-> stage
+    R -- "live times, results, PDFs" --> D
 ```
 
 - **A gate is just a sensor.** It reports "something passed at 10:42:13.412"
@@ -56,6 +66,11 @@ the rally's own closed Wi-Fi.
 - A config page on every gate (name, sensor, Wi-Fi); a gate that finds no
   known Wi-Fi opens its own hotspot so you can reach that page.
 - Creating and switching events from the dashboard.
+
+| Results | Entries | Hardware |
+|---|---|---|
+| [![Overall classification with podium](docs/images/results.png)](docs/images/results.png) | [![Entry list with classes and check-in status](docs/images/entries.png)](docs/images/entries.png) | [![Gates online with clock offsets](docs/images/hardware.png)](docs/images/hardware.png) |
+| Overall and stage classification, per class, printable | Cars, classes, transponders, check-in and scrutineering | Every gate's heartbeat and clock sync at a glance |
 
 Not yet: **RC transponder decoding** (RC3/RC4, via OpenStint and an SDR —
 waiting on working SDR hardware), time controls, Parc Fermé, penalties, and
@@ -169,6 +184,11 @@ npm run dev:web              # dashboard on :57440
 `npm run dev:gate-agent` sends continuous simulated detections instead, and
 `docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml up`
 runs the headless stack with simulated gates.
+
+`npm run screenshots` regenerates the images in `docs/images/` from a
+throwaway demo event (after building shared, rally-server and web). It needs
+Playwright's Chromium (`npx playwright install chromium`), or set
+`SCREENSHOT_CHANNEL=msedge` or `chrome` to use an installed browser.
 
 Before changing an area, read its note in `docs/` — much of the "why" lives
 there: [architecture](docs/architecture.md), [event model](docs/event-model.md),
