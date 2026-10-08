@@ -72,10 +72,16 @@ flowchart LR
 | [![Overall classification with podium](docs/images/results.png)](docs/images/results.png) | [![Entry list with classes and check-in status](docs/images/entries.png)](docs/images/entries.png) | [![Gates online with clock offsets](docs/images/hardware.png)](docs/images/hardware.png) |
 | Overall and stage classification, per class, printable | Cars, classes, transponders, check-in and scrutineering | Every gate's heartbeat and clock sync at a glance |
 
-Not yet: **RC transponder decoding** (RC3/RC4, via OpenStint and an SDR —
-waiting on working SDR hardware), time controls, Parc Fermé, penalties, and
-any login. See
-[docs/development-roadmap.md](docs/development-roadmap.md).
+## Not yet
+
+- **RC transponder decoding** (RC3/RC4, via OpenStint and an SDR), waiting
+  on working SDR hardware.
+- **ESP32 NFC check-in gate**: firmware written, not yet run on hardware
+  ([docs/esp32-gate.md](docs/esp32-gate.md)).
+- Time controls, Parc Fermé and penalties.
+- Any login.
+
+What comes when: [docs/development-roadmap.md](docs/development-roadmap.md).
 
 ## What you need
 

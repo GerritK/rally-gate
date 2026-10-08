@@ -102,8 +102,10 @@ What exists, with where its reasoning lives. History is in git.
 
 ## Next
 
-- **ESP32 NFC check-in gate** — hardware ordered (XIAO ESP32-S3, PN532),
-  firmware not started. Designed in `esp32-gate.md`; no rally-server change.
+- **ESP32 NFC check-in gate** — firmware in `firmware/esp32-gate` builds,
+  untested on hardware (ordered: XIAO ESP32-S3, PN532). Then: a server-side
+  meaning for a check-in tap (no role sets entry status yet), OTA, and the
+  status page on `packages/ui` (`esp32-gate.md`).
 
 OpenStint (below) resumes when the hardware arrives.
 
@@ -113,6 +115,14 @@ OpenStint (below) resumes when the hardware arrives.
   `decoder-adapters.md`) — on hold on branch `feature/openstint-adapter`
   until working RTL-SDR hardware arrives; merge only once a real car is timed
   through a loop. Settle the `-t` question first.
+- **Browser flashing for ESP32 gates** — CI builds one image per supported
+  board onto the GitHub release, and a static page with ESP Web Tools
+  installs it over USB, so nobody needs PlatformIO. Wanted once someone other
+  than a developer flashes gates, or a second board is supported. Variants
+  are per board only, never per feature: one firmware carries NFC and beam,
+  the reader is detected and the beam switched on at runtime, as `ADAPTER` on
+  a Pi. A per-feature builder would save no flash worth having (1.0 MB of a
+  2.5 MB slot) and turn every gate into a question of which build it runs.
 - **GPS/PPS per gate** — waiting on hardware (`decoder-adapters.md` "Hardware
   notes").
 - **Gate updates from the server** — rally WiFi is closed, so gates can't reach

@@ -1,0 +1,138 @@
+<!doctype html>
+<!-- ponytail: plain HTML in the rallyGateDark colours, not packages/ui. A
+     Vuetify build is planned (docs/esp32-gate.md "Flash budget"); this is
+     what the first hardware test needs. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rally Gate</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0B0D10; color: #E6EAF0; font: 16px/1.4 system-ui, sans-serif; }
+  main { max-width: 32rem; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  h2 { font-size: 1rem; text-transform: uppercase; letter-spacing: .06em; color: #B9C2CE; margin: 0 0 8px; }
+  section { background: #14181E; border-radius: 8px; padding: 16px; margin: 12px 0; }
+  .muted { color: #B9C2CE; font-size: .9rem; }
+  .row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; }
+  .ok::before, .bad::before, .warn::before { margin-right: 6px; }
+  .ok { color: #2ED573; } .ok::before { content: "\2714"; }
+  .bad { color: #FF3B30; } .bad::before { content: "\2716"; }
+  .warn { color: #FFC300; } .warn::before { content: "!"; }
+  .mono { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums slashed-zero; }
+  label { display: block; margin: 8px 0 4px; color: #B9C2CE; font-size: .9rem; }
+  input, select { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 6px; border: 1px solid #2A313B; background: #1A1F26; color: inherit; font: inherit; }
+  button { margin-top: 12px; padding: 10px 16px; border: 0; border-radius: 6px; background: #FF6B00; color: #1A0A00; font: inherit; font-weight: 600; }
+  button.secondary { background: #2A313B; color: #E6EAF0; }
+  #msg { min-height: 1.4em; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="gateId">Rally Gate</h1>
+  <div class="muted">ESP32 gate · <span id="version" class="mono"></span></div>
+
+  <section>
+    <h2>Status</h2>
+    <div class="row"><span>Wi-Fi</span><span id="wifi"></span></div>
+    <div class="row"><span>Server</span><span id="server"></span></div>
+    <div class="row"><span>Clock</span><span id="clock"></span></div>
+    <div class="row"><span>NFC reader</span><span id="reader"></span></div>
+    <div class="row"><span>Waiting to send</span><span id="buffered" class="mono"></span></div>
+  </section>
+
+  <section>
+    <h2>Last tags</h2>
+    <div id="recent" class="muted">None yet</div>
+  </section>
+
+  <section>
+    <h2>Wi-Fi</h2>
+    <form id="wifiForm">
+      <label for="ssid">Network</label>
+      <input id="ssid" name="ssid" list="networks" autocomplete="off" required maxlength="32">
+      <datalist id="networks"></datalist>
+      <label for="pass">Password</label>
+      <input id="pass" name="pass" type="password" maxlength="63">
+      <button type="submit">Join</button>
+      <button type="button" class="secondary" id="scan">Scan</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>Gate</h2>
+    <form id="settingsForm">
+      <label for="gateIdInput">Gate name</label>
+      <input id="gateIdInput" name="gateId" required pattern="[A-Z0-9_]{1,32}" class="mono">
+      <label for="serverHost">Server</label>
+      <input id="serverHost" name="serverHost" required maxlength="63">
+      <label for="hotspotPass">Emergency Wi-Fi password</label>
+      <input id="hotspotPass" name="hotspotPass" minlength="8" maxlength="63" placeholder="unchanged">
+      <button type="submit">Save and restart</button>
+    </form>
+  </section>
+
+  <div id="msg" class="muted"></div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const state = (el, cls, text) => { el.className = cls; el.textContent = text; };
+let filled = false;
+
+async function refresh() {
+  try {
+    const s = await (await fetch('/api/status')).json();
+    $('gateId').textContent = s.gateId;
+    $('version').textContent = s.version;
+    state($('wifi'), s.wifiConnected ? 'ok' : 'bad',
+      s.wifiConnected ? `${s.wifiSsid} (${s.wifiRssi} dBm)` : s.hotspot ? 'Not connected, emergency Wi-Fi on' : 'Not connected');
+    state($('server'), s.serverConnected ? 'ok' : 'bad',
+      s.serverConnected ? `${s.serverHost} (${s.serverIp})` : s.serverIp ? `${s.serverHost} not answering` : `${s.serverHost} not found`);
+    state($('clock'), s.clockSynced ? 'ok' : 'warn',
+      s.clockSynced ? `Synced, ${s.clockOffsetMs.toFixed(1)} ms off` : 'Not synced');
+    state($('reader'), s.readerFound ? 'ok' : 'bad', s.readerFound ? 'Found' : 'Not found, check wiring');
+    $('buffered').textContent = s.buffered;
+    $('recent').innerHTML = '';
+    for (const t of s.recent) {
+      const row = document.createElement('div');
+      row.className = 'row mono';
+      row.append(t.uid, t.time ? new Date(t.time).toLocaleTimeString() : 'clock not set');
+      $('recent').append(row);
+    }
+    if (!s.recent.length) $('recent').textContent = 'None yet';
+    if (!filled) {
+      $('gateIdInput').value = s.gateId;
+      $('serverHost').value = s.serverHost;
+      $('ssid').value = s.wifiSsid;
+      filled = true;
+    }
+  } catch { $('msg').textContent = 'Gate not reachable'; }
+}
+
+async function post(url, form) {
+  const body = new URLSearchParams(new FormData(form));
+  for (const [k, v] of [...body]) if (v === '' && k === 'hotspotPass') body.delete(k);
+  const res = await fetch(url, { method: 'POST', body });
+  $('msg').textContent = await res.text();
+}
+
+$('wifiForm').onsubmit = (e) => { e.preventDefault(); post('/api/wifi', e.target); };
+$('settingsForm').onsubmit = (e) => { e.preventDefault(); post('/api/settings', e.target); };
+$('scan').onclick = async () => {
+  $('msg').textContent = 'Scanning…';
+  const list = await (await fetch('/api/wifi/scan')).json();
+  $('networks').innerHTML = '';
+  for (const n of list.sort((a, b) => b.rssi - a.rssi)) {
+    const o = document.createElement('option');
+    o.value = n.ssid;
+    $('networks').append(o);
+  }
+  $('msg').textContent = `${list.length} networks found`;
+};
+
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>

@@ -48,6 +48,35 @@ jobs:
       - name: Build all workspaces
         run: npm run build
 
+  # The ESP32 gate firmware is outside the npm workspaces, so nothing above
+  # builds it. The native tests are its only check off real hardware.
+  firmware:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firmware/esp32-gate
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # git describe in prebuild.py needs the tags
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.platformio
+          key: platformio-${{ hashFiles('firmware/esp32-gate/platformio.ini') }}
+
+      - run: pip install platformio
+
+      - name: Core tests
+        run: pio test -e native
+
+      - name: Build
+        run: pio run -e xiao_esp32s3
+
   # The headless stack is the one path neither the tests nor a local dev loop
   # can exercise. TypeORM connects before it validates entity metadata, so a
   # Postgres-invalid column type cannot fail until Postgres is actually

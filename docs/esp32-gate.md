@@ -2,8 +2,15 @@
 
 A second kind of gate: an ESP32 with its own firmware instead of a Pi running
 `gate-agent` and `gate-config`. First target is an **NFC check-in gate**, where
-presence matters and milliseconds don't. Hardware is ordered; nothing is
-built yet.
+presence matters and milliseconds don't. Firmware in `firmware/esp32-gate`,
+built and compiling, not yet run on hardware (ordered).
+
+```bash
+cd firmware/esp32-gate
+pio run -t upload        # build + flash over USB
+pio device monitor       # serial log
+pio test -e native       # gate_core tests, needs a host gcc (CI has one)
+```
 
 **rally-server does not change.** A gate is anything that publishes the right
 JSON to `rally/gates/<gateId>/detections` and `/heartbeat` (see
@@ -11,12 +18,18 @@ JSON to `rally/gates/<gateId>/detections` and `/heartbeat` (see
 `DetectionEvent` with `transponderKind: 'NFC'`, `GateHeartbeat` every 15s with
 `sentAt`.
 
+What the server does **not** have yet is a meaning for a check-in tap: no
+gate role sets an entry's status, so a tap at an unassigned gate is stored
+and nothing else. On a stage-start assignment a tap would already start a
+run. The server also doesn't read `metadata.timeUnknown` (below) yet, so
+that flag only matters once check-in uses the time.
+
 ## Hardware
 
 | Part | Choice | Why |
 |---|---|---|
 | Board | Seeed XIAO ESP32-S3 (BerryBase SE-102010634, with header) | U.FL antenna (range at the roadside is what decides whether a gate is online at all), two cores (Wi-Fi on one, a beam interrupt on the other, so the same board serves timing later), native USB (browser flashing without a serial driver), LiPo charger on board |
-| Reader | PN532 V3 module, **SPI** with the IRQ pin wired | I²C on the ESP32 has known trouble with the PN532's clock stretching. Preferred over the RC522: more tag types, steadier |
+| Reader | PN532 V3 module, **SPI** | I²C on the ESP32 has known trouble with the PN532's clock stretching. Preferred over the RC522: more tag types, steadier. IRQ is not needed: the firmware polls with a 50ms timeout |
 | Tags | NTAG213/215 stickers; on-metal NTAG where it sits on a battery or metal | |
 | Feedback | active 3.3V buzzer + LED | the driver has to know the tap counted |
 
@@ -30,6 +43,20 @@ either way (below).
 
 **The antenna must be plugged in**, since without it the board has next to
 no range. In the case, keep it away from the battery and metal.
+
+### Wiring
+
+| PN532 (DIP switches to SPI) | XIAO ESP32-S3 |
+|---|---|
+| SCK | D8 |
+| MISO | D9 |
+| MOSI | D10 |
+| SS | D3 |
+| VCC / GND | 3V3 / GND |
+
+Buzzer on D1, LED on D2 (through a resistor), both to GND. The LED is lit
+while the gate is connected to the server. One beep means the tap is
+stored, three mean it is **not** (buffer full or flash failed).
 
 ## Identifying a driver
 
@@ -68,18 +95,28 @@ workspaces with its own CI build. What each part of the Pi stack becomes:
 |---|---|
 | `GATE_ID` from the installer | derived from the MAC address, so nothing to enter |
 | mDNS `rally-server.local` | ESP-IDF mDNS component, still zero-config |
-| chrony against rally-server's SNTP (57432/udp) | ESP-IDF SNTP in `SNTP_SYNC_MODE_SMOOTH`, because the default steps the clock, and the policy in `decoder-adapters.md` allows a step only at boot. Wi-Fi power save off: it adds latency jitter to every sync |
-| QoS 1, persistent session | esp-mqtt QoS 1 with `clean_session=false`, but its outbox is RAM, so **every detection is written to flash first** and deleted once acked. Loss of power must not cost a tap |
+| chrony against rally-server's SNTP (57432/udp) | own NTP client (`clock.cpp`), since lwIP's SNTP port is fixed at 123 at compile time. Best of 4 samples every 64s; steps only within the first three syncs and slews after, as chrony's `makestep 1 3` (`decoder-adapters.md` clock policy). Wi-Fi power save off: it adds latency jitter to every sample |
+| QoS 1, persistent session | esp-mqtt QoS 1, but its outbox is RAM, so **every tap is written to flash first** (`/q` in LittleFS) and deleted only on PUBACK. Unacked taps are sent again on reconnect and after 30s, which the server's `eventId` dedup makes safe. Flash is the outbox, so no persistent session is needed |
 | `gate-config` on 57439 + hotspot fallback | SoftAP captive portal for Wi-Fi, and a small status page on **57439**, so the dashboard's gate link (`gateConfigUrl`) works unchanged |
 | `POST /api/power-off` | deep sleep, so "Shut down all gates" works for every gate. There is no SD card to protect, so it only saves the battery |
 | `chronySynced` / `chronyOffsetMs` | filled from the firmware's own SNTP round trip. The names are chrony's; rename to `clockSynced`/`clockOffsetMs` when this lands |
 | `eventId` | random UUIDv4 from `esp_random()` |
 | `source` / `capabilities` | `nfc` |
 
-The status page uses `packages/ui` like every web UI (`design-system.md`), but
-is its own small page rather than a port of gate-config: systemd, chrony and
-journalctl don't exist here. It shows Wi-Fi setup, server connection, clock
-synced, buffer fill and the last tags read.
+The status page is its own small page rather than a port of gate-config:
+systemd, chrony and journalctl don't exist here. It shows server connection,
+clock, reader, buffer fill and the last tags read, and sets Wi-Fi, gate name,
+server and the emergency Wi-Fi password. Every change restarts the gate. For
+now it is plain HTML (`web/index.html`) in the rallyGateDark colours, not
+`packages/ui`, and `prebuild.py` gzips it into the image. The Vuetify version
+from the flash budget below comes later.
+
+Emergency Wi-Fi as on a Pi: `rally-gate-<name>` with password `rally-gate`,
+raised when no network is configured or after 60s without one, with a
+captive portal on 80 redirecting to 57439. It goes down once the gate joins
+a network. The default gate name is `ESP32_` plus the last three MAC bytes: what the
+device is, not what it does. `capabilities` reports the reader and the
+assignment gives the role, and one board may later run a beam as well.
 
 ### Time without an RTC
 
@@ -100,7 +137,7 @@ inaccurate RC oscillator and doesn't survive power loss. A DS3231 (I²C,
 
 | | |
 |---|---|
-| firmware image (Wi-Fi, MQTT, mDNS, web server, OTA, PN532) | ~1.2–1.5 MB |
+| firmware image (Wi-Fi, MQTT, mDNS, web server, PN532, plain status page) | 1.0 MB measured; OTA not in it yet |
 | two OTA app partitions, ~2.5 MB each, **status page gzipped inside the image** | 5 MB |
 | NVS (Wi-Fi credentials) + LittleFS (detection buffer, ~200 B per tap) | rest |
 
@@ -121,6 +158,8 @@ an upload through the status page for now, and from rally-server once
 
 The same board can time a beam: a GPIO interrupt with `esp_timer_get_time()`
 is microsecond-exact, better than `gpiomon` on Linux. What is unproven is
-**Wi-Fi SNTP accuracy on the ESP32**. Until it is measured, timing stays on
+**Wi-Fi NTP accuracy on the ESP32**, and how ESP-IDF's `adjtime` slews: at
+1/6 of real time, so a 60ms correction runs the clock 17% off for 360ms. That
+is harmless for check-in and decides a stage time on a beam. Until it is measured, timing stays on
 the Pi (Zero 2 W is enough). Measure it with a Pi gate and an ESP32 gate on
 the same beam and compare `timestampGate` over a few hundred passings.

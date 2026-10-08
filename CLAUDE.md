@@ -59,6 +59,8 @@ npm run format:check         # from the repo root — the check-only version of 
 
 CI (`.github/workflows/ci.yml`) runs, in order: `build:shared` → `format:check` → `lint:check` → server tests → `npm run build`. That last step is what typechecks `apps/web` (via `vue-tsc`), which has no test suite of its own — so a frontend type error only ever surfaces there or in a local `npm run build`. Master being green matters more than usual here: `deploy/install-*.sh` are `curl | bash` off master, so a broken commit is one a marshal can pull onto a Pi mid-event.
 
+`firmware/esp32-gate` (ESP32 NFC gate, PlatformIO, outside the npm workspaces): `pio run`, `pio test -e native` from that directory — see `docs/esp32-gate.md`.
+
 Standalone package for the current OS (after building shared, rally-server and web; see `docs/deployment-modes.md`):
 ```bash
 node scripts/package-standalone.js   # -> dist-standalone/
