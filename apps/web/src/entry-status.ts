@@ -34,7 +34,11 @@ function action(from: EntryStatus, to: EntryStatus): StatusAction | null {
       if (from === REGISTERED)
         return { to, label: 'Check in', icon: 'mdi-clipboard-check-outline' };
       if (from === SCRUTINEERED)
-        return { to, label: 'Back to checked in', icon: 'mdi-undo' };
+        return {
+          to,
+          label: 'Undo scrutineering',
+          icon: 'mdi-decagram-outline',
+        };
       return null;
     case SCRUTINEERED:
       if (from === CHECKED_IN)
@@ -51,7 +55,11 @@ function action(from: EntryStatus, to: EntryStatus): StatusAction | null {
     case REGISTERED:
       if (out) return { to, label: 'Reinstate', icon: 'mdi-restore' };
       if (from !== REGISTERED)
-        return { to, label: 'Back to registered', icon: 'mdi-undo' };
+        return {
+          to,
+          label: 'Undo check-in',
+          icon: 'mdi-clipboard-remove-outline',
+        };
       return null;
     case WITHDRAWN:
       return from === WITHDRAWN
@@ -65,13 +73,13 @@ function action(from: EntryStatus, to: EntryStatus): StatusAction | null {
 }
 
 /** The next step as the one direct action, every other change for the
- *  menu: forward first, then back, then out of the event. */
+ *  menu, in the order the statuses run, then out of the event. */
 export function statusActions(status: EntryStatus): {
   next: StatusAction | null;
   others: StatusAction[];
 } {
   const next = NEXT[status] ? action(status, NEXT[status]) : null;
-  const others = [SCRUTINEERED, CHECKED_IN, REGISTERED, WITHDRAWN, DISQUALIFIED]
+  const others = [REGISTERED, CHECKED_IN, SCRUTINEERED, WITHDRAWN, DISQUALIFIED]
     .filter((to) => to !== NEXT[status])
     .map((to) => action(status, to))
     .filter((a): a is StatusAction => a !== null);
