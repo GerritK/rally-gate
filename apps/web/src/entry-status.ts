@@ -82,8 +82,8 @@ const DONE: Record<EntryStatus, string> = {
 };
 
 /** A transponder already on another car. Allowed (a shared or swapped
- *  transponder is a marshal's call) but worth saying: a passing is timed for
- *  only one of the cars carrying it. */
+ *  transponder is a marshal's call) but worth saying: its passings then wait
+ *  on Live Timing for a marshal to say which car it was. */
 export function transponderWarning(
   entries: Entry[],
   transponderId: string | null | undefined,
@@ -95,7 +95,7 @@ export function transponderWarning(
     : [];
   if (others.length === 0) return undefined;
   const on = others.map((v) => `#${v.startNumber}`).join(', ');
-  return `Also on ${on}: a passing is timed for only one of them.`;
+  return `Also on ${on}: its passings wait for a marshal to pick the car.`;
 }
 
 /** Steps that move a car on at a station, as opposed to setting it back or

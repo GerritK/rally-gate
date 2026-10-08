@@ -36,7 +36,10 @@ nothing and would bury real problems.
 ### Unassigned passings
 
 A detection without a `transponderId` (a light barrier) at a gate with an
-active assignment is stored with `awaitingEntry: true` and not timed. Live
+active assignment is stored with `awaitingEntry: true` and not timed. So is one
+whose transponder is on several entries — it identifies none of them — unless
+only one of those is still in the event (a transponder moved off a withdrawn
+car is often still registered on it); its picker offers just those cars. Live
 Timing lists them; the marshal picks the entry (`POST /events/:id/assign`),
 which runs the rules with the stored clock correction, or dismisses one that was
 no car (`POST /events/:id/dismiss`). At an idle gate such a passing is just

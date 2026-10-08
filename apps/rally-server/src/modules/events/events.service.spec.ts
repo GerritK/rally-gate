@@ -14,6 +14,8 @@ const ENTRY = { id: 'v1', transponderId: '1234567' };
 function makeService(opts: {
   gate?: unknown;
   entry?: unknown;
+  /** What `findByTransponder` returns; defaults to `entry` alone. */
+  matches?: unknown[];
   pending?: unknown[];
   startRun?: jest.Mock;
   stageStatus?: StageStatus;
@@ -44,7 +46,10 @@ function makeService(opts: {
   const entriesService = {
     findByTransponder: jest
       .fn()
-      .mockResolvedValue('entry' in opts ? opts.entry : ENTRY),
+      .mockResolvedValue(
+        opts.matches ??
+          ('entry' in opts ? [opts.entry].filter(Boolean) : [ENTRY]),
+      ),
     findOne: jest.fn().mockResolvedValue('entry' in opts ? opts.entry : ENTRY),
   } as unknown as EntriesService;
   const gateAssignmentsService = {
@@ -383,6 +388,34 @@ describe('EventsService unidentified passings', () => {
       'detection.awaiting-changed',
       expect.anything(),
     );
+  });
+
+  it('holds a passing whose transponder is on several entries', async () => {
+    const { service, saved, startRun } = makeService({
+      matches: [ENTRY, { id: 'v2', transponderId: '1234567' }],
+    });
+
+    await service.handleMqttMessage(detection());
+
+    expect(startRun).not.toHaveBeenCalled();
+    expect(saved.at(-1)).toMatchObject({
+      transponderId: '1234567',
+      entryId: null,
+      awaitingEntry: true,
+    });
+  });
+
+  it('times a shared transponder for the one entry still in the event', async () => {
+    const { service, startRun } = makeService({
+      matches: [
+        { id: 'v2', transponderId: '1234567', status: EntryStatus.WITHDRAWN },
+        ENTRY,
+      ],
+    });
+
+    await service.handleMqttMessage(detection());
+
+    expect(startRun).toHaveBeenCalledWith('v1', 'SS1', expect.any(Date));
   });
 
   it('does not ask a marshal about a passing at an idle gate', async () => {

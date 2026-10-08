@@ -329,18 +329,34 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       );
     }
     const { transponderId } = detection;
-    const entry = transponderId
+    const matches = transponderId
       ? await this.entriesService.findByTransponder(transponderId)
-      : null;
-    if (transponderId && !entry) {
+      : [];
+    // A transponder moved off a withdrawn car is often still registered on it.
+    const inEvent = matches.filter((e) => !isOutOfEvent(e.status));
+    const entry =
+      matches.length === 1
+        ? matches[0]
+        : inEvent.length === 1
+          ? inEvent[0]
+          : null;
+    // On several cars it identifies none of them, so it's held like a beam
+    // passing rather than timed for whichever car the database returns first.
+    const shared = !entry && matches.length > 1;
+    if (transponderId && matches.length === 0) {
       this.logger.warn(
         `Detection for unregistered transponder ${transponderId}`,
+      );
+    }
+    if (shared) {
+      this.logger.warn(
+        `Transponder ${transponderId} is on ${matches.length} entries — holding the passing for a marshal`,
       );
     }
     // Only a passing at a live gate needs a marshal; one at an idle gate (setup,
     // someone walking through) has nothing to be timed against.
     const awaitingEntry =
-      !transponderId &&
+      (!transponderId || shared) &&
       !!gate &&
       !!(await this.gateAssignmentsService.findActiveForGate(gate.id));
 

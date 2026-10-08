@@ -36,6 +36,11 @@ defineEmits<{
           </div>
           <div class="text-caption text-medium-emphasis text-truncate">
             {{ gateName }}
+            <template v-if="passing.transponderId">
+              · transponder
+              <span class="rg-timing">{{ passing.transponderId }}</span>
+              is on several cars
+            </template>
           </div>
         </div>
       </div>

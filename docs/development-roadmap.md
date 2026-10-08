@@ -89,6 +89,9 @@ What exists, with where its reasoning lives. History is in git.
   disqualified ones leave every result, listed as DSQ. Not yet scrutineered
   still starts, marked on Live Timing, and Freeze/Activate ask
   (`event-model.md` "Entry status").
+- **Shared transponders:** one transponder on several cars holds its
+  passings for a marshal like a beam passing, the picker offering just those
+  cars (`event-model.md` "Unassigned passings").
 - **Podium** above the Overall and each stage's results, following the class
   filter: steps 2-1-3 with gold/silver/bronze trophies, crew, body, time and
   gap; a click opens the entry. On screen only, or off; the printed
@@ -100,12 +103,6 @@ What exists, with where its reasoning lives. History is in git.
 
 OpenStint (below) resumes when the hardware arrives. Meanwhile:
 
-- **One transponder on several cars.** It has to work, not just be warned
-  about (today `findByTransponder` times the passing for whichever car the
-  database returns first, and the desk and entry dialog only warn). A
-  passing whose transponder is on more than one car is held like an
-  unassigned passing (`PassingBlock`), its picker offering just those cars.
-  The field warning then says that instead.
 - **Several transponders per entry.** A spare car, a replacement for a dead
   transponder, and later an NFC gate where the driver taps in rather than the
   car being read — the tag identifies the driver, so it sits beside the car's
@@ -114,8 +111,8 @@ OpenStint (below) resumes when the hardware arrives. Meanwhile:
   kind at a time, but the software allows several of a kind and only warns
   (entry dialog, check-in desk, pre-start check): refusing would block the
   desk mid-swap. Nothing is unique on the identifier either: the item above
-  allows one transponder on several cars, so `findByTransponder` returns
-  every match (none: unregistered, one: timed, several: held for a marshal).
+  allowed one transponder on several cars (built), so `findByTransponder`
+  already returns every match (none: unregistered, one: timed, several: held for a marshal).
   The kind is a fixed enum in `packages/shared` (RC transponder, NFC, …), a
   dropdown, not free text: it's what matching keys on, so "NFC"/"nfc"/
   "NFC-Karte" must not be three kinds. A detection matches only its own

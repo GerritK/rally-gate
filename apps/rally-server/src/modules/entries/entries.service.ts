@@ -50,8 +50,8 @@ export class EntriesService {
     return this.entries.findOneBy({ id });
   }
 
-  findByTransponder(transponderId: string): Promise<Entry | null> {
-    return this.entries.findOneBy({ transponderId });
+  findByTransponder(transponderId: string): Promise<Entry[]> {
+    return this.entries.findBy({ transponderId });
   }
 
   async create({ classIds, ...data }: EntryInput): Promise<Entry> {

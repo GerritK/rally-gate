@@ -339,6 +339,25 @@ const entryOptions = computed(() =>
   })),
 );
 
+/** A passing held because its transponder is on several cars is one of
+ *  those cars. Undefined (any car) for a beam passing, or once the
+ *  transponder has since moved and matches none. */
+function carriersOf(event: DetectionEventRecord): Set<string> | undefined {
+  const ids = entries.value
+    .filter(
+      (v) => event.transponderId && v.transponderId === event.transponderId,
+    )
+    .map((v) => v.id);
+  return ids.length > 0 ? new Set(ids) : undefined;
+}
+
+function entryOptionsFor(event: DetectionEventRecord) {
+  const carriers = carriersOf(event);
+  return carriers
+    ? entryOptions.value.filter((o) => carriers.has(o.id))
+    : entryOptions.value;
+}
+
 /**
  * A suggestion only pre-selects, it never assigns: a wrong assignment is a
  * wrong time nobody notices in the results. Passings are matched in time
@@ -395,9 +414,11 @@ const suggestedEntryIds = computed(() => {
           : assignment.role === GateRole.STAGE_START_FINISH
             ? combinedCandidates(event)
             : [];
+    const carriers = carriersOf(event);
     const pick = candidates.find(
       (row) =>
         !taken.has(row.starter.entryId) &&
+        (!carriers || carriers.has(row.starter.entryId)) &&
         (assignment.role !== GateRole.STAGE_SPLIT ||
           !splitsByRun.value[row.run?.id ?? '']?.some(
             (s) => s.splitIndex === assignment.splitIndex,
@@ -1313,7 +1334,7 @@ onUnmounted(() => {
             :role="gateRole(event.gateId)"
             :gate-name="gateName(event.gateId)"
             :entry-id="entryFor(event)"
-            :entry-options="entryOptions"
+            :entry-options="entryOptionsFor(event)"
             @pick="(id) => (pickedEntryIds[event.eventId] = id)"
             @assign="onAssign(event)"
             @dismiss="onDismiss(event)"

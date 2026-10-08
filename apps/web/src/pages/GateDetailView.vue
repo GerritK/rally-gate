@@ -43,13 +43,13 @@ const DETECTION_STATE_DISPLAY = {
     label: 'Unassigned',
     color: 'warning',
     icon: 'mdi-account-question',
-    hint: 'No transponder: waiting for a marshal on Live Timing.',
+    hint: 'No transponder, or one on several cars: waiting for a marshal on Live Timing.',
   },
   unknown: {
     label: 'Unknown car',
     color: 'timing-idle',
     icon: 'mdi-help-circle-outline',
-    hint: 'No entry has this transponder, so nothing was timed.',
+    hint: 'Matched to no entry, so nothing was timed.',
   },
   processed: {
     label: 'Processed',
