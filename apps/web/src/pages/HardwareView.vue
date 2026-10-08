@@ -98,7 +98,9 @@ const gateIds = computed(() => new Set(gates.value.map((g) => g.id)));
  * assignments can't be removed, so the gate can't be deleted at all. */
 const lockedGateIds = computed(() => {
   const lockedStageIds = new Set(
-    stages.value.filter((s) => s.status !== 'NOT_STARTED').map((s) => s.id),
+    stages.value
+      .filter((s) => s.status !== StageStatus.NOT_STARTED)
+      .map((s) => s.id),
   );
   return new Set(
     gateAssignments.value

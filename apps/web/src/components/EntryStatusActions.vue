@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { EntryStatus } from '@rally-gate/shared';
+import { EntryStatus } from '@rally-gate/shared';
 import { notifyError } from '@rally-gate/ui';
 import type { Entry, EntryPatch } from '../api/entries';
 import { isForward, statusActions, useEntryStatus } from '../entry-status';
@@ -108,7 +108,7 @@ async function apply(to: EntryStatus) {
           :key="a.to"
           :prepend-icon="a.icon"
           :title="a.label"
-          :base-color="a.to === 'DISQUALIFIED' ? 'error' : undefined"
+          :base-color="a.to === EntryStatus.DISQUALIFIED ? 'error' : undefined"
           @click="apply(a.to)"
         />
       </v-list>

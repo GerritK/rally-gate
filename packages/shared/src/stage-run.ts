@@ -1,5 +1,4 @@
 export enum StageRunStatus {
-  NOT_STARTED = 'NOT_STARTED',
   STARTED = 'STARTED',
   FINISHED = 'FINISHED',
   CANCELLED = 'CANCELLED',

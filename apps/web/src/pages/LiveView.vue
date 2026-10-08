@@ -153,19 +153,23 @@ const ROW_STATE_DISPLAY: Record<
   NEXT: { label: 'Next', color: 'info', icon: 'mdi-arrow-right-bold' },
   ON_STAGE: {
     label: 'On stage',
-    color: runStatusColor('STARTED'),
+    color: runStatusColor(StageRunStatus.STARTED),
     icon: 'mdi-car-sports',
   },
   FINISHED: {
     label: 'Finished',
-    color: runStatusColor('FINISHED'),
+    color: runStatusColor(StageRunStatus.FINISHED),
     icon: 'mdi-flag-checkered',
   },
-  DNF: { label: 'DNF', color: runStatusColor('CANCELLED'), icon: 'mdi-close' },
+  DNF: {
+    label: 'DNF',
+    color: runStatusColor(StageRunStatus.CANCELLED),
+    icon: 'mdi-close',
+  },
   DNS: { label: 'DNS', color: 'warning', icon: 'mdi-minus-circle-outline' },
   RERUN: {
     label: 'Voided — re-run',
-    color: runStatusColor('VOIDED'),
+    color: runStatusColor(StageRunStatus.VOIDED),
     icon: 'mdi-cancel',
   },
   OUT: { label: 'Withdrawn', color: 'timing-idle', icon: 'mdi-account-off' },
@@ -363,14 +367,6 @@ function entryOptionsFor(event: DetectionEventRecord) {
 }
 
 /**
- * A suggestion only pre-selects, it never assigns: a wrong assignment is a
- * wrong time nobody notices in the results. Passings are matched in time
- * order — at a start gate to the cars due to start in start order, at a split
- * or finish to the cars on stage in expected arrival order — each car
- * suggested once. Passings at another stage's gates get no suggestion; this
- * page only knows its stage.
- */
-/**
  * A combined start/finish gate: a car on stage past the minimum stage time
  * is finishing (longest out first); within it, the car that just started;
  * with nobody on stage, the next car to start.
@@ -396,6 +392,14 @@ function combinedCandidates(event: DetectionEventRecord) {
   return justStarted ? [] : dueToStart.value;
 }
 
+/**
+ * A suggestion only pre-selects, it never assigns: a wrong assignment is a
+ * wrong time nobody notices in the results. Passings are matched in time
+ * order — at a start gate to the cars due to start in start order, at a split
+ * or finish to the cars on stage in expected arrival order — each car
+ * suggested once. Passings at another stage's gates get no suggestion; this
+ * page only knows its stage.
+ */
 const suggestedEntryIds = computed(() => {
   const suggestions: Record<string, string> = {};
   const taken = new Set<string>();
@@ -1317,7 +1321,10 @@ onUnmounted(() => {
         <v-card-item>
           <v-card-title class="d-flex align-center ga-2">
             On stage
-            <v-chip size="small" :color="runStatusColor('STARTED')">
+            <v-chip
+              size="small"
+              :color="runStatusColor(StageRunStatus.STARTED)"
+            >
               {{ onStage.length }}
             </v-chip>
           </v-card-title>
@@ -1440,7 +1447,7 @@ onUnmounted(() => {
       <tbody>
         <template v-for="row in rows" :key="row.starter.entryId">
           <tr v-if="row.classHeader" class="rg-class-row">
-            <td colspan="11">{{ row.classHeader }}</td>
+            <td colspan="10">{{ row.classHeader }}</td>
           </tr>
           <tr :class="{ 'rg-next-row': row.state === 'NEXT' }">
             <td class="rg-timing">{{ row.starter.position }}</td>
@@ -1648,7 +1655,7 @@ onUnmounted(() => {
           </tr>
         </template>
         <tr v-if="rows.length === 0">
-          <td colspan="11" class="rg-empty">
+          <td colspan="10" class="rg-empty">
             No entries yet — add them under Entries.
           </td>
         </tr>

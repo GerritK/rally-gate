@@ -2,8 +2,9 @@
 import { TIMING_MARKS, type TimingMark } from '../format';
 
 /** Only the marks the table actually shows: a legend listing absent icons is
- *  noise that gets skipped. Icons in the text colour, not their own: a lookup aid shouldn't pull the eye
- *  away from the times, and the shape alone identifies a mark. */
+ *  noise that gets skipped. Icons in the text colour, not their own: a
+ *  lookup aid shouldn't pull the eye away from the times, and the shape
+ *  alone identifies a mark. */
 defineProps<{ marks: TimingMark[] }>();
 </script>
 

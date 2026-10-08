@@ -10,13 +10,17 @@ import {
 import { fetchGates, type Gate } from '../api/gates';
 import { fetchStage, upsertStage, type Stage } from '../api/stages';
 import FormDialog from '../components/FormDialog.vue';
-import { required, STAGE_STATUS_DISPLAY } from '../format';
+import { gateRoleLabel, required, STAGE_STATUS_DISPLAY } from '../format';
 import {
   formatStageDuration,
   notify,
   parseStageDuration,
 } from '@rally-gate/ui';
-import { DEFAULT_MIN_STAGE_DURATION_MS } from '@rally-gate/shared';
+import {
+  DEFAULT_MIN_STAGE_DURATION_MS,
+  GateRole,
+  StageStatus,
+} from '@rally-gate/shared';
 import { useUnsavedChanges } from '../unsaved-changes';
 
 const props = defineProps<{ stageId: string }>();
@@ -43,12 +47,16 @@ const { markSaved } = useUnsavedChanges(() =>
 const assignmentDialogOpen = ref(false);
 const newAssignment = ref<{
   gateId: string;
-  role: (typeof GATE_ROLES)[number];
+  role: GateRole;
   splitIndex?: number;
-}>({ gateId: '', role: GATE_ROLES[0] });
+}>({ gateId: '', role: GateRole.STAGE_START });
+const ROLE_OPTIONS = GATE_ROLES.map((role) => ({
+  value: role,
+  title: gateRoleLabel({ role }).trim(),
+}));
 
 function openAssignmentDialog() {
-  newAssignment.value = { gateId: '', role: GATE_ROLES[0] };
+  newAssignment.value = { gateId: '', role: GateRole.STAGE_START };
   assignmentDialogOpen.value = true;
 }
 
@@ -73,7 +81,9 @@ function showStage(loaded: Stage) {
   markSaved();
 }
 
-const stageEditable = computed(() => stage.value?.status === 'NOT_STARTED');
+const stageEditable = computed(
+  () => stage.value?.status === StageStatus.NOT_STARTED,
+);
 
 async function refreshAssignments() {
   gateAssignments.value = await fetchGateAssignments();
@@ -109,7 +119,7 @@ async function onCreateAssignment() {
   const { splitIndex, ...rest } = newAssignment.value;
   await createGateAssignment({
     ...rest,
-    ...(rest.role === 'stage_split' ? { splitIndex } : {}),
+    ...(rest.role === GateRole.STAGE_SPLIT ? { splitIndex } : {}),
     stageId: props.stageId,
   });
   await refreshAssignments();
@@ -241,7 +251,6 @@ onMounted(load);
           <tr>
             <th>Gate</th>
             <th>Role</th>
-            <th>Split #</th>
             <th>Active</th>
             <th width="1%"></th>
           </tr>
@@ -249,8 +258,7 @@ onMounted(load);
         <tbody>
           <tr v-for="assignment in assignmentsForStage" :key="assignment.id">
             <td>{{ assignment.gateId }}</td>
-            <td>{{ assignment.role }}</td>
-            <td>{{ assignment.splitIndex ?? '-' }}</td>
+            <td>{{ gateRoleLabel(assignment) }}</td>
             <td>
               <v-chip
                 size="small"
@@ -282,7 +290,7 @@ onMounted(load);
             </td>
           </tr>
           <tr v-if="assignmentsForStage.length === 0">
-            <td colspan="5" class="rg-empty">
+            <td colspan="4" class="rg-empty">
               No gates assigned yet.{{
                 stageEditable ? ' Add one with + Add Assignment.' : ''
               }}
@@ -309,13 +317,9 @@ onMounted(load);
       label="Gate"
       :rules="[required]"
     />
-    <v-select
-      v-model="newAssignment.role"
-      :items="[...GATE_ROLES]"
-      label="Role"
-    />
+    <v-select v-model="newAssignment.role" :items="ROLE_OPTIONS" label="Role" />
     <v-text-field
-      v-if="newAssignment.role === 'stage_split'"
+      v-if="newAssignment.role === GateRole.STAGE_SPLIT"
       v-model.number="newAssignment.splitIndex"
       type="number"
       min="0"

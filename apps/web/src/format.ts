@@ -2,6 +2,7 @@ import {
   GATE_CONFIG_PORT,
   GateRole,
   HEARTBEAT_ONLINE_THRESHOLD_MS,
+  StageRunStatus,
   StageStatus,
   EntryStatus,
 } from '@rally-gate/shared';
@@ -62,25 +63,23 @@ export function formatGap(ms: number): string {
   return ms === 0 ? '-' : `+${formatStageDuration(ms)}`;
 }
 
-export function runStatusColor(status: string): string {
+export function runStatusColor(status: StageRunStatus): string {
   switch (status) {
-    case 'FINISHED':
+    case StageRunStatus.FINISHED:
       return 'success';
-    case 'STARTED':
+    case StageRunStatus.STARTED:
       return 'info';
-    case 'CANCELLED':
+    case StageRunStatus.CANCELLED:
       return 'error';
-    case 'VOIDED':
+    case StageRunStatus.VOIDED:
       // Neutral, not red: a voided run isn't a failure by the crew, it's a
-      // struck-out attempt. Red stays reserved for penalties/DNF/abort per
-      // the theme conventions in packages/ui.
-      return 'timing-idle';
-    default:
+      // struck-out attempt. Red is for penalties, DNF and abort.
       return 'timing-idle';
   }
 }
 
-/** The same shapes as `StagePicker`: closed ✓, running ●, upcoming ○. */
+/** Closed ✓, running ●, not started ○: the shapes differ, so colour is
+ *  never the only signal. */
 export const STAGE_STATUS_DISPLAY: Record<
   StageStatus,
   { label: string; color: string; icon: string }
@@ -98,7 +97,7 @@ export const STAGE_STATUS_DISPLAY: Record<
   [StageStatus.CLOSED]: {
     label: 'Closed',
     color: 'timing-idle',
-    icon: 'mdi-check',
+    icon: 'mdi-check-circle-outline',
   },
 };
 
@@ -218,8 +217,6 @@ export function gateRoleLabel(
       return 'Start/Finish';
     case GateRole.STAGE_SPLIT:
       return `Split ${assignment.splitIndex ?? ''}`;
-    default:
-      return assignment.role;
   }
 }
 

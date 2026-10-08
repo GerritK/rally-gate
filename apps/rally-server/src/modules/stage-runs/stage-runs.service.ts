@@ -432,16 +432,6 @@ export class StageRunsService {
   }
 
   /**
-   * Strikes out an attempt — the red-flag action. The row stays: it is the
-   * record of what was originally timed, which is exactly what a protest
-   * would turn on, so this is deliberately not a delete.
-   *
-   * Once voided the entry has no active and no finished attempt on the
-   * stage, so the *start gate* opens the re-run by itself on the car's next
-   * pass. That is the point of doing it this way rather than hand-entering a
-   * replacement run: both ends of the re-run stay gate-timed.
-   */
-  /**
    * "Finish now": a hand-timed finish stamped with the server clock, the
    * fallback when the finish gate misses a car. Unlike a gate finish it
    * refuses instead of ignoring, so a double click can't move a time.
@@ -475,6 +465,16 @@ export class StageRunsService {
     return finished;
   }
 
+  /**
+   * Strikes out an attempt — the red-flag action. The row stays: it is the
+   * record of what was originally timed, which is exactly what a protest
+   * would turn on, so this is deliberately not a delete.
+   *
+   * Once voided the entry has no active and no finished attempt on the
+   * stage, so the *start gate* opens the re-run by itself on the car's next
+   * pass. That is the point of doing it this way rather than hand-entering a
+   * replacement run: both ends of the re-run stay gate-timed.
+   */
   async voidRun(id: string): Promise<StageRunWithStatus> {
     const run = await this.stageRuns.findOneBy({ id });
     if (!run) {

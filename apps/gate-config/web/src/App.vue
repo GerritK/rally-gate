@@ -79,9 +79,6 @@ watchEffect(() => {
     : 'Gate Config';
 });
 
-// Changing GATE_ID is not a rename on the server — it keys Gate, GateAssignment
-// and every stored detection, so the old rows stay behind and this gate comes
-// back as a new, unassigned one. Warned before saving rather than after.
 // Which card a setting belongs in is decided in config-file.ts, not here, so a
 // new field cannot end up in the wrong one — or in none at all, which is what
 // a hand-maintained list in this component would eventually do.
@@ -97,6 +94,9 @@ function fieldsIn(group: 'general' | 'decoder') {
   );
 }
 
+// Changing GATE_ID is not a rename on the server — it keys Gate, GateAssignment
+// and every stored detection, so the old rows stay behind and this gate comes
+// back as a new, unassigned one. Warned before saving rather than after.
 const gateIdChanged = computed(
   () => !!originalGateId.value && values.value.GATE_ID !== originalGateId.value,
 );

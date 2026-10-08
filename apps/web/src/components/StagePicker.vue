@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { StageStatus } from '@rally-gate/shared';
 import type { Stage } from '../api/stages';
+import { STAGE_STATUS_DISPLAY } from '../format';
 
 // `overall` adds the overall result as the track's finish, selected when no
 // stage is.
@@ -10,25 +10,10 @@ const emit = defineEmits<{
   overall: [];
 }>();
 
-/**
- * Progress first, selection second: a marshal rarely switches stage, but
- * everyone wants to see where the rally stands: done, running, to come.
- * The icon shapes differ, so colour is never the only signal. Stage details
- * (a published start list) belong in the stage's own header, not here.
- */
-function display(stage: Stage): {
-  icon: string;
-  color?: string;
-  label: string;
-} {
-  if (stage.status === StageStatus.ACTIVE) {
-    return { icon: 'mdi-circle', color: 'success', label: 'running' };
-  }
-  if (stage.status === StageStatus.CLOSED) {
-    return { icon: 'mdi-check-circle-outline', label: 'closed' };
-  }
-  return { icon: 'mdi-circle-outline', label: 'upcoming' };
-}
+// Progress first, selection second: a marshal rarely switches stage, but
+// everyone wants to see where the rally stands. Stage details (a published
+// start list) belong in the stage's own header, not here.
+const display = (stage: Stage) => STAGE_STATUS_DISPLAY[stage.status];
 </script>
 
 <template>

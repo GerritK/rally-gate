@@ -27,7 +27,6 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
       if (!client) {
         return;
       }
-      this.events.emit(`mqtt.${packet.topic}`, packet.payload);
       this.events.emit('mqtt.message', {
         topic: packet.topic,
         payload: packet.payload,

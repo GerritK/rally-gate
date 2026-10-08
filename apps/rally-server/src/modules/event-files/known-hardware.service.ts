@@ -21,8 +21,9 @@ export interface KnownGate {
  * The gates this computer has seen across all its events, so a new event's
  * roster is picked from the club's gates on the Hardware page rather than
  * typed in again. Not copied in automatically: the roster should hold only
- * the gates meant for this event, so an offline one there is really missing. Identity only — heartbeat, clock offset and capabilities belong to
- * the event. Keyed by `GATE_ID`: a gate given a new id in gate-config is a new
+ * the gates meant for this event, so an offline one there is really missing.
+ * Identity only — heartbeat, clock offset and capabilities belong to the
+ * event. Keyed by `GATE_ID`: a gate given a new id in gate-config is a new
  * gate here, and the old entry stays until someone forgets it.
  *
  * A JSON file next to the event files rather than a database: it is a handful

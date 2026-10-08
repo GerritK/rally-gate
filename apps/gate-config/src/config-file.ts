@@ -120,19 +120,6 @@ export const FIELDS = {
   },
 } as const;
 
-/**
- * The browser-safe description of each field, which the page turns into input
- * rules.
- *
- * Sent so client-side validation is *derived* from this one definition rather
- * than hand-written a second time in the Vue component, where the two would
- * drift and a marshal would meet a rule the server does not have — or worse,
- * not meet one it does. `config-file.spec.ts` asserts the two paths agree.
- *
- * Client-side rules stay a convenience: `validate` below is the boundary and
- * runs on every save regardless of what the browser did. Exposing a pattern
- * costs nothing; it is a grammar, not a secret.
- */
 /** What the browser receives. Named so the wire contract is explicit rather
  *  than inferred from `as const` specs, whose literal types are an
  *  implementation detail of the server's own checks. */
@@ -148,6 +135,19 @@ export interface FieldDescriptor {
   range?: [number, number];
 }
 
+/**
+ * The browser-safe description of each field, which the page turns into input
+ * rules.
+ *
+ * Sent so client-side validation is *derived* from this one definition rather
+ * than hand-written a second time in the Vue component, where the two would
+ * drift and a marshal would meet a rule the server does not have — or worse,
+ * not meet one it does. `config-file.spec.ts` asserts the two paths agree.
+ *
+ * Client-side rules stay a convenience: `validate` below is the boundary and
+ * runs on every save regardless of what the browser did. Exposing a pattern
+ * costs nothing; it is a grammar, not a secret.
+ */
 export function fieldDescriptors(): Record<FieldName, FieldDescriptor> {
   return Object.fromEntries(
     (Object.entries(FIELDS) as [FieldName, FieldSpec][]).map(([name, spec]) => [

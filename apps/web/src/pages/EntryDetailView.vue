@@ -89,9 +89,15 @@ const stageRows = computed(() =>
         ?.find((e) => e.entryId === props.entryId);
       let state: { label: string; color?: string } | null = null;
       if (run?.status === StageRunStatus.STARTED) {
-        state = { label: 'On stage', color: runStatusColor('STARTED') };
+        state = {
+          label: 'On stage',
+          color: runStatusColor(StageRunStatus.STARTED),
+        };
       } else if (run?.status === StageRunStatus.CANCELLED) {
-        state = { label: 'DNF', color: runStatusColor('CANCELLED') };
+        state = {
+          label: 'DNF',
+          color: runStatusColor(StageRunStatus.CANCELLED),
+        };
       } else if (!run && stage.status === StageStatus.CLOSED) {
         state = { label: 'DNS', color: 'warning' };
       } else if (!run) {
