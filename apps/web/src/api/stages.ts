@@ -45,7 +45,7 @@ export function createStage(input: {
  * `stageNumber` clashes with another stage or the stage isn't NOT_STARTED.
  * `status` is not settable here — see `createStage`.
  */
-export function upsertStage(
+export function updateStage(
   id: string,
   input: {
     name: string;

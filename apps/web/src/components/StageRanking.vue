@@ -24,6 +24,14 @@ const props = defineProps<{
 
 const router = useRouter();
 
+/** Each split gate's time for this car, in column order; none where the
+ *  car has no time there. */
+const splitsOf = (entryId: string) =>
+  props.results.splitsByGate.map((splits, i) => ({
+    gateId: props.results.splitGates[i].gateId,
+    split: splits.get(entryId),
+  }));
+
 const legendMarks = computed<TimingMark[]>(() =>
   props.results.classification.some((placing) =>
     props.results.splitsByGate.some(
@@ -87,33 +95,30 @@ const legendMarks = computed<TimingMark[]>(() =>
           <td><CrewName :crew="placing" /></td>
           <td><CarName :car="placing" /></td>
           <td
-            v-for="(splits, i) in results.splitsByGate"
-            :key="results.splitGates[i].gateId"
+            v-for="{ gateId, split } in splitsOf(placing.entryId)"
+            :key="gateId"
             class="rg-timing rg-time text-no-wrap"
           >
-            <template v-if="splits.get(placing.entryId)">
+            <template v-if="split">
               <span
                 v-tooltip:top="
-                  splits.get(placing.entryId)!.gapMs === 0
+                  split.gapMs === 0
                     ? ''
-                    : `${formatGap(splits.get(placing.entryId)!.gapMs)} to the fastest`
+                    : `${formatGap(split.gapMs)} to the fastest`
                 "
                 :class="{
-                  'text-timing-best font-weight-bold':
-                    splits.get(placing.entryId)!.gapMs === 0,
+                  'text-timing-best font-weight-bold': split.gapMs === 0,
                 }"
               >
-                {{ formatDuration(splits.get(placing.entryId)!.elapsedMs) }}
+                {{ formatDuration(split.elapsedMs) }}
               </span>
               <span class="rg-time-mark"
                 ><v-icon
-                  v-if="splits.get(placing.entryId)!.gapMs === 0"
+                  v-if="split.gapMs === 0"
                   size="x-small"
                   :icon="TIMING_MARKS.best.icon"
                   :color="TIMING_MARKS.best.color" /></span
-              ><span class="text-medium-emphasis"
-                >({{ splits.get(placing.entryId)!.position }})</span
-              >
+              ><span class="text-medium-emphasis">({{ split.position }})</span>
             </template>
             <template v-else>-</template>
           </td>

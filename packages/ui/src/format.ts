@@ -14,8 +14,10 @@
  *   rather than reusing formatStageDuration for it.
  */
 
-/** Clock time (start/finish/heartbeat instants): HH:MM:SS, 24h. */
-export function formatClockTime(iso: string): string {
+/** Clock time (start/finish/heartbeat instants): HH:MM:SS, 24h. Also the
+ *  value of an `<input type="time" step="1">`; empty for no time. */
+export function formatClockTime(iso?: string): string {
+  if (!iso) return '';
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;

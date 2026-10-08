@@ -3,9 +3,11 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { fetchEntries, type Entry } from '../api/entries';
 import { fetchEntryClasses, type EntryClass } from '../api/entry-classes';
+import { classesOf } from '../class-query';
 import ClassChip from '../components/ClassChip.vue';
 import CrewName from '../components/CrewName.vue';
 import StartNumber from '../components/StartNumber.vue';
+import StatusChip from '../components/StatusChip.vue';
 import EntryDialog from '../components/EntryDialog.vue';
 import EntryStatusActions from '../components/EntryStatusActions.vue';
 import { ENTRY_STATUS_DISPLAY } from '../format';
@@ -16,21 +18,15 @@ const entries = ref<Entry[]>([]);
 const classes = ref<EntryClass[]>([]);
 const dialogOpen = ref(false);
 
-/** In the order of the class list (main first, then by name), which the
- * server sorts; an entry's own classes come back in no particular order. */
-function classesOf(entry: Entry): EntryClass[] {
-  return classes.value.filter((c) =>
-    entry.classes.some((own) => own.id === c.id),
-  );
-}
-
 function replace(saved: Entry) {
   entries.value = entries.value.map((v) => (v.id === saved.id ? saved : v));
 }
 
 async function refresh() {
-  entries.value = await fetchEntries();
-  classes.value = await fetchEntryClasses();
+  [entries.value, classes.value] = await Promise.all([
+    fetchEntries(),
+    fetchEntryClasses(),
+  ]);
 }
 
 onMounted(refresh);
@@ -88,7 +84,7 @@ onMounted(refresh);
             </td>
             <td v-if="classes.length > 0">
               <ClassChip
-                v-for="c in classesOf(entry)"
+                v-for="c in classesOf(classes, entry)"
                 :key="c.id"
                 :name="c.name"
                 :main="c.main"
@@ -96,13 +92,7 @@ onMounted(refresh);
               />
             </td>
             <td>
-              <v-chip
-                size="small"
-                :color="ENTRY_STATUS_DISPLAY[entry.status].color"
-                :prepend-icon="ENTRY_STATUS_DISPLAY[entry.status].icon"
-              >
-                {{ ENTRY_STATUS_DISPLAY[entry.status].label }}
-              </v-chip>
+              <StatusChip :display="ENTRY_STATUS_DISPLAY[entry.status]" />
             </td>
             <td class="text-no-wrap text-right">
               <EntryStatusActions :entry="entry" @saved="replace" />

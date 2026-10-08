@@ -34,8 +34,10 @@ const countOf = (entryClass: EntryClass) =>
   entryCounts.value.get(entryClass.id) ?? 0;
 
 async function refresh() {
-  classes.value = await fetchEntryClasses();
-  entries.value = await fetchEntries();
+  [classes.value, entries.value] = await Promise.all([
+    fetchEntryClasses(),
+    fetchEntries(),
+  ]);
 }
 
 function openDialog(entryClass: EntryClass | null) {

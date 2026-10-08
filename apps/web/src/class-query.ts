@@ -22,6 +22,12 @@ export function useClassQuery() {
   });
 }
 
+/** An entry's classes in the order of the class list (main first, then by
+ *  name), which the server sorts; an entry's own come back in no order. */
+export function classesOf(classes: EntryClass[], entry: Entry): EntryClass[] {
+  return classes.filter((c) => entry.classes.some((own) => own.id === c.id));
+}
+
 /** Shown even unfiltered, so a ranking always says which one it is. */
 export function classFilterLabel(
   classes: EntryClass[],

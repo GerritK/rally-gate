@@ -7,10 +7,10 @@ import {
   type Entry,
 } from '../api/entries';
 import type { EntryClass } from '../api/entry-classes';
-import { FLAG_OPTIONS, flagUrl } from '../crew';
 import { required, ENTRY_STATUS_DISPLAY } from '../format';
 import { toTransponderDrafts, toTransponderInput } from '../entry-status';
 import ClassPicker from './ClassPicker.vue';
+import FlagPicker from './FlagPicker.vue';
 import FormDialog from './FormDialog.vue';
 import TransponderFields from './TransponderFields.vue';
 
@@ -55,14 +55,6 @@ const suggestions = (pick: (v: Entry) => string | null) =>
   [...new Set(props.entries.map(pick).filter((v): v is string => !!v))].sort();
 const bodies = computed(() => suggestions((v) => v.body));
 const chassis = computed(() => suggestions((v) => v.chassis));
-
-/** Tabbing into a picked flag and typing should search, not append to the
- *  flag's name. Vuetify writes the name into the input after focus, so the
- *  select waits a frame. */
-function selectText(e: FocusEvent) {
-  const input = e.target as HTMLInputElement;
-  requestAnimationFrame(() => input.select());
-}
 
 // null, not undefined: only null clears the column (CLAUDE.md).
 const orNull = (value: string | null) => value?.trim() || null;
@@ -119,31 +111,7 @@ async function onSave() {
           />
           <v-text-field v-model="draft.driverLastName" label="Last name" />
         </div>
-        <v-autocomplete
-          v-model="draft.driverFlag"
-          :items="FLAG_OPTIONS"
-          label="Flag"
-          placeholder="None (chequered flag)"
-          persistent-placeholder
-          clearable
-          auto-select-first
-          @focus="selectText"
-        >
-          <template #prepend-inner>
-            <img :src="flagUrl(draft.driverFlag)" alt="" class="rg-flag-pick" />
-          </template>
-          <template #item="{ props: itemProps, item }">
-            <v-list-item v-bind="itemProps">
-              <template #prepend>
-                <img
-                  :src="flagUrl(item.value)"
-                  alt=""
-                  class="rg-flag-pick me-3"
-                />
-              </template>
-            </v-list-item>
-          </template>
-        </v-autocomplete>
+        <FlagPicker v-model="draft.driverFlag" />
       </section>
       <section>
         <div class="rg-section-title">Co-driver (optional)</div>
@@ -151,35 +119,7 @@ async function onSave() {
           <v-text-field v-model="draft.coDriverFirstName" label="First name" />
           <v-text-field v-model="draft.coDriverLastName" label="Last name" />
         </div>
-        <v-autocomplete
-          v-model="draft.coDriverFlag"
-          :items="FLAG_OPTIONS"
-          label="Flag"
-          placeholder="None (chequered flag)"
-          persistent-placeholder
-          clearable
-          auto-select-first
-          @focus="selectText"
-        >
-          <template #prepend-inner>
-            <img
-              :src="flagUrl(draft.coDriverFlag)"
-              alt=""
-              class="rg-flag-pick"
-            />
-          </template>
-          <template #item="{ props: itemProps, item }">
-            <v-list-item v-bind="itemProps">
-              <template #prepend>
-                <img
-                  :src="flagUrl(item.value)"
-                  alt=""
-                  class="rg-flag-pick me-3"
-                />
-              </template>
-            </v-list-item>
-          </template>
-        </v-autocomplete>
+        <FlagPicker v-model="draft.coDriverFlag" />
       </section>
     </div>
     <div class="rg-columns">
@@ -256,9 +196,5 @@ async function onSave() {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   column-gap: 12px;
-}
-.rg-flag-pick {
-  height: 16px;
-  aspect-ratio: 4 / 3;
 }
 </style>

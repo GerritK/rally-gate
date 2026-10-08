@@ -3,18 +3,17 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { isOutOfEvent, EntryStatus } from '@rally-gate/shared';
 import { fetchEntries, type Entry } from '../api/entries';
 import { fetchEntryClasses, type EntryClass } from '../api/entry-classes';
+import { classesOf } from '../class-query';
 import ClassChip from '../components/ClassChip.vue';
 import CrewName from '../components/CrewName.vue';
 import StartNumber from '../components/StartNumber.vue';
+import StatusChip from '../components/StatusChip.vue';
 import EntryDialog from '../components/EntryDialog.vue';
 import EntryStatusActions from '../components/EntryStatusActions.vue';
 import { ENTRY_STATUS_DISPLAY } from '../format';
 import TransponderFields from '../components/TransponderFields.vue';
-import {
-  transponderLabels,
-  toTransponderDrafts,
-  toTransponderInput,
-} from '../entry-status';
+import TransponderList from '../components/TransponderList.vue';
+import { toTransponderDrafts, toTransponderInput } from '../entry-status';
 
 /**
  * Two stations, one job each: the desk checks crews in, the scrutineers pass
@@ -140,9 +139,7 @@ const selected = computed(
   () => entries.value.find((v) => v.id === selectedId.value) ?? null,
 );
 const selectedClasses = computed(() =>
-  classes.value.filter((c) =>
-    selected.value?.classes.some((o) => o.id === c.id),
-  ),
+  selected.value ? classesOf(classes.value, selected.value) : [],
 );
 
 /** The desk's most common correction, taken with Check in rather than
@@ -267,13 +264,7 @@ onMounted(refresh);
           </template>
           <CrewName :crew="v" />
           <template v-if="query || v.status !== here.open" #append>
-            <v-chip
-              size="small"
-              :color="ENTRY_STATUS_DISPLAY[v.status].color"
-              :prepend-icon="ENTRY_STATUS_DISPLAY[v.status].icon"
-            >
-              {{ ENTRY_STATUS_DISPLAY[v.status].label }}
-            </v-chip>
+            <StatusChip :display="ENTRY_STATUS_DISPLAY[v.status]" />
           </template>
         </v-list-item>
       </v-list>
@@ -297,13 +288,7 @@ onMounted(refresh);
         <dl class="rg-facts">
           <dt>Status</dt>
           <dd>
-            <v-chip
-              size="small"
-              :color="ENTRY_STATUS_DISPLAY[selected.status].color"
-              :prepend-icon="ENTRY_STATUS_DISPLAY[selected.status].icon"
-            >
-              {{ ENTRY_STATUS_DISPLAY[selected.status].label }}
-            </v-chip>
+            <StatusChip :display="ENTRY_STATUS_DISPLAY[selected.status]" />
           </dd>
           <dt>Car</dt>
           <dd>
@@ -324,18 +309,7 @@ onMounted(refresh);
           <dd v-else class="text-medium-emphasis">-</dd>
           <template v-if="!transponderAtDesk">
             <dt>Transponder</dt>
-            <dd
-              :class="
-                selected.transponders.length > 0
-                  ? 'rg-timing'
-                  : 'text-medium-emphasis'
-              "
-            >
-              <div v-for="label in transponderLabels(selected)" :key="label">
-                {{ label }}
-              </div>
-              <template v-if="selected.transponders.length === 0">-</template>
-            </dd>
+            <TransponderList :entry="selected" />
           </template>
         </dl>
         <TransponderFields

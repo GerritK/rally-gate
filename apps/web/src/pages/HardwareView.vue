@@ -19,8 +19,8 @@ import {
   type Gate,
   type GatePowerOffResult,
 } from '../api/gates';
-import { closeLiveStream, openLiveStream } from '../api/live';
-import { serverVersion } from '../api/version';
+import { closeLiveStream, openLiveStream, upsert } from '../api/live';
+import { serverNow } from '../api/time';
 import {
   CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS,
   fetchClockCorrectionThresholdMs,
@@ -38,13 +38,13 @@ import {
 } from '@rally-gate/ui';
 import FormDialog from '../components/FormDialog.vue';
 import GateClockChips from '../components/GateClockChips.vue';
+import GateOnlineChip from '../components/GateOnlineChip.vue';
+import GateVersion from '../components/GateVersion.vue';
 import { useRouter } from 'vue-router';
 import { gateConfigUrl, isOnline, required } from '../format';
 
 const AUTO_DISCOVER_KEY = 'autoDiscoverGates';
 
-const now = ref(Date.now());
-let nowTimer: ReturnType<typeof setInterval>;
 let gatesSource: EventSource;
 
 const gates = ref<Gate[]>([]);
@@ -110,9 +110,11 @@ const lockedGateIds = computed(() => {
 });
 
 async function refreshGates() {
-  gates.value = await fetchGates();
-  gateAssignments.value = await fetchGateAssignments();
-  stages.value = await fetchStages();
+  [gates.value, gateAssignments.value, stages.value] = await Promise.all([
+    fetchGates(),
+    fetchGateAssignments(),
+    fetchStages(),
+  ]);
 }
 
 function openGateDialog() {
@@ -165,32 +167,27 @@ async function onToggleAutoDiscover(value: boolean | null) {
 }
 
 onMounted(async () => {
-  await refreshGates();
-  if ((await fetchEventInfo()).switchable) {
+  const [, eventInfo, autoDiscoverSetting, thresholdMs] = await Promise.all([
+    refreshGates(),
+    fetchEventInfo(),
+    fetchSetting(AUTO_DISCOVER_KEY),
+    fetchClockCorrectionThresholdMs(),
+  ]);
+  if (eventInfo.switchable) {
     knownGates.value = await fetchKnownGates();
   }
-  autoDiscover.value = (await fetchSetting(AUTO_DISCOVER_KEY)) !== 'false';
-  clockCorrectionThresholdMs.value = await fetchClockCorrectionThresholdMs();
+  autoDiscover.value = autoDiscoverSetting !== 'false';
+  clockCorrectionThresholdMs.value = thresholdMs;
   gatesSource = openLiveStream(
-    {
-      gate: (gate) => {
-        const idx = gates.value.findIndex((g) => g.id === gate.id);
-        if (idx === -1) gates.value.push(gate);
-        else gates.value[idx] = gate;
-      },
-    },
+    { gate: (gate) => upsert(gates.value, gate, 'id') },
     async () => {
       gates.value = await fetchGates();
     },
   );
-  nowTimer = setInterval(() => {
-    now.value = Date.now();
-  }, 1000);
 });
 
 onUnmounted(() => {
   if (gatesSource) closeLiveStream(gatesSource);
-  clearInterval(nowTimer);
 });
 </script>
 
@@ -235,17 +232,7 @@ onUnmounted(() => {
           >
             <td class="text-no-wrap">{{ gate.id }}</td>
             <td>{{ gate.name }}</td>
-            <td>
-              <v-chip
-                size="small"
-                :color="isOnline(gate, now) ? 'success' : 'error'"
-                :prepend-icon="
-                  isOnline(gate, now) ? 'mdi-lan-connect' : 'mdi-lan-disconnect'
-                "
-              >
-                {{ isOnline(gate, now) ? 'online' : 'offline' }}
-              </v-chip>
-            </td>
+            <td><GateOnlineChip :gate="gate" /></td>
             <td
               v-tooltip:top="
                 gate.lastHeartbeatAt
@@ -255,7 +242,7 @@ onUnmounted(() => {
             >
               {{
                 gate.lastHeartbeatAt
-                  ? formatRelativeTime(gate.lastHeartbeatAt, now)
+                  ? formatRelativeTime(gate.lastHeartbeatAt, serverNow)
                   : 'never'
               }}
             </td>
@@ -266,24 +253,7 @@ onUnmounted(() => {
               />
             </td>
             <td>{{ gate.capabilities ?? '-' }}</td>
-            <td>
-              <!-- A gate on another build than the server is the one to
-                   re-install before the event, not a curiosity. -->
-              <v-chip
-                v-if="
-                  gate.version &&
-                  serverVersion &&
-                  gate.version !== serverVersion
-                "
-                size="small"
-                color="warning"
-                prepend-icon="mdi-alert"
-                v-tooltip:top="`Server runs ${serverVersion}`"
-              >
-                {{ gate.version }}
-              </v-chip>
-              <span v-else>{{ gate.version ?? '-' }}</span>
-            </td>
+            <td><GateVersion :gate="gate" /></td>
             <td class="text-no-wrap">
               <v-menu>
                 <template #activator="{ props: menu }">
@@ -301,17 +271,17 @@ onUnmounted(() => {
                     prepend-icon="mdi-open-in-new"
                     title="Open gate config"
                     :subtitle="
-                      gate.address && isOnline(gate, now)
+                      gate.address && isOnline(gate, serverNow)
                         ? gate.address
                         : 'Gate offline'
                     "
                     :href="
-                      gate.address && isOnline(gate, now)
+                      gate.address && isOnline(gate, serverNow)
                         ? gateConfigUrl(gate.address)
                         : undefined
                     "
                     target="_blank"
-                    :disabled="!gate.address || !isOnline(gate, now)"
+                    :disabled="!gate.address || !isOnline(gate, serverNow)"
                   />
                   <v-list-item
                     prepend-icon="mdi-delete-outline"

@@ -8,8 +8,9 @@ import {
   type GateAssignment,
 } from '../api/gate-assignments';
 import { fetchGates, type Gate } from '../api/gates';
-import { fetchStage, upsertStage, type Stage } from '../api/stages';
+import { fetchStage, updateStage, type Stage } from '../api/stages';
 import FormDialog from '../components/FormDialog.vue';
+import StatusChip from '../components/StatusChip.vue';
 import { gateRoleLabel, required, STAGE_STATUS_DISPLAY } from '../format';
 import {
   formatStageDuration,
@@ -90,9 +91,12 @@ async function refreshAssignments() {
 }
 
 async function load() {
-  showStage(await fetchStage(props.stageId));
-  gates.value = await fetchGates();
-  await refreshAssignments();
+  const [loaded] = await Promise.all([
+    fetchStage(props.stageId),
+    fetchGates().then((g) => (gates.value = g)),
+    refreshAssignments(),
+  ]);
+  showStage(loaded);
 }
 
 async function onSaveStage() {
@@ -102,7 +106,7 @@ async function onSaveStage() {
   savingStage.value = true;
   try {
     showStage(
-      await upsertStage(stage.value.id, {
+      await updateStage(stage.value.id, {
         name: stage.value.name,
         stageNumber: stage.value.stageNumber,
         expectedDurationMs: parseStageDuration(expectedText.value ?? ''),
@@ -200,12 +204,7 @@ onMounted(load);
           :disabled="!stageEditable"
           style="max-width: 200px"
         />
-        <v-chip
-          :color="STAGE_STATUS_DISPLAY[stage.status].color"
-          :prepend-icon="STAGE_STATUS_DISPLAY[stage.status].icon"
-        >
-          {{ STAGE_STATUS_DISPLAY[stage.status].label }}
-        </v-chip>
+        <StatusChip :display="STAGE_STATUS_DISPLAY[stage.status]" />
         <v-btn
           type="submit"
           color="primary"

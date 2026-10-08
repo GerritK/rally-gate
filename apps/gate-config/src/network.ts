@@ -8,6 +8,8 @@
  * panel shows verbatim (see docs/gate-config-ui.md, "What the page shows").
  */
 
+import type { DeviceStatus, WifiNetwork } from './api-types';
+
 /**
  * `nmcli -t` separates fields with `:` and backslash-escapes any `:` that
  * occurs inside a value — an SSID may legitimately contain one, so a plain
@@ -32,13 +34,6 @@ export function splitTerse(line: string): string[] {
   return fields;
 }
 
-export interface DeviceStatus {
-  device: string;
-  type: string;
-  state: string;
-  connection: string;
-}
-
 /** Parses `nmcli -t -f DEVICE,TYPE,STATE,CONNECTION device status`. */
 export function parseDeviceStatus(output: string): DeviceStatus[] {
   return output
@@ -49,16 +44,6 @@ export function parseDeviceStatus(output: string): DeviceStatus[] {
         splitTerse(line);
       return { device, type, state, connection };
     });
-}
-
-export interface WifiNetwork {
-  ssid: string;
-  signal: number;
-  secured: boolean;
-  /** The network the radio is associated with. Shown instead of the connection
-   *  name, which is a profile name (`netplan-wlan0-<ssid>` on an Imager-flashed
-   *  Pi), not the network's. */
-  inUse: boolean;
 }
 
 /**

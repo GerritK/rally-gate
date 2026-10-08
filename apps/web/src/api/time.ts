@@ -4,8 +4,18 @@ import { apiFetch } from './client';
 /** Server clock minus this device's, measured once at app start. */
 export const serverOffsetMs = ref(0);
 
+/**
+ * Server time in ms, ticking once a second — the clock gates sync to and
+ * heartbeats are stamped with, so "online" and running times read off it,
+ * not off a tablet's own clock. One timer for the whole app.
+ */
+export const serverNow = ref(Date.now());
+const tick = () => (serverNow.value = Date.now() + serverOffsetMs.value);
+setInterval(tick, 1000);
+
 export async function syncServerClock(): Promise<void> {
   serverOffsetMs.value = await measureServerOffsetMs();
+  tick();
 }
 
 /**

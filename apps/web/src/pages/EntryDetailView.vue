@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { StageRunStatus, StageStatus, EntryStatus } from '@rally-gate/shared';
-import { formatClockTime } from '@rally-gate/ui';
 import {
   fetchOverallClassification,
   fetchStageClassification,
@@ -12,15 +11,17 @@ import { fetchStageRuns, type StageRun } from '../api/stage-runs';
 import { fetchStages, type Stage } from '../api/stages';
 import { fetchEntries, type Entry } from '../api/entries';
 import { fetchEntryClasses, type EntryClass } from '../api/entry-classes';
+import { classesOf } from '../class-query';
 import ClassChip from '../components/ClassChip.vue';
+import ClockTime from '../components/ClockTime.vue';
 import CrewName from '../components/CrewName.vue';
-import ManualMark from '../components/ManualMark.vue';
 import TableLegend from '../components/TableLegend.vue';
 import StartNumber from '../components/StartNumber.vue';
+import StatusChip from '../components/StatusChip.vue';
+import TransponderList from '../components/TransponderList.vue';
 import EntryDialog from '../components/EntryDialog.vue';
 import EntryStatusActions from '../components/EntryStatusActions.vue';
 import { flagName, flagUrl } from '../crew';
-import { transponderLabels } from '../entry-status';
 import {
   formatDuration,
   formatGap,
@@ -46,7 +47,7 @@ const entry = computed(
   () => entries.value.find((v) => v.id === props.entryId) ?? null,
 );
 const ownClasses = computed(() =>
-  classes.value.filter((c) => entry.value?.classes.some((o) => o.id === c.id)),
+  entry.value ? classesOf(classes.value, entry.value) : [],
 );
 
 /** Written out in full here, whatever the event's name format: the header
@@ -224,13 +225,7 @@ onMounted(refresh);
           <dl class="rg-facts">
             <dt>Status</dt>
             <dd class="d-flex flex-wrap align-center ga-1">
-              <v-chip
-                size="small"
-                :color="ENTRY_STATUS_DISPLAY[entry.status].color"
-                :prepend-icon="ENTRY_STATUS_DISPLAY[entry.status].icon"
-              >
-                {{ ENTRY_STATUS_DISPLAY[entry.status].label }}
-              </v-chip>
+              <StatusChip :display="ENTRY_STATUS_DISPLAY[entry.status]" />
               <EntryStatusActions :entry="entry" @saved="refresh" />
             </dd>
             <dt>Classes</dt>
@@ -244,18 +239,7 @@ onMounted(refresh);
             </dd>
             <dd v-else class="text-medium-emphasis">-</dd>
             <dt>Transponder</dt>
-            <dd
-              :class="
-                entry.transponders.length > 0
-                  ? 'rg-timing'
-                  : 'text-medium-emphasis'
-              "
-            >
-              <div v-for="label in transponderLabels(entry)" :key="label">
-                {{ label }}
-              </div>
-              <template v-if="entry.transponders.length === 0">-</template>
-            </dd>
+            <TransponderList :entry="entry" />
           </dl>
         </v-card-text>
       </v-card>
@@ -329,20 +313,15 @@ onMounted(refresh);
               </v-chip>
             </td>
             <template v-else>
-              <td class="rg-time rg-timing text-no-wrap">
-                {{ formatClockTime(run.startTime)
-                }}<span class="rg-time-mark"
-                  ><ManualMark v-if="run.startManual"
-                /></span>
+              <td class="rg-time">
+                <ClockTime :time="run.startTime" :manual="run.startManual" />
               </td>
               <td class="rg-time text-no-wrap">
-                <template v-if="run.finishTime"
-                  ><span class="rg-timing">{{
-                    formatClockTime(run.finishTime)
-                  }}</span
-                  ><span class="rg-time-mark"
-                    ><ManualMark v-if="run.finishManual" /></span
-                ></template>
+                <ClockTime
+                  v-if="run.finishTime"
+                  :time="run.finishTime"
+                  :manual="run.finishManual"
+                />
                 <template v-else-if="state"
                   ><v-chip size="small" :color="state.color" variant="tonal">
                     {{ state.label }} </v-chip

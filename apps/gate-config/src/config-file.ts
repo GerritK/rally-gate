@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto';
 import { readFileSync, renameSync, unlinkSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
+import type { FieldDescriptor } from './api-types';
 
 export const CONFIG_PATH =
   process.env.GATE_CONFIG_FILE ?? '/etc/rally-gate/gate.env';
@@ -120,21 +121,6 @@ export const FIELDS = {
   },
 } as const;
 
-/** What the browser receives. Named so the wire contract is explicit rather
- *  than inferred from `as const` specs, whose literal types are an
- *  implementation detail of the server's own checks. */
-export interface FieldDescriptor {
-  label: string;
-  hint: string;
-  message: string;
-  group: FieldGroup;
-  /** Shown only while ADAPTER has this value. */
-  adapter?: string;
-  oneOf?: string[];
-  pattern?: string;
-  range?: [number, number];
-}
-
 /**
  * The browser-safe description of each field, which the page turns into input
  * rules.
@@ -168,9 +154,6 @@ export function fieldDescriptors(): Record<FieldName, FieldDescriptor> {
     ]),
   ) as Record<FieldName, FieldDescriptor>;
 }
-
-/** Which card on the page a field appears in. */
-export type FieldGroup = 'general' | 'decoder';
 
 export type FieldName = keyof typeof FIELDS;
 export type FieldSpec = (typeof FIELDS)[FieldName];

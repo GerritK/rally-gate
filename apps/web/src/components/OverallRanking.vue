@@ -14,6 +14,7 @@ import CarName from './CarName.vue';
 import CrewName from './CrewName.vue';
 import ResultsPodium from './ResultsPodium.vue';
 import StartNumber from './StartNumber.vue';
+import StatusChip from './StatusChip.vue';
 import {
   formatDuration,
   formatGap,
@@ -206,13 +207,7 @@ const runningStages = computed(() =>
             <td><CrewName :crew="entry" /></td>
             <td><CarName :car="entry" /></td>
             <td>
-              <v-chip
-                size="small"
-                :color="ENTRY_STATUS_DISPLAY[entry.status].color"
-                :prepend-icon="ENTRY_STATUS_DISPLAY[entry.status].icon"
-              >
-                {{ ENTRY_STATUS_DISPLAY[entry.status].label }}
-              </v-chip>
+              <StatusChip :display="ENTRY_STATUS_DISPLAY[entry.status]" />
             </td>
           </tr>
         </tbody>

@@ -7,17 +7,18 @@ import {
   type StageResults,
 } from './api/classification';
 import { rallyName } from './api/rally-info';
-import { serverOffsetMs } from './api/time';
+import { serverNow } from './api/time';
 import type { Entry } from './api/entries';
 import { coDriverName, driverName } from './crew';
 import {
   formatDuration,
   formatGap,
+  formatStamp,
   TIMING_MARKS,
   ENTRY_STATUS_DISPLAY,
 } from './format';
 import type { Crew, Starter } from '@rally-gate/shared';
-import { logoUrl } from '@rally-gate/ui';
+import { logoUrl, notifyError } from '@rally-gate/ui';
 import barlowBoldUrl from './assets/fonts/Barlow-Bold.ttf?url';
 import barlowRegularUrl from './assets/fonts/Barlow-Regular.ttf?url';
 import monoBoldUrl from './assets/fonts/JetBrainsMono-Bold.ttf?url';
@@ -399,14 +400,31 @@ function fitLine(doc: jsPDF, text: string, max: number): string {
 }
 
 /**
+ * Builds the sections and opens them as one PDF in a new tab. Call it
+ * straight from the click: the tab is opened before anything is awaited,
+ * since one opened later is a popup and gets blocked. Without a tab it
+ * downloads; a failure closes the tab and shows the error.
+ */
+export async function printPdf(
+  build: () => Promise<{ sections: PdfSection[]; fileName: string }>,
+): Promise<void> {
+  const tab = window.open('', '_blank');
+  try {
+    const { sections, fileName } = await build();
+    await openPdf(sections, fileName, tab);
+  } catch (err) {
+    tab?.close();
+    notifyError(err);
+  }
+}
+
+/**
  * Every section starts a new sheet and is numbered on its own ("2 / 4" top
  * right), so a stack of them can be sorted and checked for a missing one.
  * Sheets go across the columns first, then down the rows, so they hang as
- * a grid. Portrait unless a table needs the width. Opens in `tab` (opened
- * by the click, before anything was awaited, or a popup blocker eats it);
- * without one it downloads.
+ * a grid. Portrait unless a table needs the width.
  */
-export async function openPdf(
+async function openPdf(
   sections: PdfSection[],
   fileName: string,
   tab: Window | null,
@@ -443,16 +461,7 @@ export async function openPdf(
   const height = doc.internal.pageSize.getHeight();
   const usable = width - MARGIN.left - MARGIN.right;
   const page = () => doc.getCurrentPageInfo().pageNumber;
-  const printedAt = new Date(Date.now() + serverOffsetMs.value).toLocaleString(
-    [],
-    {
-      weekday: 'short',
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    },
-  );
+  const printedAt = formatStamp(serverNow.value);
   const styles = {
     theme: 'plain',
     margin: MARGIN,

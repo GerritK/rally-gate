@@ -41,9 +41,11 @@ async function onSave() {
   if (saving.value) return;
   saving.value = true;
   try {
-    await saveSetting(START_ORDER_GROUPING_KEY, grouping.value);
-    await saveSetting(START_ORDER_KEY_KEY, key.value);
-    await saveSetting(START_ORDER_DIRECTION_KEY, direction.value);
+    await Promise.all([
+      saveSetting(START_ORDER_GROUPING_KEY, grouping.value),
+      saveSetting(START_ORDER_KEY_KEY, key.value),
+      saveSetting(START_ORDER_DIRECTION_KEY, direction.value),
+    ]);
     markSaved();
     notify('Start order saved');
   } finally {
@@ -52,12 +54,14 @@ async function onSave() {
 }
 
 onMounted(async () => {
-  grouping.value = ((await fetchSetting(START_ORDER_GROUPING_KEY)) ??
-    grouping.value) as StartOrderGrouping;
-  key.value = ((await fetchSetting(START_ORDER_KEY_KEY)) ??
-    key.value) as StartOrderKey;
-  direction.value = ((await fetchSetting(START_ORDER_DIRECTION_KEY)) ??
-    direction.value) as StartOrderDirection;
+  const [g, k, d] = await Promise.all([
+    fetchSetting(START_ORDER_GROUPING_KEY),
+    fetchSetting(START_ORDER_KEY_KEY),
+    fetchSetting(START_ORDER_DIRECTION_KEY),
+  ]);
+  grouping.value = (g ?? grouping.value) as StartOrderGrouping;
+  key.value = (k ?? key.value) as StartOrderKey;
+  direction.value = (d ?? direction.value) as StartOrderDirection;
   markSaved();
 });
 </script>

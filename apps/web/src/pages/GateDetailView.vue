@@ -7,16 +7,19 @@ import {
   type GateAssignment,
 } from '../api/gate-assignments';
 import { fetchGate, upsertGate, type Gate } from '../api/gates';
-import { closeLiveStream, openLiveStream } from '../api/live';
+import { closeLiveStream, openLiveStream, upsert } from '../api/live';
 import {
   CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS,
   fetchClockCorrectionThresholdMs,
 } from '../api/settings';
 import { fetchStages, type Stage } from '../api/stages';
 import { fetchEntries, type Entry } from '../api/entries';
-import { serverVersion } from '../api/version';
+import { serverNow } from '../api/time';
 import FormDialog from '../components/FormDialog.vue';
 import GateClockChips from '../components/GateClockChips.vue';
+import GateOnlineChip from '../components/GateOnlineChip.vue';
+import GateVersion from '../components/GateVersion.vue';
+import StatusChip from '../components/StatusChip.vue';
 import {
   formatClockOffset,
   gateConfigUrl,
@@ -74,11 +77,11 @@ const entries = ref<Entry[]>([]);
 const detections = ref<DetectionEventRecord[]>([]);
 const clockCorrectionThresholdMs = ref(CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS);
 
-const now = ref(Date.now());
-const nowTimer = setInterval(() => (now.value = Date.now()), 1000);
 let liveSource: EventSource | undefined;
 
-const online = computed(() => !!gate.value && isOnline(gate.value, now.value));
+const online = computed(
+  () => !!gate.value && isOnline(gate.value, serverNow.value),
+);
 
 /** Status comes from the stage: an assignment is active exactly while its
  *  stage runs, so the stage also tells planned from done. */
@@ -111,10 +114,8 @@ const DETECTION_LIMIT = 100;
 
 function upsertDetection(event: DetectionEventRecord) {
   if (event.gateId !== props.gateId) return;
-  const idx = detections.value.findIndex((d) => d.eventId === event.eventId);
-  if (idx === -1) {
-    detections.value = [event, ...detections.value].slice(0, DETECTION_LIMIT);
-  } else detections.value[idx] = event;
+  upsert(detections.value, event, 'eventId', { first: true });
+  detections.value.splice(DETECTION_LIMIT);
 }
 
 async function refreshDetections() {
@@ -162,7 +163,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (liveSource) closeLiveStream(liveSource);
-  clearInterval(nowTimer);
 });
 </script>
 
@@ -201,15 +201,7 @@ onUnmounted(() => {
           <dl class="rg-facts">
             <dt>Status</dt>
             <dd>
-              <v-chip
-                size="small"
-                :color="online ? 'success' : 'error'"
-                :prepend-icon="
-                  online ? 'mdi-lan-connect' : 'mdi-lan-disconnect'
-                "
-              >
-                {{ online ? 'online' : 'offline' }}
-              </v-chip>
+              <GateOnlineChip :gate="gate" />
               <span
                 v-tooltip:top="
                   gate.lastHeartbeatAt
@@ -220,7 +212,7 @@ onUnmounted(() => {
               >
                 {{
                   gate.lastHeartbeatAt
-                    ? `heartbeat ${formatRelativeTime(gate.lastHeartbeatAt, now)}`
+                    ? `heartbeat ${formatRelativeTime(gate.lastHeartbeatAt, serverNow)}`
                     : 'never seen'
                 }}
               </span>
@@ -254,21 +246,7 @@ onUnmounted(() => {
             </dd>
 
             <dt>Version</dt>
-            <dd>
-              <v-chip
-                v-if="
-                  gate.version &&
-                  serverVersion &&
-                  gate.version !== serverVersion
-                "
-                size="small"
-                color="warning"
-                prepend-icon="mdi-alert"
-              >
-                {{ gate.version }} — server runs {{ serverVersion }}
-              </v-chip>
-              <span v-else class="rg-timing">{{ gate.version ?? '-' }}</span>
-            </dd>
+            <dd><GateVersion :gate="gate" /></dd>
 
             <dt>Capabilities</dt>
             <dd>{{ gate.capabilities ?? '-' }}</dd>
@@ -302,14 +280,10 @@ onUnmounted(() => {
               </td>
               <td>{{ gateRoleLabel(assignment) }}</td>
               <td>
-                <v-chip
+                <StatusChip
                   v-if="stage"
-                  size="small"
-                  :color="STAGE_STATUS_DISPLAY[stage.status].color"
-                  :prepend-icon="STAGE_STATUS_DISPLAY[stage.status].icon"
-                >
-                  {{ STAGE_STATUS_DISPLAY[stage.status].label }}
-                </v-chip>
+                  :display="STAGE_STATUS_DISPLAY[stage.status]"
+                />
               </td>
             </tr>
             <tr v-if="gateAssignments.length === 0">

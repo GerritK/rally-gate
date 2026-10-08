@@ -57,6 +57,20 @@ export function openLiveStream(
   return source;
 }
 
+/** Applies a pushed item to a loaded list: replaced where `key` matches,
+ *  else added — at the front for a newest-first list. */
+export function upsert<T>(
+  list: T[],
+  item: T,
+  key: keyof T,
+  { first = false } = {},
+): void {
+  const index = list.findIndex((existing) => existing[key] === item[key]);
+  if (index !== -1) list[index] = item;
+  else if (first) list.unshift(item);
+  else list.push(item);
+}
+
 export function closeLiveStream(source: EventSource): void {
   source.close();
   liveStatus.value = null;

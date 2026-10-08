@@ -2,33 +2,16 @@
 import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue';
 import { logoUrl, RallyFeedback, REPO_URL, useConfirm } from '@rally-gate/ui';
 
-// Mirrors FieldDescriptor in ../../src/config-file.ts, which is where the rules
-// are actually defined. Rebuilt here into input rules rather than restated, so
-// the browser cannot enforce a grammar the server does not have.
-interface FieldSpec {
-  label: string;
-  hint?: string;
-  message: string;
-  group?: 'general' | 'decoder';
-  adapter?: string;
-  oneOf?: string[];
-  pattern?: string;
-  range?: [number, number];
-}
-interface CommandResult {
-  ok: boolean;
-  output: string;
-}
+import type {
+  CommandResult,
+  DeviceStatus,
+  FieldDescriptor as FieldSpec,
+  WifiNetwork,
+} from '../../src/api-types';
 
-interface WifiNetwork {
-  ssid: string;
-  signal: number;
-  secured: boolean;
-  inUse: boolean;
-}
 interface NetworkState {
   available: boolean;
-  wifi: { device: string; state: string; connection: string } | null;
+  wifi: DeviceStatus | null;
   networks: WifiNetwork[];
 }
 

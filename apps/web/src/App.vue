@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue';
+import { onMounted, ref, watchEffect } from 'vue';
 import { logoUrl, RallyFeedback, REPO_URL, SUPPORT_URL } from '@rally-gate/ui';
 import { fetchEventInfo } from './api/event';
 import { fetchRallyInfo, rallyName } from './api/rally-info';
 import { liveStatus } from './api/live';
-import { serverOffsetMs, syncServerClock } from './api/time';
+import { serverNow, syncServerClock } from './api/time';
 import { fetchServerVersion, serverVersion } from './api/version';
 import { loadDisplaySettings } from './crew';
 import { eventName } from './format';
@@ -30,12 +30,6 @@ const LIVE_DISPLAY = {
   live: { label: 'Live', color: 'success', icon: 'mdi-circle' },
   offline: { label: 'Offline', color: 'error', icon: 'mdi-lan-disconnect' },
 } as const;
-
-/** Server time, which gates sync to: a marshal reads times off it. */
-const now = ref(Date.now());
-const serverNow = computed(() => new Date(now.value + serverOffsetMs.value));
-const timer = setInterval(() => (now.value = Date.now()), 1000);
-onUnmounted(() => clearInterval(timer));
 
 onMounted(async () => {
   void fetchServerVersion();
@@ -80,7 +74,7 @@ onMounted(async () => {
         >
           <div class="rg-timing app-bar-clock">
             {{
-              serverNow.toLocaleTimeString([], {
+              new Date(serverNow).toLocaleTimeString([], {
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit',
@@ -89,7 +83,7 @@ onMounted(async () => {
           </div>
           <div class="text-caption text-medium-emphasis app-bar-label">
             {{
-              serverNow.toLocaleDateString([], {
+              new Date(serverNow).toLocaleDateString([], {
                 day: '2-digit',
                 month: '2-digit',
                 year: 'numeric',

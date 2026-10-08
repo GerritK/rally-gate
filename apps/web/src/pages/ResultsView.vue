@@ -21,8 +21,7 @@ import { fetchStages, type Stage } from '../api/stages';
 import { fetchEntryClasses, type EntryClass } from '../api/entry-classes';
 import { fetchEntries, type Entry } from '../api/entries';
 import { rallyName } from '../api/rally-info';
-import { notifyError } from '@rally-gate/ui';
-import { openPdf, overallPdf, stagePdf } from '../pdf';
+import { overallPdf, printPdf, stagePdf } from '../pdf';
 
 /** Without a stage, the overall. */
 const props = defineProps<{ stageId?: string }>();
@@ -65,10 +64,8 @@ async function loadRanking(classIds: string[]): Promise<Ranking> {
 
 /** The ranking shown, or "Print all": All classes, then each class. */
 async function print(all: boolean) {
-  // Opened by the click itself: one opened after an await is a popup.
-  const tab = window.open('', '_blank');
   printing.value = true;
-  try {
+  await printPdf(async () => {
     const rankings = await Promise.all(
       (all
         ? rankingClassIds(classes.value, entries.value)
@@ -76,8 +73,8 @@ async function print(all: boolean) {
       ).map(loadRanking),
     );
     const label = (r: Ranking) => classFilterLabel(classes.value, r.classIds);
-    await openPdf(
-      rankings.map((r) =>
+    return {
+      sections: rankings.map((r) =>
         r.stage
           ? stagePdf(heading.value, label(r), r.stage)
           : overallPdf(
@@ -88,21 +85,16 @@ async function print(all: boolean) {
               r.classIds,
             ),
       ),
-      [
+      fileName: [
         rallyName.value,
         props.stageId ?? 'Overall',
         all ? 'All rankings' : label(rankings[0]),
       ]
         .filter(Boolean)
         .join(' - '),
-      tab,
-    );
-  } catch (err) {
-    tab?.close();
-    notifyError(err);
-  } finally {
-    printing.value = false;
-  }
+    };
+  });
+  printing.value = false;
 }
 
 async function refresh() {
@@ -112,10 +104,12 @@ async function refresh() {
 watch(() => [props.stageId, route.query.classes], refresh);
 
 onMounted(async () => {
-  await refresh();
-  stages.value = await fetchStages();
-  classes.value = await fetchEntryClasses();
-  entries.value = await fetchEntries();
+  [, stages.value, classes.value, entries.value] = await Promise.all([
+    refresh(),
+    fetchStages(),
+    fetchEntryClasses(),
+    fetchEntries(),
+  ]);
 });
 
 function onStageChange(stageId: string) {

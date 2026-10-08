@@ -25,8 +25,8 @@ import {
   type GateAssignment,
 } from '../api/gate-assignments';
 import { fetchGates, type Gate } from '../api/gates';
-import { serverOffsetMs } from '../api/time';
-import { closeLiveStream, openLiveStream } from '../api/live';
+import { serverNow } from '../api/time';
+import { closeLiveStream, openLiveStream, upsert } from '../api/live';
 import { rallyName } from '../api/rally-info';
 import {
   activateStage,
@@ -35,7 +35,6 @@ import {
   type Stage,
 } from '../api/stages';
 import {
-  correctStageRun,
   createStageRun,
   deleteStageRun,
   fetchSplitsForStage,
@@ -53,8 +52,10 @@ import {
   type StartOrder,
 } from '../api/start-order';
 import { fetchEntries, type Entry } from '../api/entries';
-import FormDialog from '../components/FormDialog.vue';
-import ManualMark from '../components/ManualMark.vue';
+import ClockTime from '../components/ClockTime.vue';
+import GateFlow from '../components/GateFlow.vue';
+import RunCorrectionDialog from '../components/RunCorrectionDialog.vue';
+import StatusChip from '../components/StatusChip.vue';
 import RunningTime from '../components/RunningTime.vue';
 import TableLegend from '../components/TableLegend.vue';
 import PassingBlock from '../components/PassingBlock.vue';
@@ -66,33 +67,22 @@ import { driverName } from '../crew';
 import {
   formatClockTime,
   formatStageDuration,
-  openTimePicker,
-  notifyError,
-  parseStageDuration,
   useConfirm,
 } from '@rally-gate/ui';
-import { openPdf, startListPdf } from '../pdf';
+import { carriersOf, suggestEntries } from '../passing-suggestions';
+import { printPdf, startListPdf } from '../pdf';
 import {
-  combineDateAndTime,
   formatDuration,
   formatGap,
-  gateStatusColor,
+  formatStamp,
   gateRoleLabel,
-  gateStatusIcon,
-  isOnline,
-  isReady,
   runStatusColor,
-  required,
-  toLocalTimeValue,
   entryName,
 } from '../format';
 
 const props = defineProps<{ stageId?: string }>();
 const router = useRouter();
 
-// Server time: run start times come from gate clocks synced to it.
-const now = ref(Date.now() + serverOffsetMs.value);
-let nowTimer: ReturnType<typeof setInterval>;
 let liveSource: EventSource;
 
 const stages = ref<Stage[]>([]);
@@ -251,7 +241,7 @@ function isOverdue(run?: StageRun): boolean {
   return (
     run?.status === StageRunStatus.STARTED &&
     !!expected &&
-    now.value - new Date(run.startTime).getTime() > expected
+    serverNow.value - new Date(run.startTime).getTime() > expected
   );
 }
 
@@ -343,102 +333,29 @@ const entryOptions = computed(() =>
   })),
 );
 
-/** A passing held because its transponder is on several cars is one of
- *  those cars. Undefined (any car) for a beam passing, or once the
- *  transponder has since moved and matches none. */
-function carriersOf(event: DetectionEventRecord): Set<string> | undefined {
-  const ids = entries.value
-    .filter((v) =>
-      v.transponders.some(
-        (t) =>
-          t.kind === event.transponderKind &&
-          t.identifier === event.transponderId,
-      ),
-    )
-    .map((v) => v.id);
-  return ids.length > 0 ? new Set(ids) : undefined;
-}
-
 function entryOptionsFor(event: DetectionEventRecord) {
-  const carriers = carriersOf(event);
+  const carriers = carriersOf(entries.value, event);
   return carriers
     ? entryOptions.value.filter((o) => carriers.has(o.id))
     : entryOptions.value;
 }
 
-/**
- * A combined start/finish gate: a car on stage past the minimum stage time
- * is finishing (longest out first); within it, the car that just started;
- * with nobody on stage, the next car to start.
- */
-function combinedCandidates(event: DetectionEventRecord) {
-  const minMs = stage.value?.minDurationMs ?? DEFAULT_MIN_STAGE_DURATION_MS;
-  const at = new Date(event.timestampGate).getTime();
-  const finishing = onStage.value
-    .filter((car) => at - new Date(car.run.startTime).getTime() >= minMs)
-    .sort(
-      (a, b) =>
-        new Date(a.run.startTime).getTime() -
-        new Date(b.run.startTime).getTime(),
-    )
-    .map((car) => car.row);
-  if (finishing.length > 0) return finishing;
-  // Right after a car started here, it's that car breaking the beam again
-  // (pulling away slowly from the line outlasts the gate's lockout), not the
-  // next start: no suggestion, so a marshal dismisses it.
-  const justStarted = onStage.value.some(
-    (car) => at - new Date(car.run.startTime).getTime() >= 0,
-  );
-  return justStarted ? [] : dueToStart.value;
-}
-
-/**
- * A suggestion only pre-selects, it never assigns: a wrong assignment is a
- * wrong time nobody notices in the results. Passings are matched in time
- * order — at a start gate to the cars due to start in start order, at a split
- * or finish to the cars on stage in expected arrival order — each car
- * suggested once. Passings at another stage's gates get no suggestion; this
- * page only knows its stage.
- */
-const suggestedEntryIds = computed(() => {
-  const suggestions: Record<string, string> = {};
-  const taken = new Set<string>();
-  const running = onStage.value.map((car) => car.row);
-  const byTime = [...awaitingDetections.value].sort(
-    (a, b) =>
-      new Date(a.timestampGate).getTime() - new Date(b.timestampGate).getTime(),
-  );
-  for (const event of byTime) {
-    const assignment = gateAssignments.value.find(
-      (a) => a.active && a.gateId === event.gateId,
-    );
-    if (!assignment || assignment.stageId !== props.stageId) continue;
-    const candidates =
-      assignment.role === GateRole.STAGE_START
-        ? dueToStart.value
-        : assignment.role === GateRole.STAGE_SPLIT ||
-            assignment.role === GateRole.STAGE_FINISH
-          ? running
-          : assignment.role === GateRole.STAGE_START_FINISH
-            ? combinedCandidates(event)
-            : [];
-    const carriers = carriersOf(event);
-    const pick = candidates.find(
-      (row) =>
-        !taken.has(row.starter.entryId) &&
-        (!carriers || carriers.has(row.starter.entryId)) &&
-        (assignment.role !== GateRole.STAGE_SPLIT ||
-          !splitsByRun.value[row.run?.id ?? '']?.some(
-            (s) => s.splitIndex === assignment.splitIndex,
-          )),
-    );
-    if (pick) {
-      suggestions[event.eventId] = pick.starter.entryId;
-      taken.add(pick.starter.entryId);
-    }
-  }
-  return suggestions;
-});
+const suggestedEntryIds = computed(() =>
+  suggestEntries({
+    passings: awaitingDetections.value,
+    gates: gateAssignments.value,
+    stageId: props.stageId,
+    dueToStart: dueToStart.value.map((row) => row.starter.entryId),
+    onStage: onStage.value.map(({ row, run }) => ({
+      entryId: row.starter.entryId,
+      runId: run.id,
+      startTime: run.startTime,
+    })),
+    splitsByRun: splitsByRun.value,
+    entries: entries.value,
+    minDurationMs: stage.value?.minDurationMs ?? DEFAULT_MIN_STAGE_DURATION_MS,
+  }),
+);
 
 function entryFor(event: DetectionEventRecord): string | undefined {
   return (
@@ -557,11 +474,6 @@ const gateFlow = computed(() => {
     });
 });
 
-function gateStatusText(gate: Gate): string {
-  if (!isOnline(gate, now.value)) return 'Offline';
-  return isReady(gate, now.value) ? 'Ready' : 'Clock not synced';
-}
-
 const stageDetections = computed(() => {
   const gateIds = new Set(
     gateAssignments.value
@@ -579,9 +491,7 @@ function flashGate(gateId: string) {
 }
 
 function upsertGate(gate: Gate) {
-  const idx = gates.value.findIndex((g) => g.id === gate.id);
-  if (idx === -1) gates.value.push(gate);
-  else gates.value[idx] = gate;
+  upsert(gates.value, gate, 'id');
   flashGate(gate.id);
 }
 
@@ -589,9 +499,7 @@ function upsertGate(gate: Gate) {
 
 function upsertStageRun(run: StageRun) {
   if (run.stageId !== props.stageId) return;
-  const idx = stageRuns.value.findIndex((r) => r.id === run.id);
-  if (idx === -1) stageRuns.value.unshift(run);
-  else stageRuns.value[idx] = run;
+  upsert(stageRuns.value, run, 'id', { first: true });
 }
 
 function upsertSplit(split: StageSplit) {
@@ -667,113 +575,9 @@ const anyManual = computed(() =>
   ),
 );
 
-const correctDialogOpen = ref(false);
-const correcting = ref<StageRun | null>(null);
-/** "Enter time" on a car with no run: a missed start, typically on a closed
- * stage where Start now is long gone. */
-const enteringEntryId = ref<string | null>(null);
-const correction = ref({ start: '', finish: '', stageTime: '' });
-const initialStageTime = ref('');
-
-function openCorrect(run: StageRun) {
-  correcting.value = run;
-  enteringEntryId.value = null;
-  initialStageTime.value =
-    run.durationMs != null ? formatStageDuration(run.durationMs) : '';
-  correction.value = {
-    start: toLocalTimeValue(run.startTime),
-    finish: toLocalTimeValue(run.finishTime),
-    stageTime: initialStageTime.value,
-  };
-  correctDialogOpen.value = true;
-}
-
-function openEnterTime(entryId: string) {
-  correcting.value = null;
-  enteringEntryId.value = entryId;
-  initialStageTime.value = '';
-  correction.value = { start: '', finish: '', stageTime: '' };
-  correctDialogOpen.value = true;
-}
-
-/** A changed stage time sets the finish (correcting) or the start (entering),
- * so that field is derived instead of typed. */
-const stageTimeChanged = computed(
-  () =>
-    correction.value.stageTime.trim() !== '' &&
-    correction.value.stageTime !== initialStageTime.value,
+const correctionDialog = ref<InstanceType<typeof RunCorrectionDialog> | null>(
+  null,
 );
-
-function stageTimeRule(value: string) {
-  return !value.trim() || parseStageDuration(value) !== null
-    ? true
-    : 'A time like 3:12.4';
-}
-
-/** Start as it will be saved: the stored one, to the millisecond, unless
- * the field was changed. No run (entering): from the finish, dated today
- * like any correction without one. */
-function startIso(run: StageRun): string {
-  const { start } = correction.value;
-  return start === toLocalTimeValue(run.startTime)
-    ? run.startTime
-    : combineDateAndTime(run.startTime, start);
-}
-
-/** The finish (correcting) or start (entering) a changed stage time gives,
- * to the millisecond, so the result is exactly the stopwatch's. */
-const derivedIso = computed(() => {
-  const { start, finish, stageTime } = correction.value;
-  const durationMs = stageTimeChanged.value
-    ? parseStageDuration(stageTime)
-    : null;
-  if (!durationMs) return null;
-  const run = correcting.value;
-  if (run) {
-    if (!start) return null;
-    return new Date(Date.parse(startIso(run)) + durationMs).toISOString();
-  }
-  if (!finish) return null;
-  const finishMs = Date.parse(combineDateAndTime(new Date(), finish));
-  return new Date(finishMs - durationMs).toISOString();
-});
-
-/**
- * Sends only the times that changed: the fields hold whole seconds, so
- * resending an untouched time would drop its milliseconds and mark a gate's
- * time as hand-set.
- */
-async function onSaveCorrection() {
-  const { start, finish } = correction.value;
-  const entryId = enteringEntryId.value;
-  if (entryId && props.stageId) {
-    const finishTime = combineDateAndTime(new Date(), finish);
-    upsertStageRun(
-      await createStageRun({
-        entryId,
-        stageId: props.stageId,
-        startTime: derivedIso.value ?? combineDateAndTime(finishTime, start),
-        finishTime,
-      }),
-    );
-    return;
-  }
-  const run = correcting.value;
-  if (!run) return;
-  const patch: { startTime?: string; finishTime?: string | null } = {};
-  if (start !== toLocalTimeValue(run.startTime)) {
-    patch.startTime = startIso(run);
-  }
-  if (derivedIso.value) {
-    patch.finishTime = derivedIso.value;
-  } else if ((finish || '') !== toLocalTimeValue(run.finishTime)) {
-    patch.finishTime = finish
-      ? combineDateAndTime(run.finishTime ?? run.startTime, finish)
-      : null;
-  }
-  if (Object.keys(patch).length === 0) return;
-  upsertStageRun(await correctStageRun(run.id, patch));
-}
 
 async function onVoidRun(run: StageRun) {
   if (
@@ -812,17 +616,8 @@ async function onDeleteRun(run: StageRun) {
 
 // ---- Stage lifecycle and start list --------------------------------------
 
-/** With the day: a list is often posted the evening before. */
 const frozenAt = computed(() =>
-  startOrder.value?.frozenAt
-    ? new Date(startOrder.value.frozenAt).toLocaleString([], {
-        weekday: 'short',
-        day: '2-digit',
-        month: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : null,
+  startOrder.value?.frozenAt ? formatStamp(startOrder.value.frozenAt) : null,
 );
 
 const startListStatus = computed(() =>
@@ -843,8 +638,10 @@ function stageTitle(stageId: string): string {
  * activate can close another stage too (see `docs/architecture.md`).
  */
 async function refreshStages() {
-  stages.value = await fetchStages();
-  gateAssignments.value = await fetchGateAssignments();
+  [stages.value, gateAssignments.value] = await Promise.all([
+    fetchStages(),
+    fetchGateAssignments(),
+  ]);
 }
 
 async function onActivateStage(force = false) {
@@ -929,28 +726,21 @@ async function onUnfreeze() {
   stages.value = await fetchStages();
 }
 
-async function printStartList() {
-  if (!stage.value || !startOrder.value) return;
+function printStartList() {
+  const order = startOrder.value;
+  if (!stage.value || !order) return;
   const { id, name } = stage.value;
-  // Opened by the click itself: one opened after an await is a popup.
-  const tab = window.open('', '_blank');
-  try {
-    await openPdf(
-      [
-        startListPdf(
-          `Start list — ${id} · ${name}`,
-          startOrder.value.frozen ? frozenAt.value : null,
-          rows.value,
-          startOrder.value.grouped,
-        ),
-      ],
-      [rallyName.value, id, 'Start list'].filter(Boolean).join(' - '),
-      tab,
-    );
-  } catch (err) {
-    tab?.close();
-    notifyError(err);
-  }
+  void printPdf(async () => ({
+    sections: [
+      startListPdf(
+        `Start list — ${id} · ${name}`,
+        order.frozen ? frozenAt.value : null,
+        rows.value,
+        order.grouped,
+      ),
+    ],
+    fileName: [rallyName.value, id, 'Start list'].filter(Boolean).join(' - '),
+  }));
 }
 
 function onSelectStage(stageId: string) {
@@ -960,7 +750,6 @@ function onSelectStage(stageId: string) {
 // ---- Loading -------------------------------------------------------------
 
 async function loadStage() {
-  correctDialogOpen.value = false;
   if (!props.stageId) {
     startOrder.value = null;
     stageRuns.value = [];
@@ -1037,15 +826,10 @@ onMounted(async () => {
     () => void loadLive(),
   );
   void loadLive();
-
-  nowTimer = setInterval(() => {
-    now.value = Date.now() + serverOffsetMs.value;
-  }, 1000);
 });
 
 onUnmounted(() => {
   if (liveSource) closeLiveStream(liveSource);
-  clearInterval(nowTimer);
 });
 </script>
 
@@ -1175,40 +959,7 @@ onUnmounted(() => {
           {{ count }} {{ ROW_STATE_DISPLAY[state].label }}
         </v-chip>
       </div>
-      <template v-if="gateFlow.length > 0">
-        <div class="rg-gate-scroll">
-          <div class="rg-gate-flow" :style="{ '--gates': gateFlow.length }">
-            <div
-              v-for="node in gateFlow"
-              :key="node.gate.id"
-              class="rg-gate-node"
-            >
-              <span
-                class="rg-gate-icon"
-                :class="{ 'gate-flash': flashingGateIds[node.gate.id] }"
-              >
-                <v-icon
-                  :icon="gateStatusIcon(node.gate, now)"
-                  :color="gateStatusColor(node.gate, now)"
-                />
-              </span>
-              <div class="text-caption font-weight-bold">{{ node.label }}</div>
-              <div class="text-caption text-medium-emphasis rg-gate-name">
-                {{ node.gate.name }}
-              </div>
-              <!-- A problem in words, not a tooltip; the line is always there
-                   so a gate dropping out doesn't shift the page. -->
-              <div
-                class="text-caption rg-gate-name"
-                :class="`text-${gateStatusColor(node.gate, now)}`"
-              >
-                {{ isReady(node.gate, now) ? ' ' : gateStatusText(node.gate) }}
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-      <div v-else class="rg-empty">No gates assigned to this stage yet.</div>
+      <GateFlow :nodes="gateFlow" :flashing="flashingGateIds" />
       <v-alert
         v-if="startOrder && !startOrder.frozen"
         type="info"
@@ -1463,13 +1214,7 @@ onUnmounted(() => {
               />
             </td>
             <td class="text-no-wrap">
-              <v-chip
-                size="small"
-                :color="ROW_STATE_DISPLAY[row.state].color"
-                :prepend-icon="ROW_STATE_DISPLAY[row.state].icon"
-              >
-                {{ ROW_STATE_DISPLAY[row.state].label }}
-              </v-chip>
+              <StatusChip :display="ROW_STATE_DISPLAY[row.state]" />
               <v-chip
                 v-if="isOverdue(row.run)"
                 size="small"
@@ -1497,23 +1242,21 @@ onUnmounted(() => {
               </span>
             </td>
             <td class="rg-time">
-              <span v-if="row.run" class="rg-timing text-no-wrap">
-                {{ formatClockTime(row.run.startTime)
-                }}<span class="rg-time-mark"
-                  ><ManualMark v-if="row.run.startManual"
-                /></span>
-              </span>
+              <ClockTime
+                v-if="row.run"
+                :time="row.run.startTime"
+                :manual="row.run.startManual"
+              />
             </td>
             <td class="rg-timing rg-time text-no-wrap">
               {{ row.run ? formatSplits(row.run.id) : '' }}
             </td>
             <td class="rg-time">
-              <span v-if="row.run?.finishTime" class="rg-timing text-no-wrap">
-                {{ formatClockTime(row.run.finishTime)
-                }}<span class="rg-time-mark"
-                  ><ManualMark v-if="row.run.finishManual"
-                /></span>
-              </span>
+              <ClockTime
+                v-if="row.run?.finishTime"
+                :time="row.run.finishTime"
+                :manual="row.run.finishManual"
+              />
             </td>
             <td class="rg-timing rg-time">
               <RunningTime
@@ -1530,7 +1273,7 @@ onUnmounted(() => {
                 size="small"
                 variant="text"
                 prepend-icon="mdi-pencil"
-                @click="openCorrect(row.run)"
+                @click="correctionDialog?.correct(row.run)"
               >
                 Correct
               </v-btn>
@@ -1560,7 +1303,7 @@ onUnmounted(() => {
                   <v-list-item
                     prepend-icon="mdi-timer-edit-outline"
                     title="Enter time (missed start)"
-                    @click="openEnterTime(row.starter.entryId)"
+                    @click="correctionDialog?.enter(row.starter.entryId)"
                   />
                 </v-list>
               </v-menu>
@@ -1605,20 +1348,19 @@ onUnmounted(() => {
                 >attempt {{ voided.attempt }}</span
               >
             </td>
-            <td class="rg-timing rg-time text-no-wrap">
-              {{ formatClockTime(voided.startTime)
-              }}<span class="rg-time-mark"
-                ><ManualMark v-if="voided.startManual"
-              /></span>
+            <td class="rg-time">
+              <ClockTime
+                :time="voided.startTime"
+                :manual="voided.startManual"
+              />
             </td>
             <td class="rg-timing rg-time">{{ formatSplits(voided.id) }}</td>
-            <td class="rg-timing rg-time text-no-wrap">
-              <template v-if="voided.finishTime">
-                {{ formatClockTime(voided.finishTime)
-                }}<span class="rg-time-mark"
-                  ><ManualMark v-if="voided.finishManual"
-                /></span>
-              </template>
+            <td class="rg-time">
+              <ClockTime
+                v-if="voided.finishTime"
+                :time="voided.finishTime"
+                :manual="voided.finishManual"
+              />
             </td>
             <td class="rg-timing rg-time">
               {{ formatDuration(voided.durationMs) }}
@@ -1700,152 +1442,16 @@ onUnmounted(() => {
     </v-expansion-panel>
   </v-expansion-panels>
 
-  <FormDialog
-    v-model="correctDialogOpen"
-    :title="
-      correcting
-        ? `Correct ${entryName(entries, correcting.entryId)}, attempt ${correcting.attempt}`
-        : enteringEntryId
-          ? `Enter time for ${entryName(entries, enteringEntryId)}`
-          : ''
-    "
-    :form="correction"
-    :save="onSaveCorrection"
-    :saved="enteringEntryId ? 'Time entered' : 'Times corrected'"
-  >
-    <p class="text-body-2 text-medium-emphasis">
-      Start and finish are times of day, to the second; the stage time is what
-      the stopwatch read.
-      {{
-        enteringEntryId
-          ? 'With a stage time, the start is worked out from the finish.'
-          : 'A changed stage time sets the finish from the start.'
-      }}
-      Entered times are marked as hand-set.
-    </p>
-    <v-text-field
-      v-if="enteringEntryId && derivedIso"
-      :model-value="toLocalTimeValue(derivedIso)"
-      type="time"
-      step="1"
-      label="Start"
-      class="rg-timing"
-      hint="Set by the stage time"
-      persistent-hint
-      disabled
-    />
-    <v-text-field
-      v-else
-      v-model="correction.start"
-      type="time"
-      step="1"
-      label="Start"
-      class="rg-timing"
-      append-inner-icon="mdi-clock-outline"
-      :rules="enteringEntryId && stageTimeChanged ? [] : [required]"
-      @click:append-inner="openTimePicker"
-    />
-    <v-text-field
-      v-if="!enteringEntryId && derivedIso"
-      :model-value="toLocalTimeValue(derivedIso)"
-      type="time"
-      step="1"
-      label="Finish"
-      class="rg-timing"
-      hint="Set by the stage time"
-      persistent-hint
-      disabled
-    />
-    <v-text-field
-      v-else
-      v-model="correction.finish"
-      type="time"
-      step="1"
-      label="Finish"
-      class="rg-timing"
-      :hint="enteringEntryId ? '' : 'Empty while the car is still on stage'"
-      persistent-hint
-      :clearable="!enteringEntryId"
-      :rules="enteringEntryId ? [required] : []"
-      append-inner-icon="mdi-clock-outline"
-      @click:append-inner="openTimePicker"
-    />
-    <v-text-field
-      v-model="correction.stageTime"
-      label="Stage time"
-      placeholder="3:12.4"
-      class="rg-timing"
-      :rules="[stageTimeRule]"
-    />
-  </FormDialog>
+  <RunCorrectionDialog
+    v-if="props.stageId"
+    ref="correctionDialog"
+    :stage-id="props.stageId"
+    :entries="entries"
+    @saved="upsertStageRun"
+  />
 </template>
 
 <style scoped>
-/*
- * Gates as nodes on one track, like the stage itself. Every node gets the
- * same width, so the track runs from the first icon's centre to the last
- * one's: half a node in from each side. Too many for the width scrolls
- * sideways rather than squeezing gates out.
- */
-.rg-gate-scroll {
-  overflow-x: auto;
-  /* Scrolling clips vertically too; room for the passing pulse. */
-  padding: 10px 0 4px;
-}
-.rg-gate-flow {
-  position: relative;
-  display: flex;
-  min-width: calc(var(--gates) * 80px);
-}
-.rg-gate-flow::before {
-  content: '';
-  position: absolute;
-  top: 15px;
-  left: calc(50% / var(--gates));
-  right: calc(50% / var(--gates));
-  height: 2px;
-  background: rgb(var(--v-border-color));
-}
-.rg-gate-node {
-  position: relative;
-  flex: 1 1 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 0 4px;
-}
-/* A round node that cuts the track behind it; the passing pulse rings it. */
-.rg-gate-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: rgb(var(--v-theme-surface));
-}
-.rg-gate-name {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.gate-flash {
-  animation: gate-flash-pulse 0.6s ease-out;
-}
-
-@keyframes gate-flash-pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(var(--v-theme-primary), 0.7);
-  }
-  100% {
-    box-shadow: 0 0 0 8px rgba(var(--v-theme-primary), 0);
-  }
-}
-
 .rg-class-row td {
   font-family: 'Barlow Condensed', sans-serif;
   font-weight: 600;

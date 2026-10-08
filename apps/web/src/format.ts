@@ -139,11 +139,16 @@ export function outcomeColor(outcome: string): string {
   return outcome === 'DNS' ? 'warning' : 'error';
 }
 
-export function toLocalTimeValue(iso?: string): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+/** "Fri 09.10. 14:05": when a list was published or a sheet printed, with
+ *  the day, since a start list is often posted the evening before. */
+export function formatStamp(time: string | number): string {
+  return new Date(time).toLocaleString([], {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 /**

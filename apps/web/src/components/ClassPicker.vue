@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { EntryClass } from '../api/entry-classes';
+import ClassChip from './ClassChip.vue';
 
 const props = defineProps<{
   classes: EntryClass[];
@@ -45,14 +46,7 @@ const selected = computed({
     style="min-width: 220px"
   >
     <template #selection="{ item }">
-      <v-chip
-        size="small"
-        :color="item.main ? 'secondary' : undefined"
-        :prepend-icon="item.main ? 'mdi-star' : undefined"
-        class="me-1"
-      >
-        {{ item.name }}
-      </v-chip>
+      <ClassChip :name="item.name" :main="item.main" class="me-1" />
     </template>
   </v-select>
 </template>

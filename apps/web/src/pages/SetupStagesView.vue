@@ -9,6 +9,7 @@ import {
   type Stage,
 } from '../api/stages';
 import FormDialog from '../components/FormDialog.vue';
+import StatusChip from '../components/StatusChip.vue';
 import { required, STAGE_STATUS_DISPLAY } from '../format';
 import { notify, useConfirm } from '@rally-gate/ui';
 
@@ -96,13 +97,7 @@ onMounted(refresh);
             <td>{{ stage.id }}</td>
             <td>{{ stage.name }}</td>
             <td>
-              <v-chip
-                size="small"
-                :color="STAGE_STATUS_DISPLAY[stage.status].color"
-                :prepend-icon="STAGE_STATUS_DISPLAY[stage.status].icon"
-              >
-                {{ STAGE_STATUS_DISPLAY[stage.status].label }}
-              </v-chip>
+              <StatusChip :display="STAGE_STATUS_DISPLAY[stage.status]" />
             </td>
             <td class="text-no-wrap">
               <v-menu v-if="stage.status === StageStatus.NOT_STARTED">
