@@ -53,8 +53,8 @@ function makeService(
       .mockResolvedValue(toPlacings(times.stage)),
   };
   const stagesService = {
-    findOne: jest.fn((id: string) =>
-      Promise.resolve(stages.find((s) => s.id === id) ?? null),
+    findOneOrFail: jest.fn((id: string) =>
+      Promise.resolve(stages.find((s) => s.id === id)),
     ),
     findAll: jest.fn().mockResolvedValue(stages),
     setStartOrder: jest.fn().mockResolvedValue(undefined),

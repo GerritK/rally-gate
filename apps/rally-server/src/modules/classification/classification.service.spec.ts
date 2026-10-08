@@ -23,7 +23,7 @@ function makeService(
   entries: unknown[],
 ) {
   const stagesService = {
-    findOne: jest.fn().mockResolvedValue(stage),
+    findOneOrFail: jest.fn().mockResolvedValue(stage),
   } as unknown as StagesService;
   const stageRunsService = {
     findByStage: jest.fn().mockResolvedValue(runs),
@@ -381,7 +381,9 @@ describe('ClassificationService.getStageClassification', () => {
       { id: 'v2', startNumber: 2, driverFirstName: 'B' },
     ];
     const stagesService = {
-      findOne: jest.fn().mockResolvedValue({ status: StageStatus.CLOSED }),
+      findOneOrFail: jest
+        .fn()
+        .mockResolvedValue({ status: StageStatus.CLOSED }),
     } as unknown as StagesService;
     const stageRunsService = {
       findFinishedByStage: jest.fn().mockResolvedValue([
@@ -428,7 +430,9 @@ describe('ClassificationService.getStageClassification', () => {
         ]),
       } as unknown as StageRunsService,
       {
-        findOne: jest.fn().mockResolvedValue({ status: StageStatus.CLOSED }),
+        findOneOrFail: jest
+          .fn()
+          .mockResolvedValue({ status: StageStatus.CLOSED }),
       } as unknown as StagesService,
       {
         findAll: jest.fn().mockResolvedValue(entries),

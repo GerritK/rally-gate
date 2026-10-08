@@ -489,3 +489,29 @@ describe('EventsService unidentified passings', () => {
     });
   });
 });
+
+describe('EventsService raw payload', () => {
+  it('stores the payload as published, metadata included', async () => {
+    // The ESP32 gate flags a passing it timed without a set clock; parsing
+    // drops `metadata`, so only the stored payload keeps that evidence.
+    const { service, saved } = makeService({});
+    const message = detection({ metadata: { timeUnknown: true } });
+
+    await service.handleMqttMessage(message);
+
+    expect(saved[0].rawPayload).toBe(message.payload.toString());
+    expect(JSON.parse(saved[0].rawPayload)).toMatchObject({
+      metadata: { timeUnknown: true },
+    });
+  });
+
+  it('ignores an oversized payload instead of storing it', async () => {
+    const { service, saved } = makeService({});
+
+    await service.handleMqttMessage(
+      detection({ metadata: { filler: 'x'.repeat(5000) } }),
+    );
+
+    expect(saved).toHaveLength(0);
+  });
+});

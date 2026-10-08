@@ -44,6 +44,7 @@ export class DetectionEventRecord {
   @Column({ type: 'int', default: 0 })
   clockCorrectionMs: number;
 
+  /** The payload exactly as the gate published it, `metadata` included. */
   @Column({ type: 'text' })
   rawPayload: string;
 

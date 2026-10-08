@@ -21,8 +21,9 @@ JSON to `rally/gates/<gateId>/detections` and `/heartbeat` (see
 What the server does **not** have yet is a meaning for a check-in tap: no
 gate role sets an entry's status, so a tap at an unassigned gate is stored
 and nothing else. On a stage-start assignment a tap would already start a
-run. The server also doesn't read `metadata.timeUnknown` (below) yet, so
-that flag only matters once check-in uses the time.
+run. The server keeps `metadata.timeUnknown` (below) in the detection's
+`rawPayload` but doesn't act on it yet, so that flag only matters once
+check-in uses the time.
 
 ## Hardware
 

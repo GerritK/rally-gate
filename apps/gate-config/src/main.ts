@@ -1,4 +1,4 @@
-import { VERSION } from '@rally-gate/shared';
+import { GATE_CONFIG_PORT, VERSION } from '@rally-gate/shared';
 import express from 'express';
 import { existsSync } from 'fs';
 import { createServer } from 'http';
@@ -25,7 +25,7 @@ import {
   wifiScan,
 } from './system';
 
-const PORT = Number(process.env.GATE_CONFIG_PORT ?? 57439);
+const PORT = Number(process.env.GATE_CONFIG_PORT ?? GATE_CONFIG_PORT);
 
 const app = express();
 app.use(express.json({ limit: '16kb' }));

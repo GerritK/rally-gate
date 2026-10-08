@@ -118,4 +118,4 @@ A dropped detection is a driver with no time. gate-agent publishes at QoS 1 over
 
 ### `packages/shared`
 
-Types and constants used by every app: gate roles, `DetectionEvent`, heartbeat, MQTT topics, stage/classification/entry/start-order types, setting keys. Ships CommonJS — fine for Node; `apps/web` needs it in `optimizeDeps` (see `apps/web/CLAUDE.md`). A shape change here also reaches `firmware/esp32-gate`, which nothing type-checks.
+Types and constants used by every app: gate roles, `DetectionEvent`, heartbeat, MQTT topics, stage/classification/entry/start-order types, and every setting key with its default (`settings.ts` and beside their enums) — never a key string or a "mirrored" default inside an app. Ships CommonJS — fine for Node; `apps/web` needs it in `optimizeDeps` (see `apps/web/CLAUDE.md`). A shape change here also reaches `firmware/esp32-gate`, which nothing type-checks.

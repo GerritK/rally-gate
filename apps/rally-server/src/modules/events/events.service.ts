@@ -46,6 +46,13 @@ export const REPROCESS_INTERVAL_MS = 30_000;
 const MAX_ID_LENGTH = 128;
 
 /**
+ * A real detection is a few hundred bytes. The cap leaves room for `metadata`
+ * (the ESP32 gate's `timeUnknown`), which is stored verbatim as evidence and
+ * otherwise unbounded on an unauthenticated broker.
+ */
+const MAX_PAYLOAD_BYTES = 4096;
+
+/**
  * MQTT is the one ingress the global `ValidationPipe` doesn't cover, and the
  * broker is unauthenticated — anything on the rally network can publish to a
  * gate topic. An unparseable `timestampGate` silently poisons a run's
@@ -315,9 +322,16 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     if (!match) {
       return;
     }
+    if (payload.length > MAX_PAYLOAD_BYTES) {
+      this.logger.warn(
+        `Ignoring ${payload.length}-byte detection payload on ${topic} (limit ${MAX_PAYLOAD_BYTES})`,
+      );
+      return;
+    }
+    const raw = payload.toString();
     let parsed: unknown;
     try {
-      parsed = JSON.parse(payload.toString());
+      parsed = JSON.parse(raw);
     } catch {
       this.logger.warn(`Ignoring malformed detection payload on ${topic}`);
       return;
@@ -329,10 +343,13 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       );
       return;
     }
-    await this.processDetection(detection);
+    await this.processDetection(detection, raw);
   }
 
-  private async processDetection(detection: DetectionEvent): Promise<void> {
+  private async processDetection(
+    detection: DetectionEvent,
+    rawPayload: string,
+  ): Promise<void> {
     if (await this.isDuplicate(detection.eventId)) {
       return;
     }
@@ -400,7 +417,9 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       timestampGate,
       timestampServer: new Date(),
       clockCorrectionMs,
-      rawPayload: JSON.stringify(detection),
+      // As published, not as parsed: parsing keeps only the fields the rules
+      // use, and evidence like the ESP32's `metadata.timeUnknown` would go.
+      rawPayload,
       processed: false,
     });
     try {

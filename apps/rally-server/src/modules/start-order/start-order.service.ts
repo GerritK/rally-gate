@@ -1,9 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   isOutOfEvent,
@@ -46,7 +41,7 @@ export class StartOrderService {
   ) {}
 
   async getStartOrder(stageId: string): Promise<StartOrder> {
-    const stage = await this.findStage(stageId);
+    const stage = await this.stagesService.findOneOrFail(stageId);
     const entries = await this.entriesService.findAll();
     // A frozen list is the one posted and keeps every car it was posted
     // with, so positions don't shift; Live Timing shows one that has since
@@ -83,7 +78,7 @@ export class StartOrderService {
    * corrections do to the times. Already frozen is a no-op, not a conflict.
    */
   async freeze(stageId: string): Promise<StartOrder> {
-    const stage = await this.findStage(stageId);
+    const stage = await this.stagesService.findOneOrFail(stageId);
     if (!stage.startOrder) {
       await this.snapshot(stage);
     }
@@ -95,7 +90,7 @@ export class StartOrderService {
    * measured against, so a wrongly posted list has to be fixed before then.
    */
   async unfreeze(stageId: string): Promise<StartOrder> {
-    const stage = await this.findStage(stageId);
+    const stage = await this.stagesService.findOneOrFail(stageId);
     if (stage.status !== StageStatus.NOT_STARTED) {
       throw new ConflictException(
         `Stage ${stageId} is ${stage.status}; its start order stays frozen`,
@@ -118,14 +113,6 @@ export class StartOrderService {
       // live, which the response shows as `frozen: false`.
       this.logger.error(`Freezing the start order of ${stage.id} failed`, err);
     }
-  }
-
-  private async findStage(stageId: string): Promise<Stage> {
-    const stage = await this.stagesService.findOne(stageId);
-    if (!stage) {
-      throw new NotFoundException(`Stage ${stageId} not found`);
-    }
-    return stage;
   }
 
   private async snapshot(stage: Stage): Promise<void> {

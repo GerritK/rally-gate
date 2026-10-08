@@ -8,10 +8,7 @@ import {
 } from '../api/gate-assignments';
 import { fetchGate, upsertGate, type Gate } from '../api/gates';
 import { closeLiveStream, openLiveStream, upsert } from '../api/live';
-import {
-  CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS,
-  fetchClockCorrectionThresholdMs,
-} from '../api/settings';
+import { fetchClockCorrectionThresholdMs } from '../api/settings';
 import { fetchStages, type Stage } from '../api/stages';
 import { fetchEntries, type Entry } from '../api/entries';
 import { serverNow } from '../api/time';
@@ -22,13 +19,16 @@ import GateVersion from '../components/GateVersion.vue';
 import StatusChip from '../components/StatusChip.vue';
 import {
   formatClockOffset,
-  gateConfigUrl,
   gateRoleLabel,
   isOnline,
   required,
   STAGE_STATUS_DISPLAY,
   entryName,
 } from '../format';
+import {
+  DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS,
+  gateConfigUrl,
+} from '@rally-gate/shared';
 import { useRouter } from 'vue-router';
 
 const props = defineProps<{ gateId: string }>();
@@ -75,7 +75,7 @@ const assignments = ref<GateAssignment[]>([]);
 const stages = ref<Stage[]>([]);
 const entries = ref<Entry[]>([]);
 const detections = ref<DetectionEventRecord[]>([]);
-const clockCorrectionThresholdMs = ref(CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS);
+const clockCorrectionThresholdMs = ref(DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS);
 
 let liveSource: EventSource | undefined;
 

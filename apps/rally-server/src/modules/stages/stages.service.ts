@@ -28,6 +28,14 @@ export class StagesService {
     return this.stages.findOneBy({ id });
   }
 
+  async findOneOrFail(id: string): Promise<Stage> {
+    const stage = await this.findOne(id);
+    if (!stage) {
+      throw new NotFoundException(`Stage ${id} not found`);
+    }
+    return stage;
+  }
+
   async create(stage: CreateStageDto): Promise<Stage> {
     if (await this.findOne(stage.id)) {
       throw new ConflictException(`Stage ${stage.id} already exists`);
@@ -44,10 +52,7 @@ export class StagesService {
    * runs already tied to it.
    */
   async update(id: string, data: UpdateStageDto): Promise<Stage> {
-    const stage = await this.findOne(id);
-    if (!stage) {
-      throw new NotFoundException(`Stage ${id} not found`);
-    }
+    const stage = await this.findOneOrFail(id);
     if (stage.status !== StageStatus.NOT_STARTED) {
       throw new ConflictException(
         `Stage ${id} is ${stage.status} and can only be edited while NOT_STARTED`,
@@ -64,10 +69,7 @@ export class StagesService {
    * deleting it would orphan history instead of a plan that was never used.
    */
   async remove(id: string): Promise<void> {
-    const stage = await this.findOne(id);
-    if (!stage) {
-      throw new NotFoundException(`Stage ${id} not found`);
-    }
+    const stage = await this.findOneOrFail(id);
     if (stage.status !== StageStatus.NOT_STARTED) {
       throw new ConflictException(
         `Stage ${id} is ${stage.status} and can only be deleted while NOT_STARTED`,
@@ -98,10 +100,7 @@ export class StagesService {
    * becomes CANCELLED for free since that status is derived, not stored.
    */
   async close(id: string): Promise<Stage> {
-    const stage = await this.findOne(id);
-    if (!stage) {
-      throw new NotFoundException(`Stage ${id} not found`);
-    }
+    const stage = await this.findOneOrFail(id);
     const wasActive = stage.status === StageStatus.ACTIVE;
     await this.gateAssignmentsService.deactivateForStage(id);
     stage.status = StageStatus.CLOSED;
@@ -131,10 +130,7 @@ export class StagesService {
    * forever (see `close`'s CANCELLED-on-close behavior).
    */
   async activate(id: string, force: boolean): Promise<Stage> {
-    const stage = await this.findOne(id);
-    if (!stage) {
-      throw new NotFoundException(`Stage ${id} not found`);
-    }
+    const stage = await this.findOneOrFail(id);
     if (stage.status === StageStatus.CLOSED) {
       throw new ConflictException(
         `Stage ${id} is closed and cannot be reactivated`,

@@ -85,8 +85,13 @@ export function latestAttempts(runs: StageRun[]): StageRun[] {
  * clock trailing the start gate's (the two are separate Pis, see CLAUDE.md
  * "Timing correctness"), and a mistyped manual correction.
  */
-export function isValidRunDuration(startTime: Date, finishTime: Date): boolean {
+function isValidRunDuration(startTime: Date, finishTime: Date): boolean {
   return finishTime.getTime() > startTime.getTime();
+}
+
+/** Callers check `isValidRunDuration` first. */
+function durationMs(startTime: Date, finishTime?: Date | null): number | null {
+  return finishTime ? finishTime.getTime() - startTime.getTime() : null;
 }
 
 /** Throwing form of {@link isValidRunDuration}, for the admin HTTP paths. */
@@ -125,6 +130,14 @@ export class StageRunsService {
     private readonly stagesService: StagesService,
     private readonly emitter: EventEmitter2,
   ) {}
+
+  private async findOneOrFail(id: string): Promise<StageRun> {
+    const run = await this.stageRuns.findOneBy({ id });
+    if (!run) {
+      throw new NotFoundException(`StageRun ${id} not found`);
+    }
+    return run;
+  }
 
   private async isStageClosed(stageId: string): Promise<boolean> {
     const stage = await this.stagesService.findOne(stageId);
@@ -292,7 +305,7 @@ export class StageRunsService {
     }
     run.finishTime = finishTime;
     run.finishManual = manual;
-    run.durationMs = finishTime.getTime() - run.startTime.getTime();
+    run.durationMs = durationMs(run.startTime, finishTime);
     return this.withStatus(await this.stageRuns.save(run));
   }
 
@@ -361,10 +374,7 @@ export class StageRunsService {
     id: string,
     patch: StageRunCorrection,
   ): Promise<StageRunWithStatus> {
-    const run = await this.stageRuns.findOneBy({ id });
-    if (!run) {
-      throw new NotFoundException(`StageRun ${id} not found`);
-    }
+    const run = await this.findOneOrFail(id);
     if (patch.startTime !== undefined) {
       run.startTime = parseTime(patch.startTime, 'startTime');
       run.startManual = true;
@@ -380,9 +390,7 @@ export class StageRunsService {
     if (run.finishTime) {
       assertValidRunDuration(run.startTime, run.finishTime);
     }
-    run.durationMs = run.finishTime
-      ? run.finishTime.getTime() - run.startTime.getTime()
-      : null;
+    run.durationMs = durationMs(run.startTime, run.finishTime);
     const saved = await this.stageRuns.save(run);
     const withStatus = await this.withStatus(saved);
     this.emitter.emit('stage-run.updated', withStatus);
@@ -408,9 +416,7 @@ export class StageRunsService {
       finishTime,
       startManual: true,
       finishManual: !!finishTime,
-      durationMs: finishTime
-        ? finishTime.getTime() - startTime.getTime()
-        : null,
+      durationMs: durationMs(startTime, finishTime),
     });
     let saved: StageRun;
     try {
@@ -437,10 +443,7 @@ export class StageRunsService {
    * refuses instead of ignoring, so a double click can't move a time.
    */
   async finishNow(id: string): Promise<StageRunWithStatus> {
-    const run = await this.stageRuns.findOneBy({ id });
-    if (!run) {
-      throw new NotFoundException(`StageRun ${id} not found`);
-    }
+    const run = await this.findOneOrFail(id);
     if (
       run.voided ||
       run.finishTime ||
@@ -476,10 +479,7 @@ export class StageRunsService {
    * replacement run: both ends of the re-run stay gate-timed.
    */
   async voidRun(id: string): Promise<StageRunWithStatus> {
-    const run = await this.stageRuns.findOneBy({ id });
-    if (!run) {
-      throw new NotFoundException(`StageRun ${id} not found`);
-    }
+    const run = await this.findOneOrFail(id);
     run.voided = true;
     const withStatus = await this.withStatus(await this.stageRuns.save(run));
     this.emitter.emit('stage-run.updated', withStatus);
@@ -493,10 +493,7 @@ export class StageRunsService {
    * call to make explicitly, not a side effect of "restore".
    */
   async unvoidRun(id: string): Promise<StageRunWithStatus> {
-    const run = await this.stageRuns.findOneBy({ id });
-    if (!run) {
-      throw new NotFoundException(`StageRun ${id} not found`);
-    }
+    const run = await this.findOneOrFail(id);
     const survivor = (
       await this.stageRuns.find({
         where: {

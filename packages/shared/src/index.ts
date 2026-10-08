@@ -10,3 +10,4 @@ export * from './live-events';
 export * from './version';
 export * from './start-order';
 export * from './display';
+export * from './settings';

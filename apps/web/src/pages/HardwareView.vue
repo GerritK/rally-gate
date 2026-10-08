@@ -22,13 +22,17 @@ import {
 import { closeLiveStream, openLiveStream, upsert } from '../api/live';
 import { serverNow } from '../api/time';
 import {
-  CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS,
   fetchClockCorrectionThresholdMs,
   fetchSetting,
   saveSetting,
 } from '../api/settings';
 import { fetchStages, type Stage } from '../api/stages';
-import { StageStatus } from '@rally-gate/shared';
+import {
+  AUTO_DISCOVER_GATES_KEY,
+  DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS,
+  gateConfigUrl,
+  StageStatus,
+} from '@rally-gate/shared';
 import {
   formatClockTime,
   formatRelativeTime,
@@ -41,9 +45,7 @@ import GateClockChips from '../components/GateClockChips.vue';
 import GateOnlineChip from '../components/GateOnlineChip.vue';
 import GateVersion from '../components/GateVersion.vue';
 import { useRouter } from 'vue-router';
-import { gateConfigUrl, isOnline, required } from '../format';
-
-const AUTO_DISCOVER_KEY = 'autoDiscoverGates';
+import { isOnline, required } from '../format';
 
 let gatesSource: EventSource;
 
@@ -51,7 +53,7 @@ const gates = ref<Gate[]>([]);
 const gateAssignments = ref<GateAssignment[]>([]);
 const stages = ref<Stage[]>([]);
 const autoDiscover = ref(true);
-const clockCorrectionThresholdMs = ref(CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS);
+const clockCorrectionThresholdMs = ref(DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS);
 const gateDialogOpen = ref(false);
 const gateDraft = ref({ id: '', name: '' });
 const confirm = useConfirm();
@@ -163,14 +165,14 @@ async function onForgetKnownGate(id: string) {
 
 async function onToggleAutoDiscover(value: boolean | null) {
   autoDiscover.value = value ?? true;
-  await saveSetting(AUTO_DISCOVER_KEY, String(autoDiscover.value));
+  await saveSetting(AUTO_DISCOVER_GATES_KEY, String(autoDiscover.value));
 }
 
 onMounted(async () => {
   const [, eventInfo, autoDiscoverSetting, thresholdMs] = await Promise.all([
     refreshGates(),
     fetchEventInfo(),
-    fetchSetting(AUTO_DISCOVER_KEY),
+    fetchSetting(AUTO_DISCOVER_GATES_KEY),
     fetchClockCorrectionThresholdMs(),
   ]);
   if (eventInfo.switchable) {

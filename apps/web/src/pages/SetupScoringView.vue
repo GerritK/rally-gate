@@ -1,15 +1,14 @@
 <script setup lang="ts">
+import {
+  DEFAULT_NOTIONAL_PENALTY_MS,
+  NOTIONAL_PENALTY_MS_KEY,
+} from '@rally-gate/shared';
 import { onMounted, ref } from 'vue';
 import { fetchSetting, saveSetting } from '../api/settings';
 import { useUnsavedChanges } from '../unsaved-changes';
 import { notify } from '@rally-gate/ui';
 
-const NOTIONAL_PENALTY_KEY = 'notionalPenaltyMs';
-/** Mirrors DEFAULT_NOTIONAL_PENALTY_MS server-side; only used until the
- * stored value loads, so the two can't drift in practice. */
-const NOTIONAL_PENALTY_FALLBACK_S = 120;
-
-const notionalPenaltyS = ref(NOTIONAL_PENALTY_FALLBACK_S);
+const notionalPenaltyS = ref(DEFAULT_NOTIONAL_PENALTY_MS / 1000);
 const savingPenalty = ref(false);
 const { markSaved } = useUnsavedChanges(() => notionalPenaltyS.value);
 
@@ -18,7 +17,7 @@ async function onSavePenalty() {
   savingPenalty.value = true;
   try {
     await saveSetting(
-      NOTIONAL_PENALTY_KEY,
+      NOTIONAL_PENALTY_MS_KEY,
       String(Math.round(notionalPenaltyS.value * 1000)),
     );
     markSaved();
@@ -29,7 +28,7 @@ async function onSavePenalty() {
 }
 
 onMounted(async () => {
-  const storedMs = Number(await fetchSetting(NOTIONAL_PENALTY_KEY));
+  const storedMs = Number(await fetchSetting(NOTIONAL_PENALTY_MS_KEY));
   if (Number.isFinite(storedMs) && storedMs > 0) {
     notionalPenaltyS.value = storedMs / 1000;
   }

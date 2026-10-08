@@ -33,6 +33,8 @@ Fields the DTOs leave out on purpose, because only the server may set them:
 
 `src/config/dto-contracts.spec.ts` pins this list with the real pipe config — add a case there for each new server-owned field. Since unknown properties are a 400, **a DTO change is a breaking API change**: `apps/web` and `scripts/seed-demo-data.js` change in the same commit.
 
+A missing stage is a 404 via `StagesService.findOneOrFail`; don't hand-roll the check again.
+
 ## TypeORM entities
 
 - **Clearing a column means `null`, never `undefined`.** `save()` skips `undefined` properties and writes `null` as SQL NULL. Type nullable columns as `T | null`.

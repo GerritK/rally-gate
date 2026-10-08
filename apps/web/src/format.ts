@@ -1,5 +1,4 @@
 import {
-  GATE_CONFIG_PORT,
   GateRole,
   HEARTBEAT_ONLINE_THRESHOLD_MS,
   StageRunStatus,
@@ -205,10 +204,6 @@ export function eventName(file: string): string {
 /** Vuetify field rule for a field the form can't save without. */
 export const required = (value: unknown) =>
   (value !== '' && value != null) || 'Required';
-
-export function gateConfigUrl(address: string): string {
-  return `http://${address.includes(':') ? `[${address}]` : address}:${GATE_CONFIG_PORT}/`;
-}
 
 export function gateRoleLabel(
   assignment: Pick<GateAssignment, 'role' | 'splitIndex'>,
