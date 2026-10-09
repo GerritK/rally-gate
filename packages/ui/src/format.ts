@@ -1,3 +1,5 @@
+import { t } from './i18n';
+
 /**
  * Rally timing conventions — distinct formats for distinct kinds of value,
  * not one generic "format a duration" function:
@@ -14,8 +16,10 @@
  *   rather than reusing formatStageDuration for it.
  */
 
-/** Clock time (start/finish/heartbeat instants): HH:MM:SS, 24h. */
-export function formatClockTime(iso: string): string {
+/** Clock time (start/finish/heartbeat instants): HH:MM:SS, 24h. Also the
+ *  value of an `<input type="time" step="1">`; empty for no time. */
+export function formatClockTime(iso?: string): string {
+  if (!iso) return '';
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
@@ -39,6 +43,23 @@ export function formatStageDuration(ms: number): string {
 }
 
 /**
+ * Inverse of formatStageDuration, for a time read off a stopwatch:
+ * `3:12.4`, `03:12.45`, `72.4`, `1:02:03.4`. Null unless it's a positive
+ * duration.
+ */
+export function parseStageDuration(text: string): number | null {
+  const match = /^(?:(?:(\d+):)?(\d+):)?(\d+(?:[.,]\d{1,3})?)$/.exec(
+    text.trim(),
+  );
+  if (!match) return null;
+  const [, h = '0', m = '0', s] = match;
+  const ms = Math.round(
+    (Number(h) * 3600 + Number(m) * 60 + Number(s.replace(',', '.'))) * 1000,
+  );
+  return ms > 0 ? ms : null;
+}
+
+/**
  * Relative "how long ago" for freshness checks (gate heartbeats, that kind
  * of thing) — pass a live-ticking `now` from the caller (e.g. a ref updated
  * on a 1s interval) so the display keeps counting up without new data
@@ -47,9 +68,9 @@ export function formatStageDuration(ms: number): string {
  */
 export function formatRelativeTime(iso: string, now: number): string {
   const diffSec = Math.floor((now - new Date(iso).getTime()) / 1000);
-  if (diffSec < 5) return 'just now';
-  if (diffSec < 60) return `${diffSec}s ago`;
+  if (diffSec < 5) return t('ui.justNow');
+  if (diffSec < 60) return t('ui.secondsAgo', { n: diffSec });
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
-  return `${Math.floor(diffMin / 60)}h ago`;
+  if (diffMin < 60) return t('ui.minutesAgo', { n: diffMin });
+  return t('ui.hoursAgo', { n: Math.floor(diffMin / 60) });
 }

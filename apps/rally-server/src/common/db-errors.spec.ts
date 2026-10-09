@@ -1,7 +1,9 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { StageRun } from '../modules/stage-runs/stage-run.entity';
-import { Vehicle } from '../modules/vehicles/vehicle.entity';
+import { Entry } from '../modules/entries/entry.entity';
+import { EntryClass } from '../modules/entries/entry-class.entity';
+import { EntryTransponder } from '../modules/entries/entry-transponder.entity';
 import { isUniqueViolation } from './db-errors';
 
 /**
@@ -10,7 +12,7 @@ import { isUniqueViolation } from './db-errors';
  * The whole job of `isUniqueViolation` is to recognise what the driver
  * actually throws, so asserting against a fabricated error only tests the
  * fabrication. Getting this wrong is quiet and expensive: a missed match
- * turns a 409 into a 500 on `POST /stage-runs` and `POST /vehicles`, and
+ * turns a 409 into a 500 on `POST /stage-runs` and `POST /entries`, and
  * makes `startRun` rethrow instead of recovering from a lost race.
  */
 describe('isUniqueViolation', () => {
@@ -20,7 +22,7 @@ describe('isUniqueViolation', () => {
     dataSource = new DataSource({
       type: 'better-sqlite3',
       database: ':memory:',
-      entities: [Vehicle, StageRun],
+      entities: [Entry, EntryClass, EntryTransponder, StageRun],
       synchronize: true,
     });
     await dataSource.initialize();
@@ -31,13 +33,13 @@ describe('isUniqueViolation', () => {
   });
 
   it('recognises a duplicate on a plain unique column', async () => {
-    const vehicles = dataSource.getRepository(Vehicle);
-    await vehicles.save(
-      vehicles.create({ startNumber: '7', driverName: 'First' }),
+    const entries = dataSource.getRepository(Entry);
+    await entries.save(
+      entries.create({ startNumber: 7, driverFirstName: 'First' }),
     );
 
-    const err = await vehicles
-      .save(vehicles.create({ startNumber: '7', driverName: 'Second' }))
+    const err = await entries
+      .save(entries.create({ startNumber: 7, driverFirstName: 'Second' }))
       .then(
         () => null,
         (e: unknown) => e,
@@ -48,11 +50,11 @@ describe('isUniqueViolation', () => {
   });
 
   it('recognises a duplicate on the partial unique index over surviving runs', async () => {
-    // The index that enforces one non-voided attempt per vehicle+stage —
+    // The index that enforces one non-voided attempt per entry+stage —
     // a different constraint kind, so worth pinning separately.
     const runs = dataSource.getRepository(StageRun);
     const base = {
-      vehicleId: 'v1',
+      entryId: 'v1',
       stageId: 'SS1',
       startTime: new Date('2026-08-23T10:00:00.000Z'),
     };

@@ -10,16 +10,19 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { OnEvent } from '@nestjs/event-emitter';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
-  DetectionEvent,
+  DEFAULT_MIN_STAGE_DURATION_MS,
   DETECTION_TOPIC_PREFIX,
+  DetectionEvent,
   GateRole,
+  isOutOfEvent,
   StageStatus,
+  TransponderKind,
 } from '@rally-gate/shared';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { Gate } from '../gates/gate.entity';
 import { GatesService } from '../gates/gates.service';
-import { VehiclesService } from '../vehicles/vehicles.service';
+import { EntriesService } from '../entries/entries.service';
 import { StageRunsService } from '../stage-runs/stage-runs.service';
 import { StagesService } from '../stages/stages.service';
 import { DetectionEventRecord } from './detection-event.entity';
@@ -43,6 +46,13 @@ export const REPROCESS_INTERVAL_MS = 30_000;
 const MAX_ID_LENGTH = 128;
 
 /**
+ * A real detection is a few hundred bytes. The cap leaves room for `metadata`
+ * (the ESP32 gate's `timeUnknown`), which is stored verbatim as evidence and
+ * otherwise unbounded on an unauthenticated broker.
+ */
+const MAX_PAYLOAD_BYTES = 4096;
+
+/**
  * MQTT is the one ingress the global `ValidationPipe` doesn't cover, and the
  * broker is unauthenticated — anything on the rally network can publish to a
  * gate topic. An unparseable `timestampGate` silently poisons a run's
@@ -50,11 +60,18 @@ const MAX_ID_LENGTH = 128;
  * lands in the pending list forever. Returns null for anything malformed.
  *
  * `transponderId` may be absent — a light barrier sees a passing without
- * identifying it — but if present it must be a usable id.
+ * identifying it — but if present it must be a usable id. An absent
+ * `transponderKind` is RC; an unknown one is refused rather than guessed.
  */
 function parseDetection(payload: unknown): DetectionEvent | null {
-  const { eventId, gateId, transponderId, timestampGate, source } = (payload ??
-    {}) as Record<string, unknown>;
+  const {
+    eventId,
+    gateId,
+    transponderId,
+    transponderKind = TransponderKind.RC,
+    timestampGate,
+    source,
+  } = (payload ?? {}) as Record<string, unknown>;
 
   const isUsableId = (value: unknown): value is string =>
     typeof value === 'string' &&
@@ -68,6 +85,11 @@ function parseDetection(payload: unknown): DetectionEvent | null {
     return null;
   }
   if (
+    !Object.values(TransponderKind).includes(transponderKind as TransponderKind)
+  ) {
+    return null;
+  }
+  if (
     typeof timestampGate !== 'string' ||
     Number.isNaN(new Date(timestampGate).getTime())
   ) {
@@ -78,6 +100,7 @@ function parseDetection(payload: unknown): DetectionEvent | null {
     eventId,
     gateId,
     transponderId,
+    transponderKind: transponderKind as TransponderKind,
     timestampGate,
     source: typeof source === 'string' ? source.slice(0, MAX_ID_LENGTH) : '',
   };
@@ -93,7 +116,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     private readonly events: Repository<DetectionEventRecord>,
     private readonly gatesService: GatesService,
     private readonly gateAssignmentsService: GateAssignmentsService,
-    private readonly vehiclesService: VehiclesService,
+    private readonly entriesService: EntriesService,
     private readonly stageRunsService: StageRunsService,
     private readonly stagesService: StagesService,
     private readonly emitter: EventEmitter2,
@@ -109,8 +132,9 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     clearInterval(this.reprocessTimer);
   }
 
-  findRecent(limit = 100): Promise<DetectionEventRecord[]> {
+  findRecent(gateId?: string, limit = 100): Promise<DetectionEventRecord[]> {
     return this.events.find({
+      where: gateId ? { gateId } : {},
       order: { timestampServer: 'DESC' },
       take: limit,
     });
@@ -130,47 +154,74 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Unidentified passings waiting for a marshal, oldest first. */
-  findAwaitingVehicle(): Promise<DetectionEventRecord[]> {
+  findAwaitingEntry(): Promise<DetectionEventRecord[]> {
     return this.events.find({
-      where: { awaitingVehicle: true },
+      where: { awaitingEntry: true },
       order: { timestampGate: 'ASC' },
     });
   }
 
   /**
-   * Times an unidentified passing as the given vehicle. Refuses rather than
+   * Times an unidentified passing as the given entry. Refuses rather than
    * silently consuming it when the rules would do nothing — a finish for a car
    * that never started, a start for one already running, a stage no longer
    * live — so the marshal hears about it while the passing is still listed.
    */
-  async assignVehicle(
+  async assignEntry(
     eventId: string,
-    vehicleId: string,
+    entryId: string,
   ): Promise<DetectionEventRecord> {
     const record = await this.findAwaitingOrThrow(eventId);
-    if (!(await this.vehiclesService.findOne(vehicleId))) {
-      throw new NotFoundException(`Vehicle ${vehicleId} not found`);
+    if (!(await this.entriesService.findOne(entryId))) {
+      throw new NotFoundException(`Entry ${entryId} not found`);
     }
     const gate = await this.gatesService.findOne(record.gateId);
     const applied =
-      gate && (await this.applyRules(gate, vehicleId, effectiveTime(record)));
+      gate && (await this.applyRules(gate, entryId, effectiveTime(record)));
     if (!applied) {
       throw new ConflictException(
-        `This passing can't be timed for that vehicle: its stage is no longer active, or the vehicle has no matching run (a finish or split needs its start assigned first)`,
+        `This passing can't be timed for that entry: its stage is no longer active, the entry is withdrawn or disqualified, or it has no matching run (a finish or split needs its start assigned first)`,
       );
     }
-    record.vehicleId = vehicleId;
-    record.awaitingVehicle = false;
+    record.entryId = entryId;
+    record.awaitingEntry = false;
     record.processed = true;
     await this.events.save(record);
     await this.emitAwaitingChanged();
     return record;
   }
 
+  /**
+   * A closed stage's unassigned passings can no longer be timed (assign 409s
+   * on a closed stage), and once a gate is reused by another stage they'd be
+   * read as that stage's. So they leave the list; the records stay as
+   * evidence. Live Timing's close confirmation says how many.
+   */
+  @OnEvent('stage.closed')
+  async discardPassingsOfClosedStage({
+    stageId,
+    gateIds,
+  }: {
+    stageId: string;
+    gateIds: string[];
+  }): Promise<void> {
+    if (gateIds.length === 0) return;
+    const { affected } = await this.events.update(
+      { awaitingEntry: true, gateId: In(gateIds) },
+      { awaitingEntry: false },
+    );
+    if (affected) {
+      this.logger.warn(
+        `Discarded ${affected} unassigned passing(s) on closed stage ${stageId}`,
+      );
+      await this.emitAwaitingChanged();
+    }
+  }
+
   /** For a passing that was no car at all: a marshal, a dog, a double trigger. */
   async dismissAwaiting(eventId: string): Promise<DetectionEventRecord> {
     const record = await this.findAwaitingOrThrow(eventId);
-    record.awaitingVehicle = false;
+    record.awaitingEntry = false;
     await this.events.save(record);
     await this.emitAwaitingChanged();
     return record;
@@ -180,9 +231,9 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     eventId: string,
   ): Promise<DetectionEventRecord> {
     const record = await this.events.findOneBy({ eventId });
-    if (!record?.awaitingVehicle) {
+    if (!record?.awaitingEntry) {
       throw new NotFoundException(
-        `No passing ${eventId} is waiting for a vehicle`,
+        `No passing ${eventId} is waiting for an entry`,
       );
     }
     return record;
@@ -248,7 +299,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
   private async emitAwaitingChanged(): Promise<void> {
     try {
       this.emitter.emit('detection.awaiting-changed', {
-        awaiting: await this.findAwaitingVehicle(),
+        awaiting: await this.findAwaitingEntry(),
       });
     } catch (err) {
       this.logger.warn(
@@ -271,9 +322,16 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     if (!match) {
       return;
     }
+    if (payload.length > MAX_PAYLOAD_BYTES) {
+      this.logger.warn(
+        `Ignoring ${payload.length}-byte detection payload on ${topic} (limit ${MAX_PAYLOAD_BYTES})`,
+      );
+      return;
+    }
+    const raw = payload.toString();
     let parsed: unknown;
     try {
-      parsed = JSON.parse(payload.toString());
+      parsed = JSON.parse(raw);
     } catch {
       this.logger.warn(`Ignoring malformed detection payload on ${topic}`);
       return;
@@ -281,14 +339,17 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     const detection = parseDetection(parsed);
     if (!detection) {
       this.logger.warn(
-        `Ignoring detection on ${topic} with missing or invalid fields — expected non-empty eventId and gateId, a usable transponderId if any, and a parseable timestampGate`,
+        `Ignoring detection on ${topic} with missing or invalid fields — expected non-empty eventId and gateId, a usable transponderId if any, a known transponderKind if any, and a parseable timestampGate`,
       );
       return;
     }
-    await this.processDetection(detection);
+    await this.processDetection(detection, raw);
   }
 
-  private async processDetection(detection: DetectionEvent): Promise<void> {
+  private async processDetection(
+    detection: DetectionEvent,
+    rawPayload: string,
+  ): Promise<void> {
     if (await this.isDuplicate(detection.eventId)) {
       return;
     }
@@ -299,18 +360,41 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       );
     }
     const { transponderId } = detection;
-    const vehicle = transponderId
-      ? await this.vehiclesService.findByTransponder(transponderId)
+    const transponderKind = transponderId
+      ? (detection.transponderKind ?? TransponderKind.RC)
       : null;
-    if (transponderId && !vehicle) {
+    const matches =
+      transponderId && transponderKind
+        ? await this.entriesService.findByTransponder(
+            transponderKind,
+            transponderId,
+          )
+        : [];
+    // A transponder moved off a withdrawn car is often still registered on it.
+    const inEvent = matches.filter((e) => !isOutOfEvent(e.status));
+    const entry =
+      matches.length === 1
+        ? matches[0]
+        : inEvent.length === 1
+          ? inEvent[0]
+          : null;
+    // On several cars it identifies none of them, so it's held like a beam
+    // passing rather than timed for whichever car the database returns first.
+    const shared = !entry && matches.length > 1;
+    if (transponderId && matches.length === 0) {
       this.logger.warn(
-        `Detection for unregistered transponder ${transponderId}`,
+        `Detection for unregistered ${transponderKind} transponder ${transponderId}`,
+      );
+    }
+    if (shared) {
+      this.logger.warn(
+        `Transponder ${transponderId} is on ${matches.length} entries — holding the passing for a marshal`,
       );
     }
     // Only a passing at a live gate needs a marshal; one at an idle gate (setup,
     // someone walking through) has nothing to be timed against.
-    const awaitingVehicle =
-      !transponderId &&
+    const awaitingEntry =
+      (!transponderId || shared) &&
       !!gate &&
       !!(await this.gateAssignmentsService.findActiveForGate(gate.id));
 
@@ -327,12 +411,15 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       eventId: detection.eventId,
       gateId: detection.gateId,
       transponderId: transponderId ?? null,
-      vehicleId: vehicle?.id ?? null,
-      awaitingVehicle,
+      transponderKind,
+      entryId: entry?.id ?? null,
+      awaitingEntry,
       timestampGate,
       timestampServer: new Date(),
       clockCorrectionMs,
-      rawPayload: JSON.stringify(detection),
+      // As published, not as parsed: parsing keeps only the fields the rules
+      // use, and evidence like the ESP32's `metadata.timeUnknown` would go.
+      rawPayload,
       processed: false,
     });
     try {
@@ -345,19 +432,22 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       }
       throw err;
     }
-    this.emitter.emit('detection.created', record);
-    if (awaitingVehicle) {
+    if (awaitingEntry) {
       await this.emitAwaitingChanged();
     }
 
     await this.applyRulesForRecord(record);
+    // After the rules, not before: the payload carries `processed`, and
+    // emitted earlier it is always false, so every live detection would read
+    // as a rule failure.
+    this.emitter.emit('detection.created', record);
   }
 
   /**
    * QoS 1 is at-least-once: a gate that never saw the PUBACK republishes a
    * detection the server already stored. The stored record must win — a
    * re-ingest would re-measure `clockCorrectionMs` and, for a passing a
-   * marshal already assigned, clear `vehicleId` and list it as awaiting again.
+   * marshal already assigned, clear `entryId` and list it as awaiting again.
    * `save()` would do exactly that, as it upserts on the primary key.
    */
   private async isDuplicate(eventId: string): Promise<boolean> {
@@ -384,11 +474,11 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
   ): Promise<boolean> {
     try {
       const gate = await this.gatesService.findOne(record.gateId);
-      // An unknown gate or unidentified vehicle is not a failure — there's
+      // An unknown gate or unidentified entry is not a failure — there's
       // nothing to apply and retrying won't change that, so it's marked
       // processed to keep the pending list to real problems.
-      if (gate && record.vehicleId) {
-        await this.applyRules(gate, record.vehicleId, effectiveTime(record));
+      if (gate && record.entryId) {
+        await this.applyRules(gate, record.entryId, effectiveTime(record));
       }
       record.processed = true;
       await this.events.save(record);
@@ -409,7 +499,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
    */
   private async applyRules(
     gate: Gate,
-    vehicleId: string,
+    entryId: string,
     at: Date,
   ): Promise<boolean> {
     const assignment = await this.gateAssignmentsService.findActiveForGate(
@@ -419,6 +509,16 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       return false;
     }
     const stageId = assignment.stageId;
+
+    // Out of the event: the passing is evidence (a protest may turn on it),
+    // so it stays stored, but it times nothing for this car.
+    const entry = await this.entriesService.findOne(entryId);
+    if (entry && isOutOfEvent(entry.status)) {
+      this.logger.warn(
+        `#${entry.startNumber} is ${entry.status} — storing the passing at gate ${gate.id} without timing it`,
+      );
+      return false;
+    }
 
     // `GateAssignment.active` and `Stage.status` are two records kept in step
     // by `StagesService` in separate steps, so a crash between them leaves a
@@ -432,21 +532,38 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       return false;
     }
     if (assignment.role === GateRole.STAGE_START) {
-      const run = await this.stageRunsService.startRun(vehicleId, stageId, at);
+      const run = await this.stageRunsService.startRun(entryId, stageId, at);
       this.emitter.emit('stage-run.updated', run);
       // startRun hands back the existing run for a duplicate start.
       return run.startTime.getTime() === at.getTime();
     }
     if (assignment.role === GateRole.STAGE_FINISH) {
-      const run = await this.stageRunsService.finishRun(vehicleId, stageId, at);
+      const run = await this.stageRunsService.finishRun(entryId, stageId, at);
       if (run) {
         this.emitter.emit('stage-run.updated', run);
       }
       return !!run;
     }
+    if (assignment.role === GateRole.STAGE_START_FINISH) {
+      const run = await this.stageRunsService.startOrFinishRun(
+        entryId,
+        stageId,
+        at,
+        stage.minDurationMs ?? DEFAULT_MIN_STAGE_DURATION_MS,
+      );
+      if (run) {
+        this.emitter.emit('stage-run.updated', run);
+      }
+      // A duplicate start hands back the existing run, unchanged.
+      return (
+        !!run &&
+        (run.startTime.getTime() === at.getTime() ||
+          run.finishTime?.getTime() === at.getTime())
+      );
+    }
     if (assignment.role === GateRole.STAGE_SPLIT) {
       const split = await this.stageRunsService.recordSplit(
-        vehicleId,
+        entryId,
         stageId,
         gate.id,
         assignment.splitIndex ?? 0,

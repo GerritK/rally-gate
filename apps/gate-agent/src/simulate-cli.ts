@@ -1,4 +1,8 @@
-import { detectionTopicFor, DetectionEvent } from '@rally-gate/shared';
+import {
+  detectionTopicFor,
+  DetectionEvent,
+  TransponderKind,
+} from '@rally-gate/shared';
 import mqtt from 'mqtt';
 import { ulid } from 'ulid';
 
@@ -12,6 +16,8 @@ const gateId = arg('gate', process.env.GATE_ID ?? 'START_WP1')!;
 const transponderId = process.argv.includes('--beam')
   ? undefined
   : arg('transponder', '1234567')!;
+// --kind NFC for a tap; left out, the server reads it as RC.
+const transponderKind = arg('kind') as TransponderKind | undefined;
 const host = process.env.MQTT_HOST ?? 'localhost';
 const port = process.env.MQTT_PORT ?? '57431';
 
@@ -22,6 +28,7 @@ client.on('connect', () => {
     eventId: ulid(),
     gateId,
     transponderId,
+    transponderKind,
     timestampGate: new Date().toISOString(),
     source: 'simulated-cli',
   };

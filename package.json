@@ -17,7 +17,9 @@
     "simulate": "npm run simulate --workspace=@rally-gate/gate-agent --",
     "seed-demo-data": "node scripts/seed-demo-data.js",
     "build": "npm run build --workspaces --if-present",
-    "format:check": "prettier --config apps/rally-server/.prettierrc --check \"apps/gate-agent/src/**/*.ts\" \"apps/gate-config/src/**/*.ts\" \"apps/gate-config/web/src/**/*.{ts,vue}\" \"apps/web/src/**/*.{ts,vue}\" \"packages/shared/src/**/*.ts\" \"packages/ui/src/**/*.{ts,css}\""
+    "format": "npm run format:check -- --write",
+    "format:check": "prettier --config apps/rally-server/.prettierrc --check \"apps/gate-agent/src/**/*.ts\" \"apps/gate-config/src/**/*.ts\" \"apps/gate-config/web/src/**/*.{ts,vue}\" \"apps/web/src/**/*.{ts,vue}\" \"packages/shared/src/**/*.ts\" \"packages/ui/src/**/*.{ts,vue,css}\"",
+    "screenshots": "node scripts/screenshots.js"
   },
   "devDependencies": {
     "rolldown": "~1.1.3"

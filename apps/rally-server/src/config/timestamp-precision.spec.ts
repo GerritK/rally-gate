@@ -48,7 +48,7 @@ describe('timestamp precision through sqlite', () => {
 
     const saved = await runs.save(
       runs.create({
-        vehicleId: 'v1',
+        entryId: 'v1',
         stageId: 'SS1',
         attempt: 1,
         startTime,
@@ -77,7 +77,7 @@ describe('timestamp precision through sqlite', () => {
       [90_100, 90_200].map((durationMs, i) =>
         runs.save(
           runs.create({
-            vehicleId: `tenths-${i}`,
+            entryId: `tenths-${i}`,
             stageId: 'SS2',
             attempt: 1,
             startTime: start,

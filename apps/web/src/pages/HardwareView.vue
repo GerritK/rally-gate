@@ -19,45 +19,48 @@ import {
   type Gate,
   type GatePowerOffResult,
 } from '../api/gates';
-import { openLiveStream } from '../api/live';
-import { serverVersion } from '../api/version';
-import { fetchSetting, saveSetting } from '../api/settings';
-import { fetchStages, type Stage } from '../api/stages';
-import { GATE_CONFIG_PORT, StageStatus } from '@rally-gate/shared';
-import { formatClockTime, formatRelativeTime } from '@rally-gate/ui';
+import { closeLiveStream, openLiveStream, upsert } from '../api/live';
+import { serverNow } from '../api/time';
 import {
-  clockOffsetColor,
-  clockOffsetHint,
-  formatClockOffset,
-  isOnline,
-} from '../format';
+  fetchClockCorrectionThresholdMs,
+  fetchSetting,
+  saveSetting,
+} from '../api/settings';
+import { fetchStages, type Stage } from '../api/stages';
+import {
+  AUTO_DISCOVER_GATES_KEY,
+  DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS,
+  gateConfigUrl,
+  StageStatus,
+} from '@rally-gate/shared';
+import {
+  formatClockTime,
+  formatRelativeTime,
+  notify,
+  notifyError,
+  t,
+  useConfirm,
+} from '@rally-gate/ui';
+import FormDialog from '../components/FormDialog.vue';
+import GateClockChips from '../components/GateClockChips.vue';
+import GateOnlineChip from '../components/GateOnlineChip.vue';
+import GateVersion from '../components/GateVersion.vue';
+import { useRouter } from 'vue-router';
+import { isOnline, required } from '../format';
 
-const AUTO_DISCOVER_KEY = 'autoDiscoverGates';
-const CLOCK_CORRECTION_THRESHOLD_KEY = 'clockCorrectionThresholdMs';
-/** Mirrors DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS; only used until the real
- * value arrives from settings, so the two can't drift in practice. */
-const CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS = 1_000;
-
-const now = ref(Date.now());
-let nowTimer: ReturnType<typeof setInterval>;
 let gatesSource: EventSource;
 
 const gates = ref<Gate[]>([]);
 const gateAssignments = ref<GateAssignment[]>([]);
 const stages = ref<Stage[]>([]);
 const autoDiscover = ref(true);
-const clockCorrectionThresholdMs = ref(CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS);
-const newGate = ref({ id: '', name: '' });
-const creatingGate = ref(false);
-const editingGateId = ref<string | null>(null);
-const deleteConflictGate = ref<Gate | null>(null);
-const deleteConflictMessage = ref('');
+const clockCorrectionThresholdMs = ref(DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS);
+const gateDialogOpen = ref(false);
+const gateDraft = ref({ id: '', name: '' });
+const confirm = useConfirm();
+const router = useRouter();
 /** Null when this server keeps no per-computer list (DB_PATH, Postgres). */
 const knownGates = ref<KnownGate[] | null>(null);
-
-function gateConfigUrl(address: string): string {
-  return `http://${address.includes(':') ? `[${address}]` : address}:${GATE_CONFIG_PORT}/`;
-}
 
 const confirmingPowerOff = ref(false);
 const poweringOff = ref(false);
@@ -66,13 +69,22 @@ const stageActive = computed(() =>
   stages.value.some((s) => s.status === StageStatus.ACTIVE),
 );
 
+/** Never disabled: a disabled button can't say why, so it says it here. */
+function onShutDownAll() {
+  if (stageActive.value) {
+    notifyError(new Error(t('hardware.stageActive')));
+    return;
+  }
+  confirmingPowerOff.value = true;
+}
+
 async function onPowerOffAll() {
   poweringOff.value = true;
   try {
     powerOffResults.value = await powerOffAllGates();
   } catch (err) {
     confirmingPowerOff.value = false;
-    alert(err instanceof Error ? err.message : 'Failed to shut down gates');
+    throw err;
   } finally {
     poweringOff.value = false;
   }
@@ -89,7 +101,9 @@ const gateIds = computed(() => new Set(gates.value.map((g) => g.id)));
  * assignments can't be removed, so the gate can't be deleted at all. */
 const lockedGateIds = computed(() => {
   const lockedStageIds = new Set(
-    stages.value.filter((s) => s.status !== 'NOT_STARTED').map((s) => s.id),
+    stages.value
+      .filter((s) => s.status !== StageStatus.NOT_STARTED)
+      .map((s) => s.id),
   );
   return new Set(
     gateAssignments.value
@@ -99,18 +113,21 @@ const lockedGateIds = computed(() => {
 });
 
 async function refreshGates() {
-  gates.value = await fetchGates();
-  gateAssignments.value = await fetchGateAssignments();
-  stages.value = await fetchStages();
+  [gates.value, gateAssignments.value, stages.value] = await Promise.all([
+    fetchGates(),
+    fetchGateAssignments(),
+    fetchStages(),
+  ]);
 }
 
-function toggleEditGate(gateId: string) {
-  editingGateId.value = editingGateId.value === gateId ? null : gateId;
+function openGateDialog() {
+  gateDraft.value = { id: '', name: '' };
+  gateDialogOpen.value = true;
 }
 
-async function onRenameGate(gate: Gate, name: string) {
-  if (!name || name === gate.name) return;
-  await upsertGate(gate.id, { name });
+async function onSaveGate() {
+  const id = gateDraft.value.id.trim();
+  await upsertGate(id, { name: gateDraft.value.name.trim() || id });
   await refreshGates();
 }
 
@@ -118,21 +135,26 @@ async function onDeleteGate(gate: Gate, force = false) {
   try {
     await deleteGate(gate.id, force);
     gates.value = gates.value.filter((g) => g.id !== gate.id);
-    deleteConflictGate.value = null;
+    notify(t('hardware.deleted'));
   } catch (err) {
-    // Narrowed into a local so the type survives into the branch below —
-    // `err instanceof ApiError` inside the ternary doesn't carry past it,
-    // which is why `err.message` was an error on `unknown`.
     const conflict = err instanceof ApiError && err.status === 409 ? err : null;
     const assignmentCount = (
       conflict?.body as { assignmentCount?: number } | null
     )?.assignmentCount;
-    if (conflict && assignmentCount) {
-      deleteConflictGate.value = gate;
-      deleteConflictMessage.value = conflict.message;
-    } else {
-      alert(err instanceof Error ? err.message : 'Failed to delete gate');
-    }
+    if (!conflict || !assignmentCount) throw err;
+    if (
+      await confirm({
+        title: t('hardware.deleteWithAssignmentsTitle'),
+        text: t(
+          'hardware.deleteWithAssignmentsText',
+          { id: gate.id, n: assignmentCount },
+          assignmentCount,
+        ),
+        confirmText: t('hardware.deleteWithAssignments'),
+        color: 'error',
+      })
+    )
+      await onDeleteGate(gate, true);
   }
 }
 
@@ -146,92 +168,49 @@ async function onForgetKnownGate(id: string) {
   knownGates.value = knownGates.value?.filter((g) => g.id !== id) ?? null;
 }
 
-function onConfirmDeleteGate() {
-  if (deleteConflictGate.value) onDeleteGate(deleteConflictGate.value, true);
-}
-
 async function onToggleAutoDiscover(value: boolean | null) {
   autoDiscover.value = value ?? true;
-  await saveSetting(AUTO_DISCOVER_KEY, String(autoDiscover.value));
-}
-
-async function onCreateGate() {
-  if (!newGate.value.id || creatingGate.value) return;
-  creatingGate.value = true;
-  try {
-    await upsertGate(newGate.value.id, {
-      name: newGate.value.name || newGate.value.id,
-    });
-    newGate.value = { id: '', name: '' };
-    await refreshGates();
-  } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to add gate');
-  } finally {
-    creatingGate.value = false;
-  }
+  await saveSetting(AUTO_DISCOVER_GATES_KEY, String(autoDiscover.value));
 }
 
 onMounted(async () => {
-  await refreshGates();
-  if ((await fetchEventInfo()).switchable) {
+  const [, eventInfo, autoDiscoverSetting, thresholdMs] = await Promise.all([
+    refreshGates(),
+    fetchEventInfo(),
+    fetchSetting(AUTO_DISCOVER_GATES_KEY),
+    fetchClockCorrectionThresholdMs(),
+  ]);
+  if (eventInfo.switchable) {
     knownGates.value = await fetchKnownGates();
   }
-  autoDiscover.value = (await fetchSetting(AUTO_DISCOVER_KEY)) !== 'false';
-  clockCorrectionThresholdMs.value =
-    Number(await fetchSetting(CLOCK_CORRECTION_THRESHOLD_KEY)) ||
-    CLOCK_CORRECTION_THRESHOLD_FALLBACK_MS;
+  autoDiscover.value = autoDiscoverSetting !== 'false';
+  clockCorrectionThresholdMs.value = thresholdMs;
   gatesSource = openLiveStream(
-    {
-      gate: (gate) => {
-        const idx = gates.value.findIndex((g) => g.id === gate.id);
-        if (idx === -1) gates.value.push(gate);
-        else gates.value[idx] = gate;
-      },
-    },
+    { gate: (gate) => upsert(gates.value, gate, 'id') },
     async () => {
       gates.value = await fetchGates();
     },
   );
-  nowTimer = setInterval(() => {
-    now.value = Date.now();
-  }, 1000);
 });
 
 onUnmounted(() => {
-  gatesSource?.close();
-  clearInterval(nowTimer);
+  if (gatesSource) closeLiveStream(gatesSource);
 });
 </script>
 
 <template>
   <v-card class="mb-6">
     <v-card-title class="d-flex align-center">
-      Gates
+      {{ $t('hardware.gates') }}
       <v-spacer />
-      <v-tooltip
-        :disabled="!stageActive"
-        text="A stage is active — close it first"
-      >
-        <template #activator="{ props: tooltipProps }">
-          <span v-bind="tooltipProps">
-            <v-btn
-              size="small"
-              variant="outlined"
-              color="error"
-              prepend-icon="mdi-power"
-              :disabled="stageActive"
-              @click="confirmingPowerOff = true"
-            >
-              Shut down all gates
-            </v-btn>
-          </span>
-        </template>
-      </v-tooltip>
+      <v-btn variant="tonal" prepend-icon="mdi-plus" @click="openGateDialog">
+        {{ $t('hardware.addGate') }}
+      </v-btn>
     </v-card-title>
     <v-card-text>
       <v-switch
         :model-value="autoDiscover"
-        label="Auto-discover new gates from their first heartbeat"
+        :label="$t('hardware.autoDiscover')"
         color="primary"
         density="comfortable"
         hide-details
@@ -241,227 +220,135 @@ onUnmounted(() => {
       <v-table density="comfortable">
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Online</th>
-            <th>Last Heartbeat</th>
-            <th>Clock</th>
-            <th>Capabilities</th>
-            <th>Version</th>
-            <th></th>
+            <th>{{ $t('stages.id') }}</th>
+            <th>{{ $t('stages.name') }}</th>
+            <th>{{ $t('hardware.online') }}</th>
+            <th>{{ $t('hardware.lastHeartbeat') }}</th>
+            <th>{{ $t('gate.clock') }}</th>
+            <th>{{ $t('gate.capabilities') }}</th>
+            <th>{{ $t('gate.version') }}</th>
+            <th width="1%"></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="gate in gates" :key="gate.id">
-            <td class="text-no-wrap">
-              {{ gate.id }}
-              <v-btn
-                v-if="gate.address && isOnline(gate, now)"
-                :href="gateConfigUrl(gate.address)"
-                target="_blank"
-                icon="mdi-open-in-new"
-                size="x-small"
-                variant="text"
-                :title="`Open gate config (${gate.address})`"
-              />
-            </td>
-            <td>
-              <v-text-field
-                v-if="editingGateId === gate.id"
-                :model-value="gate.name"
-                density="compact"
-                hide-details
-                @change="
-                  onRenameGate(gate, ($event.target as HTMLInputElement).value)
-                "
-              />
-              <span v-else>{{ gate.name }}</span>
-            </td>
-            <td>
-              <v-chip
-                size="small"
-                :color="isOnline(gate, now) ? 'success' : 'error'"
-              >
-                {{ isOnline(gate, now) ? 'online' : 'offline' }}
-              </v-chip>
-            </td>
+          <tr
+            v-for="gate in gates"
+            :key="gate.id"
+            class="cursor-pointer"
+            @click="router.push(`/hardware/gates/${gate.id}`)"
+          >
+            <td class="text-no-wrap">{{ gate.id }}</td>
+            <td>{{ gate.name }}</td>
+            <td><GateOnlineChip :gate="gate" /></td>
             <td
-              :title="
+              v-tooltip:top="
                 gate.lastHeartbeatAt
                   ? formatClockTime(gate.lastHeartbeatAt)
-                  : undefined
+                  : ''
               "
             >
               {{
                 gate.lastHeartbeatAt
-                  ? formatRelativeTime(gate.lastHeartbeatAt, now)
-                  : 'never'
+                  ? formatRelativeTime(gate.lastHeartbeatAt, serverNow)
+                  : $t('hardware.never')
               }}
             </td>
-            <td>
-              <v-tooltip
-                :text="
-                  clockOffsetHint(
-                    gate.clockOffsetMs,
-                    clockCorrectionThresholdMs,
-                  )
-                "
-                location="top"
-              >
-                <template #activator="{ props }">
-                  <v-chip
-                    v-bind="props"
-                    size="small"
-                    class="rg-timing"
-                    :color="
-                      clockOffsetColor(
-                        gate.clockOffsetMs,
-                        clockCorrectionThresholdMs,
-                      )
-                    "
-                    :prepend-icon="
-                      gate.clockOffsetMs != null &&
-                      Math.abs(gate.clockOffsetMs) >= clockCorrectionThresholdMs
-                        ? 'mdi-clock-alert-outline'
-                        : 'mdi-clock-check-outline'
-                    "
-                  >
-                    {{ formatClockOffset(gate.clockOffsetMs) }}
-                  </v-chip>
-                </template>
-              </v-tooltip>
-              <v-chip
-                v-if="gate.chronySynced != null"
-                size="small"
-                class="rg-timing ml-1"
-                :color="gate.chronySynced ? 'success' : 'error'"
-                :prepend-icon="
-                  gate.chronySynced ? 'mdi-sync' : 'mdi-sync-alert'
-                "
-                :title="
-                  gate.chronySynced
-                    ? 'chrony on the gate is synced'
-                    : 'chrony on the gate is not synced — its times are not comparable with other gates'
-                "
-              >
-                {{
-                  gate.chronySynced
-                    ? `NTP ${(gate.chronyOffsetMs ?? 0).toFixed(1)} ms`
-                    : 'NTP not synced'
-                }}
-              </v-chip>
+            <td class="text-no-wrap">
+              <GateClockChips
+                :gate="gate"
+                :correction-threshold-ms="clockCorrectionThresholdMs"
+              />
             </td>
             <td>{{ gate.capabilities ?? '-' }}</td>
-            <td>
-              <!-- A gate on another build than the server is the one to
-                   re-install before the event, not a curiosity. -->
-              <v-chip
-                v-if="
-                  gate.version &&
-                  serverVersion &&
-                  gate.version !== serverVersion
-                "
-                size="small"
-                color="warning"
-                prepend-icon="mdi-alert"
-                :title="`Server runs ${serverVersion}`"
-              >
-                {{ gate.version }}
-              </v-chip>
-              <span v-else>{{ gate.version ?? '-' }}</span>
-            </td>
-            <td>
-              <v-btn
-                size="small"
-                variant="text"
-                :prepend-icon="
-                  editingGateId === gate.id ? 'mdi-check' : 'mdi-pencil'
-                "
-                @click="toggleEditGate(gate.id)"
-              >
-                {{ editingGateId === gate.id ? 'Done' : 'Rename' }}
-              </v-btn>
-              <v-tooltip
-                :disabled="!lockedGateIds.has(gate.id)"
-                text="Referenced by an active/closed stage — can't be deleted"
-              >
-                <template #activator="{ props: tooltipProps }">
-                  <span v-bind="tooltipProps">
-                    <v-btn
-                      size="small"
-                      variant="text"
-                      color="error"
-                      prepend-icon="mdi-delete"
-                      :disabled="lockedGateIds.has(gate.id)"
-                      @click="onDeleteGate(gate)"
-                    >
-                      Delete
-                    </v-btn>
-                  </span>
+            <td><GateVersion :gate="gate" /></td>
+            <td class="text-no-wrap">
+              <v-menu>
+                <template #activator="{ props: menu }">
+                  <v-btn
+                    v-bind="menu"
+                    icon="mdi-dots-vertical"
+                    size="small"
+                    variant="text"
+                    :aria-label="$t('common.moreFor', { name: gate.id })"
+                    @click.stop
+                  />
                 </template>
-              </v-tooltip>
+                <v-list density="compact">
+                  <v-list-item
+                    prepend-icon="mdi-open-in-new"
+                    :title="$t('hardware.openGateConfig')"
+                    :subtitle="
+                      gate.address && isOnline(gate, serverNow)
+                        ? gate.address
+                        : $t('hardware.gateOffline')
+                    "
+                    :href="
+                      gate.address && isOnline(gate, serverNow)
+                        ? gateConfigUrl(gate.address)
+                        : undefined
+                    "
+                    target="_blank"
+                    :disabled="!gate.address || !isOnline(gate, serverNow)"
+                  />
+                  <v-list-item
+                    prepend-icon="mdi-delete-outline"
+                    :title="$t('common.delete')"
+                    :subtitle="
+                      lockedGateIds.has(gate.id)
+                        ? $t('hardware.locked')
+                        : undefined
+                    "
+                    base-color="error"
+                    :disabled="lockedGateIds.has(gate.id)"
+                    @click="onDeleteGate(gate)"
+                  />
+                </v-list>
+              </v-menu>
+            </td>
+          </tr>
+          <tr v-if="gates.length === 0">
+            <td colspan="8" class="rg-empty">
+              {{ $t('hardware.empty') }}
             </td>
           </tr>
         </tbody>
       </v-table>
-      <v-alert v-if="gates.length === 0" type="info" variant="tonal">
-        No gates yet — waiting for a gate-agent heartbeat.
-      </v-alert>
       <v-alert v-if="!autoDiscover" type="warning" variant="tonal" class="mt-4">
-        Auto-discovery is off — heartbeats from gates not listed here are
-        ignored until you add them below.
+        {{ $t('hardware.autoDiscoverOff', { action: $t('hardware.addGate') }) }}
       </v-alert>
-      <form
-        class="d-flex flex-wrap align-center ga-3 mt-4"
-        @submit.prevent="onCreateGate"
-      >
-        <v-text-field
-          v-model="newGate.id"
-          label="Gate ID (e.g. START_WP2)"
-          density="comfortable"
-          hide-details
-          style="min-width: 220px"
-        />
-        <v-text-field
-          v-model="newGate.name"
-          label="Name (optional)"
-          density="comfortable"
-          hide-details
-          style="min-width: 220px"
-        />
-        <v-btn
-          type="submit"
-          color="primary"
-          :loading="creatingGate"
-          prepend-icon="mdi-plus"
-        >
-          Add Gate
-        </v-btn>
-      </form>
     </v-card-text>
+    <v-card-actions>
+      <v-btn
+        variant="text"
+        color="error"
+        prepend-icon="mdi-power"
+        @click="onShutDownAll"
+      >
+        {{ $t('hardware.shutDownAll') }}
+      </v-btn>
+    </v-card-actions>
   </v-card>
 
   <v-card v-if="knownGates">
-    <v-card-title>Known on This Computer</v-card-title>
+    <v-card-title>{{ $t('hardware.known') }}</v-card-title>
     <v-card-subtitle>
-      Every gate this computer has seen, across all events. Add the ones this
-      event uses; forgetting one leaves the open event as it is.
+      {{ $t('hardware.knownHint') }}
     </v-card-subtitle>
     <v-table density="comfortable">
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Name</th>
-          <th></th>
+          <th>{{ $t('stages.id') }}</th>
+          <th>{{ $t('stages.name') }}</th>
+          <th width="1%"></th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="gate in knownGates" :key="gate.id">
           <td>{{ gate.id }}</td>
           <td>{{ gate.name }}</td>
-          <td class="text-right">
-            <v-chip v-if="gateIds.has(gate.id)" size="small">
-              in this event
+          <td class="text-no-wrap text-right">
+            <v-chip v-if="gateIds.has(gate.id)" size="small" class="mr-2">
+              {{ $t('hardware.inThisEvent') }}
             </v-chip>
             <v-btn
               v-else
@@ -470,22 +357,31 @@ onUnmounted(() => {
               prepend-icon="mdi-plus"
               @click="onAddKnownGate(gate)"
             >
-              Add
+              {{ $t('hardware.add') }}
             </v-btn>
-            <v-btn
-              size="small"
-              variant="text"
-              prepend-icon="mdi-close"
-              @click="onForgetKnownGate(gate.id)"
-            >
-              Forget
-            </v-btn>
+            <v-menu>
+              <template #activator="{ props: menu }">
+                <v-btn
+                  v-bind="menu"
+                  icon="mdi-dots-vertical"
+                  size="small"
+                  variant="text"
+                  :aria-label="$t('common.moreFor', { name: gate.id })"
+                />
+              </template>
+              <v-list density="compact">
+                <v-list-item
+                  prepend-icon="mdi-close"
+                  :title="$t('hardware.forget')"
+                  @click="onForgetKnownGate(gate.id)"
+                />
+              </v-list>
+            </v-menu>
           </td>
         </tr>
         <tr v-if="knownGates.length === 0">
-          <td colspan="3" class="text-center text-medium-emphasis">
-            None yet — every gate that sends a heartbeat or is added above is
-            remembered.
+          <td colspan="3" class="rg-empty">
+            {{ $t('hardware.knownEmpty') }}
           </td>
         </tr>
       </tbody>
@@ -494,48 +390,59 @@ onUnmounted(() => {
 
   <v-dialog :model-value="confirmingPowerOff" max-width="480" persistent>
     <v-card>
-      <v-card-title>Shut down all gates?</v-card-title>
+      <v-card-title>{{ $t('hardware.shutDownTitle') }}</v-card-title>
       <v-card-text v-if="!powerOffResults">
-        Every online gate powers off and has to be switched back on by hand. Use
-        this after the event, before pulling their power.
+        {{ $t('hardware.shutDownText') }}
       </v-card-text>
       <v-card-text v-else>
-        <div v-if="powerOffResults.length === 0">No gate was online.</div>
+        <div v-if="powerOffResults.length === 0">
+          {{ $t('hardware.noneOnline') }}
+        </div>
         <div v-for="r in powerOffResults" :key="r.gateId">
           <v-icon
             :icon="r.ok ? 'mdi-check' : 'mdi-alert'"
             :color="r.ok ? 'success' : 'error'"
             size="small"
           />
-          {{ r.gateId }}: {{ r.ok ? 'shutting down' : r.message }}
+          {{ r.gateId }}: {{ r.ok ? $t('hardware.shuttingDown') : r.message }}
         </div>
       </v-card-text>
       <v-card-actions>
         <v-spacer />
         <template v-if="!powerOffResults">
-          <v-btn variant="text" @click="closePowerOff">Cancel</v-btn>
+          <v-btn variant="text" @click="closePowerOff">
+            {{ $t('common.cancel') }}
+          </v-btn>
           <v-btn color="error" :loading="poweringOff" @click="onPowerOffAll">
-            Shut down
+            {{ $t('hardware.shutDown') }}
           </v-btn>
         </template>
-        <v-btn v-else variant="text" @click="closePowerOff">Close</v-btn>
+        <v-btn v-else variant="text" @click="closePowerOff">
+          {{ $t('common.close') }}
+        </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
 
-  <v-dialog :model-value="!!deleteConflictGate" max-width="480">
-    <v-card>
-      <v-card-title>Delete gate and its assignments?</v-card-title>
-      <v-card-text>{{ deleteConflictMessage }}</v-card-text>
-      <v-card-actions>
-        <v-spacer />
-        <v-btn variant="text" @click="deleteConflictGate = null">
-          Cancel
-        </v-btn>
-        <v-btn color="error" @click="onConfirmDeleteGate">
-          Delete gate and assignments
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+  <FormDialog
+    v-model="gateDialogOpen"
+    :title="$t('hardware.addGate')"
+    :form="gateDraft"
+    :save="onSaveGate"
+    :saved="$t('hardware.added')"
+    :save-text="$t('hardware.addGate')"
+  >
+    <v-text-field
+      v-model="gateDraft.id"
+      :label="$t('hardware.gateId')"
+      :hint="$t('hardware.gateIdHint')"
+      persistent-hint
+      :rules="[required]"
+      autofocus
+    />
+    <v-text-field
+      v-model="gateDraft.name"
+      :label="$t('hardware.nameOptional')"
+    />
+  </FormDialog>
 </template>

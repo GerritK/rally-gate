@@ -1,8 +1,15 @@
-import { HEARTBEAT_ONLINE_THRESHOLD_MS } from '@rally-gate/shared';
-import { formatStageDuration } from '@rally-gate/ui';
+import {
+  GateRole,
+  HEARTBEAT_ONLINE_THRESHOLD_MS,
+  StageRunStatus,
+  StageStatus,
+  EntryStatus,
+} from '@rally-gate/shared';
+import { currentLocale, formatStageDuration, t } from '@rally-gate/ui';
+import type { GateAssignment } from './api/gate-assignments';
 import type { Gate } from './api/gates';
-import type { Stage } from './api/stages';
-import type { Vehicle } from './api/vehicles';
+import type { Entry } from './api/entries';
+import { driverName } from './crew';
 
 /**
  * Where a clock offset stops looking like ordinary network transit and
@@ -14,7 +21,7 @@ import type { Vehicle } from './api/vehicles';
 export const CLOCK_OFFSET_WARN_THRESHOLD_MS = 250;
 
 export function formatClockOffset(offsetMs?: number | null): string {
-  if (offsetMs === null || offsetMs === undefined) return 'not measured';
+  if (offsetMs === null || offsetMs === undefined) return t('gate.notMeasured');
   const sign = offsetMs < 0 ? '-' : '+';
   const abs = Math.abs(offsetMs);
   return abs < 1000
@@ -38,50 +45,130 @@ export function clockOffsetHint(
   correctionThresholdMs: number,
 ): string {
   if (offsetMs === null || offsetMs === undefined) {
-    return 'This gate has not reported its clock yet.';
+    return t('gate.clockNotReported');
   }
-  const behind = offsetMs > 0 ? 'behind' : 'ahead of';
+  const offset = formatClockOffset(offsetMs);
   if (Math.abs(offsetMs) >= correctionThresholdMs) {
-    return `Clock is ${formatClockOffset(offsetMs)} ${behind} the server — detections from this gate are being corrected. Check its time sync.`;
+    return offsetMs > 0
+      ? t('gate.clockBehind', { offset })
+      : t('gate.clockAhead', { offset });
   }
-  return `Clock is within tolerance (${formatClockOffset(offsetMs)}); no correction applied.`;
+  return t('gate.clockWithinTolerance', { offset });
 }
 
-export function formatDuration(ms?: number): string {
-  return ms === undefined ? '-' : formatStageDuration(ms);
+export function formatDuration(ms?: number | null): string {
+  return ms == null ? '-' : formatStageDuration(ms);
 }
 
 export function formatGap(ms: number): string {
   return ms === 0 ? '-' : `+${formatStageDuration(ms)}`;
 }
 
-export function runStatusColor(status: string): string {
+export function runStatusColor(status: StageRunStatus): string {
   switch (status) {
-    case 'FINISHED':
+    case StageRunStatus.FINISHED:
       return 'success';
-    case 'STARTED':
+    case StageRunStatus.STARTED:
       return 'info';
-    case 'CANCELLED':
+    case StageRunStatus.CANCELLED:
       return 'error';
-    case 'VOIDED':
+    case StageRunStatus.VOIDED:
       // Neutral, not red: a voided run isn't a failure by the crew, it's a
-      // struck-out attempt. Red stays reserved for penalties/DNF/abort per
-      // the theme conventions in packages/ui.
-      return 'timing-idle';
-    default:
+      // struck-out attempt. Red is for penalties, DNF and abort.
       return 'timing-idle';
   }
 }
 
+/** Closed ✓, running ●, not started ○: the shapes differ, so colour is
+ *  never the only signal. Labels are getters, so each read is in the current
+ *  language. */
+export const STAGE_STATUS_DISPLAY: Record<
+  StageStatus,
+  { label: string; color: string; icon: string }
+> = {
+  [StageStatus.NOT_STARTED]: {
+    get label() {
+      return t('stageStatus.notStarted');
+    },
+    color: 'timing-idle',
+    icon: 'mdi-circle-outline',
+  },
+  [StageStatus.ACTIVE]: {
+    get label() {
+      return t('stageStatus.active');
+    },
+    color: 'success',
+    icon: 'mdi-circle',
+  },
+  [StageStatus.CLOSED]: {
+    get label() {
+      return t('stageStatus.closed');
+    },
+    color: 'timing-idle',
+    icon: 'mdi-check-circle-outline',
+  },
+};
+
+/** Withdrawn and disqualified are race problems (red); the rest is entry
+ *  paperwork. Labels are getters, so each read is in the current language. */
+export const ENTRY_STATUS_DISPLAY: Record<
+  EntryStatus,
+  { label: string; color: string; icon: string }
+> = {
+  [EntryStatus.REGISTERED]: {
+    get label() {
+      return t('entryStatus.registered');
+    },
+    color: 'timing-idle',
+    icon: 'mdi-clipboard-text-outline',
+  },
+  [EntryStatus.CHECKED_IN]: {
+    get label() {
+      return t('entryStatus.checkedIn');
+    },
+    color: 'info',
+    icon: 'mdi-clipboard-check-outline',
+  },
+  [EntryStatus.SCRUTINEERED]: {
+    get label() {
+      return t('entryStatus.scrutineered');
+    },
+    color: 'success',
+    icon: 'mdi-check-decagram',
+  },
+  [EntryStatus.WITHDRAWN]: {
+    get label() {
+      return t('entryStatus.withdrawn');
+    },
+    color: 'error',
+    icon: 'mdi-flag-remove',
+  },
+  [EntryStatus.DISQUALIFIED]: {
+    get label() {
+      return t('entryStatus.disqualified');
+    },
+    color: 'error',
+    icon: 'mdi-cancel',
+  },
+};
+
+/** DNF and DSQ end a car's stage (red); DNS only means it never came. */
 export function outcomeColor(outcome: string): string {
-  return outcome === 'DNF' ? 'error' : 'warning';
+  return outcome === 'DNS' ? 'warning' : 'error';
 }
 
-export function toLocalTimeValue(iso?: string): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+/** "Fri 09.10. 14:05": when a list was published or a sheet printed, with
+ *  the day, since a start list is often posted the evening before. */
+export function formatStamp(time: string | number): string {
+  return new Date(time).toLocaleString(currentLocale(), {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    // 24h in every language: "en" alone reads as en-US, which says AM/PM.
+    hourCycle: 'h23',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 /**
@@ -100,13 +187,9 @@ export function combineDateAndTime(
   return d.toISOString();
 }
 
-export function stageName(stages: Stage[], stageId: string): string {
-  return stages.find((stage) => stage.id === stageId)?.name ?? stageId;
-}
-
-export function vehicleName(vehicles: Vehicle[], vehicleId: string): string {
-  const vehicle = vehicles.find((v) => v.id === vehicleId);
-  return vehicle ? `#${vehicle.startNumber} ${vehicle.driverName}` : vehicleId;
+export function entryName(entries: Entry[], entryId: string): string {
+  const entry = entries.find((v) => v.id === entryId);
+  return entry ? `#${entry.startNumber} ${driverName(entry)}` : entryId;
 }
 
 export function isOnline(
@@ -138,3 +221,50 @@ export function gateStatusColor(gate: Gate, nowMs: number): string {
 export function eventName(file: string): string {
   return file.replace(/\.sqlite$/, '');
 }
+
+/** Vuetify field rule for a field the form can't save without. */
+export const required = (value: unknown) =>
+  (value !== '' && value != null) || t('common.required');
+
+export function gateRoleLabel(
+  assignment: Pick<GateAssignment, 'role' | 'splitIndex'>,
+): string {
+  switch (assignment.role) {
+    case GateRole.STAGE_START:
+      return t('gateRole.start');
+    case GateRole.STAGE_FINISH:
+      return t('gateRole.finish');
+    case GateRole.STAGE_START_FINISH:
+      return t('gateRole.startFinish');
+    case GateRole.STAGE_SPLIT:
+      return t('gateRole.split', { n: assignment.splitIndex ?? '' });
+  }
+}
+
+/** Icons that qualify a time in a table. Cells and `TableLegend` both read
+ *  them from here, so the legend can't drift from what the table shows. */
+export const TIMING_MARKS = {
+  best: {
+    icon: 'mdi-star',
+    color: 'timing-best',
+    get label() {
+      return t('marks.best');
+    },
+  },
+  manual: {
+    icon: 'mdi-hand-back-right-outline',
+    color: 'warning',
+    get label() {
+      return t('marks.manual');
+    },
+  },
+  notional: {
+    icon: 'mdi-timer-off-outline',
+    color: undefined,
+    get label() {
+      return t('marks.notional');
+    },
+  },
+} as const;
+
+export type TimingMark = keyof typeof TIMING_MARKS;

@@ -1,3 +1,4 @@
+import { TransponderKind } from '@rally-gate/shared';
 import { Column, Entity, PrimaryColumn } from 'typeorm';
 
 @Entity()
@@ -12,15 +13,19 @@ export class DetectionEventRecord {
   @Column({ type: 'varchar', nullable: true })
   transponderId: string | null;
 
+  /** What read `transponderId`; null along with it. */
   @Column({ type: 'varchar', nullable: true })
-  vehicleId: string | null;
+  transponderKind: TransponderKind | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  entryId: string | null;
 
   /**
    * An unidentified passing at a gate that was live on a stage: stored untimed
-   * until a marshal assigns the vehicle or dismisses it. Cleared by either.
+   * until a marshal assigns the entry or dismisses it. Cleared by either.
    */
   @Column({ default: false })
-  awaitingVehicle: boolean;
+  awaitingEntry: boolean;
 
   /** As reported by the gate, never rewritten — the raw evidence. */
   @Column({ type: Date })
@@ -39,6 +44,7 @@ export class DetectionEventRecord {
   @Column({ type: 'int', default: 0 })
   clockCorrectionMs: number;
 
+  /** The payload exactly as the gate published it, `metadata` included. */
   @Column({ type: 'text' })
   rawPayload: string;
 

@@ -1,12 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import {
-  ClassificationEntry,
-  OverallClassificationEntry,
-  SplitClassificationEntry,
+  Crew,
+  DEFAULT_NOTIONAL_PENALTY_MS,
+  NOTIONAL_PENALTY_MS_KEY,
+  Placing,
+  OverallPlacing,
+  OverallStageTime,
+  SplitPlacing,
   SplitGateInfo,
-  StageOutcomeEntry,
+  StageOutcome,
   StageStatus,
-  VehicleStatus,
+  EntryStatus,
 } from '@rally-gate/shared';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { GatesService } from '../gates/gates.service';
@@ -16,32 +20,40 @@ import {
 } from '../stage-runs/stage-runs.service';
 import { StagesService } from '../stages/stages.service';
 import { SettingsService } from '../settings/settings.service';
-import { Vehicle } from '../vehicles/vehicle.entity';
-import { VehiclesService } from '../vehicles/vehicles.service';
+import { Entry } from '../entries/entry.entity';
+import { crewOf, EntriesService } from '../entries/entries.service';
 
-export const NOTIONAL_PENALTY_MS_KEY = 'notionalPenaltyMs';
-
-/**
- * Added on top of the slowest real time in the ranking being computed, which
- * is what keeps a notional worse than every real time in it. Roughly a stage
- * duration, deliberately not a token few seconds: with a small penalty a
- * quick crew can retire and still lead the rally. Tune per event via the
- * `notionalPenaltyMs` setting — the right value scales with stage length,
- * which this can't know.
- */
-export const DEFAULT_NOTIONAL_PENALTY_MS = 120_000;
-
-interface RankableEntry {
-  vehicleId: string;
+interface Rankable {
+  entryId: string;
   durationMs: number;
 }
 
+type Row = { entryId: string; startNumber: number | null } & Crew;
+
+/** Who a result row is about, as every listing carries it. */
+function rowOf(entries: Map<string, Entry>, entryId: string): Row {
+  const entry = entries.get(entryId);
+  return { entryId, startNumber: entry?.startNumber ?? null, ...crewOf(entry) };
+}
+
+function byId(entries: Entry[]): Map<string, Entry> {
+  return new Map(entries.map((entry) => [entry.id, entry]));
+}
+
+function idsWithStatus(entries: Entry[], status: EntryStatus): Set<string> {
+  return new Set(entries.filter((e) => e.status === status).map((e) => e.id));
+}
+
+/**
+ * Every public method loads the entries once and hands them down: the
+ * helpers below each used to load them again.
+ */
 @Injectable()
 export class ClassificationService {
   constructor(
     private readonly stageRunsService: StageRunsService,
     private readonly stagesService: StagesService,
-    private readonly vehiclesService: VehiclesService,
+    private readonly entriesService: EntriesService,
     private readonly gatesService: GatesService,
     private readonly gateAssignmentsService: GateAssignmentsService,
     private readonly settingsService: SettingsService,
@@ -49,17 +61,20 @@ export class ClassificationService {
 
   async getStageClassification(
     stageId: string,
-  ): Promise<ClassificationEntry[]> {
-    const stage = await this.stagesService.findOne(stageId);
-    if (!stage) {
-      throw new NotFoundException(`Stage ${stageId} not found`);
-    }
+    classIds: string[] = [],
+  ): Promise<Placing[]> {
+    await this.stagesService.findOneOrFail(stageId);
+    const entries = await this.entriesService.findAll();
+    const inClass = await this.rankable(classIds, entries);
     const runs = await this.stageRunsService.findFinishedByStage(stageId);
     return this.rank(
-      runs.map((run) => ({
-        vehicleId: run.vehicleId,
-        durationMs: run.durationMs as number,
-      })),
+      runs
+        .filter((run) => inClass(run.entryId))
+        .map((run) => ({
+          entryId: run.entryId,
+          durationMs: run.durationMs as number,
+        })),
+      entries,
     );
   }
 
@@ -73,8 +88,17 @@ export class ClassificationService {
    * Only **CLOSED** stages count, the same trigger `getNonFinishers` uses: a
    * stage still running has no result to penalise anyone against. So the
    * overall table moves when a stage closes, not continuously during one.
+   *
+   * With `classIds`, runs are narrowed to entries in *all* of those classes
+   * (Stock + Rookie + 2WD) *before* anything else, so who is classified,
+   * which stages count and every notional are all taken from within that
+   * group, not borrowed from the overall field.
    */
-  async getOverallClassification(): Promise<OverallClassificationEntry[]> {
+  async getOverallClassification(
+    classIds: string[] = [],
+  ): Promise<OverallPlacing[]> {
+    const entries = await this.entriesService.findAll();
+    const inClass = await this.rankable(classIds, entries);
     const stages = await this.stagesService.findAll();
     const closedStageIds = new Set(
       stages
@@ -86,14 +110,26 @@ export class ClassificationService {
     }
 
     const finished = (await this.stageRunsService.findAllFinished()).filter(
-      (run) => closedStageIds.has(run.stageId),
+      (run) => closedStageIds.has(run.stageId) && inClass(run.entryId),
     );
     // Classified = drove at least one closed stage. Without this a registered
     // car that never turned up would collect notional times for the whole
     // rally and appear in the results on an invented total. This set is also
-    // the notional's population, which is what a future per-class ranking
-    // narrows — hence notionals are computed per view, never stored on a run.
-    const classified = [...new Set(finished.map((run) => run.vehicleId))];
+    // the notional's population, which a class ranking narrows — hence
+    // notionals are computed per view, never stored on a run.
+    //
+    // A withdrawn car is retired: not classified, so it collects no
+    // notionals for the stages it won't drive. Its real times stay in
+    // `finished` and still anchor the others' notionals, so a withdrawal
+    // never moves anyone else's total.
+    const withdrawn = idsWithStatus(entries, EntryStatus.WITHDRAWN);
+    const classified = [
+      ...new Set(
+        finished
+          .map((run) => run.entryId)
+          .filter((entryId) => !withdrawn.has(entryId)),
+      ),
+    ];
     if (classified.length === 0) {
       return [];
     }
@@ -107,49 +143,60 @@ export class ClassificationService {
     for (const run of finished) {
       const stageTimes =
         timesByStage.get(run.stageId) ?? new Map<string, number>();
-      stageTimes.set(run.vehicleId, run.durationMs ?? 0);
+      stageTimes.set(run.entryId, run.durationMs ?? 0);
       timesByStage.set(run.stageId, stageTimes);
     }
 
     const totals = new Map(
-      classified.map((vehicleId) => [
-        vehicleId,
-        { durationMs: 0, stagesCompleted: 0 },
+      classified.map((entryId) => [
+        entryId,
+        {
+          durationMs: 0,
+          stagesCompleted: 0,
+          stageTimes: [] as OverallStageTime[],
+        },
       ]),
     );
-    for (const stageTimes of timesByStage.values()) {
-      // A stage nobody finished never lands here: with no real time to
-      // anchor a notional, every crew would get the same figure anyway.
+    // `stages` is in stage order, so each crew's stageTimes are too. A stage
+    // nobody finished never lands in timesByStage: with no real time to
+    // anchor a notional, every crew would get the same figure anyway.
+    for (const stage of stages) {
+      const stageTimes = timesByStage.get(stage.id);
+      if (!stageTimes) continue;
       const notionalMs = Math.max(...stageTimes.values()) + notionalPenaltyMs;
-      for (const vehicleId of classified) {
-        const total = totals.get(vehicleId)!;
-        const realMs = stageTimes.get(vehicleId);
+      for (const entryId of classified) {
+        const total = totals.get(entryId)!;
+        const realMs = stageTimes.get(entryId);
         total.durationMs += realMs ?? notionalMs;
         if (realMs !== undefined) {
           total.stagesCompleted += 1;
         }
+        total.stageTimes.push({
+          stageId: stage.id,
+          durationMs: realMs ?? notionalMs,
+          notional: realMs === undefined,
+        });
       }
     }
 
-    const ranked = await this.rank(
-      [...totals].map(([vehicleId, total]) => ({
-        vehicleId,
+    const ranked = this.rank(
+      [...totals].map(([entryId, total]) => ({
+        entryId,
         durationMs: total.durationMs,
       })),
+      entries,
     );
-    return ranked.map((entry) => ({
-      ...entry,
-      stagesCompleted: totals.get(entry.vehicleId)!.stagesCompleted,
+    return ranked.map((placing) => ({
+      ...placing,
+      stagesCompleted: totals.get(placing.entryId)!.stagesCompleted,
+      stageTimes: totals.get(placing.entryId)!.stageTimes,
     }));
   }
 
   async getSplitGates(stageId: string): Promise<SplitGateInfo[]> {
-    const stage = await this.stagesService.findOne(stageId);
-    if (!stage) {
-      throw new NotFoundException(`Stage ${stageId} not found`);
-    }
+    await this.stagesService.findOneOrFail(stageId);
     const assignments =
-      await this.gateAssignmentsService.findActiveSplitGatesForStage(stageId);
+      await this.gateAssignmentsService.findSplitGatesForStage(stageId);
     const gates = await this.gatesService.findAll();
     const gateById = new Map(gates.map((gate) => [gate.id, gate]));
     return assignments.map((assignment) => ({
@@ -162,85 +209,113 @@ export class ClassificationService {
   async getSplitClassification(
     stageId: string,
     splitIndex: number,
-  ): Promise<SplitClassificationEntry[]> {
-    const stage = await this.stagesService.findOne(stageId);
-    if (!stage) {
-      throw new NotFoundException(`Stage ${stageId} not found`);
-    }
-    const pairs = await this.stageRunsService.findSplitsForStageAtIndex(
-      stageId,
-      splitIndex,
-    );
-    const vehicles = await this.vehiclesService.findAll();
-    const vehicleById = new Map<string, Vehicle>(
-      vehicles.map((vehicle) => [vehicle.id, vehicle]),
-    );
+    classIds: string[] = [],
+  ): Promise<SplitPlacing[]> {
+    const stage = await this.stagesService.findOneOrFail(stageId);
+    const entries = await this.entriesService.findAll();
+    const inClass = await this.rankable(classIds, entries);
+    const pairs = (
+      await this.stageRunsService.findSplitsForStageAtIndex(stageId, splitIndex)
+    ).filter((pair) => inClass(pair.run.entryId));
+    const entryById = byId(entries);
     const sorted = [...pairs].sort(
       (a, b) => a.split.elapsedMs - b.split.elapsedMs,
     );
     const leaderMs = sorted[0]?.split.elapsedMs ?? 0;
     const stageClosed = stage.status === StageStatus.CLOSED;
-    return sorted.map((pair, index) => {
-      const vehicle = vehicleById.get(pair.run.vehicleId);
-      return {
-        position: index + 1,
-        vehicleId: pair.run.vehicleId,
-        startNumber: vehicle?.startNumber ?? '?',
-        driverName: vehicle?.driverName ?? 'Unknown',
-        coDriverName: vehicle?.coDriverName ?? undefined,
-        splitIndex,
-        elapsedMs: pair.split.elapsedMs,
-        gapMs: pair.split.elapsedMs - leaderMs,
-        stageRunStatus: deriveStageRunStatus(pair.run, stageClosed),
-      };
-    });
+    return sorted.map((pair, index) => ({
+      position: index + 1,
+      ...rowOf(entryById, pair.run.entryId),
+      splitIndex,
+      elapsedMs: pair.split.elapsedMs,
+      gapMs: pair.split.elapsedMs - leaderMs,
+      stageRunStatus: deriveStageRunStatus(pair.run, stageClosed),
+    }));
   }
 
-  async getNonFinishers(stageId: string): Promise<StageOutcomeEntry[]> {
-    const stage = await this.stagesService.findOne(stageId);
-    if (!stage) {
-      throw new NotFoundException(`Stage ${stageId} not found`);
-    }
+  async getNonFinishers(
+    stageId: string,
+    classIds: string[] = [],
+  ): Promise<StageOutcome[]> {
+    const stage = await this.stagesService.findOneOrFail(stageId);
+    const entries = await this.entriesService.findAll();
+    const inClass = await this.classFilter(classIds, entries);
     const runs = await this.stageRunsService.findByStage(stageId);
-    const vehicles = await this.vehiclesService.findAll();
-    const vehicleById = new Map<string, Vehicle>(
-      vehicles.map((vehicle) => [vehicle.id, vehicle]),
-    );
-    const toEntry = (
-      vehicleId: string,
-      outcome: 'DNF' | 'DNS',
-    ): StageOutcomeEntry => {
-      const vehicle = vehicleById.get(vehicleId);
-      return {
-        vehicleId,
-        startNumber: vehicle?.startNumber ?? '?',
-        driverName: vehicle?.driverName ?? 'Unknown',
-        coDriverName: vehicle?.coDriverName ?? undefined,
-        outcome,
-      };
-    };
+    const entryById = byId(entries);
+    const toOutcome = (
+      entryId: string,
+      outcome: StageOutcome['outcome'],
+    ): StageOutcome => ({ ...rowOf(entryById, entryId), outcome });
+
+    const disqualified = idsWithStatus(entries, EntryStatus.DISQUALIFIED);
+    // Off every ranking (see `rankable`), so listed here wherever it drove,
+    // whether the stage still runs or not: a decision, not a pending result.
+    const dsq = [...new Set(runs.map((run) => run.entryId))]
+      .filter((entryId) => disqualified.has(entryId))
+      .map((entryId) => toOutcome(entryId, 'DSQ'));
 
     if (stage.status !== StageStatus.CLOSED) {
       // Before the stage closes, an unfinished run is still running, not DNF,
       // and "no run yet" just means "hasn't started" — not DNS.
-      return [];
+      return dsq.filter((row) => inClass(row.entryId));
     }
     const dnf = runs
-      .filter((run) => !run.finishTime)
-      .map((run) => toEntry(run.vehicleId, 'DNF'));
-    const startedVehicleIds = new Set(runs.map((run) => run.vehicleId));
-    const dns = vehicles
+      .filter((run) => !run.finishTime && !disqualified.has(run.entryId))
+      .map((run) => toOutcome(run.entryId, 'DNF'));
+    const startedEntryIds = new Set(runs.map((run) => run.entryId));
+    const dns = entries
       .filter(
-        (vehicle) =>
-          !startedVehicleIds.has(vehicle.id) &&
+        (entry) =>
+          !startedEntryIds.has(entry.id) &&
           // A withdrawn or excluded car isn't a "did not start" — it wasn't
           // entered in the stage at all, so listing it alongside crews who
           // were due out and failed to appear misrepresents both.
-          vehicle.status !== VehicleStatus.WITHDRAWN &&
-          vehicle.status !== VehicleStatus.DISQUALIFIED,
+          entry.status !== EntryStatus.WITHDRAWN &&
+          entry.status !== EntryStatus.DISQUALIFIED,
       )
-      .map((vehicle) => toEntry(vehicle.id, 'DNS'));
-    return [...dnf, ...dns];
+      .map((entry) => toOutcome(entry.id, 'DNS'));
+    return [...dnf, ...dns, ...dsq].filter((row) => inClass(row.entryId));
+  }
+
+  /**
+   * Who is ranked: in all the classes asked for, and not disqualified. A
+   * disqualified car's times leave every result, the notional times the
+   * others are charged included, as if it had never run; the stage's
+   * non-finishers list it as DSQ instead.
+   */
+  private async rankable(
+    classIds: string[],
+    entries: Entry[],
+  ): Promise<(entryId: string) => boolean> {
+    const inClass = await this.classFilter(classIds, entries);
+    const disqualified = idsWithStatus(entries, EntryStatus.DISQUALIFIED);
+    return (entryId) => inClass(entryId) && !disqualified.has(entryId);
+  }
+
+  /**
+   * An unknown class is a 404, not an empty table — empty would read as
+   * "nobody in this class has finished yet".
+   */
+  private async classFilter(
+    classIds: string[],
+    entries: Entry[],
+  ): Promise<(entryId: string) => boolean> {
+    if (classIds.length === 0) {
+      return () => true;
+    }
+    for (const classId of classIds) {
+      if (!(await this.entriesService.findClass(classId))) {
+        throw new NotFoundException(`Class ${classId} not found`);
+      }
+    }
+    const members = new Set(
+      entries
+        .filter((entry) =>
+          classIds.every((id) => entry.classes.some((c) => c.id === id)),
+        )
+        .map((entry) => entry.id),
+    );
+    return (entryId) => members.has(entryId);
   }
 
   /**
@@ -249,24 +324,15 @@ export class ClassificationService {
    * padded with notional times — because a plain time sort is only correct
    * once that holds. See `getOverallClassification`.
    */
-  private async rank(entries: RankableEntry[]): Promise<ClassificationEntry[]> {
-    const vehicles = await this.vehiclesService.findAll();
-    const vehicleById = new Map<string, Vehicle>(
-      vehicles.map((vehicle) => [vehicle.id, vehicle]),
-    );
-    const sorted = [...entries].sort((a, b) => a.durationMs - b.durationMs);
+  private rank(placings: Rankable[], entries: Entry[]): Placing[] {
+    const entryById = byId(entries);
+    const sorted = [...placings].sort((a, b) => a.durationMs - b.durationMs);
     const leaderMs = sorted[0]?.durationMs ?? 0;
-    return sorted.map((entry, index) => {
-      const vehicle = vehicleById.get(entry.vehicleId);
-      return {
-        position: index + 1,
-        vehicleId: entry.vehicleId,
-        startNumber: vehicle?.startNumber ?? '?',
-        driverName: vehicle?.driverName ?? 'Unknown',
-        coDriverName: vehicle?.coDriverName ?? undefined,
-        durationMs: entry.durationMs,
-        gapMs: entry.durationMs - leaderMs,
-      };
-    });
+    return sorted.map((placing, index) => ({
+      position: index + 1,
+      ...rowOf(entryById, placing.entryId),
+      durationMs: placing.durationMs,
+      gapMs: placing.durationMs - leaderMs,
+    }));
   }
 }

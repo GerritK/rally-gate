@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto';
 import { readFileSync, renameSync, unlinkSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
+import type { FieldDescriptor, FieldError } from './api-types';
 
 export const CONFIG_PATH =
   process.env.GATE_CONFIG_FILE ?? '/etc/rally-gate/gate.env';
@@ -14,7 +15,9 @@ export const CONFIG_PATH =
  * `group` decides which card on the page a field lands in, and `adapter` that
  * it only shows while that decoder is selected; both are here rather than in
  * the Vue component so the two cannot disagree about where a new setting
- * belongs. Anything without a group goes in the general card.
+ * belongs. Anything without a group goes in the general card. Labels, hints
+ * and messages are the page's (`fields.<NAME>` in its locales), which
+ * `config-file.spec.ts` checks every field here has.
  *
  * Accepting an arbitrary key name would therefore let anyone who can reach this
  * service set `NODE_OPTIONS`, `LD_PRELOAD` or `PATH` and run code as the
@@ -24,90 +27,59 @@ export const CONFIG_PATH =
  */
 export const FIELDS = {
   GATE_ID: {
-    label: 'Gate ID',
     // Matches what the server accepts as a Gate primary key, and stays within
     // what a host name can be derived from (see install-gate-pi.sh).
     pattern: /^[A-Za-z0-9_-]{1,64}$/,
-    message: 'Use letters, digits, underscore and hyphen only (max 64).',
-    hint: 'Identity on the server — changing it makes the old one a separate gate.',
   },
   MQTT_HOST: {
-    label: 'rally-server address',
     // Host name or IP. Deliberately not a strict hostname grammar: `.local`
     // names, bare IPv4 and IPv6 literals all have to pass.
     pattern: /^[A-Za-z0-9._:-]{1,253}$/,
-    message: 'Use a host name or IP address.',
-    hint: 'Default rally-server.local is discovered over mDNS; an address here overrides it.',
   },
   MQTT_PORT: {
-    label: 'MQTT port',
     range: [1, 65535] as const,
-    message: 'Must be a port between 1 and 65535.',
-    hint: 'Default 57431.',
   },
   ADAPTER: {
     group: 'decoder',
-    label: 'Decoder',
     oneOf: ['simulated', 'beam', 'openstint'] as const,
-    message: 'Pick one of the listed decoders.',
-    hint: 'beam: a light barrier on a GPIO pin — times passings, a marshal assigns the car. openstint: transponder loop on an RTL-SDR.',
   },
   OPENSTINT_GAIN: {
     group: 'decoder',
     adapter: 'openstint',
-    label: 'RTL-SDR gain (dB)',
     range: [0, 40] as const,
-    message: 'Must be between 0 and 40 dB.',
-    hint: 'Default 20. Lower it if passings report an RSSI above -3 (clipping).',
   },
   BEAM_GPIO: {
     group: 'decoder',
     adapter: 'beam',
-    label: 'Light barrier GPIO',
     // A line name rather than a pin number: the same on every Pi model, where
     // chip offsets are not.
     pattern: /^GPIO[0-9]{1,2}$/,
-    message: 'A GPIO line name, e.g. GPIO17.',
-    hint: 'BCM name of the pin the sensor output is wired to. Default GPIO17.',
   },
   BEAM_EDGE: {
     group: 'decoder',
     adapter: 'beam',
-    label: 'Light barrier trigger edge',
     oneOf: ['rising', 'falling'] as const,
-    message: 'rising or falling.',
-    hint: 'Which edge means "beam broken" — depends on the sensor Light-ON/Dark-ON setting. Default rising.',
   },
   BEAM_LOCKOUT_MS: {
     group: 'decoder',
     adapter: 'beam',
-    label: 'Light barrier lockout (ms)',
     // Lower bound because a car body breaks the beam several times (wheels,
     // wing); upper because a second car closer than this is lost.
     range: [50, 10_000] as const,
-    message: 'Must be between 50 and 10000 ms.',
-    hint: 'Further triggers within this time count as the same car. Default 500.',
   },
   TRANSPONDERS: {
     group: 'decoder',
     adapter: 'simulated',
-    label: 'Simulated transponders',
     pattern: /^[0-9]+(,[0-9]+)*$/,
-    message: 'Comma-separated digits, e.g. 1234567,7654321.',
-    hint: 'Transponder ids the simulator cycles through.',
   },
   SIMULATE_INTERVAL_MS: {
     group: 'decoder',
     adapter: 'simulated',
-    label: 'Simulated interval (ms)',
     // Lower bound because the simulator drives the real publish path: a 1ms
     // interval is a flood at the broker, not a test.
     range: [250, 3_600_000] as const,
-    message: 'Must be between 250 and 3600000 ms.',
-    hint: 'Leave empty to publish no simulated detections.',
   },
   HOTSPOT_PASSWORD: {
-    label: 'Hotspot password',
     // WPA2's own limits: 8-63 printable ASCII. Not a generated secret — the
     // installer prints it and the organiser needs it on a sticker, so it is
     // predictable on purpose (docs/gate-config-ui.md, "Access"). It is also
@@ -115,16 +87,11 @@ export const FIELDS = {
     // consistent: anyone already on the rally network is inside the boundary
     // this password exists to draw around the gate's *own* access point.
     pattern: /^[\x20-\x7e]{8,63}$/,
-    message: 'Must be 8 to 63 printable characters.',
-    hint: 'For the rally-gate-<hostname> network this gate raises when it can reach no Wi-Fi. Default rally-gate.',
   },
   HEARTBEAT_INTERVAL_MS: {
-    label: 'Heartbeat interval (ms)',
     // Upper bound tied to the dashboard's 30s offline threshold: anything
     // slower makes a healthy gate read as offline.
     range: [1_000, 30_000] as const,
-    message: 'Must be between 1000 and 30000 ms.',
-    hint: 'Default 15000. Slower than 30000 and the server reads this gate as offline.',
   },
 } as const;
 
@@ -141,29 +108,11 @@ export const FIELDS = {
  * runs on every save regardless of what the browser did. Exposing a pattern
  * costs nothing; it is a grammar, not a secret.
  */
-/** What the browser receives. Named so the wire contract is explicit rather
- *  than inferred from `as const` specs, whose literal types are an
- *  implementation detail of the server's own checks. */
-export interface FieldDescriptor {
-  label: string;
-  hint: string;
-  message: string;
-  group: FieldGroup;
-  /** Shown only while ADAPTER has this value. */
-  adapter?: string;
-  oneOf?: string[];
-  pattern?: string;
-  range?: [number, number];
-}
-
 export function fieldDescriptors(): Record<FieldName, FieldDescriptor> {
   return Object.fromEntries(
     (Object.entries(FIELDS) as [FieldName, FieldSpec][]).map(([name, spec]) => [
       name,
       {
-        label: spec.label,
-        hint: spec.hint,
-        message: spec.message,
         group: 'group' in spec ? spec.group : 'general',
         adapter: 'adapter' in spec ? spec.adapter : undefined,
         oneOf: 'oneOf' in spec ? [...spec.oneOf] : undefined,
@@ -176,9 +125,6 @@ export function fieldDescriptors(): Record<FieldName, FieldDescriptor> {
     ]),
   ) as Record<FieldName, FieldDescriptor>;
 }
-
-/** Which card on the page a field appears in. */
-export type FieldGroup = 'general' | 'decoder';
 
 export type FieldName = keyof typeof FIELDS;
 export type FieldSpec = (typeof FIELDS)[FieldName];
@@ -228,15 +174,15 @@ export function serializeEnvFile(config: GateConfig): string {
   return lines.join('\n') + '\n';
 }
 
-/** Returns one error message per invalid field, keyed by field name. */
+/** Returns one error code per invalid field, keyed by field name. */
 export function validate(
   input: Record<string, unknown>,
-): Record<string, string> {
-  const errors: Record<string, string> = {};
+): Record<string, FieldError> {
+  const errors: Record<string, FieldError> = {};
 
   for (const key of Object.keys(input)) {
     if (!isFieldName(key)) {
-      errors[key] = 'Unknown setting.';
+      errors[key] = 'unknown';
     }
   }
 
@@ -246,32 +192,32 @@ export function validate(
       continue; // absent means "leave unset"; required-ness is the caller's call
     }
     if (typeof raw !== 'string') {
-      errors[key] = 'Must be text.';
+      errors[key] = 'notText';
       continue;
     }
     // Checked before anything else: a newline would inject a second
     // KEY=value line into the file systemd reads, making every other
     // per-field rule bypassable.
     if (/[\r\n\0]/.test(raw)) {
-      errors[key] = 'Must not contain line breaks.';
+      errors[key] = 'lineBreak';
       continue;
     }
-    // One message per field, taken from the spec, so the text a marshal reads is
-    // identical whether the browser or the server produced it. `port` is gone as
-    // a separate case: it was a range with another name, and one fewer case is
+    // One code for every rule, so the page shows the field's one message
+    // whether the browser or the server caught it. `port` is gone as a
+    // separate case: it was a range with another name, and one fewer case is
     // one fewer thing the client has to reimplement.
     if ('pattern' in spec && !spec.pattern.test(raw)) {
-      errors[key] = spec.message;
+      errors[key] = 'invalid';
     } else if (
       'oneOf' in spec &&
       !(spec.oneOf as readonly string[]).includes(raw)
     ) {
-      errors[key] = spec.message;
+      errors[key] = 'invalid';
     } else if ('range' in spec) {
       const value = Number(raw);
       const [min, max] = spec.range;
       if (!Number.isInteger(value) || value < min || value > max) {
-        errors[key] = spec.message;
+        errors[key] = 'invalid';
       }
     }
   }

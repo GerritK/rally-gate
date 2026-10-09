@@ -11,5 +11,7 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"],
+  // Run by node --test, so checked with Node types: tsconfig.node.json.
+  "exclude": ["src/**/*.spec.ts"]
 }

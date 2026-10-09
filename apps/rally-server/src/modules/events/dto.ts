@@ -1,7 +1,15 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
-export class AssignVehicleDto {
+export class AssignEntryDto {
   @IsString()
   @IsNotEmpty()
-  vehicleId: string;
+  entryId: string;
+}
+
+export class RecentEventsQueryDto {
+  /** One gate's detections, e.g. its detail page; otherwise every gate's. */
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  gateId?: string;
 }

@@ -10,7 +10,11 @@ import {
   CreateStageRunDto,
 } from '../modules/stage-runs/dto';
 import { CreateStageDto, UpdateStageDto } from '../modules/stages/dto';
-import { CreateVehicleDto, UpdateVehicleDto } from '../modules/vehicles/dto';
+import {
+  CreateEntryDto,
+  UpdateEntryDto,
+  EntryClassDto,
+} from '../modules/entries/dto';
 
 /**
  * The DTOs are declarative, so what's worth testing isn't each decorator —
@@ -88,11 +92,26 @@ describe('server-owned fields are not settable through the API', () => {
       { name: 'Pass', stageNumber: 1, status: 'CLOSED' },
       'status',
     ],
-    // Object.assign in VehiclesService.update would retarget the save.
+    // Whether a time was hand-set is evidence; a client claiming a corrected
+    // time came from the gate would hide exactly what a protest asks about.
     [
-      'Vehicle.id on update',
-      UpdateVehicleDto,
-      { id: 'some-other-uuid', driverName: 'Mallory' },
+      'StageRun.finishManual on correction',
+      CorrectStageRunDto,
+      { finishTime: '2026-01-01T00:01:00.000Z', finishManual: false },
+      'finishManual',
+    ],
+    // The frozen start order is the published list; freezing writes it.
+    [
+      'Stage.startOrder on update',
+      UpdateStageDto,
+      { name: 'Pass', stageNumber: 1, startOrder: ['v1'] },
+      'startOrder',
+    ],
+    // Object.assign in EntriesService.update would retarget the save.
+    [
+      'Entry.id on update',
+      UpdateEntryDto,
+      { id: 'some-other-uuid', driverFirstName: 'Mallory' },
       'id',
     ],
     // Would make an offline gate look alive on the Hardware page.
@@ -123,6 +142,15 @@ describe('server-owned fields are not settable through the API', () => {
       { gateId: 'g1', stageId: 'WP1', role: 'stage_start', active: true },
       'active',
     ],
+    // Classes are assigned by id only; a nested object would bypass the
+    // unknown-id check in EntriesService.resolveClasses.
+    [
+      'Entry.classes',
+      UpdateEntryDto,
+      { classes: [{ id: 'c1', name: 'Pro' }] },
+      'classes',
+    ],
+    ['EntryClass.id', EntryClassDto, { name: 'Pro', id: 'other' }, 'id'],
     // Singleton pinned to RALLY_INFO_ID; an id could only make a stray row.
     ['RallyInfo.id', UpsertRallyInfoDto, { name: 'Rally', id: 'other' }, 'id'],
   ];
@@ -143,12 +171,12 @@ describe('valid payloads still pass', () => {
     ).resolves.toMatchObject({ id: 'WP1', stageNumber: 1 });
   });
 
-  it('accepts null to clear an optional vehicle field', async () => {
+  it('accepts null to clear an optional entry field', async () => {
     // null is not "absent": only null actually writes SQL NULL (CLAUDE.md),
     // so the DTO has to let it through rather than strip it.
     await expect(
-      transform(UpdateVehicleDto, { coDriverName: null }),
-    ).resolves.toEqual({ coDriverName: null });
+      transform(UpdateEntryDto, { coDriverFirstName: null }),
+    ).resolves.toEqual({ coDriverFirstName: null });
   });
 
   it('accepts null to clear a stage expected duration', async () => {
@@ -174,7 +202,7 @@ describe('malformed values are rejected at the boundary', () => {
     ['an empty start time', CreateStageRunDto, ''],
   ])('rejects %s', async (_label, metatype, startTime) => {
     const messages = await rejectionMessages(metatype, {
-      vehicleId: 'v1',
+      entryId: 'v1',
       stageId: 's1',
       startTime,
     });
@@ -208,12 +236,28 @@ describe('malformed values are rejected at the boundary', () => {
     expect(messages).toMatch(/role/);
   });
 
-  it('rejects an unknown vehicle status', async () => {
-    const messages = await rejectionMessages(CreateVehicleDto, {
-      startNumber: '1',
-      driverName: 'A',
+  it('rejects an unknown entry status', async () => {
+    const messages = await rejectionMessages(CreateEntryDto, {
+      startNumber: 1,
+      driverFirstName: 'A',
       status: 'VIBING',
     });
     expect(messages).toMatch(/status/);
+  });
+
+  // Nested too: an id would point the cascade save at another entry's row.
+  it('rejects an id or an unknown kind on a transponder', async () => {
+    const messages = await rejectionMessages(UpdateEntryDto, {
+      transponders: [{ id: 't1', kind: 'RFID', identifier: '1' }],
+    });
+    expect(messages).toMatch(/transponders\.0\.property id/);
+    expect(messages).toMatch(/transponders\.0\.kind/);
+  });
+
+  it('rejects a flag that is not a code', async () => {
+    const messages = await rejectionMessages(UpdateEntryDto, {
+      driverFlag: 'de" onerror="x',
+    });
+    expect(messages).toMatch(/driverFlag/);
   });
 });

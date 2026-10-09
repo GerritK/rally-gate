@@ -19,19 +19,19 @@ function uniqueViolation(): Error {
 
 describe('latestAttempts', () => {
   const run = (
-    vehicleId: string,
+    entryId: string,
     stageId: string,
     attempt: number,
     durationMs: number,
   ) =>
     ({
-      vehicleId,
+      entryId,
       stageId,
       attempt,
       durationMs,
     }) as StageRun;
 
-  it('keeps only the most recent attempt per vehicle and stage', () => {
+  it('keeps only the most recent attempt per entry and stage', () => {
     const first = run('v1', 'SS1', 1, 90_000);
     const rerun = run('v1', 'SS1', 2, 120_000);
 
@@ -58,7 +58,7 @@ describe('latestAttempts', () => {
     expect(latestAttempts([only])).toEqual([]);
   });
 
-  it('keeps attempts on different stages and by different vehicles apart', () => {
+  it('keeps attempts on different stages and by different entries apart', () => {
     const a = run('v1', 'SS1', 1, 90_000);
     const b = run('v1', 'SS2', 1, 95_000);
     const c = run('v2', 'SS1', 1, 88_000);
@@ -121,7 +121,7 @@ describe('StageRunsService.findSplitsForStageAtIndex', () => {
     // attempt's split times kept showing on the split classification.
     const surviving = {
       id: 'r2',
-      vehicleId: 'v1',
+      entryId: 'v1',
       stageId: 's1',
       attempt: 2,
       voided: false,
@@ -129,7 +129,7 @@ describe('StageRunsService.findSplitsForStageAtIndex', () => {
     };
     const voided = {
       id: 'r1',
-      vehicleId: 'v1',
+      entryId: 'v1',
       stageId: 's1',
       attempt: 1,
       voided: true,
@@ -162,7 +162,7 @@ describe('StageRunsService.findSplitsForStageAtIndex', () => {
 describe('StageRunsService.correctRun', () => {
   const baseRun = {
     id: 'r1',
-    vehicleId: 'v1',
+    entryId: 'v1',
     stageId: 's1',
     startTime: new Date('2026-01-01T00:00:00.000Z'),
     finishTime: new Date('2026-01-01T00:01:00.000Z'),
@@ -179,6 +179,19 @@ describe('StageRunsService.correctRun', () => {
     expect(corrected.durationMs).toBe(90_000);
     expect(corrected.status).toBe(StageRunStatus.FINISHED);
     expect(emitter.emit).toHaveBeenCalledWith('stage-run.updated', corrected);
+  });
+
+  it('marks only the corrected end as hand-set, and a cleared finish as not', async () => {
+    const { service } = makeService({ ...baseRun });
+
+    const corrected = await service.correctRun('r1', {
+      startTime: '2026-01-01T00:00:05.000Z',
+    });
+    expect(corrected.startManual).toBe(true);
+    expect(corrected.finishManual).toBeFalsy();
+
+    const cleared = await service.correctRun('r1', { finishTime: null });
+    expect(cleared.finishManual).toBe(false);
   });
 
   it('reports STARTED when finishTime is cleared and the stage is open', async () => {
@@ -247,7 +260,7 @@ describe('StageRunsService.correctRun', () => {
 describe('StageRunsService.unvoidRun', () => {
   const voidedRun = {
     id: 'r1',
-    vehicleId: 'v1',
+    entryId: 'v1',
     stageId: 's1',
     attempt: 1,
     voided: true,
@@ -287,7 +300,7 @@ describe('StageRunsService.unvoidRun', () => {
   });
 
   // One rule covers every shape of "something else already counts", because
-  // there is one invariant: at most one non-voided attempt per vehicle+stage.
+  // there is one invariant: at most one non-voided attempt per entry+stage.
   it.each([
     ['a higher attempt survives', { id: 'r2', attempt: 2 }],
     ['a lower attempt survives', { id: 'r0', attempt: 0 }],
@@ -313,7 +326,7 @@ describe('StageRunsService.unvoidRun', () => {
 });
 
 describe('StageRunsService.createManual', () => {
-  it('throws ConflictException when the vehicle already has an unfinished run', async () => {
+  it('throws ConflictException when the entry already has an unfinished run', async () => {
     const stageRuns = {
       findOne: jest.fn().mockResolvedValue(null), // nextAttempt lookup
       create: jest.fn().mockImplementation((r: unknown) => r),
@@ -330,11 +343,32 @@ describe('StageRunsService.createManual', () => {
 
     await expect(
       service.createManual({
-        vehicleId: 'v1',
+        entryId: 'v1',
         stageId: 's1',
         startTime: '2026-01-01T00:00:00.000Z',
       }),
     ).rejects.toThrow('already has an attempt on stage s1 that counts');
+  });
+
+  it('stamps a run without a start time with the server clock', async () => {
+    const stageRuns = {
+      findOne: jest.fn().mockResolvedValue(null),
+      create: jest.fn((r: { startTime: Date }) => r),
+      save: jest.fn((r: unknown) => Promise.resolve(r)),
+    };
+    const service = new StageRunsService(
+      stageRuns as never,
+      {} as never,
+      { findOne: jest.fn().mockResolvedValue(null) } as never,
+      { emit: jest.fn() } as never,
+    );
+    const before = Date.now();
+
+    await service.createManual({ entryId: 'v1', stageId: 's1' });
+
+    const { startTime } = stageRuns.create.mock.calls[0][0];
+    expect(startTime.getTime()).toBeGreaterThanOrEqual(before);
+    expect(startTime.getTime()).toBeLessThanOrEqual(Date.now());
   });
 
   it('rejects a finish time at or before the start time', async () => {
@@ -342,7 +376,7 @@ describe('StageRunsService.createManual', () => {
 
     await expect(
       service.createManual({
-        vehicleId: 'v1',
+        entryId: 'v1',
         stageId: 's1',
         startTime: '2026-01-01T00:01:00.000Z',
         finishTime: '2026-01-01T00:00:00.000Z',
@@ -352,10 +386,117 @@ describe('StageRunsService.createManual', () => {
   });
 });
 
+describe('StageRunsService.finishNow', () => {
+  function makeFinishNowService(run: Record<string, unknown>) {
+    const stageRuns = {
+      findOneBy: jest.fn().mockResolvedValue(run),
+      findOne: jest.fn().mockResolvedValue(run),
+      save: jest.fn((r: unknown) => Promise.resolve(r)),
+    };
+    const stagesService = {
+      findOne: jest.fn().mockResolvedValue({ status: 'ACTIVE' }),
+    };
+    const emitter = { emit: jest.fn() };
+    const service = new StageRunsService(
+      stageRuns as never,
+      {} as never,
+      stagesService as never,
+      emitter as never,
+    );
+    return { service, stageRuns, emitter };
+  }
+
+  it('finishes a running car with the server clock', async () => {
+    const { service, emitter } = makeFinishNowService({
+      id: 'r1',
+      entryId: 'v1',
+      stageId: 's1',
+      startTime: new Date(Date.now() - 60_000),
+      finishTime: null,
+      voided: false,
+    });
+
+    const finished = await service.finishNow('r1');
+
+    expect(finished.durationMs).toBeGreaterThanOrEqual(60_000);
+    expect(finished.finishManual).toBe(true);
+    expect(emitter.emit).toHaveBeenCalledWith('stage-run.updated', finished);
+  });
+
+  it('refuses a run that already finished, so a double click moves nothing', async () => {
+    const { service, stageRuns } = makeFinishNowService({
+      id: 'r1',
+      startTime: new Date(Date.now() - 60_000),
+      finishTime: new Date(),
+      voided: false,
+    });
+
+    await expect(service.finishNow('r1')).rejects.toThrow('already finished');
+    expect(stageRuns.save).not.toHaveBeenCalled();
+  });
+});
+
+describe('StageRunsService.startOrFinishRun', () => {
+  const start = new Date('2026-10-04T10:00:00Z');
+  const after = (ms: number) => new Date(start.getTime() + ms);
+
+  function makeCombinedService(open: StageRun | null) {
+    const service = new StageRunsService(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    const internals = service as unknown as {
+      findActive: () => Promise<StageRun | null>;
+    };
+    internals.findActive = jest.fn().mockResolvedValue(open);
+    const startRun = jest
+      .spyOn(service, 'startRun')
+      .mockResolvedValue({ id: 'new' } as never);
+    const finishRun = jest
+      .spyOn(service, 'finishRun')
+      .mockResolvedValue({ id: 'r1' } as never);
+    return { service, startRun, finishRun };
+  }
+
+  it('starts a run when the car has none open', async () => {
+    const { service, startRun, finishRun } = makeCombinedService(null);
+
+    await service.startOrFinishRun('v1', 's1', start, 10_000);
+
+    expect(startRun).toHaveBeenCalledWith('v1', 's1', start);
+    expect(finishRun).not.toHaveBeenCalled();
+  });
+
+  it('finishes the open run once the minimum stage time has passed', async () => {
+    const { service, startRun, finishRun } = makeCombinedService({
+      startTime: start,
+    } as StageRun);
+
+    await service.startOrFinishRun('v1', 's1', after(95_000), 10_000);
+
+    expect(finishRun).toHaveBeenCalledWith('v1', 's1', after(95_000));
+    expect(startRun).not.toHaveBeenCalled();
+  });
+
+  it('ignores a passing within the minimum stage time as the same passing', async () => {
+    const { service, startRun, finishRun } = makeCombinedService({
+      startTime: start,
+    } as StageRun);
+
+    await expect(
+      service.startOrFinishRun('v1', 's1', after(3_000), 10_000),
+    ).resolves.toBeNull();
+    expect(finishRun).not.toHaveBeenCalled();
+    expect(startRun).not.toHaveBeenCalled();
+  });
+});
+
 describe('StageRunsService.finishRun', () => {
   const activeRun = {
     id: 'r1',
-    vehicleId: 'v1',
+    entryId: 'v1',
     stageId: 's1',
     startTime: new Date('2026-01-01T00:00:00.000Z'),
     finishTime: null,
@@ -397,7 +538,7 @@ describe('StageRunsService.startRun', () => {
     // second one becoming a duplicate row.
     const existing = {
       id: 'r1',
-      vehicleId: 'v1',
+      entryId: 'v1',
       stageId: 's1',
       startTime: new Date('2026-01-01T00:00:00.000Z'),
       finishTime: undefined,

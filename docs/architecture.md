@@ -4,7 +4,7 @@
 Gate hardware (or SimulatedAdapter)
   -> gate-agent (DetectionEvent + heartbeat over MQTT)
   -> embedded Aedes broker inside rally-server
-  -> EventsService (stores DetectionEventRecord, looks up gate + vehicle)
+  -> EventsService (stores DetectionEventRecord, looks up gate + entry)
   -> rule engine (active GateAssignment.role -> start/finish/split a StageRun)
   -> EventEmitter2 ("detection.created", "stage-run.updated", "stage-run.split")
   -> LiveController (one SSE stream, /api/live) -> web dashboard
@@ -27,7 +27,8 @@ mode has nothing external to install.
   off. Gates can also be added by hand on the Hardware page.
 - Online/offline is `now - lastHeartbeatAt > 30s`
   (`HEARTBEAT_ONLINE_THRESHOLD_MS`). *Ready* is online and chrony not reported
-  unsynced; Live Timing shows "Gates ready X/Y" for the selected stage.
+  unsynced; Live Timing shows each gate of the selected stage on a line in
+  course order with its state.
 - **No decoder status in the heartbeat.** `BeamAdapter` and `OpenStintAdapter`
   exit the process when their decoder process (gpiomon, openstint_rtlsdr) dies,
   so a dead decoder already reads as an offline gate.

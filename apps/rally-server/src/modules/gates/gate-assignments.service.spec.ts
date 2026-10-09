@@ -2,7 +2,13 @@ import { ConflictException } from '@nestjs/common';
 import { StageStatus } from '@rally-gate/shared';
 import { GateAssignmentsService } from './gate-assignments.service';
 
-type Row = { id: string; gateId: string; stageId: string; active: boolean };
+type Row = {
+  id: string;
+  gateId: string;
+  stageId: string;
+  active: boolean;
+  role?: string;
+};
 type StageRow = { id: string; status: StageStatus };
 
 function matches(
@@ -155,6 +161,50 @@ describe('GateAssignmentsService.create', () => {
       expect(state).toHaveLength(0);
     },
   );
+});
+
+describe('GateAssignmentsService.create, combined start/finish', () => {
+  const on = (role: string): Row => ({
+    id: role,
+    gateId: role,
+    stageId: 'SS1',
+    active: false,
+    role,
+  });
+
+  it.each([
+    [
+      'a combined gate next to a start gate',
+      'stage_start',
+      'stage_start_finish',
+    ],
+    [
+      'a finish gate next to a combined gate',
+      'stage_start_finish',
+      'stage_finish',
+    ],
+    ['a second combined gate', 'stage_start_finish', 'stage_start_finish'],
+  ])('refuses %s', async (_label, existing, role) => {
+    const { service, state } = makeService([on(existing)]);
+
+    await expect(
+      service.create({ gateId: 'G9', stageId: 'SS1', role: role as never }),
+    ).rejects.toThrow(ConflictException);
+    expect(state).toHaveLength(1);
+  });
+
+  it('allows splits alongside a combined gate', async () => {
+    const { service, state } = makeService([on('stage_start_finish')]);
+
+    await service.create({
+      gateId: 'G9',
+      stageId: 'SS1',
+      role: 'stage_split' as never,
+      splitIndex: 1,
+    });
+
+    expect(state).toHaveLength(2);
+  });
 });
 
 describe('GateAssignmentsService.remove', () => {

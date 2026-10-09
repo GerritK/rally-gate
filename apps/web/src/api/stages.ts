@@ -13,6 +13,7 @@ export interface Stage {
   stageNumber: number;
   status: StageStatus;
   expectedDurationMs: number | null;
+  minDurationMs: number | null;
 }
 
 export function fetchStages(): Promise<Stage[]> {
@@ -44,12 +45,13 @@ export function createStage(input: {
  * `stageNumber` clashes with another stage or the stage isn't NOT_STARTED.
  * `status` is not settable here — see `createStage`.
  */
-export function upsertStage(
+export function updateStage(
   id: string,
   input: {
     name: string;
     stageNumber: number;
     expectedDurationMs: number | null;
+    minDurationMs: number | null;
   },
 ): Promise<Stage> {
   return putJson(`/stages/${id}`, input);

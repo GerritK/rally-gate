@@ -8,7 +8,22 @@ import {
   type GateAssignment,
 } from '../api/gate-assignments';
 import { fetchGates, type Gate } from '../api/gates';
-import { fetchStage, upsertStage, type Stage } from '../api/stages';
+import { fetchStage, updateStage, type Stage } from '../api/stages';
+import FormDialog from '../components/FormDialog.vue';
+import StatusChip from '../components/StatusChip.vue';
+import { gateRoleLabel, required, STAGE_STATUS_DISPLAY } from '../format';
+import {
+  formatStageDuration,
+  notify,
+  parseStageDuration,
+  t,
+} from '@rally-gate/ui';
+import {
+  DEFAULT_MIN_STAGE_DURATION_MS,
+  GateRole,
+  StageStatus,
+} from '@rally-gate/shared';
+import { useUnsavedChanges } from '../unsaved-changes';
 
 const props = defineProps<{ stageId: string }>();
 
@@ -16,68 +31,112 @@ const stage = ref<Stage | null>(null);
 const gates = ref<Gate[]>([]);
 const gateAssignments = ref<GateAssignment[]>([]);
 const savingStage = ref(false);
+/** Durations are typed like a stopwatch reading ("5:00", "0:10"), the same
+ * as a corrected stage time; blank means none (expected) or the default
+ * (minimum). */
+const expectedText = ref('');
+const minText = ref('');
+const { markSaved } = useUnsavedChanges(() =>
+  stage.value
+    ? [
+        stage.value.name,
+        stage.value.stageNumber,
+        expectedText.value,
+        minText.value,
+      ]
+    : null,
+);
+const assignmentDialogOpen = ref(false);
 const newAssignment = ref<{
   gateId: string;
-  role: (typeof GATE_ROLES)[number];
+  role: GateRole;
   splitIndex?: number;
-}>({ gateId: '', role: GATE_ROLES[0] });
+}>({ gateId: '', role: GateRole.STAGE_START });
+const roleOptions = computed(() =>
+  GATE_ROLES.map((role) => ({
+    value: role,
+    title: gateRoleLabel({ role }).trim(),
+  })),
+);
+
+function openAssignmentDialog() {
+  newAssignment.value = { gateId: '', role: GateRole.STAGE_START };
+  assignmentDialogOpen.value = true;
+}
 
 const assignmentsForStage = computed(() =>
   gateAssignments.value.filter((a) => a.stageId === props.stageId),
 );
 
-/** Entered in minutes, stored in ms; blank means no expectation. */
-const expectedMinutes = computed({
-  get: () =>
-    stage.value?.expectedDurationMs
-      ? stage.value.expectedDurationMs / 60_000
-      : '',
-  set: (value: number | string | null) => {
-    if (!stage.value) return;
-    stage.value.expectedDurationMs =
-      !value || Number(value) <= 0 ? null : Math.round(Number(value) * 60_000);
-  },
-});
+function toText(ms: number | null): string {
+  return ms ? formatStageDuration(ms) : '';
+}
 
-const stageEditable = computed(() => stage.value?.status === 'NOT_STARTED');
+function durationRule(value: string | null) {
+  return !value?.trim() || parseStageDuration(value) !== null
+    ? true
+    : t('stage.durationRule');
+}
+
+function showStage(loaded: Stage) {
+  stage.value = loaded;
+  expectedText.value = toText(loaded.expectedDurationMs);
+  minText.value = toText(loaded.minDurationMs);
+  markSaved();
+}
+
+const stageEditable = computed(
+  () => stage.value?.status === StageStatus.NOT_STARTED,
+);
 
 async function refreshAssignments() {
   gateAssignments.value = await fetchGateAssignments();
 }
 
 async function load() {
-  stage.value = await fetchStage(props.stageId);
-  gates.value = await fetchGates();
-  await refreshAssignments();
+  const [loaded] = await Promise.all([
+    fetchStage(props.stageId),
+    fetchGates().then((g) => (gates.value = g)),
+    refreshAssignments(),
+  ]);
+  showStage(loaded);
 }
 
 async function onSaveStage() {
   if (!stage.value || savingStage.value) return;
+  if (durationRule(expectedText.value) !== true) return;
+  if (durationRule(minText.value) !== true) return;
   savingStage.value = true;
   try {
-    stage.value = await upsertStage(stage.value.id, {
-      name: stage.value.name,
-      stageNumber: stage.value.stageNumber,
-      expectedDurationMs: stage.value.expectedDurationMs,
-    });
+    showStage(
+      await updateStage(stage.value.id, {
+        name: stage.value.name,
+        stageNumber: stage.value.stageNumber,
+        expectedDurationMs: parseStageDuration(expectedText.value ?? ''),
+        minDurationMs: parseStageDuration(minText.value ?? ''),
+      }),
+    );
+    notify(t('stage.saved'));
   } finally {
     savingStage.value = false;
   }
 }
 
 async function onCreateAssignment() {
-  if (!newAssignment.value.gateId) return;
+  const { splitIndex, ...rest } = newAssignment.value;
   await createGateAssignment({
-    ...newAssignment.value,
+    ...rest,
+    ...(rest.role === GateRole.STAGE_SPLIT ? { splitIndex } : {}),
     stageId: props.stageId,
   });
-  newAssignment.value = { gateId: '', role: GATE_ROLES[0] };
   await refreshAssignments();
 }
 
+/** No confirmation: a plan edit on a stage that hasn't started, cheap to redo. */
 async function onDeleteAssignment(assignment: GateAssignment) {
   await deleteGateAssignment(assignment.id);
   await refreshAssignments();
+  notify(t('stage.assignmentDeleted'));
 }
 
 watch(() => props.stageId, load);
@@ -91,15 +150,18 @@ onMounted(load);
     to="/setup/stages"
     class="mb-4"
   >
-    Back to Stages
+    {{ $t('stage.back') }}
   </v-btn>
 
   <v-card v-if="stage" class="mb-6">
-    <v-card-title>Stage Details</v-card-title>
+    <v-card-title>{{ $t('stage.details') }}</v-card-title>
     <v-card-text>
       <v-alert v-if="!stageEditable" type="info" variant="tonal" class="mb-4">
-        This stage is {{ stage.status }} and can only be edited while
-        NOT_STARTED.
+        {{
+          $t('stage.notEditable', {
+            status: STAGE_STATUS_DISPLAY[stage.status].label,
+          })
+        }}
       </v-alert>
       <form
         class="d-flex flex-wrap align-center ga-3"
@@ -109,7 +171,7 @@ onMounted(load);
           v-model.number="stage.stageNumber"
           type="number"
           min="1"
-          label="Stage #"
+          :label="$t('stages.number')"
           density="comfortable"
           hide-details
           :disabled="!stageEditable"
@@ -117,27 +179,38 @@ onMounted(load);
         />
         <v-text-field
           v-model="stage.name"
-          label="Name"
+          :label="$t('stages.name')"
           density="comfortable"
           hide-details
           :disabled="!stageEditable"
           style="min-width: 220px"
         />
         <v-text-field
-          v-model="expectedMinutes"
-          type="number"
-          min="0"
-          step="0.5"
-          label="Expected time (min)"
+          v-model="expectedText"
+          :label="$t('stage.expectedTime')"
+          placeholder="5:00"
+          class="rg-timing"
           density="comfortable"
-          hide-details
+          hide-details="auto"
           clearable
+          :rules="[durationRule]"
           :disabled="!stageEditable"
           style="max-width: 200px"
         />
-        <v-chip :color="stage.status === 'ACTIVE' ? 'success' : 'timing-idle'">
-          {{ stage.status }}
-        </v-chip>
+        <v-text-field
+          v-model="minText"
+          :label="$t('stage.minimumTime')"
+          :placeholder="formatStageDuration(DEFAULT_MIN_STAGE_DURATION_MS)"
+          persistent-placeholder
+          class="rg-timing"
+          density="comfortable"
+          hide-details="auto"
+          clearable
+          :rules="[durationRule]"
+          :disabled="!stageEditable"
+          style="max-width: 200px"
+        />
+        <StatusChip :display="STAGE_STATUS_DISPLAY[stage.status]" />
         <v-btn
           type="submit"
           color="primary"
@@ -145,14 +218,28 @@ onMounted(load);
           :disabled="!stageEditable"
           prepend-icon="mdi-content-save"
         >
-          Save
+          {{ $t('common.save') }}
         </v-btn>
       </form>
+      <div class="text-caption text-medium-emphasis mt-2">
+        {{ $t('stage.minimumHint') }}
+      </div>
     </v-card-text>
   </v-card>
 
   <v-card>
-    <v-card-title>Gate Assignments</v-card-title>
+    <v-card-title class="d-flex align-center">
+      {{ $t('stage.assignments') }}
+      <v-spacer />
+      <v-btn
+        v-if="stageEditable"
+        variant="tonal"
+        prepend-icon="mdi-plus"
+        @click="openAssignmentDialog"
+      >
+        {{ $t('stage.addAssignment') }}
+      </v-btn>
+    </v-card-title>
     <v-card-text>
       <v-alert
         v-if="stage && !stageEditable"
@@ -160,84 +247,105 @@ onMounted(load);
         variant="tonal"
         class="mb-4"
       >
-        This stage is {{ stage.status }} — gate assignments can only be added or
-        removed while NOT_STARTED.
+        {{
+          $t('stage.assignmentsLocked', {
+            status: STAGE_STATUS_DISPLAY[stage.status].label,
+          })
+        }}
       </v-alert>
       <v-table density="comfortable">
         <thead>
           <tr>
-            <th>Gate</th>
-            <th>Role</th>
-            <th>Split #</th>
-            <th>Active</th>
-            <th></th>
+            <th>{{ $t('stage.gate') }}</th>
+            <th>{{ $t('stage.role') }}</th>
+            <th>{{ $t('stage.active') }}</th>
+            <th width="1%"></th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="assignment in assignmentsForStage" :key="assignment.id">
             <td>{{ assignment.gateId }}</td>
-            <td>{{ assignment.role }}</td>
-            <td>{{ assignment.splitIndex ?? '-' }}</td>
+            <td>{{ gateRoleLabel(assignment) }}</td>
             <td>
               <v-chip
                 size="small"
                 :color="assignment.active ? 'success' : 'timing-idle'"
               >
-                {{ assignment.active ? 'active' : 'inactive' }}
+                {{
+                  assignment.active
+                    ? $t('stage.isActive')
+                    : $t('stage.isInactive')
+                }}
               </v-chip>
             </td>
-            <td>
-              <v-btn
-                v-if="stageEditable"
-                size="small"
-                variant="text"
-                color="error"
-                prepend-icon="mdi-delete"
-                @click="onDeleteAssignment(assignment)"
-              >
-                Delete
-              </v-btn>
+            <td class="text-no-wrap">
+              <v-menu v-if="stageEditable">
+                <template #activator="{ props: menu }">
+                  <v-btn
+                    v-bind="menu"
+                    icon="mdi-dots-vertical"
+                    size="small"
+                    variant="text"
+                    :aria-label="
+                      $t('common.moreFor', { name: assignment.gateId })
+                    "
+                  />
+                </template>
+                <v-list density="compact">
+                  <v-list-item
+                    prepend-icon="mdi-delete-outline"
+                    :title="$t('common.delete')"
+                    base-color="error"
+                    @click="onDeleteAssignment(assignment)"
+                  />
+                </v-list>
+              </v-menu>
+            </td>
+          </tr>
+          <tr v-if="assignmentsForStage.length === 0">
+            <td colspan="4" class="rg-empty">
+              {{
+                stageEditable
+                  ? $t('stage.noAssignmentsAdd', {
+                      action: $t('stage.addAssignment'),
+                    })
+                  : $t('stage.noAssignments')
+              }}
             </td>
           </tr>
         </tbody>
       </v-table>
-      <form
-        v-if="stageEditable"
-        class="d-flex flex-wrap align-center ga-3 mt-4"
-        @submit.prevent="onCreateAssignment"
-      >
-        <v-select
-          v-model="newAssignment.gateId"
-          :items="gates"
-          item-title="name"
-          item-value="id"
-          label="Gate"
-          density="comfortable"
-          hide-details
-          style="min-width: 200px"
-        />
-        <v-select
-          v-model="newAssignment.role"
-          :items="[...GATE_ROLES]"
-          label="Role"
-          density="comfortable"
-          hide-details
-          style="min-width: 200px"
-        />
-        <v-text-field
-          v-if="newAssignment.role === 'stage_split'"
-          v-model.number="newAssignment.splitIndex"
-          type="number"
-          min="0"
-          label="Split #"
-          density="comfortable"
-          hide-details
-          style="max-width: 140px"
-        />
-        <v-btn type="submit" color="primary" prepend-icon="mdi-plus">
-          Add Assignment
-        </v-btn>
-      </form>
     </v-card-text>
   </v-card>
+
+  <FormDialog
+    v-model="assignmentDialogOpen"
+    :title="$t('stage.addAssignment')"
+    :form="newAssignment"
+    :save="onCreateAssignment"
+    :saved="$t('stage.assignmentAdded')"
+    :save-text="$t('stage.addAssignment')"
+  >
+    <v-select
+      v-model="newAssignment.gateId"
+      :items="gates"
+      item-title="name"
+      item-value="id"
+      :label="$t('stage.gate')"
+      :rules="[required]"
+    />
+    <v-select
+      v-model="newAssignment.role"
+      :items="roleOptions"
+      :label="$t('stage.role')"
+    />
+    <v-text-field
+      v-if="newAssignment.role === GateRole.STAGE_SPLIT"
+      v-model.number="newAssignment.splitIndex"
+      type="number"
+      min="0"
+      :label="$t('stage.splitNumber')"
+      :rules="[required]"
+    />
+  </FormDialog>
 </template>

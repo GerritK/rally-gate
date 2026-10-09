@@ -1,19 +1,21 @@
 import { ConflictException } from '@nestjs/common';
-import { GateRole, StageStatus } from '@rally-gate/shared';
+import { GateRole, StageStatus, EntryStatus } from '@rally-gate/shared';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { GatesService } from '../gates/gates.service';
 import { StageRunsService } from '../stage-runs/stage-runs.service';
 import { StagesService } from '../stages/stages.service';
-import { VehiclesService } from '../vehicles/vehicles.service';
+import { EntriesService } from '../entries/entries.service';
 import { DetectionEventRecord } from './detection-event.entity';
 import { EventsService } from './events.service';
 
 const GATE = { id: 'G1', name: 'G1', clockOffsetMs: null };
-const VEHICLE = { id: 'v1', transponderId: '1234567' };
+const ENTRY = { id: 'v1', transponderId: '1234567' };
 
 function makeService(opts: {
   gate?: unknown;
-  vehicle?: unknown;
+  entry?: unknown;
+  /** What `findByTransponder` returns; defaults to `entry` alone. */
+  matches?: unknown[];
   pending?: unknown[];
   startRun?: jest.Mock;
   stageStatus?: StageStatus;
@@ -41,12 +43,16 @@ function makeService(opts: {
     findOne: jest.fn().mockResolvedValue('gate' in opts ? opts.gate : GATE),
     clockCorrectionMsFor: jest.fn().mockResolvedValue(0),
   } as unknown as GatesService;
-  const vehiclesService = {
-    findByTransponder: jest
-      .fn()
-      .mockResolvedValue('vehicle' in opts ? opts.vehicle : VEHICLE),
-    findOne: jest.fn().mockResolvedValue(VEHICLE),
-  } as unknown as VehiclesService;
+  const findByTransponder = jest
+    .fn()
+    .mockResolvedValue(
+      opts.matches ??
+        ('entry' in opts ? [opts.entry].filter(Boolean) : [ENTRY]),
+    );
+  const entriesService = {
+    findByTransponder,
+    findOne: jest.fn().mockResolvedValue('entry' in opts ? opts.entry : ENTRY),
+  } as unknown as EntriesService;
   const gateAssignmentsService = {
     findActiveForGate: jest
       .fn()
@@ -76,12 +82,12 @@ function makeService(opts: {
     events as never,
     gatesService,
     gateAssignmentsService,
-    vehiclesService,
+    entriesService,
     stageRunsService,
     stagesService,
     emitter as never,
   );
-  return { service, events, saved, startRun, emitter };
+  return { service, events, saved, startRun, emitter, findByTransponder };
 }
 
 function detection(overrides: Record<string, unknown> = {}) {
@@ -163,9 +169,9 @@ describe('EventsService detection failures', () => {
     expect(saved.at(-1)).toMatchObject({ processed: true });
   });
 
-  const nothingToApply: [string, { gate?: null; vehicle?: null }][] = [
+  const nothingToApply: [string, { gate?: null; entry?: null }][] = [
     ['an unknown gate', { gate: null }],
-    ['an unregistered transponder', { vehicle: null }],
+    ['an unregistered transponder', { entry: null }],
   ];
 
   it.each(nothingToApply)(
@@ -180,6 +186,56 @@ describe('EventsService detection failures', () => {
       expect(saved.at(-1)).toMatchObject({ processed: true });
     },
   );
+});
+
+describe('EventsService cars out of the event', () => {
+  it("stores a withdrawn car's passing as evidence without starting a run", async () => {
+    const { service, saved, startRun } = makeService({
+      entry: { ...ENTRY, startNumber: 7, status: EntryStatus.WITHDRAWN },
+    });
+
+    await service.handleMqttMessage(detection());
+
+    expect(startRun).not.toHaveBeenCalled();
+    // Nothing to apply is not a failure: processed, so it isn't retried.
+    expect(saved.at(-1)).toMatchObject({ eventId: 'e1', processed: true });
+  });
+});
+
+describe('EventsService live detection payload', () => {
+  // The live stream serialises the record when it is emitted; a payload sent
+  // before the rules ran read as a rule failure on every gate page.
+  function emittedDetection(emitter: { emit: jest.Mock }) {
+    const sent: DetectionEventRecord[] = [];
+    emitter.emit.mockImplementation((name: string, payload: unknown) => {
+      if (name === 'detection.created') {
+        sent.push({ ...(payload as DetectionEventRecord) });
+      }
+    });
+    return sent;
+  }
+
+  it('is sent processed once the rules have run', async () => {
+    const { service, emitter } = makeService({});
+    const sent = emittedDetection(emitter);
+
+    await service.handleMqttMessage(detection());
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].processed).toBe(true);
+  });
+
+  it('is still sent, unprocessed, when the rules fail', async () => {
+    const { service, emitter } = makeService({
+      startRun: jest.fn().mockRejectedValue(new Error('db down')),
+    });
+    const sent = emittedDetection(emitter);
+
+    await service.handleMqttMessage(detection());
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].processed).toBe(false);
+  });
 });
 
 describe('EventsService redelivered detections', () => {
@@ -228,6 +284,7 @@ describe('EventsService detection payload validation', () => {
     ['a missing eventId', { eventId: undefined }],
     ['an empty gateId', { gateId: '' }],
     ['a non-string transponderId', { transponderId: 1234567 }],
+    ['an unknown transponderKind', { transponderKind: 'RFID-ish' }],
     ['an unparseable timestampGate', { timestampGate: 'yesterday-ish' }],
     ['an absurdly long gateId', { gateId: 'g'.repeat(500) }],
   ])('drops a detection with %s', async (_label, overrides) => {
@@ -253,7 +310,7 @@ describe('EventsService.reprocessPending', () => {
   const pendingRecord = {
     eventId: 'e1',
     gateId: 'G1',
-    vehicleId: 'v1',
+    entryId: 'v1',
     transponderId: '1234567',
     timestampGate: new Date('2026-01-01T12:00:00.000Z'),
     clockCorrectionMs: 0,
@@ -311,11 +368,11 @@ describe('EventsService unidentified passings', () => {
     eventId: 'e1',
     gateId: 'G1',
     transponderId: null,
-    vehicleId: null,
+    entryId: null,
     timestampGate: new Date('2026-01-01T12:00:00.000Z'),
     clockCorrectionMs: 2_000,
     processed: true,
-    awaitingVehicle: true,
+    awaitingEntry: true,
   };
 
   it('holds a passing without a transponder for a marshal', async () => {
@@ -326,7 +383,7 @@ describe('EventsService unidentified passings', () => {
     expect(startRun).not.toHaveBeenCalled();
     expect(saved.at(-1)).toMatchObject({
       transponderId: null,
-      awaitingVehicle: true,
+      awaitingEntry: true,
       processed: true,
     });
     expect(emitter.emit).toHaveBeenCalledWith(
@@ -335,12 +392,52 @@ describe('EventsService unidentified passings', () => {
     );
   });
 
+  it('matches a transponder of the kind the gate states, RC if none', async () => {
+    const { service, findByTransponder } = makeService({});
+
+    await service.handleMqttMessage(detection());
+    await service.handleMqttMessage(
+      detection({ eventId: 'e2', transponderKind: 'NFC' }),
+    );
+
+    expect(findByTransponder).toHaveBeenNthCalledWith(1, 'RC', '1234567');
+    expect(findByTransponder).toHaveBeenNthCalledWith(2, 'NFC', '1234567');
+  });
+
+  it('holds a passing whose transponder is on several entries', async () => {
+    const { service, saved, startRun } = makeService({
+      matches: [ENTRY, { id: 'v2', transponderId: '1234567' }],
+    });
+
+    await service.handleMqttMessage(detection());
+
+    expect(startRun).not.toHaveBeenCalled();
+    expect(saved.at(-1)).toMatchObject({
+      transponderId: '1234567',
+      entryId: null,
+      awaitingEntry: true,
+    });
+  });
+
+  it('times a shared transponder for the one entry still in the event', async () => {
+    const { service, startRun } = makeService({
+      matches: [
+        { id: 'v2', transponderId: '1234567', status: EntryStatus.WITHDRAWN },
+        ENTRY,
+      ],
+    });
+
+    await service.handleMqttMessage(detection());
+
+    expect(startRun).toHaveBeenCalledWith('v1', 'SS1', expect.any(Date));
+  });
+
   it('does not ask a marshal about a passing at an idle gate', async () => {
     const { service, saved } = makeService({ assignment: null });
 
     await service.handleMqttMessage(detection(beam));
 
-    expect(saved.at(-1)).toMatchObject({ awaitingVehicle: false });
+    expect(saved.at(-1)).toMatchObject({ awaitingEntry: false });
   });
 
   it('times an assigned passing with the correction stored at ingest', async () => {
@@ -348,7 +445,7 @@ describe('EventsService unidentified passings', () => {
       stored: { ...awaiting },
     });
 
-    await service.assignVehicle('e1', 'v1');
+    await service.assignEntry('e1', 'v1');
 
     expect(startRun).toHaveBeenCalledWith(
       'v1',
@@ -356,8 +453,8 @@ describe('EventsService unidentified passings', () => {
       new Date('2026-01-01T12:00:02.000Z'),
     );
     expect(saved.at(-1)).toMatchObject({
-      vehicleId: 'v1',
-      awaitingVehicle: false,
+      entryId: 'v1',
+      awaitingEntry: false,
     });
   });
 
@@ -372,7 +469,7 @@ describe('EventsService unidentified passings', () => {
       }),
     });
 
-    await expect(service.assignVehicle('e1', 'v1')).rejects.toThrow(
+    await expect(service.assignEntry('e1', 'v1')).rejects.toThrow(
       ConflictException,
     );
     expect(saved).toHaveLength(0);
@@ -387,8 +484,34 @@ describe('EventsService unidentified passings', () => {
 
     expect(startRun).not.toHaveBeenCalled();
     expect(saved.at(-1)).toMatchObject({
-      vehicleId: null,
-      awaitingVehicle: false,
+      entryId: null,
+      awaitingEntry: false,
     });
+  });
+});
+
+describe('EventsService raw payload', () => {
+  it('stores the payload as published, metadata included', async () => {
+    // The ESP32 gate flags a passing it timed without a set clock; parsing
+    // drops `metadata`, so only the stored payload keeps that evidence.
+    const { service, saved } = makeService({});
+    const message = detection({ metadata: { timeUnknown: true } });
+
+    await service.handleMqttMessage(message);
+
+    expect(saved[0].rawPayload).toBe(message.payload.toString());
+    expect(JSON.parse(saved[0].rawPayload)).toMatchObject({
+      metadata: { timeUnknown: true },
+    });
+  });
+
+  it('ignores an oversized payload instead of storing it', async () => {
+    const { service, saved } = makeService({});
+
+    await service.handleMqttMessage(
+      detection({ metadata: { filler: 'x'.repeat(5000) } }),
+    );
+
+    expect(saved).toHaveLength(0);
   });
 });

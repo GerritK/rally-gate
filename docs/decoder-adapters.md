@@ -23,7 +23,7 @@ ever sees a `DetectionEvent`.
 
 Times a passing but can't identify the car: detections carry no
 `transponderId`, and the server holds them as **unassigned passings** until a
-marshal picks the vehicle on Live Timing (see `event-model.md`).
+marshal picks the entry on Live Timing (see `event-model.md`).
 
 Reads the pin through libgpiod's `gpiomon` (package `gpiod`, installed by the
 gate installer), not a native Node module, so nothing compiles on the Pi. The
@@ -129,18 +129,20 @@ one SDR. The gate user joins `plugdev` (SDR) and `users` (`/var/lib/openstint`).
 
 ## Other adapter ideas
 
-- `ManualEntryAdapter` — a marshal keying in a passing.
-- **ESP32 checkpoint gates** for Parc Fermé / pre-start, where presence matters
-  and timing doesn't (RFID reader or a button). A gate is anything that
-  publishes the right JSON to `rally/gates/<gateId>/detections` — no gate-agent
-  needed.
+- **ESP32 checkpoint gates** for check-in, Parc Fermé and pre-start, where
+  presence matters and timing doesn't. A gate is anything that publishes the
+  right JSON to `rally/gates/<gateId>/detections`, so no gate-agent is needed.
+  The NFC one is designed in `esp32-gate.md`.
 
-### Multiple IDs per vehicle
+### Multiple IDs per entry
 
-An RFID badge, a backup transponder, or OpenStint's `OPN`/`AMB` split all mean
-one vehicle with several IDs. Today `Vehicle` has one `transponderId` and lookup
-is one exact match, so anything else looks unregistered. Fix when needed: a
-list of IDs per vehicle, matched by `DetectionEvent.source`. Small change.
+Built: an entry has a list of transponders, each with a kind (RC, NFC) from
+`TransponderKind` in `packages/shared`, and a detection matches only its own
+kind. The adapter states the kind as `DetectionEvent.transponderKind` — not
+derived from `source`, which names the adapter (beam + OpenStint reads RC) —
+and absent means RC. OpenStint's `OPN`/`AMB` split is still open: two ID
+namespaces within RC, so either two kinds or a prefixed identifier, settled
+with the adapter.
 
 ## Gate system clock policy
 

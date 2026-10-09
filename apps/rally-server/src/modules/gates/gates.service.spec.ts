@@ -1,8 +1,5 @@
-import {
-  DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS,
-  GatesService,
-  measureClockOffsetMs,
-} from './gates.service';
+import { DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS } from '@rally-gate/shared';
+import { GatesService, measureClockOffsetMs } from './gates.service';
 
 function makeService(opts: {
   existingGate?: unknown;

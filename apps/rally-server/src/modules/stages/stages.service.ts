@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { StageStatus } from '@rally-gate/shared';
 import { Not, Repository } from 'typeorm';
@@ -16,6 +17,7 @@ export class StagesService {
     @InjectRepository(Stage)
     private readonly stages: Repository<Stage>,
     private readonly gateAssignmentsService: GateAssignmentsService,
+    private readonly emitter: EventEmitter2,
   ) {}
 
   findAll(): Promise<Stage[]> {
@@ -24,6 +26,14 @@ export class StagesService {
 
   findOne(id: string): Promise<Stage | null> {
     return this.stages.findOneBy({ id });
+  }
+
+  async findOneOrFail(id: string): Promise<Stage> {
+    const stage = await this.findOne(id);
+    if (!stage) {
+      throw new NotFoundException(`Stage ${id} not found`);
+    }
+    return stage;
   }
 
   async create(stage: CreateStageDto): Promise<Stage> {
@@ -42,10 +52,7 @@ export class StagesService {
    * runs already tied to it.
    */
   async update(id: string, data: UpdateStageDto): Promise<Stage> {
-    const stage = await this.findOne(id);
-    if (!stage) {
-      throw new NotFoundException(`Stage ${id} not found`);
-    }
+    const stage = await this.findOneOrFail(id);
     if (stage.status !== StageStatus.NOT_STARTED) {
       throw new ConflictException(
         `Stage ${id} is ${stage.status} and can only be edited while NOT_STARTED`,
@@ -62,10 +69,7 @@ export class StagesService {
    * deleting it would orphan history instead of a plan that was never used.
    */
   async remove(id: string): Promise<void> {
-    const stage = await this.findOne(id);
-    if (!stage) {
-      throw new NotFoundException(`Stage ${id} not found`);
-    }
+    const stage = await this.findOneOrFail(id);
     if (stage.status !== StageStatus.NOT_STARTED) {
       throw new ConflictException(
         `Stage ${id} is ${stage.status} and can only be deleted while NOT_STARTED`,
@@ -96,13 +100,20 @@ export class StagesService {
    * becomes CANCELLED for free since that status is derived, not stored.
    */
   async close(id: string): Promise<Stage> {
-    const stage = await this.findOne(id);
-    if (!stage) {
-      throw new NotFoundException(`Stage ${id} not found`);
-    }
+    const stage = await this.findOneOrFail(id);
+    const wasActive = stage.status === StageStatus.ACTIVE;
     await this.gateAssignmentsService.deactivateForStage(id);
     stage.status = StageStatus.CLOSED;
-    return this.stages.save(stage);
+    const saved = await this.stages.save(stage);
+    // Only a stage that ran: a never-activated one's gates may be timing
+    // another stage right now, and their passings belong to that one.
+    if (wasActive) {
+      const gateIds = (await this.gateAssignmentsService.findByStage(id)).map(
+        (a) => a.gateId,
+      );
+      await this.emitter.emitAsync('stage.closed', { stageId: id, gateIds });
+    }
+    return saved;
   }
 
   /**
@@ -119,10 +130,7 @@ export class StagesService {
    * forever (see `close`'s CANCELLED-on-close behavior).
    */
   async activate(id: string, force: boolean): Promise<Stage> {
-    const stage = await this.findOne(id);
-    if (!stage) {
-      throw new NotFoundException(`Stage ${id} not found`);
-    }
+    const stage = await this.findOneOrFail(id);
     if (stage.status === StageStatus.CLOSED) {
       throw new ConflictException(
         `Stage ${id} is closed and cannot be reactivated`,
@@ -137,6 +145,17 @@ export class StagesService {
       await this.close(bumpedStageId);
     }
     stage.status = StageStatus.ACTIVE;
-    return this.stages.save(stage);
+    const saved = await this.stages.save(stage);
+    // Awaited so the start order is frozen by the time the response arrives.
+    await this.emitter.emitAsync('stage.activated', saved);
+    return saved;
+  }
+
+  /** `null` unfreezes. */
+  async setStartOrder(id: string, entryIds: string[] | null): Promise<void> {
+    await this.stages.update(id, {
+      startOrder: entryIds,
+      startOrderFrozenAt: entryIds ? new Date() : null,
+    });
   }
 }

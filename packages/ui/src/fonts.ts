@@ -5,7 +5,7 @@
  * width on every live update. @fontsource bundles the font files into the
  * app itself via Vite, same as any other asset.
  *
- * Barlow: derived from American highway/vehicle signage — reads as
+ * Barlow: derived from American highway/entry signage — reads as
  * motorsport without going full gaming-logo. Condensed for headings packs
  * long stage/driver names into table headers, which is the actual
  * bottleneck on a tablet results list; regular Barlow for body text keeps
@@ -13,7 +13,11 @@
  */
 import '@fontsource/barlow/400.css';
 import '@fontsource/barlow/500.css';
+// Start numbers, a door plate's bold sans.
+import '@fontsource/barlow/700.css';
 import '@fontsource/barlow-condensed/500.css';
 import '@fontsource/barlow-condensed/600.css';
+// Crew names, lettered like a rally car's side window.
+import '@fontsource/barlow-condensed/700.css';
 import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/700.css';

@@ -30,6 +30,11 @@ export function fetchGates(): Promise<Gate[]> {
   return apiFetch('/gates');
 }
 
+/** Null for an id no gate has. */
+export function fetchGate(id: string): Promise<Gate | null> {
+  return apiFetch(`/gates/${id}`);
+}
+
 export function upsertGate(id: string, input: { name: string }): Promise<Gate> {
   return putJson(`/gates/${id}`, input);
 }

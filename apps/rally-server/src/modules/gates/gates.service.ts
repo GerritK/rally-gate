@@ -2,8 +2,11 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import {
+  AUTO_DISCOVER_GATES_KEY,
+  CLOCK_CORRECTION_THRESHOLD_KEY,
+  DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS,
   DETECTION_TOPIC_PREFIX,
-  GATE_CONFIG_PORT,
+  gateConfigUrl,
   GateHeartbeat,
   HEARTBEAT_ONLINE_THRESHOLD_MS,
 } from '@rally-gate/shared';
@@ -11,22 +14,6 @@ import { Repository } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
 import { GateAssignmentsService } from './gate-assignments.service';
 import { Gate } from './gate.entity';
-
-export const AUTO_DISCOVER_GATES_KEY = 'autoDiscoverGates';
-export const CLOCK_CORRECTION_THRESHOLD_KEY = 'clockCorrectionThresholdMs';
-
-/**
- * Below this, a measured offset is indistinguishable from network transit
- * time (the measurement is one-way), so correcting would inject latency
- * noise into clocks that may well be fine. Above it, the gate's clock is
- * unambiguously wrong — an unsynced Pi drifts seconds over an event, and one
- * booting from `fake-hwclock` with no RTC can be days out.
- *
- * Exposed as a setting because the right value depends on the site's network:
- * the floor is however long a heartbeat takes to arrive, and that is a
- * property of the rally's WiFi, not of this code.
- */
-export const DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS = 1_000;
 
 /**
  * `capabilities` is self-reported by the gate over an unauthenticated broker
@@ -78,15 +65,11 @@ async function powerOffGate(
   gateId: string,
   address: string,
 ): Promise<GatePowerOffResult> {
-  const host = address.includes(':') ? `[${address}]` : address;
   try {
-    const res = await fetch(
-      `http://${host}:${GATE_CONFIG_PORT}/api/power-off`,
-      {
-        method: 'POST',
-        signal: AbortSignal.timeout(5000),
-      },
-    );
+    const res = await fetch(`${gateConfigUrl(address)}api/power-off`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(5000),
+    });
     const body = (await res.json()) as { started?: boolean; output?: string };
     return body.started
       ? { gateId, ok: true }

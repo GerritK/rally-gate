@@ -15,7 +15,8 @@ import { RallyInfoModule } from './modules/rally-info/rally-info.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { StageRunsModule } from './modules/stage-runs/stage-runs.module';
 import { StagesModule } from './modules/stages/stages.module';
-import { VehiclesModule } from './modules/vehicles/vehicles.module';
+import { StartOrderModule } from './modules/start-order/start-order.module';
+import { EntriesModule } from './modules/entries/entries.module';
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { VehiclesModule } from './modules/vehicles/vehicles.module';
     NtpModule,
     DiscoveryModule,
     GatesModule,
-    VehiclesModule,
+    EntriesModule,
     RallyInfoModule,
     SettingsModule,
     StagesModule,
@@ -33,6 +34,7 @@ import { VehiclesModule } from './modules/vehicles/vehicles.module';
     EventsModule,
     LiveModule,
     ClassificationModule,
+    StartOrderModule,
     EventFilesModule,
   ],
   controllers: [AppController],

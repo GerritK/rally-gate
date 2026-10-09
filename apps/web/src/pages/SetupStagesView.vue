@@ -1,56 +1,62 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { StageStatus } from '@rally-gate/shared';
 import {
   createStage,
   deleteStage,
   fetchStages,
   type Stage,
 } from '../api/stages';
+import FormDialog from '../components/FormDialog.vue';
+import StatusChip from '../components/StatusChip.vue';
+import { required, STAGE_STATUS_DISPLAY } from '../format';
+import { notify, t, useConfirm } from '@rally-gate/ui';
+
+const confirm = useConfirm();
+const router = useRouter();
 
 const stages = ref<Stage[]>([]);
-const newStage = ref({ id: '', name: '', stageNumber: 1 });
-const creating = ref(false);
-const deletingId = ref<string | null>(null);
-
-function nextStageNumber(): number {
-  return Math.max(0, ...stages.value.map((s) => s.stageNumber)) + 1;
-}
+const dialogOpen = ref(false);
+const draft = ref({ id: '', name: '', stageNumber: 1 });
 
 async function refresh() {
   stages.value = await fetchStages();
-  newStage.value.stageNumber = nextStageNumber();
+}
+
+function openCreate() {
+  draft.value = {
+    id: '',
+    name: '',
+    stageNumber: Math.max(0, ...stages.value.map((s) => s.stageNumber)) + 1,
+  };
+  dialogOpen.value = true;
+}
+
+/** Only the required fields here; the rest, gates included, is set on the
+ *  detail page it opens. */
+async function onCreate() {
+  const stage = await createStage({
+    id: draft.value.id.trim(),
+    name: draft.value.name.trim(),
+    stageNumber: Number(draft.value.stageNumber),
+  });
+  await router.push(`/setup/stages/${stage.id}`);
 }
 
 async function onDeleteStage(stage: Stage) {
-  if (!confirm(`Delete stage ${stage.id}?`)) return;
-  deletingId.value = stage.id;
-  try {
-    await deleteStage(stage.id);
-    await refresh();
-  } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to delete stage');
-  } finally {
-    deletingId.value = null;
-  }
-}
-
-async function onCreateStage() {
-  if (!newStage.value.id || !newStage.value.name || creating.value) return;
-  creating.value = true;
-  try {
-    await createStage({
-      id: newStage.value.id,
-      name: newStage.value.name,
-      stageNumber: newStage.value.stageNumber,
-    });
-    newStage.value.id = '';
-    newStage.value.name = '';
-    await refresh();
-  } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to create stage');
-  } finally {
-    creating.value = false;
-  }
+  if (
+    !(await confirm({
+      title: t('stages.deleteTitle', { id: stage.id }),
+      text: t('stages.deleteText'),
+      confirmText: t('stages.delete'),
+      color: 'error',
+    }))
+  )
+    return;
+  await deleteStage(stage.id);
+  await refresh();
+  notify(t('stages.deleted'));
 }
 
 onMounted(refresh);
@@ -58,95 +64,101 @@ onMounted(refresh);
 
 <template>
   <v-btn variant="text" prepend-icon="mdi-arrow-left" to="/setup" class="mb-4">
-    Back to Setup
+    {{ $t('setup.back') }}
   </v-btn>
 
   <v-card>
-    <v-card-title>Stages</v-card-title>
+    <v-card-title class="d-flex align-center">
+      {{ $t('stages.title') }}
+      <v-spacer />
+      <v-btn color="primary" prepend-icon="mdi-plus" @click="openCreate">
+        {{ $t('stages.add') }}
+      </v-btn>
+    </v-card-title>
     <v-card-text>
-      <v-table density="comfortable">
+      <v-table density="comfortable" hover>
         <thead>
           <tr>
             <th>#</th>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Status</th>
-            <th></th>
+            <th>{{ $t('stages.id') }}</th>
+            <th>{{ $t('stages.name') }}</th>
+            <th>{{ $t('table.status') }}</th>
+            <th width="1%"></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="stage in stages" :key="stage.id">
+          <tr
+            v-for="stage in stages"
+            :key="stage.id"
+            class="cursor-pointer"
+            @click="router.push(`/setup/stages/${stage.id}`)"
+          >
             <td>{{ stage.stageNumber }}</td>
             <td>{{ stage.id }}</td>
             <td>{{ stage.name }}</td>
             <td>
-              <v-chip
-                size="small"
-                :color="stage.status === 'CLOSED' ? 'timing-idle' : 'success'"
-              >
-                {{ stage.status }}
-              </v-chip>
+              <StatusChip :display="STAGE_STATUS_DISPLAY[stage.status]" />
             </td>
-            <td>
-              <v-btn
-                size="small"
-                variant="text"
-                prepend-icon="mdi-pencil"
-                :to="`/setup/stages/${stage.id}`"
-              >
-                Edit / Gates
-              </v-btn>
-              <v-btn
-                v-if="stage.status === 'NOT_STARTED'"
-                size="small"
-                variant="text"
-                color="error"
-                prepend-icon="mdi-delete"
-                :loading="deletingId === stage.id"
-                @click="onDeleteStage(stage)"
-              >
-                Delete
-              </v-btn>
+            <td class="text-no-wrap">
+              <v-menu v-if="stage.status === StageStatus.NOT_STARTED">
+                <template #activator="{ props: menu }">
+                  <v-btn
+                    v-bind="menu"
+                    icon="mdi-dots-vertical"
+                    size="small"
+                    variant="text"
+                    :aria-label="$t('common.moreFor', { name: stage.id })"
+                    @click.stop
+                  />
+                </template>
+                <v-list density="compact">
+                  <v-list-item
+                    prepend-icon="mdi-delete-outline"
+                    :title="$t('common.delete')"
+                    base-color="error"
+                    @click="onDeleteStage(stage)"
+                  />
+                </v-list>
+              </v-menu>
+            </td>
+          </tr>
+          <tr v-if="stages.length === 0">
+            <td colspan="5" class="rg-empty">
+              {{ $t('stages.empty', { action: $t('stages.add') }) }}
             </td>
           </tr>
         </tbody>
       </v-table>
-      <form
-        class="d-flex flex-wrap align-center ga-3 mt-4"
-        @submit.prevent="onCreateStage"
-      >
-        <v-text-field
-          v-model.number="newStage.stageNumber"
-          type="number"
-          min="1"
-          label="Stage #"
-          density="comfortable"
-          hide-details
-          style="max-width: 140px"
-        />
-        <v-text-field
-          v-model="newStage.id"
-          label="ID (e.g. SS2)"
-          density="comfortable"
-          hide-details
-          style="max-width: 160px"
-        />
-        <v-text-field
-          v-model="newStage.name"
-          label="Name"
-          density="comfortable"
-          hide-details
-          style="min-width: 220px"
-        />
-        <v-btn
-          type="submit"
-          color="primary"
-          :loading="creating"
-          prepend-icon="mdi-plus"
-        >
-          Create Stage
-        </v-btn>
-      </form>
     </v-card-text>
   </v-card>
+
+  <FormDialog
+    v-model="dialogOpen"
+    :title="$t('stages.add')"
+    :form="draft"
+    :save="onCreate"
+    :saved="$t('stages.added')"
+    :save-text="$t('stages.add')"
+  >
+    <v-text-field
+      v-model.number="draft.stageNumber"
+      type="number"
+      min="1"
+      :label="$t('stages.number')"
+      :rules="[required]"
+    />
+    <v-text-field
+      v-model="draft.id"
+      :label="$t('stages.id')"
+      :hint="$t('stages.idHint')"
+      persistent-hint
+      :rules="[required]"
+      autofocus
+    />
+    <v-text-field
+      v-model="draft.name"
+      :label="$t('stages.name')"
+      :rules="[required]"
+    />
+  </FormDialog>
 </template>

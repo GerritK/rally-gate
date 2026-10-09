@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
-import { AssignVehicleDto } from './dto';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { AssignEntryDto, RecentEventsQueryDto } from './dto';
 import { EventsService } from './events.service';
 
 @Controller('events')
@@ -7,8 +7,8 @@ export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 
   @Get()
-  findRecent() {
-    return this.eventsService.findRecent();
+  findRecent(@Query() query: RecentEventsQueryDto) {
+    return this.eventsService.findRecent(query.gateId);
   }
 
   /**
@@ -28,14 +28,14 @@ export class EventsController {
   }
 
   /** Passings a gate saw but couldn't identify, e.g. a light barrier. */
-  @Get('awaiting-vehicle')
-  findAwaitingVehicle() {
-    return this.eventsService.findAwaitingVehicle();
+  @Get('awaiting-entry')
+  findAwaitingEntry() {
+    return this.eventsService.findAwaitingEntry();
   }
 
   @Post(':eventId/assign')
-  assign(@Param('eventId') eventId: string, @Body() body: AssignVehicleDto) {
-    return this.eventsService.assignVehicle(eventId, body.vehicleId);
+  assign(@Param('eventId') eventId: string, @Body() body: AssignEntryDto) {
+    return this.eventsService.assignEntry(eventId, body.entryId);
   }
 
   @Post(':eventId/dismiss')

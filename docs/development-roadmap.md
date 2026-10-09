@@ -15,9 +15,13 @@ What exists, with where its reasoning lives. History is in git.
 - **Pipeline:** gate-agent → embedded MQTT → ingest → rule engine → stage runs →
   SSE → dashboard; QoS 1 persistent sessions, idempotent rules, failed
   detections retried and surfaced (`CLAUDE.md`, `event-model.md`).
-- **Timing:** start/finish/split roles, stage/split/overall classification, DNF/DNS,
-  manual corrections, voiding and gate-timed re-runs, notional times
-  (`event-model.md`).
+- **Timing:** start/finish/split roles, a combined start/finish gate with an
+  optional minimum stage time (`event-model.md`), stage/split/overall classification, DNF/DNS,
+  manual corrections (a time of day or a stage time), a missed start
+  entered from finish and stage time, voiding and gate-timed re-runs, notional times,
+  entry classes as filtered rankings, splits as columns of the stage
+  classification, crews without a counted stage listed
+  as "Not classified" below the overall (`event-model.md`).
 - **Light barrier:** `BeamAdapter` (E3Z-T61 via GPIO), unassigned passings
   assigned by a marshal (`decoder-adapters.md`, `event-model.md`). Verified on
   a Pi with the E3Z-T61, marshal assignment included.
@@ -30,12 +34,32 @@ What exists, with where its reasoning lives. History is in git.
   (`architecture.md` "Clock offset", `deployment-modes.md` "Time sync").
 - **Discovery:** mDNS `rally-server.local`, so a gate install needs no address
   (`architecture.md` "Server discovery").
+- **Start order:** integer start numbers, per-stage start list grouped by main
+  class and sorted by start number, overall or last stage time in either
+  direction, frozen by hand when posted or on first activation (`event-model.md`
+  "Start order").
+- **Marshal view:** Live Timing is laid out like the stage: "Up next" with
+  Start now beside the cars on stage in expected arrival order, above one
+  table of every entry in start order with run state, corrections and
+  Start now per row, and unassigned passings pre-selected from the start
+  order (never auto-assigned). Prints as the posted start list (`frontend-structure.md`).
+- **Overall stage headers** link to that stage's results, class filter
+  kept. Header only: a row click is kept free for an entry detail page.
+- **Printing:** start lists and results (Overall, each stage) as PDFs
+  built in the browser (jsPDF), on numbered sheets with what each holds,
+  the print time, and "Provisional" while a stage runs or a start list
+  isn't frozen; "Print all" puts every class's ranking in one PDF. Saved
+  class combinations ("2WD + Rookie") wait until someone needs one; the
+  filter is a link (`design-system.md` "Print").
 - **Dashboard:** multi-page `apps/web` — Live Timing, Results, Setup, Hardware,
-  Vehicles (`frontend-structure.md`).
+  Entries (`frontend-structure.md`).
+- **UI guidelines** (`design-system.md`): shared confirm dialog and
+  snackbar in both apps, add/edit forms in `FormDialog`, one direct action
+  plus a menu per row, unsaved changes guarded on page forms.
 - **Gate config UI:** settings, status, Wi-Fi, hotspot fallback, Wi-Fi reset;
   verified on a Pi. Shutdown built, not yet tried on a Pi (`gate-config-ui.md`).
-- **Gate health:** chrony state in the heartbeat, "Gates ready X/Y" in Live
-  Timing, "Shut down all gates" on the Hardware page via gate-config
+- **Gate health:** chrony state in the heartbeat, each gate's state on Live
+  Timing's gate line, "Shut down all gates" on the Hardware page via gate-config
   (`architecture.md`). Not yet tried on a Pi.
 - **Versions:** git build stamped into `packages/shared`, reported by gates in
   the heartbeat, shown in gate-config and the dashboard, mismatch flagged
@@ -48,23 +72,63 @@ What exists, with where its reasoning lives. History is in git.
 - **Events:** new / open event in the dashboard, one file each, switched by
   restarting under `start.js`; gates remembered per computer, picked into
   each event on the Hardware page (`deployment-modes.md` "New / open event").
+- **Crews:** driver and co-driver as first/last name with a flag each, body
+  and chassis; names in the event's format and flags shown or off on
+  screen (Setup → Display; printed PDFs never show flags); an entry page,
+  opened from Entries and Results rows, with its crew, car, entry and
+  times per stage (`frontend-structure.md`, `design-system.md`). Flags are
+  freely usable only: `flag-icons` for countries, own SVGs for the
+  chequered default and the Pride, Progress Pride and trans flags
+  (`THIRD_PARTY_NOTICES.md`). Not the International Flag of Planet Earth:
+  its terms forbid it standing for a person.
+- **Check-in:** entry status from the Entries list, the entry page
+  and a check-in page with Desk and Scrutineering stations, the desk
+  taking the transponder (Registered → Checked in → Scrutineered, or both
+  at once; Withdraw, Disqualify, Reinstate). Withdrawn and
+  disqualified cars leave computed start lists and start no run;
+  disqualified ones leave every result, listed as DSQ. Not yet scrutineered
+  still starts, marked on Live Timing, and Freeze/Activate ask
+  (`event-model.md` "Entry status").
+- **Transponders:** several per entry, each with a kind (RC, NFC) and an
+  optional label, a detection matching only its own kind; one transponder on
+  several cars holds its passings for a marshal like a beam passing, the
+  picker offering just those cars (`event-model.md` "Transponders").
+- **Podium** above the Overall and each stage's results, following the class
+  filter: steps 2-1-3 with gold/silver/bronze trophies, crew, body, time and
+  gap; a click opens the entry. On screen only, or off; the printed
+  result is a plain table (`design-system.md`).
 - **CI:** build, format, lint, tests, and a headless-stack job against real
   Postgres (`CLAUDE.md`).
+- **English and German** in both web UIs (vue-i18n, Vuetify's own texts
+  included), picked per browser: its language, or the viewer's choice in the
+  app bar. Printed PDFs follow it. Server error messages are still English.
 
 ## Next
 
-1. **Verify `OpenStintAdapter` on the real loop**, then **beam + OpenStint**
-   combined (designed in `decoder-adapters.md`) — critical path. The adapter
-   is built; it has not yet timed a car through a real loop.
-2. **Vehicle classes** with per-class classification — the one piece of
-   deferred work that needs no hardware and matters at a real event. Two
-   constraints known up front: classes are organiser-defined **data**, not an
-   enum; and a vehicle can be in **several classes at once** (many-to-many),
-   each class ranking being a filtered view over the same runs, with the
-   overall ranking unchanged.
+- **Server errors as codes**, so the UIs can translate them: today a 409's
+  English `message` reaches the snackbar as-is.
+
+- **ESP32 NFC check-in gate** — firmware in `firmware/esp32-gate` builds,
+  untested on hardware (ordered: XIAO ESP32-S3, PN532). Then: a server-side
+  meaning for a check-in tap (no role sets entry status yet), OTA, and the
+  status page on `packages/ui` (`esp32-gate.md`).
+
+OpenStint (below) resumes when the hardware arrives.
 
 ## Deliberately deferred
 
+- **`OpenStintAdapter`**, then **beam + OpenStint** combined (designed in
+  `decoder-adapters.md`) — on hold on branch `feature/openstint-adapter`
+  until working RTL-SDR hardware arrives; merge only once a real car is timed
+  through a loop.
+- **Browser flashing for ESP32 gates** — CI builds one image per supported
+  board onto the GitHub release, and a static page with ESP Web Tools
+  installs it over USB, so nobody needs PlatformIO. Wanted once someone other
+  than a developer flashes gates, or a second board is supported. Variants
+  are per board only, never per feature: one firmware carries NFC and beam,
+  the reader is detected and the beam switched on at runtime, as `ADAPTER` on
+  a Pi. A per-feature builder would save no flash worth having (1.0 MB of a
+  2.5 MB slot) and turn every gate into a question of which build it runs.
 - **GPS/PPS per gate** — waiting on hardware (`decoder-adapters.md` "Hardware
   notes").
 - **Gate updates from the server** — rally WiFi is closed, so gates can't reach
@@ -91,27 +155,76 @@ What exists, with where its reasoning lives. History is in git.
   undesigned; don't grow Setup UI for them speculatively. When checkpoint
   interval times land, give them their own formatter rather than reusing
   `formatStageDuration` (see `packages/ui/src/format.ts`).
-- **Start order suggestions** for unassigned passings — once a start order
-  exists, pre-select a vehicle, never assign it: a wrong assignment is a wrong
-  time nobody notices in the classification, so the marshal always confirms.
-  At a start gate, suggest the next car in the order after the last one
-  started that has no run on the stage yet, so a no-show is skipped
-  implicitly and nothing gets stuck behind them. Skipped cars stay selectable
-  (late starter) until marked DNS. At a finish gate, suggest open runs in
-  start order; an overtake is just a suggestion the marshal corrects. Planned
-  start times (above) could later narrow it by time window.
-- **Combined start/finish gate** — one gate as both start and finish of a
-  stage: on a detection, finish the vehicle's open run if it has one, otherwise
-  start one. Not needed for the first functional test; to be thought through
-  before building. Known points so far: a finished car passing again must still
-  be ignored (as `startRun` already does); a detection right after the start
-  would finish the run, so it needs a minimum stage time or similar; and the
-  stage config needs a sanity check (e.g. a combined gate excludes separate
-  start/finish gates on the same stage).
+- **Required passings at one gate** — a stage that loops past the same gate
+  n times between its own entry and exit (a car-park rally). Fits the
+  stage-rally model: a `requiredPassings` on the `GateAssignment`, earlier
+  passings recorded as splits with the pass number as `splitIndex`, and when
+  it's the finish gate only the nth one finishes. Today the second passing is
+  dropped: `StageSplit` is unique on `(stageRunId, gateId)` and `finishRun`
+  takes the first. Needs a minimum pass interval like the combined gate's
+  `minDurationMs` — a transponder reads a passing several times, and a double
+  read counted as a lap finishes the car early, i.e. wins it the stage. A
+  missed read leaves the car short a lap with no finish coming, so Live Timing
+  shows "lap 2/3" and a marshal can add the missing one. One gate counts
+  passings, it can't see a cut; that takes a second gate on the loop.
+  The minimum interval is per entry, not per identifier: a car carrying two
+  transponders of one kind is two detections per passing.
+- **Other competition formats** — circuit races (several cars at once, ended
+  by lap count or time) and regularity rallies, both asked for by the
+  community. Not wanted yet; don't build the abstraction ahead of the first
+  real second format. Direction when one comes: a `Stage.kind` with
+  per-kind settings (each its own DTO class), and `EventsService.applyRules`'
+  role branching moved into one handler per kind that also ranks — still
+  hardcoded, not a DSL. Passings become generic (`StageSplit` minus its
+  one-per-gate unique, plus a pass number — the required-passings gate above
+  gets there first), so laps, splits and regularity checks are one table
+  read differently. Keep the `Stage` entity name: a
+  rename makes `synchronize` create new tables and every existing event file
+  opens empty. The overall keeps summing stage-rally times only; ranking
+  across formats needs a points scheme, decided when needed. Circuit races
+  also need a transponder decoder first (OpenStint, above): a light barrier
+  can't tell cars apart once several are on track, and the decoder has to
+  separate simultaneous passings.
+- **Event-wide status** — Setup → Running → Closed, on `RallyInfo`,
+  server-owned like `Stage.status`. Activating the first stage starts the
+  rally, with a pre-start check in that confirmation (every stage has a start
+  and finish, gates online and synced, transponder gaps and duplicates,
+  entries without a class): few hard errors, mostly warnings, as a marshal
+  knows things the check doesn't. Running locks only what reinterprets
+  results already timed (deleting/renaming classes, a timed car's start
+  number, start-order settings) — late entries, transponder swaps, withdrawals
+  and corrections stay open, or marshals unlock and forget. Closed is the
+  valuable one: results official, no corrections, no "Provisional"; reopening
+  is deliberate (a protest). Locks as a per-route decorator, and disabled
+  controls say why.
+- **Manual start-order edits** on the frozen snapshot (late entry, car moved
+  to the back after a repair, swaps). Until then, change start numbers before
+  the start list is frozen.
+- **Out-of-order start penalties**, measured against the frozen start order.
+  They depend on penalties as a whole (Rally controls, above).
+- **Smarter passing suggestions** — today a start passing suggests the next
+  car in start order and a split/finish one the first car on stage
+  (`LiveView.vue` `suggestedEntryIds`). Planned start times could narrow it
+  by time window.
 - **Auth** on broker, API and dashboard — the closed rally network is the
   boundary until the timing pipeline is solid. Gates would authenticate against
   rally-server itself.
-- **Carrying vehicles/stages over** into a new event (the useful part of an
+- **Reset event** — clear a rally that was only a trial so the same file can
+  be used for real. Clears detections, stage runs and splits, sets stages
+  back to NOT_STARTED with their gates inactive, and unfreezes start lists;
+  keeps stages, gate assignments, classes, settings, rally info and known
+  gates. A checkbox also clears the entries; kept entries go back to
+  Registered, as the trial's check-in says nothing about the real one. It
+  destroys evidence, so: refused while a stage is active, confirmed by typing
+  the rally name, and in standalone mode the event file is copied aside
+  first (one database = one event makes that a file copy). Emits an event so
+  open dashboards reload. Overlaps with carrying entries/stages over (below):
+  a reset is the same-file version of it.
+- **Screens and announcements** — tablets, Pis and browser windows as
+  server-controlled kiosk screens (start list, live timing, results, picked
+  automatically by stage state), and finisher announcements. Thoughts only,
+  not a plan: `ideas/output-devices.md`.
+- **Carrying entries/stages over** into a new event (the useful part of an
   event wizard) — low priority, re-entering them per event is acceptable — and
   new/open event under Postgres (`deployment-modes.md`).
 - **Renaming an event file** after a rally rename. The file name is fixed at

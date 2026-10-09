@@ -238,10 +238,8 @@ describe('fieldDescriptors', () => {
     },
   );
 
-  it('shows the same message from both sides', () => {
-    expect(validate({ MQTT_PORT: '70000' }).MQTT_PORT).toBe(
-      fieldDescriptors().MQTT_PORT.message,
-    );
+  it("reports a broken rule as 'invalid', which the page words as the field's message", () => {
+    expect(validate({ MQTT_PORT: '70000' }).MQTT_PORT).toBe('invalid');
   });
 });
 
@@ -278,4 +276,26 @@ describe('field groups', () => {
     expect(descriptors.SIMULATE_INTERVAL_MS.group).toBe('decoder');
     expect(descriptors.GATE_ID.group).toBe('general');
   });
+});
+
+// The server sends rules only, so a new field without its words on the page
+// would show its raw key as label.
+describe('field texts', () => {
+  it.each(['en', 'de'])(
+    'has a label, hint and message for every field in %s',
+    (locale) => {
+      const messages = JSON.parse(
+        readFileSync(
+          join(__dirname, '..', 'web', 'src', 'locales', `${locale}.json`),
+          'utf8',
+        ),
+      );
+      const missing = Object.keys(FIELDS).flatMap((name) =>
+        ['label', 'hint', 'message']
+          .filter((part) => typeof messages.fields?.[name]?.[part] !== 'string')
+          .map((part) => `${name}.${part}`),
+      );
+      expect(missing).toEqual([]);
+    },
+  );
 });

@@ -17,14 +17,16 @@ import {
 export class CreateStageRunDto {
   @IsString()
   @IsNotEmpty()
-  vehicleId: string;
+  entryId: string;
 
   @IsString()
   @IsNotEmpty()
   stageId: string;
 
+  /** Omitted for "Start now": the server stamps it with its own clock. */
+  @IsOptional()
   @IsISO8601()
-  startTime: string;
+  startTime?: string;
 
   @IsOptional()
   @IsISO8601()

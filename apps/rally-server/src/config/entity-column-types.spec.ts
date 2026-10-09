@@ -14,7 +14,9 @@ import { Setting } from '../modules/settings/setting.entity';
 import { StageRun } from '../modules/stage-runs/stage-run.entity';
 import { StageSplit } from '../modules/stage-runs/stage-split.entity';
 import { Stage } from '../modules/stages/stage.entity';
-import { Vehicle } from '../modules/vehicles/vehicle.entity';
+import { EntryClass } from '../modules/entries/entry-class.entity';
+import { Entry } from '../modules/entries/entry.entity';
+import { EntryTransponder } from '../modules/entries/entry-transponder.entity';
 
 const ENTITIES = [
   DetectionEventRecord,
@@ -25,7 +27,9 @@ const ENTITIES = [
   Stage,
   StageRun,
   StageSplit,
-  Vehicle,
+  Entry,
+  EntryClass,
+  EntryTransponder,
 ];
 
 /**

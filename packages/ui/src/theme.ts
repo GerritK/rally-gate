@@ -7,19 +7,8 @@ import type { ThemeDefinition } from 'vuetify';
  * semantic colors (timing-*, flag-*) so components can reference intent
  * ("timing-best") instead of a raw hex value.
  *
- * Usage notes (apply when building components against this theme):
- * - Keep `primary` (orange) rare — the one main action per screen (start a
- *   run, confirm a time) and active nav state. Everything else stays
- *   gray-on-gray, or orange loses its signal value.
- * - `error` is reserved for penalties/DNF/abort. Don't reuse it for generic
- *   delete buttons — it needs to stay a distinct, alarming signal.
- * - Color alone doesn't carry the best-time distinction for red-green color
- *   blindness (common) — pair `timing-best`/`timing-personal` with a second
- *   signal (icon, +/- prefix) wherever a time is highlighted.
- * - `background`/`surface` here are tuned for screens, not direct sunlight.
- *   A tablet at a stage in daylight needs a separate, higher-contrast
- *   variant (near-black bg, 100% white text, brighter borders) — not built
- *   yet, add as a second ThemeDefinition + theme switcher when it's needed.
+ * How to use these colours (orange rare, red for race problems only, never
+ * colour alone) is in docs/design-system.md — read it before building UI.
  */
 export const rallyGateDark: ThemeDefinition = {
   dark: true,
@@ -51,6 +40,11 @@ export const rallyGateDark: ThemeDefinition = {
     'timing-slower': '#FFC300', // slower than reference
     'timing-penalty': '#FF3B30', // penalty seconds / missed gate
     'timing-idle': '#6B7686', // no time / DNS
+
+    // Podium trophies
+    'podium-gold': '#F5C542',
+    'podium-silver': '#C3CAD3',
+    'podium-bronze': '#C98A4B',
 
     // Track status (flags)
     'flag-green': '#00E05A',

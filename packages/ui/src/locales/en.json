@@ -1,0 +1,11 @@
+{
+  "ui": {
+    "language": "Language",
+    "cancel": "Cancel",
+    "somethingWentWrong": "Something went wrong",
+    "justNow": "just now",
+    "secondsAgo": "{n}s ago",
+    "minutesAgo": "{n}m ago",
+    "hoursAgo": "{n}h ago"
+  }
+}

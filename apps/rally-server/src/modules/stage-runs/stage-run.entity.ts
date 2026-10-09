@@ -7,14 +7,14 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
  * would let it drift out of sync with the timestamps it's supposed to
  * summarize.
  *
- * **Several rows per (vehicleId, stageId) are allowed** — a red-flagged stage
+ * **Several rows per (entryId, stageId) are allowed** — a red-flagged stage
  * gets re-run, and the earlier attempt is kept as evidence rather than
  * overwritten. Only the most recent attempt counts toward results
  * (`latestAttempts` in `stage-runs.service.ts`).
  */
 @Entity()
 /**
- * Partial unique index: **at most one non-voided attempt per vehicle+stage**.
+ * Partial unique index: **at most one non-voided attempt per entry+stage**.
  *
  * This is the invariant the whole re-run model rests on — *not voided means
  * it counts*. Without it an attempt could fail to count for two different
@@ -26,7 +26,7 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
  * covered, where two detections for the same passing are processed
  * concurrently and both clear the `findActive` check.
  */
-@Index(['vehicleId', 'stageId'], {
+@Index(['entryId', 'stageId'], {
   unique: true,
   where: '"voided" = false',
 })
@@ -35,7 +35,7 @@ export class StageRun {
   id: string;
 
   /**
-   * 1 for a vehicle's first go at this stage, incrementing for each re-run.
+   * 1 for an entry's first go at this stage, incrementing for each re-run.
    * Highest attempt wins — see `latestAttempts` in `stage-runs.service.ts`.
    *
    * An explicit counter rather than a creation timestamp, for two reasons.
@@ -58,7 +58,7 @@ export class StageRun {
 
   /**
    * Struck out by a marshal, typically after a red flag. A voided attempt
-   * counts for nothing and stops blocking the vehicle from running the stage
+   * counts for nothing and stops blocking the entry from running the stage
    * again, so the start gate is free to open a fresh attempt on its own.
    *
    * This is the *only* reason an attempt doesn't count — see the index
@@ -68,8 +68,20 @@ export class StageRun {
   @Column({ default: false })
   voided: boolean;
 
+  /**
+   * Set by a marshal (Start now / Finish now / a correction) instead of a
+   * gate. A hand time carries the marshal's reaction time, and a protest
+   * turns on exactly which times were hand-set. Assigning an unassigned
+   * passing doesn't set these: the time is still the gate's.
+   */
+  @Column({ default: false })
+  startManual: boolean;
+
+  @Column({ default: false })
+  finishManual: boolean;
+
   @Column()
-  vehicleId: string;
+  entryId: string;
 
   @Column()
   stageId: string;

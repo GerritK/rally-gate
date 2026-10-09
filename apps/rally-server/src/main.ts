@@ -26,7 +26,7 @@ async function bootstrap() {
       process.env.LOG_LEVEL === 'warn' ? ['warn', 'error', 'fatal'] : undefined,
   });
 
-  // The frontend is served from this same origin, and `/vehicles` is both a
+  // The frontend is served from this same origin, and `/entries` is both a
   // REST resource and a dashboard page. The prefix is what keeps a new
   // endpoint from silently shadowing a page.
   app.setGlobalPrefix('api');

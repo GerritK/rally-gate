@@ -36,3 +36,10 @@ export const HEARTBEAT_ONLINE_THRESHOLD_MS = 30_000;
 
 /** gate-config's fixed port on every gate — see the port table in CLAUDE.md. */
 export const GATE_CONFIG_PORT = 57439;
+
+/** A gate's config page, from the address its MQTT connection came from.
+ *  An IPv6 literal needs brackets in a URL. */
+export function gateConfigUrl(address: string): string {
+  const host = address.includes(':') ? `[${address}]` : address;
+  return `http://${host}:${GATE_CONFIG_PORT}/`;
+}

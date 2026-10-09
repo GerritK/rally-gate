@@ -1,14 +1,15 @@
-export interface ClassificationEntry {
+import type { Crew } from './entry';
+
+export interface Placing extends Crew {
   position: number;
-  vehicleId: string;
-  startNumber: string;
-  driverName: string;
-  coDriverName?: string;
+  entryId: string;
+  /** `null` only if the entry was deleted after it drove. */
+  startNumber: number | null;
   durationMs: number;
   gapMs: number;
 }
 
-export interface OverallClassificationEntry extends ClassificationEntry {
+export interface OverallPlacing extends Placing {
   /**
    * Stages this crew actually *drove*, which is display information, not the
    * ranking key. `durationMs` covers every counted stage for everyone —
@@ -20,26 +21,31 @@ export interface OverallClassificationEntry extends ClassificationEntry {
    * `docs/event-model.md`.
    */
   stagesCompleted: number;
+  /** One per counted stage, in stage order; together they make `durationMs`. */
+  stageTimes: OverallStageTime[];
 }
 
-export interface SplitClassificationEntry {
+export interface OverallStageTime {
+  stageId: string;
+  durationMs: number;
+  /** Charged for a stage the crew didn't complete, not driven. */
+  notional: boolean;
+}
+
+export interface SplitPlacing extends Crew {
   position: number;
-  vehicleId: string;
-  startNumber: string;
-  driverName: string;
-  coDriverName?: string;
+  entryId: string;
+  startNumber: number | null;
   splitIndex: number;
   elapsedMs: number;
   gapMs: number;
   stageRunStatus: string;
 }
 
-export interface StageOutcomeEntry {
-  vehicleId: string;
-  startNumber: string;
-  driverName: string;
-  coDriverName?: string;
-  outcome: 'DNF' | 'DNS';
+export interface StageOutcome extends Crew {
+  entryId: string;
+  startNumber: number | null;
+  outcome: 'DNF' | 'DNS' | 'DSQ';
 }
 
 export interface SplitGateInfo {
