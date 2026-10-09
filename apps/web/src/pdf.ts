@@ -72,6 +72,7 @@ export function overallPdf(
   const fastest = fastestByStage(placings);
   const times = placings.flatMap((e) => e.stageTimes);
   const unranked = notClassified(placings, entries, classIds);
+  const anyPenalty = placings.some((e) => e.penaltyMs > 0);
   return {
     heading,
     subtitle,
@@ -84,6 +85,7 @@ export function overallPdf(
       t('table.gap'),
       t('table.stages'),
       ...(placings[0]?.stageTimes ?? []).map((t) => t.stageId),
+      ...(anyPenalty ? [t('penalties.penalties')] : []),
     ],
     body: placings.map((e) => [
       String(e.position),
@@ -101,6 +103,9 @@ export function overallPdf(
               t.durationMs === fastest.get(t.stageId),
             ),
       ),
+      ...(anyPenalty
+        ? [time(e.penaltyMs > 0 ? `+${formatDuration(e.penaltyMs)}` : '')]
+        : []),
     ]),
     repeat: 7,
     rightFrom: 4,

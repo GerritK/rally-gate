@@ -13,6 +13,8 @@ Anything outside `/api` that isn't a file returns `index.html`.
 | `/gate-assignments` | GET, POST, `/:id` DELETE | the (gate, stage, role, splitIndex) plan. `active` is not settable — activation is per stage |
 | `/entries` | GET, POST, `/:id` GET/PATCH | `startNumber` is unique, POST/PATCH 409 on a clash. Classes are written as `classIds` (replaces the list, 400 on an unknown id) and read back as `classes` |
 | `/entry-classes` | GET, POST, `/:id` PUT/DELETE | `{ name, main? }`, name unique (409), main classes listed first. DELETE takes the class off its entries |
+| `/penalty-types` | GET, POST, `/:id` PUT/DELETE | `{ name, scope, tiers: [{ fromCount, seconds }] }`, tiers from 1 ascending (400), name unique (409). PUT reprices given penalties, DELETE deletes them |
+| `/penalties` | GET `?entryId=`, POST, `/:id` DELETE | `{ entryId, stageId?, typeId?, count?, seconds?, note? }`: a type, or free text with `seconds` and `note` (400). 409 on a stage not started. Read back with its computed `penaltyMs` (`event-model.md` "Penalties") |
 | `/stages` | GET, POST, `/:id` GET/PUT/DELETE | sorted by `stageNumber`; `status` is server-owned |
 | `/stages/:id/activate` | POST | activates the stage's gate assignments. 409 `{ conflictingStageIds }` if a gate is active elsewhere (`?force=true` closes that stage), 409 if already `CLOSED` |
 | `/stages/:id/close` | POST | deactivates its gates, marks it `CLOSED`. Terminal |

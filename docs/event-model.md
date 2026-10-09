@@ -177,6 +177,34 @@ penalty is the knob; roughly one stage duration is a sensible start.
 - Notionals are computed per ranking and never stored, because a class
   ranking has a different slowest time than the overall one.
 
+## Penalties
+
+Time added to a crew's **overall total**, never to a stage time: a stage's
+results show what was driven, and its notionals anchor on that too, so one
+crew's penalty never changes what another's retirement costs.
+
+A **penalty type** is the rally's catalogue entry ("Jump start"): a name and
+tiers `{ fromCount, seconds }`, starting at 1 and ascending. One tier is a
+flat price per offence; more make each offence dearer the more an entry
+already has (1st 0:10, from the 2nd 0:30, from the 5th 1:00: three cost
+1:10, five 2:40). Its **scope** says where offences are counted: from 1
+again on every stage, or on through the rally.
+
+A **penalty** is an entry, a stage or none (the whole rally), a type and a
+count of offences, plus a note; or **free text**, a reason with seconds
+typed in (a jury decision). Seconds are whole and positive: a car held up
+on a stage is a time correction on its run, not a credit.
+
+- **The price is never stored.** Offences are counted per entry and type in
+  stage order (no stage after every stage, then by entry time), so a
+  correction on WP2 can reprice WP5, and editing a type reprices penalties
+  already given (`pricePenalties`).
+- **Counted when the overall counts their stage:** a stage's penalties join
+  the total once it is closed, a whole-rally one at once.
+- Only on a stage that has started, which is also why deleting a stage (only
+  possible before it starts) never orphans one. Deleting a type deletes its
+  penalties.
+
 ## Classes
 
 Organiser-defined data (`EntryClass`: a name and a `main` flag), not an

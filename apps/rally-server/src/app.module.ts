@@ -11,6 +11,7 @@ import { EventsModule } from './modules/events/events.module';
 import { GatesModule } from './modules/gates/gates.module';
 import { LiveModule } from './modules/live/live.module';
 import { NtpModule } from './modules/ntp/ntp.module';
+import { PenaltiesModule } from './modules/penalties/penalties.module';
 import { RallyInfoModule } from './modules/rally-info/rally-info.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { StageRunsModule } from './modules/stage-runs/stage-runs.module';
@@ -27,6 +28,7 @@ import { EntriesModule } from './modules/entries/entries.module';
     DiscoveryModule,
     GatesModule,
     EntriesModule,
+    PenaltiesModule,
     RallyInfoModule,
     SettingsModule,
     StagesModule,

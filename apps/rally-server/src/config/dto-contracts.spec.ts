@@ -15,6 +15,7 @@ import {
   UpdateEntryDto,
   EntryClassDto,
 } from '../modules/entries/dto';
+import { CreatePenaltyDto } from '../modules/penalties/dto';
 
 /**
  * The DTOs are declarative, so what's worth testing isn't each decorator —
@@ -151,6 +152,13 @@ describe('server-owned fields are not settable through the API', () => {
       'classes',
     ],
     ['EntryClass.id', EntryClassDto, { name: 'Pro', id: 'other' }, 'id'],
+    // Orders penalties within a stage, which decides what each one costs.
+    [
+      'Penalty.createdAt',
+      CreatePenaltyDto,
+      { entryId: 'v1', typeId: 't1', createdAt: '2026-01-01T00:00:00.000Z' },
+      'createdAt',
+    ],
     // Singleton pinned to RALLY_INFO_ID; an id could only make a stray row.
     ['RallyInfo.id', UpsertRallyInfoDto, { name: 'Rally', id: 'other' }, 'id'],
   ];

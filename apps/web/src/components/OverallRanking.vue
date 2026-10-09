@@ -50,6 +50,12 @@ const countedStages = computed(() =>
 
 const bestByStage = computed(() => fastestByStage(props.placings));
 
+/** No column while nobody has one. */
+const anyPenalty = computed(() => props.placings.some((p) => p.penaltyMs > 0));
+const columns = computed(
+  () => 7 + countedStages.value.length + (anyPenalty.value ? 1 : 0),
+);
+
 const legendMarks = computed<TimingMark[]>(() => {
   const times = props.placings.flatMap((e) => e.stageTimes);
   return [
@@ -110,6 +116,9 @@ const runningStages = computed(() =>
               {{ stage.id }} </router-link
             ><span class="rg-time-mark" />
           </th>
+          <th v-if="anyPenalty" class="rg-time">
+            {{ $t('penalties.penalties') }}
+          </th>
           <th class="rg-time">{{ $t('table.totalTime') }}</th>
           <th class="rg-time">{{ $t('table.gap') }}</th>
           <th>{{ $t('table.stages') }}</th>
@@ -161,6 +170,13 @@ const runningStages = computed(() =>
               {{ formatDuration(time.durationMs) }}<span class="rg-time-mark" />
             </span>
           </td>
+          <td v-if="anyPenalty" class="rg-timing rg-time text-timing-penalty">
+            {{
+              placing.penaltyMs > 0
+                ? `+${formatDuration(placing.penaltyMs)}`
+                : ''
+            }}
+          </td>
           <td class="rg-timing rg-time font-weight-bold">
             {{ formatDuration(placing.durationMs) }}
           </td>
@@ -177,14 +193,14 @@ const runningStages = computed(() =>
           </td>
         </tr>
         <tr v-if="placings.length === 0">
-          <td :colspan="7 + countedStages.length" class="rg-empty">
+          <td :colspan="columns" class="rg-empty">
             {{ $t('results.noneCompleted') }}
           </td>
         </tr>
       </tbody>
       <tfoot v-if="legendMarks.length > 0">
         <tr>
-          <td :colspan="7 + countedStages.length">
+          <td :colspan="columns">
             <TableLegend :marks="legendMarks" />
           </td>
         </tr>

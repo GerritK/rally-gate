@@ -1,6 +1,7 @@
 import { StageStatus, EntryStatus } from '@rally-gate/shared';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { GatesService } from '../gates/gates.service';
+import { PenaltiesService } from '../penalties/penalties.service';
 import { SettingsService } from '../settings/settings.service';
 import { StageRunsService } from '../stage-runs/stage-runs.service';
 import { StagesService } from '../stages/stages.service';
@@ -40,6 +41,7 @@ function makeService(
     gatesService,
     gateAssignmentsService,
     {} as unknown as SettingsService,
+    {} as unknown as PenaltiesService,
   );
 }
 
@@ -48,6 +50,7 @@ function makeOverallService(
   finishedRuns: unknown[],
   entries: unknown[],
   notionalPenaltyMs = SMALL_PENALTY_MS,
+  penaltyTotals = new Map<string, number>(),
 ) {
   const stageRunsService = {
     findAllFinished: jest.fn().mockResolvedValue(finishedRuns),
@@ -73,6 +76,9 @@ function makeOverallService(
     {} as unknown as GatesService,
     {} as unknown as GateAssignmentsService,
     settingsService,
+    {
+      overallTotals: jest.fn().mockResolvedValue(penaltyTotals),
+    } as unknown as PenaltiesService,
   );
 }
 
@@ -170,6 +176,25 @@ describe('ClassificationService.getOverallClassification', () => {
       ['v1', 1],
       ['v2', 2],
     ]);
+  });
+
+  it('adds penalties to the total, not to a stage time or a notional', async () => {
+    const service = makeOverallService(
+      twoClosed,
+      runs,
+      entries,
+      SMALL_PENALTY_MS,
+      new Map([['v1', 30_000]]),
+    );
+
+    const result = await service.getOverallClassification();
+    const v1 = result.find((e) => e.entryId === 'v1')!;
+    const v2 = result.find((e) => e.entryId === 'v2')!;
+
+    expect([v1.durationMs, v1.penaltyMs]).toEqual([230_000, 30_000]);
+    expect(v1.stageTimes.map((t) => t.durationMs)).toEqual([100_000, 100_000]);
+    // Still the slowest driven time (100s) plus 30s, whatever v1's penalty.
+    expect(v2.stageTimes[1].durationMs).toBe(130_000);
   });
 
   it('ignores stages that are not closed yet', async () => {
@@ -400,6 +425,7 @@ describe('ClassificationService.getStageClassification', () => {
       {} as unknown as GatesService,
       {} as unknown as GateAssignmentsService,
       {} as unknown as SettingsService,
+      {} as unknown as PenaltiesService,
     );
 
     const result = await service.getStageClassification('SS1');
@@ -440,6 +466,7 @@ describe('ClassificationService.getStageClassification', () => {
       {} as unknown as GatesService,
       {} as unknown as GateAssignmentsService,
       {} as unknown as SettingsService,
+      {} as unknown as PenaltiesService,
     );
 
     const result = await service.getStageClassification('SS1');

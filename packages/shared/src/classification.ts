@@ -21,8 +21,13 @@ export interface OverallPlacing extends Placing {
    * `docs/event-model.md`.
    */
   stagesCompleted: number;
-  /** One per counted stage, in stage order; together they make `durationMs`. */
+  /** One per counted stage, in stage order; with `penaltyMs` they make `durationMs`. */
   stageTimes: OverallStageTime[];
+  /**
+   * Penalties inside `durationMs`: those on closed stages and those on no
+   * stage. Stage results never include them.
+   */
+  penaltyMs: number;
 }
 
 export interface OverallStageTime {

@@ -54,6 +54,7 @@ import { fetchEntries, type Entry } from '../api/entries';
 import ClockTime from '../components/ClockTime.vue';
 import GateFlow from '../components/GateFlow.vue';
 import RunCorrectionDialog from '../components/RunCorrectionDialog.vue';
+import PenaltyDialog from '../components/PenaltyDialog.vue';
 import StatusChip from '../components/StatusChip.vue';
 import RunningTime from '../components/RunningTime.vue';
 import TableLegend from '../components/TableLegend.vue';
@@ -600,6 +601,7 @@ const anyManual = computed(() =>
 const correctionDialog = ref<InstanceType<typeof RunCorrectionDialog> | null>(
   null,
 );
+const penaltyDialog = ref<InstanceType<typeof PenaltyDialog> | null>(null);
 
 async function onVoidRun(run: StageRun) {
   if (
@@ -1354,6 +1356,11 @@ onUnmounted(() => {
                     :title="$t('live.enterTime')"
                     @click="correctionDialog?.enter(row.starter.entryId)"
                   />
+                  <v-list-item
+                    prepend-icon="mdi-flag-variant-outline"
+                    :title="$t('penalties.add')"
+                    @click="penaltyDialog?.add(row.starter.entryId, stage.id)"
+                  />
                 </v-list>
               </v-menu>
               <v-menu v-if="row.run">
@@ -1367,6 +1374,11 @@ onUnmounted(() => {
                   />
                 </template>
                 <v-list density="compact">
+                  <v-list-item
+                    prepend-icon="mdi-flag-variant-outline"
+                    :title="$t('penalties.add')"
+                    @click="penaltyDialog?.add(row.run!.entryId, stage.id)"
+                  />
                   <v-list-item
                     prepend-icon="mdi-cancel"
                     :title="$t('live.voidAttempt')"
@@ -1464,6 +1476,7 @@ onUnmounted(() => {
     :entries="entries"
     @saved="upsertStageRun"
   />
+  <PenaltyDialog ref="penaltyDialog" :stages="stages" :entries="entries" />
 </template>
 
 <style scoped>

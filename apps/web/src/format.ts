@@ -5,7 +5,12 @@ import {
   StageStatus,
   EntryStatus,
 } from '@rally-gate/shared';
-import { currentLocale, formatStageDuration, t } from '@rally-gate/ui';
+import {
+  currentLocale,
+  formatStageDuration,
+  parseStageDuration,
+  t,
+} from '@rally-gate/ui';
 import type { GateAssignment } from './api/gate-assignments';
 import type { Gate } from './api/gates';
 import type { Entry } from './api/entries';
@@ -221,6 +226,21 @@ export function gateStatusColor(gate: Gate, nowMs: number): string {
 export function eventName(file: string): string {
   return file.replace(/\.sqlite$/, '');
 }
+
+/** `1:30` or `90` as whole seconds, as penalties are given; null otherwise. */
+export function parseWholeSeconds(text: string): number | null {
+  const ms = parseStageDuration(text);
+  return ms !== null && ms % 1000 === 0 ? ms / 1000 : null;
+}
+
+/** Whole seconds as `01:30`, the way `parseWholeSeconds` reads them back. */
+export function formatWholeSeconds(seconds: number): string {
+  return formatStageDuration(seconds * 1000).replace(/.0$/, '');
+}
+
+/** Vuetify field rule for a `parseWholeSeconds` field. */
+export const wholeSeconds = (value: string | null) =>
+  parseWholeSeconds(value ?? '') !== null || t('common.wholeSeconds');
 
 /** Vuetify field rule for a field the form can't save without. */
 export const required = (value: unknown) =>

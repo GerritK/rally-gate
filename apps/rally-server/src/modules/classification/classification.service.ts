@@ -20,6 +20,7 @@ import {
 } from '../stage-runs/stage-runs.service';
 import { StagesService } from '../stages/stages.service';
 import { SettingsService } from '../settings/settings.service';
+import { PenaltiesService } from '../penalties/penalties.service';
 import { Entry } from '../entries/entry.entity';
 import { crewOf, EntriesService } from '../entries/entries.service';
 
@@ -57,6 +58,7 @@ export class ClassificationService {
     private readonly gatesService: GatesService,
     private readonly gateAssignmentsService: GateAssignmentsService,
     private readonly settingsService: SettingsService,
+    private readonly penaltiesService: PenaltiesService,
   ) {}
 
   async getStageClassification(
@@ -147,11 +149,15 @@ export class ClassificationService {
       timesByStage.set(run.stageId, stageTimes);
     }
 
+    // Added to the total only, never to a stage time: a stage's results
+    // show what was driven, and the notionals anchor on that too.
+    const penaltyTotals = await this.penaltiesService.overallTotals(stages);
     const totals = new Map(
       classified.map((entryId) => [
         entryId,
         {
-          durationMs: 0,
+          durationMs: penaltyTotals.get(entryId) ?? 0,
+          penaltyMs: penaltyTotals.get(entryId) ?? 0,
           stagesCompleted: 0,
           stageTimes: [] as OverallStageTime[],
         },
@@ -190,6 +196,7 @@ export class ClassificationService {
       ...placing,
       stagesCompleted: totals.get(placing.entryId)!.stagesCompleted,
       stageTimes: totals.get(placing.entryId)!.stageTimes,
+      penaltyMs: totals.get(placing.entryId)!.penaltyMs,
     }));
   }
 

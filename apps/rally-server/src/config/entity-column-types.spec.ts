@@ -17,6 +17,8 @@ import { Stage } from '../modules/stages/stage.entity';
 import { EntryClass } from '../modules/entries/entry-class.entity';
 import { Entry } from '../modules/entries/entry.entity';
 import { EntryTransponder } from '../modules/entries/entry-transponder.entity';
+import { Penalty } from '../modules/penalties/penalty.entity';
+import { PenaltyType } from '../modules/penalties/penalty-type.entity';
 
 const ENTITIES = [
   DetectionEventRecord,
@@ -30,6 +32,8 @@ const ENTITIES = [
   Entry,
   EntryClass,
   EntryTransponder,
+  Penalty,
+  PenaltyType,
 ];
 
 /**

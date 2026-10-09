@@ -22,6 +22,10 @@ What exists, with where its reasoning lives. History is in git.
   entry classes as filtered rankings, splits as columns of the stage
   classification, crews without a counted stage listed
   as "Not classified" below the overall (`event-model.md`).
+- **Penalties:** a catalogue of types, flat or tiered, counted per stage or
+  across the rally, plus free text; given on Live Timing or the entry page,
+  added to the overall total only, priced on read (`event-model.md`
+  "Penalties").
 - **Light barrier:** `BeamAdapter` (E3Z-T61 via GPIO), unassigned passings
   assigned by a marshal (`decoder-adapters.md`, `event-model.md`). Verified on
   a Pi with the E3Z-T61, marshal assignment included.
@@ -151,7 +155,7 @@ OpenStint (below) resumes when the hardware arrives.
   LAN (only proven from a laptop and inside WSL so far), and two rally-servers on
   one network both claiming `rally-server.local`.
 - **Rally controls** — Parc Fermé, time control, service park, pre-start roles
-  (unused `GateRole` values today), planned start times, and penalties. All
+  (unused `GateRole` values today) and planned start times. All
   undesigned; don't grow Setup UI for them speculatively. When checkpoint
   interval times land, give them their own formatter rather than reusing
   `formatStageDuration` (see `packages/ui/src/format.ts`).
@@ -201,7 +205,7 @@ OpenStint (below) resumes when the hardware arrives.
   to the back after a repair, swaps). Until then, change start numbers before
   the start list is frozen.
 - **Out-of-order start penalties**, measured against the frozen start order.
-  They depend on penalties as a whole (Rally controls, above).
+  A penalty type exists; the measuring doesn't.
 - **Smarter passing suggestions** — today a start passing suggests the next
   car in start order and a split/finish one the first car on stage
   (`LiveView.vue` `suggestedEntryIds`). Planned start times could narrow it

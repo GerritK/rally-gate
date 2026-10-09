@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { StageRunStatus, StageStatus, EntryStatus } from '@rally-gate/shared';
-import { t } from '@rally-gate/ui';
+import { t, useConfirm } from '@rally-gate/ui';
 import {
   fetchOverallClassification,
   fetchStageClassification,
@@ -12,6 +12,13 @@ import { fetchStageRuns, type StageRun } from '../api/stage-runs';
 import { fetchStages, type Stage } from '../api/stages';
 import { fetchEntries, type Entry } from '../api/entries';
 import { fetchEntryClasses, type EntryClass } from '../api/entry-classes';
+import {
+  deletePenalty,
+  fetchPenalties,
+  fetchPenaltyTypes,
+  type Penalty,
+  type PenaltyType,
+} from '../api/penalties';
 import { classesOf } from '../class-query';
 import ClassChip from '../components/ClassChip.vue';
 import ClockTime from '../components/ClockTime.vue';
@@ -22,6 +29,7 @@ import StatusChip from '../components/StatusChip.vue';
 import TransponderList from '../components/TransponderList.vue';
 import EntryDialog from '../components/EntryDialog.vue';
 import EntryStatusActions from '../components/EntryStatusActions.vue';
+import PenaltyDialog from '../components/PenaltyDialog.vue';
 import { flagName, flagUrl } from '../crew';
 import {
   formatDuration,
@@ -41,8 +49,12 @@ const runs = ref<StageRun[]>([]);
 /** Each started stage's classification, all classes. */
 const stageRanks = ref(new Map<string, Placing[]>());
 const overall = ref<OverallPlacing[]>([]);
+const penalties = ref<Penalty[]>([]);
+const penaltyTypes = ref<PenaltyType[]>([]);
 const loaded = ref(false);
 const dialogOpen = ref(false);
+const penaltyDialog = ref<InstanceType<typeof PenaltyDialog> | null>(null);
+const confirm = useConfirm();
 
 const entry = computed(
   () => entries.value.find((v) => v.id === props.entryId) ?? null,
@@ -119,6 +131,45 @@ const stageRows = computed(() =>
     }),
 );
 
+/** In stage order, the whole rally's last: the order their tiers count in. */
+const penaltyRows = computed(() => {
+  const position = (stageId: string | null) =>
+    stageId === null
+      ? Infinity
+      : (stages.value.find((s) => s.id === stageId)?.stageNumber ?? Infinity);
+  return [...penalties.value]
+    .sort(
+      (a, b) =>
+        position(a.stageId) - position(b.stageId) ||
+        a.createdAt.localeCompare(b.createdAt),
+    )
+    .map((penalty) => {
+      const stage = stages.value.find((s) => s.id === penalty.stageId);
+      return {
+        penalty,
+        stage,
+        name:
+          penaltyTypes.value.find((type) => type.id === penalty.typeId)?.name ??
+          penalty.note,
+        // The overall counts closed stages only, their penalties alike.
+        pending: !!stage && stage.status !== StageStatus.CLOSED,
+      };
+    });
+});
+
+async function onDeletePenalty(penalty: Penalty) {
+  if (
+    !(await confirm({
+      title: t('penalties.deleteOne'),
+      confirmText: t('penalties.deleteOneConfirm'),
+      color: 'error',
+    }))
+  )
+    return;
+  await deletePenalty(penalty.id);
+  await refresh();
+}
+
 const legendMarks = computed<TimingMark[]>(() => [
   ...(stageRows.value.some((r) => r.rank?.gapMs === 0)
     ? (['best'] as const)
@@ -130,14 +181,23 @@ const legendMarks = computed<TimingMark[]>(() => [
 ]);
 
 async function refresh() {
-  [entries.value, classes.value, stages.value, runs.value, overall.value] =
-    await Promise.all([
-      fetchEntries(),
-      fetchEntryClasses(),
-      fetchStages(),
-      fetchStageRuns(),
-      fetchOverallClassification(),
-    ]);
+  [
+    entries.value,
+    classes.value,
+    stages.value,
+    runs.value,
+    overall.value,
+    penalties.value,
+    penaltyTypes.value,
+  ] = await Promise.all([
+    fetchEntries(),
+    fetchEntryClasses(),
+    fetchStages(),
+    fetchStageRuns(),
+    fetchOverallClassification(),
+    fetchPenalties(props.entryId),
+    fetchPenaltyTypes(),
+  ]);
   const started = stages.value.filter(
     (s) => s.status !== StageStatus.NOT_STARTED,
   );
@@ -267,6 +327,12 @@ onMounted(refresh);
             <dt>{{ $t('table.gap') }}</dt>
             <dd class="rg-timing">{{ formatGap(standing.gapMs) }}</dd>
           </div>
+          <div v-if="standing.penaltyMs > 0">
+            <dt>{{ $t('penalties.penalties') }}</dt>
+            <dd class="rg-timing text-timing-penalty">
+              +{{ formatDuration(standing.penaltyMs) }}
+            </dd>
+          </div>
         </dl>
         <div v-else class="rg-empty">
           {{
@@ -377,7 +443,93 @@ onMounted(refresh);
         </tfoot>
       </v-table>
     </v-card>
+
+    <v-card class="mt-4">
+      <v-card-item>
+        <v-card-title>{{ $t('penalties.penalties') }}</v-card-title>
+        <template #append>
+          <v-btn
+            variant="tonal"
+            prepend-icon="mdi-plus"
+            @click="penaltyDialog?.add(entry.id, null)"
+          >
+            {{ $t('penalties.add') }}
+          </v-btn>
+        </template>
+      </v-card-item>
+      <v-table density="comfortable">
+        <thead>
+          <tr>
+            <th>{{ $t('entryDetail.stage') }}</th>
+            <th>{{ $t('penalties.type') }}</th>
+            <th>{{ $t('penalties.count') }}</th>
+            <th>{{ $t('penalties.note') }}</th>
+            <th class="rg-time">{{ $t('penalties.price') }}</th>
+            <th width="1%"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="{ penalty, stage, name, pending } in penaltyRows"
+            :key="penalty.id"
+          >
+            <td>
+              <template v-if="stage">
+                {{ stage.id }}
+                <span class="text-medium-emphasis"> · {{ stage.name }}</span>
+              </template>
+              <template v-else>{{ $t('penalties.wholeRally') }}</template>
+            </td>
+            <td>{{ name }}</td>
+            <td>{{ penalty.count }}</td>
+            <td>{{ penalty.typeId ? (penalty.note ?? '') : '' }}</td>
+            <td class="rg-time rg-timing text-no-wrap">
+              <span
+                v-if="pending"
+                v-tooltip:top="$t('penalties.pending')"
+                class="text-medium-emphasis"
+                >+{{ formatDuration(penalty.penaltyMs) }}</span
+              >
+              <span v-else class="text-timing-penalty"
+                >+{{ formatDuration(penalty.penaltyMs) }}</span
+              >
+            </td>
+            <td>
+              <v-menu>
+                <template #activator="{ props: menu }">
+                  <v-btn
+                    v-bind="menu"
+                    icon="mdi-dots-vertical"
+                    size="small"
+                    variant="text"
+                    :aria-label="$t('common.moreActions')"
+                  />
+                </template>
+                <v-list density="compact">
+                  <v-list-item
+                    prepend-icon="mdi-delete-outline"
+                    :title="$t('common.delete')"
+                    base-color="error"
+                    @click="onDeletePenalty(penalty)"
+                  />
+                </v-list>
+              </v-menu>
+            </td>
+          </tr>
+          <tr v-if="penaltyRows.length === 0">
+            <td colspan="6" class="rg-empty">{{ $t('penalties.none') }}</td>
+          </tr>
+        </tbody>
+      </v-table>
+    </v-card>
   </template>
+
+  <PenaltyDialog
+    ref="penaltyDialog"
+    :stages="stages"
+    :entries="entries"
+    @saved="refresh"
+  />
 
   <EntryDialog
     v-model="dialogOpen"
