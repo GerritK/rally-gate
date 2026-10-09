@@ -305,13 +305,14 @@ run "Installing git" sudo apt-get install -y git
 run "Installing sensor tools" sudo apt-get install -y gpiod
 getent group gpio >/dev/null && sudo usermod -aG gpio "$USER"
 # openstint: the transponder adapter spawns its openstint_rtlsdr itself, so the
-# package's own service is disabled — two decoders can't share one SDR. Upstream
+# package's own service is masked — two decoders can't share one SDR, and a
+# merely disabled one still gets started and crash-loops on port 5556. Upstream
 # only publishes arm64; plugdev opens the SDR, users writes /var/lib/openstint.
 if [ "$(dpkg --print-architecture)" = arm64 ]; then
   echo 'deb [trusted=yes arch=arm64] https://repo.lapbeeps.com/apt/ /' | sudo tee /etc/apt/sources.list.d/openstint.list >/dev/null
   run "Adding the OpenStint source" sudo apt-get update
   run "Installing OpenStint" sudo apt-get install -y openstint
-  sudo systemctl disable --now openstint.service >/dev/null 2>&1 || true
+  sudo systemctl mask --now openstint.service >/dev/null 2>&1 || true
   sudo usermod -aG plugdev,users "$USER"
   # Our own rule rather than trusting the distro's: those may grant the SDR via
   # TAG+="uaccess" only, i.e. to the logged-in seat user, which leaves a system

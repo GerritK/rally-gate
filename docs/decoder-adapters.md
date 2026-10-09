@@ -120,7 +120,7 @@ and upstream may append more, so only a minimum length is checked.
 - If the decoder exits, gate-agent exits, like `gpiomon` for the beam.
 
 The installer adds upstream's apt repo (arm64 only), installs `openstint`, and
-**disables the package's own `openstint.service`** — two decoders can't share
+**masks the package's own `openstint.service`** — two decoders can't share
 one SDR. The gate user joins `plugdev` (SDR) and `users` (`/var/lib/openstint`).
 
 | Setting | Default | |
