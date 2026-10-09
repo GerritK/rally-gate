@@ -12,3 +12,4 @@ export * from './start-order';
 export * from './display';
 export * from './settings';
 export * from './penalty';
+export * from './api-error';

@@ -10,6 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { OnEvent } from '@nestjs/event-emitter';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
+  ApiErrorCode,
   DEFAULT_MIN_STAGE_DURATION_MS,
   DETECTION_TOPIC_PREFIX,
   DetectionEvent,
@@ -19,6 +20,7 @@ import {
   TransponderKind,
 } from '@rally-gate/shared';
 import { In, Repository } from 'typeorm';
+import { apiError } from '../../common/api-error';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { Gate } from '../gates/gate.entity';
 import { GatesService } from '../gates/gates.service';
@@ -173,14 +175,19 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
   ): Promise<DetectionEventRecord> {
     const record = await this.findAwaitingOrThrow(eventId);
     if (!(await this.entriesService.findOne(entryId))) {
-      throw new NotFoundException(`Entry ${entryId} not found`);
+      throw new NotFoundException(
+        apiError(ApiErrorCode.ENTRY_NOT_FOUND, `Entry ${entryId} not found`),
+      );
     }
     const gate = await this.gatesService.findOne(record.gateId);
     const applied =
       gate && (await this.applyRules(gate, entryId, effectiveTime(record)));
     if (!applied) {
       throw new ConflictException(
-        `This passing can't be timed for that entry: its stage is no longer active, the entry is withdrawn or disqualified, or it has no matching run (a finish or split needs its start assigned first)`,
+        apiError(
+          ApiErrorCode.PASSING_NOT_TIMEABLE,
+          `This passing can't be timed for that entry: its stage is no longer active, the entry is withdrawn or disqualified, or it has no matching run (a finish or split needs its start assigned first)`,
+        ),
       );
     }
     record.entryId = entryId;
@@ -233,7 +240,10 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     const record = await this.events.findOneBy({ eventId });
     if (!record?.awaitingEntry) {
       throw new NotFoundException(
-        `No passing ${eventId} is waiting for an entry`,
+        apiError(
+          ApiErrorCode.PASSING_NOT_WAITING,
+          `No passing ${eventId} is waiting for an entry`,
+        ),
       );
     }
     return record;

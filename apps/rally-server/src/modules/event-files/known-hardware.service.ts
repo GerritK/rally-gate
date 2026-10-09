@@ -1,3 +1,4 @@
+import { ApiErrorCode } from '@rally-gate/shared';
 import {
   ConflictException,
   Injectable,
@@ -9,6 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Repository } from 'typeorm';
+import { apiError } from '../../common/api-error';
 import { Gate } from '../gates/gate.entity';
 import { eventsDir } from './event-files';
 
@@ -69,7 +71,10 @@ export class KnownHardwareService implements OnModuleInit {
   forget(id: string): void {
     if (!this.path()) {
       throw new ConflictException(
-        'Known hardware is only kept in the standalone package',
+        apiError(
+          ApiErrorCode.KNOWN_HARDWARE_STANDALONE_ONLY,
+          'Known hardware is only kept in the standalone package',
+        ),
       );
     }
     this.gates = this.gates.filter((gate) => gate.id !== id);

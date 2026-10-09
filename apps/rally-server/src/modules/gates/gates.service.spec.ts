@@ -272,7 +272,12 @@ describe('GatesService.powerOffAll', () => {
     );
     expect(results).toEqual([
       { gateId: 'ONLINE', ok: true },
-      { gateId: 'FAILS', ok: false, message: 'sudo: not allowed' },
+      {
+        gateId: 'FAILS',
+        ok: false,
+        error: 'refused',
+        detail: 'sudo: not allowed',
+      },
     ]);
   });
 });

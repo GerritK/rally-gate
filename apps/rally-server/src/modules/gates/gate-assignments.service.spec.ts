@@ -1,5 +1,5 @@
 import { ConflictException } from '@nestjs/common';
-import { StageStatus } from '@rally-gate/shared';
+import { ApiErrorCode, StageStatus } from '@rally-gate/shared';
 import { GateAssignmentsService } from './gate-assignments.service';
 
 type Row = {
@@ -109,9 +109,12 @@ describe('GateAssignmentsService.activateForStage', () => {
       { id: 'a2', gateId: 'G1', stageId: 'SS2', active: true },
     ]);
 
-    await expect(service.activateForStage('SS1')).rejects.toMatchObject(
-      new ConflictException({ conflictingStageIds: ['SS2'] }),
-    );
+    await expect(service.activateForStage('SS1')).rejects.toMatchObject({
+      response: {
+        code: ApiErrorCode.OTHER_STAGE_ACTIVE,
+        params: { conflictingStageIds: ['SS2'] },
+      },
+    });
   });
 
   it('deactivates the conflicting stage when forced', async () => {

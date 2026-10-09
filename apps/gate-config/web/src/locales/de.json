@@ -23,7 +23,7 @@
     "and": " und ",
     "savedButFailed": "Gespeichert, aber {failed} ist fehlgeschlagen.",
     "saved": "Gespeichert und angewendet.",
-    "unreachable": "Das Gate ist nicht erreichbar: {error}",
+    "unreachable": "Das Gate ist nicht erreichbar.",
     "running": "läuft",
     "unknown": "unbekannt",
     "settings": "Einstellungen",

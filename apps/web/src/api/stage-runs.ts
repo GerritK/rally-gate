@@ -82,7 +82,7 @@ export function voidStageRun(id: string): Promise<StageRun> {
 }
 
 /**
- * Reverses a void. Throws `ApiError` 409 with `body.blockingAttempt` if
+ * Reverses a void. Throws `OTHER_ATTEMPT_COUNTS` if
  * another attempt already counts for that stage — an entry has at most one
  * non-voided attempt, so that one must be voided first. Deliberately not a
  * cascade: discarding the other run is the marshal's call to make explicitly.

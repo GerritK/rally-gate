@@ -43,3 +43,15 @@ export function gateConfigUrl(address: string): string {
   const host = address.includes(':') ? `[${address}]` : address;
   return `http://${host}:${GATE_CONFIG_PORT}/`;
 }
+
+/**
+ * One gate's answer to "shut down". `unreachable`: no reply from its
+ * gate-config; `refused`: it replied but the shutdown didn't start, with the
+ * command's own output as `detail`.
+ */
+export interface GatePowerOffResult {
+  gateId: string;
+  ok: boolean;
+  error?: 'unreachable' | 'refused';
+  detail?: string;
+}

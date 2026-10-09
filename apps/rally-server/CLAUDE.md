@@ -35,6 +35,8 @@ Fields the DTOs leave out on purpose, because only the server may set them:
 
 A missing stage is a 404 via `StagesService.findOneOrFail`; don't hand-roll the check again.
 
+**Every refusal is coded**: `throw new ConflictException(apiError(ApiErrorCode.X, 'English message', params))` (`src/common/api-error.ts`). The dashboard shows `errors.<code>` from its locales, never the English message — a new code needs its text in `apps/web`'s `en.json`/`de.json` (`i18n-keys.spec.ts` checks).
+
 ## TypeORM entities
 
 - **Clearing a column means `null`, never `undefined`.** `save()` skips `undefined` properties and writes `null` as SQL NULL. Type nullable columns as `T | null`.

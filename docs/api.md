@@ -4,19 +4,25 @@
 port serves the built dashboard and `/entries` is both a page and a resource.
 Anything outside `/api` that isn't a file returns `index.html`.
 
+A refusal the server raises itself (the 400/404/409s below) carries
+`{ code, message, params? }`: `code` is an `ApiErrorCode` (`packages/shared`),
+which the dashboard translates as `errors.<code>` with `params` filled in;
+`message` is English, for logs and curl. Validation 400s and 500s have no
+`code`.
+
 | Endpoint | Methods | Notes |
 |---|---|---|
 | `/version` | GET | `{ version }`, the server's build — see "Gate discovery & heartbeat" in `architecture.md` |
 | `/time` | GET | `{ now }`, the server clock; the dashboard shows it instead of the device's, since gates sync to the server |
 | `/gates` | GET, `/:id` GET/PUT/DELETE | hardware identity only (PUT sets the name). Auto-created from a first heartbeat unless `autoDiscoverGates` is off |
-| `/gates/power-off` | POST | shuts down every online gate through its gate-config; one `{ gateId, ok, message? }` per gate. 409 while a stage is active |
+| `/gates/power-off` | POST | shuts down every online gate through its gate-config; one `{ gateId, ok, error?, detail? }` per gate (`unreachable`, or `refused` with the command output). 409 while a stage is active |
 | `/gate-assignments` | GET, POST, `/:id` DELETE | the (gate, stage, role, splitIndex) plan. `active` is not settable — activation is per stage |
 | `/entries` | GET, POST, `/:id` GET/PATCH | `startNumber` is unique, POST/PATCH 409 on a clash. Classes are written as `classIds` (replaces the list, 400 on an unknown id) and read back as `classes` |
 | `/entry-classes` | GET, POST, `/:id` PUT/DELETE | `{ name, main? }`, name unique (409), main classes listed first. DELETE takes the class off its entries |
 | `/penalty-types` | GET, POST, `/:id` PUT/DELETE | `{ name, scope, tiers: [{ fromCount, seconds }] }`, tiers from 1 ascending (400), name unique (409). PUT reprices given penalties, DELETE deletes them |
 | `/penalties` | GET `?entryId=`, POST, `/:id` DELETE | `{ entryId, stageId?, typeId?, count?, seconds?, note? }`: a type, or free text with `seconds` and `note` (400). 409 on a stage not started. Read back with its computed `penaltyMs` (`event-model.md` "Penalties") |
 | `/stages` | GET, POST, `/:id` GET/PUT/DELETE | sorted by `stageNumber`; `status` is server-owned |
-| `/stages/:id/activate` | POST | activates the stage's gate assignments. 409 `{ conflictingStageIds }` if a gate is active elsewhere (`?force=true` closes that stage), 409 if already `CLOSED` |
+| `/stages/:id/activate` | POST | activates the stage's gate assignments. 409 `otherStageActive` with `params.conflictingStageIds` if a gate is active elsewhere (`?force=true` closes that stage), 409 if already `CLOSED` |
 | `/stages/:id/close` | POST | deactivates its gates, marks it `CLOSED`. Terminal |
 | `/stages/:id/start-order` | GET | `{ frozen, frozenAt, grouped, entries }`; computed live until frozen. See `event-model.md` "Start order" |
 | `/stages/:id/start-order/freeze` | POST | stores the snapshot; no-op if already frozen (activation also freezes) |
@@ -24,7 +30,7 @@ Anything outside `/api` that isn't a file returns `index.html`.
 | `/stage-runs` | GET, POST, `/:id` PATCH/DELETE | POST/PATCH/DELETE are manual corrections. POST without `startTime` is "Start now", stamped with the server clock. POST 409s while a non-voided attempt exists, and for an entry withdrawn or disqualified. GET includes voided attempts; `?stageId=` narrows to one stage |
 | `/stage-runs/splits?stageId=` | GET | every split of every attempt on the stage, one request per page |
 | `/stage-runs/:id/finish` | POST | "Finish now": hand-timed finish stamped with the server clock. 409 if already finished, voided or the stage is closed |
-| `/stage-runs/:id/void`, `/unvoid` | POST | red flag / reverse it — see "Voiding" in `event-model.md`. Unvoid 409s with `{ blockingAttempt }` |
+| `/stage-runs/:id/void`, `/unvoid` | POST | red flag / reverse it — see "Voiding" in `event-model.md`. Unvoid 409s with `params.blockingAttempt` |
 | `/events` | GET | the 100 most recent detections; `?gateId=` for one gate's |
 | `/events/awaiting-entry` | GET | unassigned passings (no transponder, or one on several entries) at live gates, oldest first |
 | `/events/:eventId/assign` | POST `{ entryId }` | times the passing as that entry; 409 when the rules would do nothing (e.g. finish before start) |

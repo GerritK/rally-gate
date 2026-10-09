@@ -17,7 +17,6 @@ import {
   powerOffAllGates,
   upsertGate,
   type Gate,
-  type GatePowerOffResult,
 } from '../api/gates';
 import { closeLiveStream, openLiveStream, upsert } from '../api/live';
 import { serverNow } from '../api/time';
@@ -28,10 +27,12 @@ import {
 } from '../api/settings';
 import { fetchStages, type Stage } from '../api/stages';
 import {
+  ApiErrorCode,
   AUTO_DISCOVER_GATES_KEY,
   DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS,
   gateConfigUrl,
   StageStatus,
+  type GatePowerOffResult,
 } from '@rally-gate/shared';
 import {
   formatClockTime,
@@ -137,11 +138,11 @@ async function onDeleteGate(gate: Gate, force = false) {
     gates.value = gates.value.filter((g) => g.id !== gate.id);
     notify(t('hardware.deleted'));
   } catch (err) {
-    const conflict = err instanceof ApiError && err.status === 409 ? err : null;
-    const assignmentCount = (
-      conflict?.body as { assignmentCount?: number } | null
-    )?.assignmentCount;
-    if (!conflict || !assignmentCount) throw err;
+    const assignmentCount =
+      err instanceof ApiError && err.code === ApiErrorCode.GATE_HAS_ASSIGNMENTS
+        ? (err.params.assignmentCount as number)
+        : undefined;
+    if (!assignmentCount) throw err;
     if (
       await confirm({
         title: t('hardware.deleteWithAssignmentsTitle'),
@@ -404,7 +405,14 @@ onUnmounted(() => {
             :color="r.ok ? 'success' : 'error'"
             size="small"
           />
-          {{ r.gateId }}: {{ r.ok ? $t('hardware.shuttingDown') : r.message }}
+          {{ r.gateId }}:
+          {{
+            r.ok
+              ? $t('hardware.shuttingDown')
+              : r.error === 'refused'
+                ? $t('hardware.powerOffRefused', { detail: r.detail })
+                : $t('hardware.powerOffUnreachable')
+          }}
         </div>
       </v-card-text>
       <v-card-actions>

@@ -7,8 +7,9 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { StageRunStatus, StageStatus } from '@rally-gate/shared';
+import { ApiErrorCode, StageRunStatus, StageStatus } from '@rally-gate/shared';
 import { In, IsNull, Not, Repository } from 'typeorm';
+import { apiError } from '../../common/api-error';
 import { isUniqueViolation } from '../../common/db-errors';
 import { StagesService } from '../stages/stages.service';
 import { StageRun } from './stage-run.entity';
@@ -98,7 +99,10 @@ function durationMs(startTime: Date, finishTime?: Date | null): number | null {
 function assertValidRunDuration(startTime: Date, finishTime: Date): void {
   if (!isValidRunDuration(startTime, finishTime)) {
     throw new BadRequestException(
-      `finishTime (${finishTime.toISOString()}) must be after startTime (${startTime.toISOString()})`,
+      apiError(
+        ApiErrorCode.FINISH_NOT_AFTER_START,
+        `finishTime (${finishTime.toISOString()}) must be after startTime (${startTime.toISOString()})`,
+      ),
     );
   }
 }
@@ -112,7 +116,10 @@ function parseTime(value: string, field: string): Date {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
     throw new BadRequestException(
-      `${field} is not a valid date/time: ${value}`,
+      apiError(
+        ApiErrorCode.INVALID_TIME,
+        `${field} is not a valid date/time: ${value}`,
+      ),
     );
   }
   return parsed;
@@ -134,7 +141,9 @@ export class StageRunsService {
   private async findOneOrFail(id: string): Promise<StageRun> {
     const run = await this.stageRuns.findOneBy({ id });
     if (!run) {
-      throw new NotFoundException(`StageRun ${id} not found`);
+      throw new NotFoundException(
+        apiError(ApiErrorCode.STAGE_RUN_NOT_FOUND, `StageRun ${id} not found`),
+      );
     }
     return run;
   }
@@ -427,7 +436,10 @@ export class StageRunsService {
         // a re-run by hand therefore means voiding the previous attempt
         // first — the same act that frees the car for a gate-timed re-run.
         throw new ConflictException(
-          `Entry ${input.entryId} already has an attempt on stage ${input.stageId} that counts; void it first to record another`,
+          apiError(
+            ApiErrorCode.ATTEMPT_ALREADY_COUNTS,
+            `Entry ${input.entryId} already has an attempt on stage ${input.stageId} that counts; void it first to record another`,
+          ),
         );
       }
       throw err;
@@ -450,7 +462,10 @@ export class StageRunsService {
       (await this.isStageClosed(run.stageId))
     ) {
       throw new ConflictException(
-        `StageRun ${id} is ${run.voided ? 'voided' : run.finishTime ? 'already finished' : 'on a closed stage'}`,
+        apiError(
+          ApiErrorCode.RUN_NOT_FINISHABLE,
+          `StageRun ${id} is ${run.voided ? 'voided' : run.finishTime ? 'already finished' : 'on a closed stage'}`,
+        ),
       );
     }
     const finished = await this.finishRun(
@@ -461,7 +476,10 @@ export class StageRunsService {
     );
     if (!finished) {
       throw new ConflictException(
-        `StageRun ${id} starts after now; correct its start first`,
+        apiError(
+          ApiErrorCode.RUN_STARTS_IN_FUTURE,
+          `StageRun ${id} starts after now; correct its start first`,
+        ),
       );
     }
     this.emitter.emit('stage-run.updated', finished);
@@ -505,10 +523,13 @@ export class StageRunsService {
     ).find((other) => other.id !== run.id);
 
     if (survivor) {
-      throw new ConflictException({
-        message: `Attempt ${survivor.attempt} already counts for this stage; void it first if attempt ${run.attempt} should count instead`,
-        blockingAttempt: survivor.attempt,
-      });
+      throw new ConflictException(
+        apiError(
+          ApiErrorCode.OTHER_ATTEMPT_COUNTS,
+          `Attempt ${survivor.attempt} already counts for this stage; void it first if attempt ${run.attempt} should count instead`,
+          { blockingAttempt: survivor.attempt, attempt: run.attempt },
+        ),
+      );
     }
 
     run.voided = false;
@@ -524,7 +545,9 @@ export class StageRunsService {
     await this.stageSplits.delete({ stageRunId: id });
     const result = await this.stageRuns.delete(id);
     if (result.affected === 0) {
-      throw new NotFoundException(`StageRun ${id} not found`);
+      throw new NotFoundException(
+        apiError(ApiErrorCode.STAGE_RUN_NOT_FOUND, `StageRun ${id} not found`),
+      );
     }
   }
 

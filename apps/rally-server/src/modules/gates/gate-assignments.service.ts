@@ -4,8 +4,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { GateRole, StageStatus } from '@rally-gate/shared';
+import { ApiErrorCode, GateRole, StageStatus } from '@rally-gate/shared';
 import { In, Not, Repository } from 'typeorm';
+import { apiError } from '../../common/api-error';
 import { Stage } from '../stages/stage.entity';
 import { GateAssignment } from './gate-assignment.entity';
 
@@ -29,11 +30,17 @@ export class GateAssignmentsService {
   private async assertStageEditable(stageId: string): Promise<void> {
     const stage = await this.stages.findOneBy({ id: stageId });
     if (!stage) {
-      throw new NotFoundException(`Stage ${stageId} not found`);
+      throw new NotFoundException(
+        apiError(ApiErrorCode.STAGE_NOT_FOUND, `Stage ${stageId} not found`),
+      );
     }
     if (stage.status !== StageStatus.NOT_STARTED) {
       throw new ConflictException(
-        `Stage ${stageId} is ${stage.status} — gate assignments can only be edited while NOT_STARTED`,
+        apiError(
+          ApiErrorCode.STAGE_STARTED_NO_EDIT,
+          `Stage ${stageId} is ${stage.status} — gate assignments can only be edited while NOT_STARTED`,
+          { stage: stageId },
+        ),
       );
     }
   }
@@ -108,7 +115,13 @@ export class GateAssignmentsService {
   ): Promise<{ deactivatedStageIds: string[] }> {
     const conflictingStageIds = await this.findConflictingStageIds(stageId);
     if (conflictingStageIds.length > 0 && !force) {
-      throw new ConflictException({ conflictingStageIds });
+      throw new ConflictException(
+        apiError(
+          ApiErrorCode.OTHER_STAGE_ACTIVE,
+          `Stage(s) ${conflictingStageIds.join(', ')} are active`,
+          { conflictingStageIds },
+        ),
+      );
     }
     await this.assignments.manager.transaction(async (manager) => {
       if (conflictingStageIds.length > 0) {
@@ -158,14 +171,21 @@ export class GateAssignmentsService {
       .map((s) => s.id);
     if (lockedStageIds.length > 0) {
       throw new ConflictException(
-        `Gate ${gateId} is referenced by ACTIVE/CLOSED stage(s) (${lockedStageIds.join(', ')}) and cannot be deleted`,
+        apiError(
+          ApiErrorCode.GATE_IN_STARTED_STAGE,
+          `Gate ${gateId} is referenced by ACTIVE/CLOSED stage(s) (${lockedStageIds.join(', ')}) and cannot be deleted`,
+          { gate: gateId, stages: lockedStageIds.join(', ') },
+        ),
       );
     }
     if (!force) {
-      throw new ConflictException({
-        message: `Gate ${gateId} has ${assignments.length} gate assignment(s) that will also be deleted`,
-        assignmentCount: assignments.length,
-      });
+      throw new ConflictException(
+        apiError(
+          ApiErrorCode.GATE_HAS_ASSIGNMENTS,
+          `Gate ${gateId} has ${assignments.length} gate assignment(s) that will also be deleted`,
+          { gate: gateId, assignmentCount: assignments.length },
+        ),
+      );
     }
     await this.assignments.delete({ gateId });
   }
@@ -192,7 +212,11 @@ export class GateAssignmentsService {
     );
     if (clash) {
       throw new ConflictException(
-        `Stage ${stageId} already has a ${clash.role} gate; a combined start/finish gate replaces separate start and finish gates`,
+        apiError(
+          ApiErrorCode.COMBINED_GATE_CLASH,
+          `Stage ${stageId} already has a ${clash.role} gate; a combined start/finish gate replaces separate start and finish gates`,
+          { stage: stageId },
+        ),
       );
     }
   }

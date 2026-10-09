@@ -2,15 +2,18 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import {
+  ApiErrorCode,
   AUTO_DISCOVER_GATES_KEY,
   CLOCK_CORRECTION_THRESHOLD_KEY,
   DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS,
   DETECTION_TOPIC_PREFIX,
   gateConfigUrl,
   GateHeartbeat,
+  GatePowerOffResult,
   HEARTBEAT_ONLINE_THRESHOLD_MS,
 } from '@rally-gate/shared';
 import { Repository } from 'typeorm';
+import { apiError } from '../../common/api-error';
 import { SettingsService } from '../settings/settings.service';
 import { GateAssignmentsService } from './gate-assignments.service';
 import { Gate } from './gate.entity';
@@ -50,12 +53,6 @@ export function measureClockOffsetMs(
   return arrivedAt.getTime() - sentMs;
 }
 
-export interface GatePowerOffResult {
-  gateId: string;
-  ok: boolean;
-  message?: string;
-}
-
 /**
  * Through gate-config's own endpoint rather than an MQTT command, so a gate
  * never listens for anything from the server (docs/architecture.md, "No
@@ -73,13 +70,14 @@ async function powerOffGate(
     const body = (await res.json()) as { started?: boolean; output?: string };
     return body.started
       ? { gateId, ok: true }
-      : { gateId, ok: false, message: body.output || `HTTP ${res.status}` };
-  } catch (err) {
-    return {
-      gateId,
-      ok: false,
-      message: err instanceof Error ? err.message : String(err),
-    };
+      : {
+          gateId,
+          ok: false,
+          error: 'refused',
+          detail: body.output || `HTTP ${res.status}`,
+        };
+  } catch {
+    return { gateId, ok: false, error: 'unreachable' };
   }
 }
 
@@ -131,7 +129,10 @@ export class GatesService {
   async powerOffAll(now = Date.now()): Promise<GatePowerOffResult[]> {
     if (await this.gateAssignmentsService.hasActiveStage()) {
       throw new ConflictException(
-        'A stage is active — close it before shutting down the gates',
+        apiError(
+          ApiErrorCode.CLOSE_STAGE_BEFORE_POWER_OFF,
+          'A stage is active — close it before shutting down the gates',
+        ),
       );
     }
     const online = (await this.gates.find()).filter(

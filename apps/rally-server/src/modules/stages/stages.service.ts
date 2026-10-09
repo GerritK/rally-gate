@@ -5,8 +5,9 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { StageStatus } from '@rally-gate/shared';
+import { ApiErrorCode, StageStatus } from '@rally-gate/shared';
 import { Not, Repository } from 'typeorm';
+import { apiError } from '../../common/api-error';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { CreateStageDto, UpdateStageDto } from './dto';
 import { Stage } from './stage.entity';
@@ -31,14 +32,22 @@ export class StagesService {
   async findOneOrFail(id: string): Promise<Stage> {
     const stage = await this.findOne(id);
     if (!stage) {
-      throw new NotFoundException(`Stage ${id} not found`);
+      throw new NotFoundException(
+        apiError(ApiErrorCode.STAGE_NOT_FOUND, `Stage ${id} not found`),
+      );
     }
     return stage;
   }
 
   async create(stage: CreateStageDto): Promise<Stage> {
     if (await this.findOne(stage.id)) {
-      throw new ConflictException(`Stage ${stage.id} already exists`);
+      throw new ConflictException(
+        apiError(
+          ApiErrorCode.STAGE_EXISTS,
+          `Stage ${stage.id} already exists`,
+          { stage: stage.id },
+        ),
+      );
     }
     await this.assertStageNumberFree(stage.stageNumber);
     await this.stages.save(stage);
@@ -55,7 +64,11 @@ export class StagesService {
     const stage = await this.findOneOrFail(id);
     if (stage.status !== StageStatus.NOT_STARTED) {
       throw new ConflictException(
-        `Stage ${id} is ${stage.status} and can only be edited while NOT_STARTED`,
+        apiError(
+          ApiErrorCode.STAGE_STARTED_NO_EDIT,
+          `Stage ${id} is ${stage.status} and can only be edited while NOT_STARTED`,
+          { stage: id },
+        ),
       );
     }
     await this.assertStageNumberFree(data.stageNumber, id);
@@ -72,7 +85,11 @@ export class StagesService {
     const stage = await this.findOneOrFail(id);
     if (stage.status !== StageStatus.NOT_STARTED) {
       throw new ConflictException(
-        `Stage ${id} is ${stage.status} and can only be deleted while NOT_STARTED`,
+        apiError(
+          ApiErrorCode.STAGE_STARTED_NO_DELETE,
+          `Stage ${id} is ${stage.status} and can only be deleted while NOT_STARTED`,
+          { stage: id },
+        ),
       );
     }
     await this.gateAssignmentsService.removeForStage(id);
@@ -88,7 +105,11 @@ export class StagesService {
     );
     if (clash) {
       throw new ConflictException(
-        `Stage number ${stageNumber} is already used by stage ${clash.id}`,
+        apiError(
+          ApiErrorCode.STAGE_NUMBER_TAKEN,
+          `Stage number ${stageNumber} is already used by stage ${clash.id}`,
+          { stageNumber, stage: clash.id },
+        ),
       );
     }
   }
@@ -133,7 +154,11 @@ export class StagesService {
     const stage = await this.findOneOrFail(id);
     if (stage.status === StageStatus.CLOSED) {
       throw new ConflictException(
-        `Stage ${id} is closed and cannot be reactivated`,
+        apiError(
+          ApiErrorCode.STAGE_CLOSED,
+          `Stage ${id} is closed and cannot be reactivated`,
+          { stage: id },
+        ),
       );
     }
     const { deactivatedStageIds } =

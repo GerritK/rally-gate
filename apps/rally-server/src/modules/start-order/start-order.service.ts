@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
+  ApiErrorCode,
   isOutOfEvent,
   START_ORDER_DIRECTION_KEY,
   START_ORDER_GROUPING_KEY,
@@ -11,6 +12,7 @@ import {
   StartOrderGrouping,
   StartOrderKey,
 } from '@rally-gate/shared';
+import { apiError } from '../../common/api-error';
 import { ClassificationService } from '../classification/classification.service';
 import { SettingsService } from '../settings/settings.service';
 import { Stage } from '../stages/stage.entity';
@@ -93,7 +95,11 @@ export class StartOrderService {
     const stage = await this.stagesService.findOneOrFail(stageId);
     if (stage.status !== StageStatus.NOT_STARTED) {
       throw new ConflictException(
-        `Stage ${stageId} is ${stage.status}; its start order stays frozen`,
+        apiError(
+          ApiErrorCode.START_ORDER_FROZEN,
+          `Stage ${stageId} is ${stage.status}; its start order stays frozen`,
+          { stage: stageId },
+        ),
       );
     }
     await this.stagesService.setStartOrder(stageId, null);

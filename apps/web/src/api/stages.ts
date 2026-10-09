@@ -69,11 +69,9 @@ export function closeStage(stageId: string): Promise<Stage> {
 
 /**
  * Makes this stage's gates live and flips its status to `ACTIVE`. Throws
- * `ApiError` with status 409 and `body.conflictingStageIds` if another stage
- * is already active on a shared gate — pass `force: true` to deactivate
- * that other stage instead. 409s with a plain message (no
- * `conflictingStageIds`) if the stage is already `CLOSED` — closing is
- * terminal.
+ * `OTHER_STAGE_ACTIVE` if another stage is already active on a shared gate —
+ * pass `force: true` to deactivate that other stage instead — and
+ * `STAGE_CLOSED` if this one is closed: closing is terminal.
  */
 export function activateStage(stageId: string, force = false): Promise<Stage> {
   return postRequest(

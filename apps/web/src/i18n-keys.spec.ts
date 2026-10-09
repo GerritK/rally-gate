@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { ApiErrorCode } from '@rally-gate/shared';
 
 /**
  * A key typo or a missing translation renders the raw key on screen, and
@@ -59,3 +60,11 @@ for (const app of [
     );
   });
 }
+
+test('every server error code has a message', () => {
+  const en = load(join(root, 'apps', 'web', 'src'), 'en');
+  assert.deepEqual(
+    Object.values(ApiErrorCode).filter((code) => !en.has(`errors.${code}`)),
+    [],
+  );
+});

@@ -322,7 +322,11 @@ async function save() {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(values.value),
-    });
+    }).catch(() => null);
+    if (!response) {
+      notice.value = { type: 'error', text: t('gateConfig.unreachable') };
+      return;
+    }
     const result = await response.json();
     if (!response.ok) {
       errors.value = result.errors ?? {};
@@ -356,11 +360,9 @@ async function save() {
       : { type: 'success', text: t('gateConfig.saved') };
     originalGateId.value = values.value.GATE_ID ?? '';
     await loadStatus();
-  } catch (err) {
-    notice.value = {
-      type: 'error',
-      text: t('gateConfig.unreachable', { error: String(err) }),
-    };
+  } catch {
+    // The gate answered, but not as expected: whether it saved is unknown.
+    notice.value = { type: 'error', text: t('ui.somethingWentWrong') };
   } finally {
     saving.value = false;
   }

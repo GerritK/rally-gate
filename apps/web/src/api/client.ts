@@ -1,3 +1,6 @@
+import type { ApiErrorBody } from '@rally-gate/shared';
+import { t } from '@rally-gate/ui';
+
 /**
  * Empty in a built app: rally-server serves these files itself, so the API
  * is same-origin and a relative `/api/...` needs no host. That also removes
@@ -16,12 +19,23 @@ export class ApiError extends Error {
   // properties: those emit runtime code from a type-position annotation,
   // which `erasableSyntaxOnly` (on in tsconfig.app.json) rejects.
   status: number;
-  body: unknown;
+  /** Set when the server raised the error itself, see `ApiErrorCode`. */
+  code?: ApiErrorBody['code'];
+  params: Record<string, unknown>;
 
-  constructor(message: string, status: number, body: unknown) {
-    super(message);
+  constructor(status: number, body: Partial<ApiErrorBody>, fallback: string) {
+    // The text is fixed in the locale current when the request failed. A 5xx
+    // message is Nest's "Internal server error" or a proxy's, never ours.
+    super(
+      body.code
+        ? t(`errors.${body.code}`, body.params)
+        : status >= 500
+          ? t('ui.somethingWentWrong')
+          : (body.message ?? fallback),
+    );
     this.status = status;
-    this.body = body;
+    this.code = body.code;
+    this.params = body.params ?? {};
   }
 }
 
@@ -29,13 +43,18 @@ export async function apiFetch<T>(
   path: string,
   options?: RequestInit,
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, options);
+  // A rejected fetch is a network failure, worded by the browser in its own
+  // language ("Failed to fetch", "NetworkError when…"), never the viewer's.
+  const res = await fetch(`${API_BASE}${path}`, options).catch(() => {
+    throw new Error(t('errors.serverUnreachable'));
+  });
   const body = await res.json().catch(() => null);
   if (!res.ok) {
-    const message =
-      (body as { message?: string } | null)?.message ??
-      `${res.status} ${res.statusText}`;
-    throw new ApiError(message, res.status, body);
+    throw new ApiError(
+      res.status,
+      (body ?? {}) as Partial<ApiErrorBody>,
+      `${res.status} ${res.statusText}`,
+    );
   }
   return body as T;
 }

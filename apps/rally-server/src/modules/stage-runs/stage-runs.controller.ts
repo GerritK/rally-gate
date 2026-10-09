@@ -10,7 +10,8 @@ import {
   NotFoundException,
   Query,
 } from '@nestjs/common';
-import { isOutOfEvent } from '@rally-gate/shared';
+import { ApiErrorCode, isOutOfEvent } from '@rally-gate/shared';
+import { apiError } from '../../common/api-error';
 import { EntriesService } from '../entries/entries.service';
 import { CorrectStageRunDto, CreateStageRunDto } from './dto';
 import { StageRunsService } from './stage-runs.service';
@@ -40,11 +41,20 @@ export class StageRunsController {
   async create(@Body() body: CreateStageRunDto) {
     const entry = await this.entriesService.findOne(body.entryId);
     if (!entry) {
-      throw new NotFoundException(`Entry ${body.entryId} not found`);
+      throw new NotFoundException(
+        apiError(
+          ApiErrorCode.ENTRY_NOT_FOUND,
+          `Entry ${body.entryId} not found`,
+        ),
+      );
     }
     if (isOutOfEvent(entry.status)) {
       throw new ConflictException(
-        `#${entry.startNumber} is ${entry.status.toLowerCase()} and can't start`,
+        apiError(
+          ApiErrorCode.ENTRY_OUT_OF_EVENT,
+          `#${entry.startNumber} is ${entry.status.toLowerCase()} and can't start`,
+          { startNumber: entry.startNumber },
+        ),
       );
     }
     return this.stageRunsService.createManual(body);

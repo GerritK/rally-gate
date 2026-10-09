@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  ApiErrorCode,
   DEFAULT_MIN_STAGE_DURATION_MS,
   GateRole,
   isOutOfEvent,
@@ -683,9 +684,8 @@ async function onActivateStage(force = false) {
     startOrder.value = await fetchStartOrder(props.stageId);
   } catch (err) {
     conflictingStageIds =
-      err instanceof ApiError && err.status === 409
-        ? (err.body as { conflictingStageIds?: string[] } | null)
-            ?.conflictingStageIds
+      err instanceof ApiError && err.code === ApiErrorCode.OTHER_STAGE_ACTIVE
+        ? (err.params.conflictingStageIds as string[])
         : undefined;
     if (!conflictingStageIds) throw err;
   } finally {

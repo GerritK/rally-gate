@@ -105,12 +105,10 @@ What exists, with where its reasoning lives. History is in git.
   Postgres (`CLAUDE.md`).
 - **English and German** in both web UIs (vue-i18n, Vuetify's own texts
   included), picked per browser: its language, or the viewer's choice in the
-  app bar. Printed PDFs follow it. Server error messages are still English.
+  app bar. Printed PDFs follow it. Server refusals arrive as codes and are
+  translated too; only validation 400s stay English (`api.md`).
 
 ## Next
-
-- **Server errors as codes**, so the UIs can translate them: today a 409's
-  English `message` reaches the snackbar as-is.
 
 - **Event-wide status** — Setup → Running → Closed, on `RallyInfo`,
   server-owned like `Stage.status`. Activating the first stage starts the

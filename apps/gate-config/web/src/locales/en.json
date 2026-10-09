@@ -23,7 +23,7 @@
     "and": " and ",
     "savedButFailed": "Saved, but {failed} failed.",
     "saved": "Saved and applied.",
-    "unreachable": "Could not reach the gate: {error}",
+    "unreachable": "Could not reach the gate.",
     "running": "running",
     "unknown": "unknown",
     "settings": "Settings",

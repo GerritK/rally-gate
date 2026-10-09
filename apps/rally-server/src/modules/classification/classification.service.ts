@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import {
+  ApiErrorCode,
   Crew,
   DEFAULT_NOTIONAL_PENALTY_MS,
   NOTIONAL_PENALTY_MS_KEY,
@@ -12,6 +13,7 @@ import {
   StageStatus,
   EntryStatus,
 } from '@rally-gate/shared';
+import { apiError } from '../../common/api-error';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { GatesService } from '../gates/gates.service';
 import {
@@ -312,7 +314,9 @@ export class ClassificationService {
     }
     for (const classId of classIds) {
       if (!(await this.entriesService.findClass(classId))) {
-        throw new NotFoundException(`Class ${classId} not found`);
+        throw new NotFoundException(
+          apiError(ApiErrorCode.CLASS_NOT_FOUND, `Class ${classId} not found`),
+        );
       }
     }
     const members = new Set(

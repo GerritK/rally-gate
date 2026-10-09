@@ -1,3 +1,4 @@
+import type { GatePowerOffResult } from '@rally-gate/shared';
 import { apiFetch, deleteRequest, postRequest, putJson } from './client';
 
 export interface Gate {
@@ -18,12 +19,6 @@ export interface Gate {
   chronySynced?: boolean | null;
   /** chrony's own offset estimate, absolute ms. */
   chronyOffsetMs?: number | null;
-}
-
-export interface GatePowerOffResult {
-  gateId: string;
-  ok: boolean;
-  message?: string;
 }
 
 export function fetchGates(): Promise<Gate[]> {

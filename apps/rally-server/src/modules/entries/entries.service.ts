@@ -5,8 +5,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Crew, TransponderKind } from '@rally-gate/shared';
+import { ApiErrorCode, Crew, TransponderKind } from '@rally-gate/shared';
 import { In, Repository } from 'typeorm';
+import { apiError } from '../../common/api-error';
 import { isUniqueViolation } from '../../common/db-errors';
 import { EntryClassDto, EntryTransponderDto } from './dto';
 import { EntryClass } from './entry-class.entity';
@@ -68,7 +69,11 @@ export class EntriesService {
     } catch (err) {
       if (isUniqueViolation(err)) {
         throw new ConflictException(
-          `Start number ${data.startNumber} is already in use`,
+          apiError(
+            ApiErrorCode.START_NUMBER_TAKEN,
+            `Start number ${data.startNumber} is already in use`,
+            { startNumber: data.startNumber },
+          ),
         );
       }
       throw err;
@@ -78,7 +83,9 @@ export class EntriesService {
   async update(id: string, { classIds, ...patch }: EntryInput): Promise<Entry> {
     const entry = await this.findOne(id);
     if (!entry) {
-      throw new NotFoundException(`Entry ${id} not found`);
+      throw new NotFoundException(
+        apiError(ApiErrorCode.ENTRY_NOT_FOUND, `Entry ${id} not found`),
+      );
     }
     // The validated DTO carries every declared field as an own property, unset
     // ones as `undefined` (ES2022+ class fields). Copied over, they'd blank the
@@ -98,7 +105,11 @@ export class EntriesService {
     } catch (err) {
       if (isUniqueViolation(err)) {
         throw new ConflictException(
-          `Start number ${entry.startNumber} is already in use`,
+          apiError(
+            ApiErrorCode.START_NUMBER_TAKEN,
+            `Start number ${entry.startNumber} is already in use`,
+            { startNumber: entry.startNumber },
+          ),
         );
       }
       throw err;
@@ -128,7 +139,9 @@ export class EntriesService {
   ): Promise<EntryClass> {
     const entryClass = await this.findClass(id);
     if (!entryClass) {
-      throw new NotFoundException(`Class ${id} not found`);
+      throw new NotFoundException(
+        apiError(ApiErrorCode.CLASS_NOT_FOUND, `Class ${id} not found`),
+      );
     }
     entryClass.name = name;
     if (main !== undefined) {
@@ -140,7 +153,9 @@ export class EntriesService {
   async removeClass(id: string): Promise<void> {
     const { affected } = await this.classes.delete(id);
     if (!affected) {
-      throw new NotFoundException(`Class ${id} not found`);
+      throw new NotFoundException(
+        apiError(ApiErrorCode.CLASS_NOT_FOUND, `Class ${id} not found`),
+      );
     }
   }
 
@@ -149,7 +164,13 @@ export class EntriesService {
       return await this.classes.save(entryClass);
     } catch (err) {
       if (isUniqueViolation(err)) {
-        throw new ConflictException(`Class ${entryClass.name} already exists`);
+        throw new ConflictException(
+          apiError(
+            ApiErrorCode.CLASS_EXISTS,
+            `Class ${entryClass.name} already exists`,
+            { name: entryClass.name },
+          ),
+        );
       }
       throw err;
     }
@@ -167,7 +188,9 @@ export class EntriesService {
     }
     const classes = await this.classes.findBy({ id: In(ids) });
     if (classes.length !== ids.length) {
-      throw new BadRequestException('Unknown entry class');
+      throw new BadRequestException(
+        apiError(ApiErrorCode.CLASS_NOT_FOUND, 'Unknown entry class'),
+      );
     }
     return classes;
   }

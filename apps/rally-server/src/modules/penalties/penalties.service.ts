@@ -5,8 +5,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { StageStatus } from '@rally-gate/shared';
+import { ApiErrorCode, StageStatus } from '@rally-gate/shared';
 import { DataSource, Repository } from 'typeorm';
+import { apiError } from '../../common/api-error';
 import { isUniqueViolation } from '../../common/db-errors';
 import { EntriesService } from '../entries/entries.service';
 import { Stage } from '../stages/stage.entity';
@@ -41,7 +42,12 @@ export class PenaltiesService {
   async updateType(id: string, dto: PenaltyTypeDto): Promise<PenaltyType> {
     const type = await this.types.findOneBy({ id });
     if (!type) {
-      throw new NotFoundException(`Penalty type ${id} not found`);
+      throw new NotFoundException(
+        apiError(
+          ApiErrorCode.PENALTY_TYPE_NOT_FOUND,
+          `Penalty type ${id} not found`,
+        ),
+      );
     }
     return this.saveType(Object.assign(type, dto));
   }
@@ -52,7 +58,12 @@ export class PenaltiesService {
       await manager.delete(Penalty, { typeId: id });
       const { affected } = await manager.delete(PenaltyType, id);
       if (!affected) {
-        throw new NotFoundException(`Penalty type ${id} not found`);
+        throw new NotFoundException(
+          apiError(
+            ApiErrorCode.PENALTY_TYPE_NOT_FOUND,
+            `Penalty type ${id} not found`,
+          ),
+        );
       }
     });
   }
@@ -72,26 +83,50 @@ export class PenaltiesService {
 
   async create(dto: CreatePenaltyDto): Promise<PricedPenalty> {
     if (!(await this.entriesService.findOne(dto.entryId))) {
-      throw new NotFoundException(`Entry ${dto.entryId} not found`);
+      throw new NotFoundException(
+        apiError(
+          ApiErrorCode.ENTRY_NOT_FOUND,
+          `Entry ${dto.entryId} not found`,
+        ),
+      );
     }
     if (dto.stageId) {
       // A stage can only be deleted while NOT_STARTED, so this also keeps
       // penalties from outliving their stage.
       const stage = await this.stagesService.findOneOrFail(dto.stageId);
       if (stage.status === StageStatus.NOT_STARTED) {
-        throw new ConflictException(`Stage ${stage.id} has not started`);
+        throw new ConflictException(
+          apiError(
+            ApiErrorCode.STAGE_NOT_STARTED,
+            `Stage ${stage.id} has not started`,
+            { stage: stage.id },
+          ),
+        );
       }
     }
     if (dto.typeId) {
       if (!(await this.types.existsBy({ id: dto.typeId }))) {
-        throw new NotFoundException(`Penalty type ${dto.typeId} not found`);
+        throw new NotFoundException(
+          apiError(
+            ApiErrorCode.PENALTY_TYPE_NOT_FOUND,
+            `Penalty type ${dto.typeId} not found`,
+          ),
+        );
       }
       if (dto.seconds != null) {
-        throw new BadRequestException('A typed penalty is priced by its type');
+        throw new BadRequestException(
+          apiError(
+            ApiErrorCode.TYPED_PENALTY_HAS_SECONDS,
+            'A typed penalty is priced by its type',
+          ),
+        );
       }
     } else if (dto.seconds == null || !dto.note?.trim()) {
       throw new BadRequestException(
-        'A free-text penalty needs seconds and a note',
+        apiError(
+          ApiErrorCode.FREE_PENALTY_INCOMPLETE,
+          'A free-text penalty needs seconds and a note',
+        ),
       );
     }
     const { id } = await this.penalties.save(
@@ -111,7 +146,9 @@ export class PenaltiesService {
   async remove(id: string): Promise<void> {
     const { affected } = await this.penalties.delete(id);
     if (!affected) {
-      throw new NotFoundException(`Penalty ${id} not found`);
+      throw new NotFoundException(
+        apiError(ApiErrorCode.PENALTY_NOT_FOUND, `Penalty ${id} not found`),
+      );
     }
   }
 
@@ -149,14 +186,23 @@ export class PenaltiesService {
       fromCounts.some((n, i) => i > 0 && n <= fromCounts[i - 1])
     ) {
       throw new BadRequestException(
-        'Tiers must start at the 1st offence and ascend',
+        apiError(
+          ApiErrorCode.PENALTY_TIERS_INVALID,
+          'Tiers must start at the 1st offence and ascend',
+        ),
       );
     }
     try {
       return await this.types.save(type);
     } catch (err) {
       if (isUniqueViolation(err)) {
-        throw new ConflictException(`Penalty type ${type.name} already exists`);
+        throw new ConflictException(
+          apiError(
+            ApiErrorCode.PENALTY_TYPE_EXISTS,
+            `Penalty type ${type.name} already exists`,
+            { name: type.name },
+          ),
+        );
       }
       throw err;
     }

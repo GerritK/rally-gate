@@ -6,10 +6,11 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { StageStatus } from '@rally-gate/shared';
+import { ApiErrorCode, StageStatus } from '@rally-gate/shared';
 import { existsSync, rmSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { DataSource, Repository } from 'typeorm';
+import { apiError } from '../../common/api-error';
 import { RALLY_INFO_ID, RallyInfo } from '../rally-info/rally-info.entity';
 import { Stage } from '../stages/stage.entity';
 import { CreateEventDto } from './dto';
@@ -56,11 +57,20 @@ export class EventFilesService {
     const dir = await this.switchableDir();
     const file = eventFileName(date, name);
     if (!file) {
-      throw new BadRequestException('The name has no usable characters');
+      throw new BadRequestException(
+        apiError(
+          ApiErrorCode.EVENT_NAME_UNUSABLE,
+          'The name has no usable characters',
+        ),
+      );
     }
     const path = join(dir, file);
     if (existsSync(path)) {
-      throw new ConflictException(`${file} already exists`);
+      throw new ConflictException(
+        apiError(ApiErrorCode.EVENT_FILE_EXISTS, `${file} already exists`, {
+          file,
+        }),
+      );
     }
     const target = new DataSource({
       type: 'better-sqlite3',
@@ -85,7 +95,11 @@ export class EventFilesService {
   async open(file: string): Promise<{ file: string }> {
     const dir = await this.switchableDir();
     if (!isEventFile(dir, file)) {
-      throw new NotFoundException(`No event file ${file}`);
+      throw new NotFoundException(
+        apiError(ApiErrorCode.EVENT_FILE_NOT_FOUND, `No event file ${file}`, {
+          file,
+        }),
+      );
     }
     if (file === this.currentFile()) {
       return { file };
@@ -106,12 +120,18 @@ export class EventFilesService {
     const dir = eventsDir();
     if (!dir) {
       throw new ConflictException(
-        "This server's event is fixed by its configuration (DB_PATH or Postgres)",
+        apiError(
+          ApiErrorCode.EVENT_FIXED_BY_CONFIG,
+          "This server's event is fixed by its configuration (DB_PATH or Postgres)",
+        ),
       );
     }
     if (await this.stages.countBy({ status: StageStatus.ACTIVE })) {
       throw new ConflictException(
-        'Close the active stage before switching events',
+        apiError(
+          ApiErrorCode.CLOSE_STAGE_BEFORE_SWITCH,
+          'Close the active stage before switching events',
+        ),
       );
     }
     return dir;
