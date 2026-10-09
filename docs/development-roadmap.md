@@ -112,6 +112,23 @@ What exists, with where its reasoning lives. History is in git.
 - **Server errors as codes**, so the UIs can translate them: today a 409's
   English `message` reaches the snackbar as-is.
 
+- **Event-wide status** — Setup → Running → Closed, on `RallyInfo`,
+  server-owned like `Stage.status`. Activating the first stage starts the
+  rally, with a pre-start check in that confirmation (every stage has a start
+  and finish, gates online and synced, transponder gaps and duplicates,
+  entries without a class): few hard errors, mostly warnings, as a marshal
+  knows things the check doesn't. Running locks only what reinterprets
+  results already timed (deleting/renaming classes, a timed car's start
+  number, start-order settings) — late entries, transponder swaps, withdrawals
+  and corrections stay open, or marshals unlock and forget. Closed is the
+  valuable one: results official, no corrections or penalties, no
+  "Provisional"; reopening is deliberate (a protest). Locks as a per-route
+  decorator, and disabled controls say why.
+- **Class and category badges in rankings** ("2WD · Rookie") on Results
+  and the PDFs: only the classes the current filter doesn't already imply
+  (filtered to 2WD, a 2WD badge says nothing), and no column at all while
+  no entry has a class or category.
+
 - **ESP32 NFC check-in gate** — firmware in `firmware/esp32-gate` builds,
   untested on hardware (ordered: XIAO ESP32-S3, PN532). Then: a server-side
   meaning for a check-in tap (no role sets entry status yet), OTA, and the
@@ -189,18 +206,6 @@ OpenStint (below) resumes when the hardware arrives.
   also need a transponder decoder first (OpenStint, above): a light barrier
   can't tell cars apart once several are on track, and the decoder has to
   separate simultaneous passings.
-- **Event-wide status** — Setup → Running → Closed, on `RallyInfo`,
-  server-owned like `Stage.status`. Activating the first stage starts the
-  rally, with a pre-start check in that confirmation (every stage has a start
-  and finish, gates online and synced, transponder gaps and duplicates,
-  entries without a class): few hard errors, mostly warnings, as a marshal
-  knows things the check doesn't. Running locks only what reinterprets
-  results already timed (deleting/renaming classes, a timed car's start
-  number, start-order settings) — late entries, transponder swaps, withdrawals
-  and corrections stay open, or marshals unlock and forget. Closed is the
-  valuable one: results official, no corrections, no "Provisional"; reopening
-  is deliberate (a protest). Locks as a per-route decorator, and disabled
-  controls say why.
 - **Manual start-order edits** on the frozen snapshot (late entry, car moved
   to the back after a repair, swaps). Until then, change start numbers before
   the start list is frozen.
