@@ -1,5 +1,7 @@
 # Rally Gate
 
+[rallygate.app](https://rallygate.app)
+
 Timing for **RC rally events**: special stages timed from start to finish gate,
 live on a laptop or tablet at the service park, with results and a stage
 classification at the end of the day.
