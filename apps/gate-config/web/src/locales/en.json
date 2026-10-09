@@ -48,7 +48,7 @@
     "decoderNoise": "Noise floor: {value} dBFS",
     "decoderFrames": "Frames decoded: {processed} of {received} per second",
     "decoderDc": "DC offset: {value}",
-    "decoderHint": "Frames only appear with a powered transponder at the loop. With none there, touching the SDR's antenna socket must raise the noise floor — if it doesn't, the stick's HF input isn't connected.",
+    "decoderHint": "Frames only appear with a powered transponder at the loop.",
     "decoderStale": "No report from the decoder for {seconds} s.",
     "clock": "Clock",
     "recentLog": "Recent gate-agent log",
