@@ -12,6 +12,10 @@
 # (see "Gate discovery & heartbeat" in docs/architecture.md).
 # Re-running it updates the gate; the prompts then default to its current
 # settings (/etc/rally-gate/gate.env), so pressing Enter keeps them.
+# BRANCH=<name> switches the clone to that branch, and later updates stay on it;
+# unset, an update keeps the clone's branch. The URL picks the installer, BRANCH
+# the code it installs, so a branch test sets both:
+#   curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/<name>/deploy/install-gate-pi.sh | BRANCH=<name> bash
 # Build/apt output is hidden unless a step fails; -v shows it all:
 #   curl -fsSL <url> | bash -s -- -v
 set -euo pipefail
@@ -26,6 +30,7 @@ done
 
 REPO_URL="${REPO_URL:-https://github.com/GerritK/rally-gate.git}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/rally-gate}"
+BRANCH="${BRANCH:-}"
 
 # ---------------------------------------------------------------------------
 # Output helpers. Colour and animation only on a real terminal (NO_COLOR
@@ -337,9 +342,12 @@ if [ -d "$INSTALL_DIR/.git" ]; then
   # older installer's `npm install` left modified. Nobody edits this clone on
   # purpose — config lives in /etc, build output is gitignored.
   run "Fetching the latest version" git -C "$INSTALL_DIR" fetch
+  if [ -n "$BRANCH" ]; then
+    run "Switching to $BRANCH" git -C "$INSTALL_DIR" checkout -f -B "$BRANCH" --track "origin/$BRANCH"
+  fi
   run "Updating files" git -C "$INSTALL_DIR" reset --hard '@{u}'
 else
-  run "Downloading" git clone "$REPO_URL" "$INSTALL_DIR"
+  run "Downloading" git clone ${BRANCH:+--branch "$BRANCH"} "$REPO_URL" "$INSTALL_DIR"
 fi
 
 step "Building the gate software"
