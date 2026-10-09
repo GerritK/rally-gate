@@ -133,31 +133,51 @@ onMounted(async () => {
 
   <v-row>
     <v-col cols="12" sm="4">
-      <v-card to="/setup/stages" prepend-icon="mdi-flag-checkered">
+      <v-card
+        class="h-100"
+        to="/setup/stages"
+        prepend-icon="mdi-flag-checkered"
+      >
         <v-card-title>{{ $t('stages.title') }}</v-card-title>
         <v-card-text>{{ $t('setup.stagesHint') }}</v-card-text>
       </v-card>
     </v-col>
     <v-col cols="12" sm="4">
-      <v-card to="/setup/classes" prepend-icon="mdi-shape-outline">
+      <v-card
+        class="h-100"
+        to="/setup/classes"
+        prepend-icon="mdi-shape-outline"
+      >
         <v-card-title>{{ $t('classes.classes') }}</v-card-title>
         <v-card-text>{{ $t('setup.classesHint') }}</v-card-text>
       </v-card>
     </v-col>
     <v-col cols="12" sm="4">
-      <v-card to="/setup/start-order" prepend-icon="mdi-sort-numeric-ascending">
+      <v-card
+        class="h-100"
+        to="/setup/start-order"
+        prepend-icon="mdi-sort-numeric-ascending"
+      >
         <v-card-title>{{ $t('startOrder.title') }}</v-card-title>
         <v-card-text>{{ $t('setup.startOrderHint') }}</v-card-text>
       </v-card>
     </v-col>
     <v-col cols="12" sm="4">
-      <v-card to="/setup/scoring" prepend-icon="mdi-calculator-variant-outline">
+      <v-card
+        class="h-100"
+        to="/setup/scoring"
+        prepend-icon="mdi-calculator-variant-outline"
+      >
         <v-card-title>{{ $t('setup.scoring') }}</v-card-title>
         <v-card-text>{{ $t('setup.scoringHint') }}</v-card-text>
       </v-card>
     </v-col>
     <v-col cols="12" sm="4">
-      <v-card to="/setup/display" prepend-icon="mdi-palette-outline">
+      <v-card
+        class="h-100"
+        to="/setup/display"
+        prepend-icon="mdi-palette-outline"
+      >
         <v-card-title>{{ $t('displaySetup.title') }}</v-card-title>
         <v-card-text>{{ $t('setup.displayHint') }}</v-card-text>
       </v-card>

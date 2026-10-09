@@ -17,6 +17,7 @@ defineProps<{ car: Pick<Crew, 'body' | 'chassis'> }>();
   display: flex;
   flex-direction: column;
   line-height: 1.2;
+  white-space: nowrap;
 }
 /* Smaller, like the co-driver under the driver. */
 .rg-chassis {
