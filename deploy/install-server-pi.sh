@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # One-shot installer for headless/server mode on a stock Raspberry Pi OS Lite image.
 # Usage: curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-server-pi.sh | bash
+# BRANCH=<name> switches the clone to that branch, and later updates stay on it;
+# unset, an update keeps the clone's branch. The URL picks the installer, BRANCH
+# the code it installs, so a branch test sets both:
+#   curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/<name>/deploy/install-server-pi.sh | BRANCH=<name> bash
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/GerritK/rally-gate.git}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/rally-gate}"
+BRANCH="${BRANCH:-}"
 # Outside INSTALL_DIR on purpose: that directory is a git clone, and an update
 # should never have to reason about event data sitting inside it.
 BACKUP_DIR="${BACKUP_DIR:-$HOME/rally-gate-backups}"
@@ -26,9 +31,12 @@ fi
 if [ -d "$INSTALL_DIR/.git" ]; then
   # Not `pull`, which refuses once upstream history has been rewritten.
   git -C "$INSTALL_DIR" fetch
+  if [ -n "$BRANCH" ]; then
+    git -C "$INSTALL_DIR" checkout -f -B "$BRANCH" --track "origin/$BRANCH"
+  fi
   git -C "$INSTALL_DIR" reset --hard '@{u}'
 else
-  git clone "$REPO_URL" "$INSTALL_DIR"
+  git clone ${BRANCH:+--branch "$BRANCH"} "$REPO_URL" "$INSTALL_DIR"
 fi
 
 cd "$INSTALL_DIR/deploy"
