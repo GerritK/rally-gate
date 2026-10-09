@@ -304,8 +304,8 @@ getent group gpio >/dev/null && sudo usermod -aG gpio "$USER"
 # only publishes arm64; plugdev opens the SDR, users writes /var/lib/openstint.
 if [ "$(dpkg --print-architecture)" = arm64 ]; then
   echo 'deb [trusted=yes arch=arm64] https://repo.lapbeeps.com/apt/ /' | sudo tee /etc/apt/sources.list.d/openstint.list >/dev/null
-  quiet sudo apt-get update
-  quiet sudo apt-get install -y openstint
+  run "Adding the OpenStint source" sudo apt-get update
+  run "Installing OpenStint" sudo apt-get install -y openstint
   sudo systemctl disable --now openstint.service >/dev/null 2>&1 || true
   sudo usermod -aG plugdev,users "$USER"
   # Our own rule rather than trusting the distro's: those may grant the SDR via
@@ -319,7 +319,7 @@ EOF
   sudo udevadm control --reload
   sudo udevadm trigger --subsystem-match=usb
 else
-  echo "   (not arm64: skipping OpenStint, ADAPTER=openstint won't run on this gate)"
+  note "Not arm64: skipping OpenStint, ADAPTER=openstint won't run on this gate"
 fi
 
 step "Installing Node.js"
