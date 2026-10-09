@@ -55,5 +55,5 @@ reconnect.
   the whole list on every change, not a delta
 
 A gate's own configuration is not here: `apps/gate-config` serves it on the gate
-itself, port 57439 (`/api/config`, `/api/status`, `/api/network`,
+itself, port 57439 (`/api/config`, `/api/status`, `/api/decoder`, `/api/network`,
 `/api/network/reset`) — see `gate-config-ui.md`.

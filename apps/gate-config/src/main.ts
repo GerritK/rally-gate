@@ -84,13 +84,13 @@ app.get('/api/status', async (_req, res) => {
     clockTracking(),
     recentLog(),
   ]);
-  res.json({
-    agent,
-    clock,
-    log,
-    decoder: readDecoderStatus(),
-    version: VERSION,
-  });
+  res.json({ agent, clock, log, version: VERSION });
+});
+
+// Apart from /api/status because the page polls it every second while
+// setting up a loop, and that must not run chronyc and journalctl each time.
+app.get('/api/decoder', (_req, res) => {
+  res.json(readDecoderStatus());
 });
 
 /**

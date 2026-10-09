@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   LocaleMenu,
@@ -32,7 +32,6 @@ const status = ref<{
   agent: CommandResult;
   clock: CommandResult;
   log: CommandResult;
-  decoder: DecoderStatus | null;
   version: string;
 } | null>(null);
 
@@ -71,6 +70,9 @@ const wifiError = (field: 'ssid' | 'password') =>
   wifiErrors.value[field] && t(`wifiError.${wifiErrors.value[field]}`);
 
 let statusTimer: ReturnType<typeof setInterval> | undefined;
+
+const decoder = ref<DecoderStatus | null>(null);
+let decoderTimer: ReturnType<typeof setInterval> | undefined;
 
 const agentOnline = computed(() => status.value?.agent.output === 'active');
 
@@ -305,6 +307,7 @@ async function powerOff() {
   }
   // Polling a gate that is going away would only flip the chip to "unknown".
   clearInterval(statusTimer);
+  clearInterval(decoderTimer);
 }
 
 async function loadStatus() {
@@ -314,6 +317,28 @@ async function loadStatus() {
     status.value = null;
   }
 }
+
+async function loadDecoder() {
+  try {
+    decoder.value = await (await fetch('/api/decoder')).json();
+  } catch {
+    decoder.value = null;
+  }
+}
+
+// Every second, matching OpenStint's own status rate, so moving a transponder
+// over the loop shows at once — but only while OpenStint is the selected decoder.
+watch(
+  () => values.value.ADAPTER === 'openstint',
+  (openstint) => {
+    clearInterval(decoderTimer);
+    decoder.value = null;
+    if (!openstint) return;
+    loadDecoder();
+    decoderTimer = setInterval(loadDecoder, 1000);
+  },
+  { immediate: true },
+);
 
 async function save() {
   saving.value = true;
@@ -373,7 +398,10 @@ onMounted(async () => {
   await Promise.all([loadStatus(), loadNetwork()]);
   statusTimer = setInterval(loadStatus, 5000);
 });
-onUnmounted(() => clearInterval(statusTimer));
+onUnmounted(() => {
+  clearInterval(statusTimer);
+  clearInterval(decoderTimer);
+});
 </script>
 
 <template>
@@ -481,20 +509,15 @@ onUnmounted(() => clearInterval(statusTimer));
                   @update:model-value="clearServerError(name)"
                 />
               </template>
-              <template
-                v-if="status?.decoder && values.ADAPTER === 'openstint'"
-              >
+              <template v-if="decoder">
                 <div class="text-medium-emphasis text-caption mb-1">
                   {{ t('gateConfig.decoderSignal') }}
                 </div>
                 <!-- OpenStint reports once a second; older means it stopped. -->
-                <div
-                  v-if="status.decoder.ageMs > 3000"
-                  class="text-warning mb-4"
-                >
+                <div v-if="decoder.ageMs > 3000" class="text-warning mb-4">
                   {{
                     t('gateConfig.decoderStale', {
-                      seconds: Math.round(status.decoder.ageMs / 1000),
+                      seconds: Math.round(decoder.ageMs / 1000),
                     })
                   }}
                 </div>
@@ -502,22 +525,22 @@ onUnmounted(() => clearInterval(statusTimer));
                   <div class="rg-timing">
                     {{
                       t('gateConfig.decoderNoise', {
-                        value: status.decoder.noisePower.toFixed(1),
+                        value: decoder.noisePower.toFixed(1),
                       })
                     }}
                   </div>
                   <div class="rg-timing">
                     {{
                       t('gateConfig.decoderFrames', {
-                        processed: status.decoder.framesProcessed,
-                        received: status.decoder.framesReceived,
+                        processed: decoder.framesProcessed,
+                        received: decoder.framesReceived,
                       })
                     }}
                   </div>
                   <div class="rg-timing">
                     {{
                       t('gateConfig.decoderDc', {
-                        value: status.decoder.dcOffset.toFixed(2),
+                        value: decoder.dcOffset.toFixed(2),
                       })
                     }}
                   </div>

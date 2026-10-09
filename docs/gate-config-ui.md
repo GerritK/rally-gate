@@ -37,7 +37,8 @@ text is not an interface. If a real indicator is ever needed, gate-agent should
 write a small status file instead — as it does for the decoder: with OpenStint,
 the decoder card shows the latest `S` line (noise floor, frames received/decoded, DC
 offset) from `/run/rally-gate-agent/openstint-status`, a warning once it is
-older than 3 s, and nothing for any other adapter.
+older than 3 s, and nothing for any other adapter. It polls `/api/decoder` every
+second, only while OpenStint is the selected decoder.
 
 ## Applying a change
 
