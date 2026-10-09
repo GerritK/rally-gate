@@ -11,6 +11,7 @@ import {
 
 import type {
   CommandResult,
+  DecoderStatus,
   DeviceStatus,
   FieldDescriptor as FieldSpec,
   FieldError,
@@ -31,6 +32,7 @@ const status = ref<{
   agent: CommandResult;
   clock: CommandResult;
   log: CommandResult;
+  decoder: DecoderStatus | null;
   version: string;
 } | null>(null);
 
@@ -478,6 +480,51 @@ onUnmounted(() => clearInterval(statusTimer));
                   class="mb-4"
                   @update:model-value="clearServerError(name)"
                 />
+              </template>
+              <template
+                v-if="status?.decoder && values.ADAPTER === 'openstint'"
+              >
+                <div class="text-medium-emphasis text-caption mb-1">
+                  {{ t('gateConfig.decoderSignal') }}
+                </div>
+                <!-- OpenStint reports once a second; older means it stopped. -->
+                <div
+                  v-if="status.decoder.ageMs > 3000"
+                  class="text-warning mb-4"
+                >
+                  {{
+                    t('gateConfig.decoderStale', {
+                      seconds: Math.round(status.decoder.ageMs / 1000),
+                    })
+                  }}
+                </div>
+                <div v-else class="mb-4">
+                  <div class="rg-timing">
+                    {{
+                      t('gateConfig.decoderNoise', {
+                        value: status.decoder.noisePower.toFixed(1),
+                      })
+                    }}
+                  </div>
+                  <div class="rg-timing">
+                    {{
+                      t('gateConfig.decoderFrames', {
+                        processed: status.decoder.framesProcessed,
+                        received: status.decoder.framesReceived,
+                      })
+                    }}
+                  </div>
+                  <div class="rg-timing">
+                    {{
+                      t('gateConfig.decoderDc', {
+                        value: status.decoder.dcOffset.toFixed(2),
+                      })
+                    }}
+                  </div>
+                  <div class="text-medium-emphasis text-caption mt-1">
+                    {{ t('gateConfig.decoderHint') }}
+                  </div>
+                </div>
               </template>
             </v-card-text>
           </v-card>

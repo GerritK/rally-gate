@@ -11,6 +11,7 @@ import {
   validate,
   writeConfig,
 } from './config-file';
+import { readDecoderStatus } from './decoder-status';
 import { parseDeviceStatus, parseWifiList, validateWifi } from './network';
 import {
   agentActive,
@@ -83,7 +84,13 @@ app.get('/api/status', async (_req, res) => {
     clockTracking(),
     recentLog(),
   ]);
-  res.json({ agent, clock, log, version: VERSION });
+  res.json({
+    agent,
+    clock,
+    log,
+    decoder: readDecoderStatus(),
+    version: VERSION,
+  });
 });
 
 /**

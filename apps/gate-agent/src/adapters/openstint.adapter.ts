@@ -1,4 +1,6 @@
 import { ChildProcess, spawn } from 'child_process';
+import { writeFileSync } from 'fs';
+import { join } from 'path';
 import { createInterface } from 'readline';
 import { DecoderAdapter, DetectionCallback } from './decoder-adapter';
 
@@ -55,11 +57,15 @@ export class OpenStintAdapter implements DecoderAdapter {
     );
 
     createInterface({ input: this.child.stdout! }).on('line', (line) => {
+      if (line.startsWith('S ')) {
+        writeStatus(line);
+        return;
+      }
       const passing = parsePassing(line);
       if (!passing) {
         // Startup lines (dongle model, V4 mode) and RC4 learning (`L`) are
-        // what setting up a gate needs to see; status (`S`) comes every second.
-        if (line.trim() && !line.startsWith('S ')) {
+        // what setting up a gate needs to see.
+        if (line.trim()) {
           console.log(`[openstint] ${line.trim()}`);
         }
         return;
@@ -91,6 +97,24 @@ export class OpenStintAdapter implements DecoderAdapter {
     const child = this.child;
     this.child = undefined;
     child?.kill();
+  }
+}
+
+/**
+ * The latest status line (`S`, once a second), for gate-config's status page
+ * to read. A file in systemd's RuntimeDirectory= (tmpfs) rather than the
+ * journal, which it would bury; unset off a Pi, where nothing reads it.
+ */
+const STATUS_FILE =
+  process.env.RUNTIME_DIRECTORY &&
+  join(process.env.RUNTIME_DIRECTORY, 'openstint-status');
+
+function writeStatus(line: string): void {
+  if (!STATUS_FILE) return;
+  try {
+    writeFileSync(STATUS_FILE, line);
+  } catch {
+    // A status page losing its numbers must never take timing down with it.
   }
 }
 

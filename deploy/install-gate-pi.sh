@@ -403,6 +403,9 @@ RestartSec=5
 User=$USER
 # Lets the openstint adapter run its decoder SCHED_FIFO (chrt) without root.
 LimitRTPRIO=70
+# /run/rally-gate-agent: the decoder's latest status, read by gate-config.
+# Removed when the agent stops, so a stopped decoder reads as no status at all.
+RuntimeDirectory=rally-gate-agent
 
 [Install]
 WantedBy=multi-user.target

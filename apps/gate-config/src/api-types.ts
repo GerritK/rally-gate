@@ -29,6 +29,16 @@ export type WifiError =
   | 'notText'
   | 'passwordInvalid';
 
+/** OpenStint's latest status line. `ageMs` since it was written: it comes
+ *  once a second, so a large age means the decoder stopped reporting. */
+export interface DecoderStatus {
+  noisePower: number;
+  dcOffset: number;
+  framesReceived: number;
+  framesProcessed: number;
+  ageMs: number;
+}
+
 export interface CommandResult {
   ok: boolean;
   output: string;

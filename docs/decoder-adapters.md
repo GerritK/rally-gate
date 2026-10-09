@@ -118,6 +118,12 @@ and upstream may append more, so only a minimum length is checked.
   its own unit that way; `LimitRTPRIO=70` in the gate-agent unit lets an
   unprivileged user do it.
 - If the decoder exits, gate-agent exits, like `gpiomon` for the beam.
+- The once-a-second status line `S <timestamp> <noise_power> <dc_offset>
+  <frames_received> <frames_processed> …` stays out of the journal: the
+  latest one goes to `$RUNTIME_DIRECTORY/openstint-status` (tmpfs) for the
+  gate-config page. `frames_received` stuck at 0 with a powered transponder
+  on the loop, and a `noise_power` that doesn't rise when the antenna socket
+  is touched, means the SDR's HF input isn't connected — a fake stick.
 
 The installer adds upstream's apt repo (arm64 only), installs `openstint`, and
 **masks the package's own `openstint.service`** — two decoders can't share

@@ -34,7 +34,10 @@ Status first: gate-agent active/failed, `chronyc tracking`, the Wi-Fi state and
 the last 20 journal lines, each probe failing independently. "Connected to the
 broker" is read from the log panel, deliberately not parsed into a field — log
 text is not an interface. If a real indicator is ever needed, gate-agent should
-write a small status file instead.
+write a small status file instead — as it does for the decoder: with OpenStint,
+the decoder card shows the latest `S` line (noise floor, frames received/decoded, DC
+offset) from `/run/rally-gate-agent/openstint-status`, a warning once it is
+older than 3 s, and nothing for any other adapter.
 
 ## Applying a change
 
