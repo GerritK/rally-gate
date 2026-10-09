@@ -241,6 +241,24 @@ OpenStint (below) resumes when the hardware arrives.
   on Windows, so `current.json` would carry `renameFrom` and the restarted
   server renames it before TypeORM opens it — keeping the old name, with a
   warning, if that fails.
+- **NFC stop control for beam-only finishes** — once the ESP32 check-in
+  gate runs on hardware. The driver taps the entry's NFC sticker at an ESP32
+  gate at the stop control, where cars halt well past the flying finish, so
+  the tap names the car instead of a marshal. A new role: on a
+  `stage_finish` gate a tap would finish the run with the tap's own time.
+  Never "tap takes the oldest open passing": a phantom passing or a missed
+  tap shifts every later car onto the previous car's time, and close
+  finishes tapped in reverse swap them — the wrong time nobody notices
+  (`event-model.md` "Unassigned passings"). Only open finish passings in a
+  **window before the tap** count: at least the drive from finish to stop
+  control, at most ~60 s (both per stage). A leftover phantom or untapped
+  car's passing ages out of it, so a shift can't run on through the field.
+  **Exactly one** in the window, and the car has an open run: the tap
+  assigns it, through the same path as a marshal's assign, with its checks.
+  **Several**: a phantom or a missed tap just before would hand this car the
+  wrong time, so it is a suggestion — the oldest pre-selected for the tapped
+  car, one click to confirm. **None**: the tap is stored, nothing more.
+  Server side needs no hardware (`simulate` with an NFC kind).
 - Online/spectator mode (`deployment-modes.md`).
 - Rule engine DSL (hardcoded branching in `EventsService` is fine at this scale),
   RC4 learning registry / transponder management UI.
