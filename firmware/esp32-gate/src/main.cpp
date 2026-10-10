@@ -20,6 +20,7 @@ static const uint32_t SAME_TAG_MS = 3000;    // a tag held on the reader reads c
 static const uint32_t HOTSPOT_AFTER_MS = 60000;  // as the Pi's hotspot watchdog
 static const uint32_t RESOLVE_EVERY_MS = 30000;
 static const uint32_t READER_RETRY_MS = 10000;
+static const uint32_t READER_CHECK_MS = 5000;
 
 Settings settings;
 uint32_t bootId = 0;
@@ -35,6 +36,7 @@ static uint32_t lastUidMs = 0;
 static uint32_t wifiDownSinceMs = 0;
 static uint32_t nextResolveMs = 0;
 static uint32_t nextReaderTryMs = 0;
+static uint32_t nextReaderCheckMs = 0;
 
 static String hostname() {
   String h = settings.gateId;
@@ -130,6 +132,18 @@ static void readerTick() {
     readerFound = startReader();
     if (!readerFound) Serial.println("[nfc] PN532 not found");
     return;
+  }
+
+  // A failed read looks the same as no tag, so a reader that dropped off the
+  // bus would otherwise go unnoticed with readerFound still true.
+  if ((int32_t)(millis() - nextReaderCheckMs) >= 0) {
+    nextReaderCheckMs = millis() + READER_CHECK_MS;
+    if (!nfc.getFirmwareVersion()) {
+      Serial.println("[nfc] PN532 stopped answering");
+      readerFound = false;
+      nextReaderTryMs = millis();
+      return;
+    }
   }
 
   uint8_t uid[10];

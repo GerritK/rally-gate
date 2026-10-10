@@ -98,7 +98,8 @@ async function refresh() {
     for (const t of s.recent) {
       const row = document.createElement('div');
       row.className = 'row mono';
-      row.append(t.uid, t.time ? new Date(t.time).toLocaleTimeString() : 'clock not set');
+      for (const text of [t.uid, t.time ? new Date(t.time).toLocaleTimeString() : 'clock not set'])
+        row.append(Object.assign(document.createElement('span'), { textContent: text }));
       $('recent').append(row);
     }
     if (!s.recent.length) $('recent').textContent = 'None yet';

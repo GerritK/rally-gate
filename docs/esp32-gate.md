@@ -56,6 +56,11 @@ no range. In the case, keep it away from the battery and metal.
 | SS | D3 |
 | VCC / GND | 3V3 / GND |
 
+The firmware asks the PN532 for its firmware version every 5s and
+re-initialises it if it stops answering. Its RSTPDN pin isn't broken out on
+the V3 module and an ESP32 reset leaves it powered, so a reader that answers
+but no longer reads needs a power cycle (seen once, right after flashing).
+
 Buzzer on D1, LED on D2 (through a resistor), both to GND. The LED is lit
 while the gate is connected to the server. One beep means the tap is
 stored, three mean it is **not** (buffer full or flash failed).
