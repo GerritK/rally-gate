@@ -3,7 +3,8 @@
 A second kind of gate: an ESP32 with its own firmware instead of a Pi running
 `gate-agent` and `gate-config`. First target is an **NFC check-in gate**, where
 presence matters and milliseconds don't. Firmware in `firmware/esp32-gate`,
-built and compiling, not yet run on hardware (ordered).
+runs on a first board: it joins Wi-Fi, finds the server, syncs its clock and
+has sent a PN532 tap through to rally-server.
 
 ```bash
 cd firmware/esp32-gate
@@ -38,9 +39,9 @@ Not chosen: ESP32-C3 SuperMini (antenna notoriously weak), classic
 ESP32-WROOM DevKit (PCB antenna, USB-serial bridge, older generation; fine on
 a desk).
 
-BerryBase lists the board with 6 MB flash, Seeed's spec says 8 MB. Check with
-`esptool.py flash_id` before fixing the partition table. 6 MB is enough
-either way (below).
+The board has 8 MB flash, as Seeed specifies and `esptool.py flash_id`
+confirms; BerryBase's shop page saying 6 MB is a listing error. The partition
+table uses all 8 MB.
 
 **The antenna must be plugged in**, since without it the board has next to
 no range. In the case, keep it away from the battery and metal.
@@ -69,10 +70,12 @@ writable. An entry already takes several transponders of different kinds
 transponder, and a replacement sticker is added rather than swapped.
 
 **UID format: uppercase hex, no separators, in the byte order the tag
-reports.** It has to match what the registration desk enters. The cheap
-route there is a USB reader that types into the focused field, but many of
-those emit decimal or reversed bytes. Check the one in use against the
-firmware's output before an event, or no tap ever matches an entry.
+reports.** It has to match what the registration desk enters. Typing it in
+works, but the desk is meant to take it from a gate instead
+(`development-roadmap.md` "Unassigned tags at check-in"), which matches by
+construction. A USB desk reader that types into the focused field is the
+fallback, but many emit decimal or reversed bytes: check one against the
+firmware's output first.
 
 Phones were considered and rejected:
 - **Android** can emulate a card (HCE) with a fixed ID behind an AID, which the
@@ -139,7 +142,7 @@ inaccurate RC oscillator and doesn't survive power loss. A DS3231 (I²C,
 | | |
 |---|---|
 | firmware image (Wi-Fi, MQTT, mDNS, web server, PN532, plain status page) | 1.0 MB measured; OTA not in it yet |
-| two OTA app partitions, ~2.5 MB each, **status page gzipped inside the image** | 5 MB |
+| two OTA app partitions, 3 MB each, **status page gzipped inside the image** | 6 MB |
 | NVS (Wi-Fi credentials) + LittleFS (detection buffer, ~200 B per tap) | rest |
 
 The page lives inside the firmware image so one OTA updates both, and there

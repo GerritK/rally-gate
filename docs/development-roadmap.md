@@ -125,8 +125,9 @@ What exists, with where its reasoning lives. History is in git.
   (filtered to 2WD, a 2WD badge says nothing), and no column at all while
   no entry has a class or category.
 
-- **ESP32 NFC check-in gate** — firmware in `firmware/esp32-gate` builds,
-  untested on hardware (ordered: XIAO ESP32-S3, PN532). Then: a server-side
+- **ESP32 NFC check-in gate** — firmware in `firmware/esp32-gate` runs on
+  a XIAO ESP32-S3 with a PN532: Wi-Fi, server discovery, clock sync and a
+  tap through to rally-server. Then: a server-side
   meaning for a check-in tap (no role sets entry status yet), OTA, and the
   status page on `packages/ui` (`esp32-gate.md`).
 
@@ -257,6 +258,13 @@ OpenStint (below) resumes when the hardware arrives.
   wrong time, so it is a suggestion — the oldest pre-selected for the tapped
   car, one click to confirm. **None**: the tap is stored, nothing more.
   Server side needs no hardware (`simulate` with an NFC kind).
+- **Unassigned tags at check-in** — an ESP32 gate on the desk, its taps of
+  tags no entry has shown on the check-in page to add to the selected
+  entry, so the desk never types a UID and gate and desk read it the same
+  way (`esp32-gate.md` "Identifying a driver"). Which gate is the desk's is
+  open: picked on the page, or a gate role that never times, which could
+  also check in a known tag. Server side needs nothing new: the taps are
+  plain detections with no entry.
 - Online/spectator mode (`deployment-modes.md`).
 - Rule engine DSL (hardcoded branching in `EventsService` is fine at this scale),
   RC4 learning registry / transponder management UI.
