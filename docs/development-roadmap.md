@@ -110,18 +110,50 @@ What exists, with where its reasoning lives. History is in git.
 
 ## Next
 
+- **Stages outside the overall** — `Stage.scoring`: `OVERALL` (default),
+  `QUALIFYING` or `NONE` (shakedown, trial run), set in the stage form. Such
+  a stage is timed, ranked, printed and podiumed like any other, marked "not
+  counted" or "qualifying" on screen and on its PDF, but **nothing global
+  ever reads it**: the overall skips it (no times, no notionals, driving
+  only it doesn't make a crew classified), its penalties never reach a
+  total, and they don't count as occurrences for a penalty tiered across
+  the rally. The only exception is the start order, and only by marking a
+  stage `QUALIFYING`: with "Overall time" set and no counted stage closed
+  yet, a stage is ordered by the latest closed qualifying stage before it
+  instead of by start number — qualifying sets the first stage, the overall
+  the rest, with no new start-order key. "Last stage time" means the last
+  counted stage. Comes before the event-wide status, which relies on it.
 - **Event-wide status** — Setup → Running → Closed, on `RallyInfo`,
-  server-owned like `Stage.status`. Activating the first stage starts the
-  rally, with a pre-start check in that confirmation (every stage has a start
-  and finish, gates online and synced, transponder gaps and duplicates,
-  entries without a class): few hard errors, mostly warnings, as a marshal
-  knows things the check doesn't. Running locks only what reinterprets
-  results already timed (deleting/renaming classes, a timed car's start
-  number, start-order settings) — late entries, transponder swaps, withdrawals
-  and corrections stay open, or marshals unlock and forget. Closed is the
-  valuable one: results official, no corrections or penalties, no
-  "Provisional"; reopening is deliberate (a protest). Locks as a per-route
-  decorator, and disabled controls say why.
+  server-owned like `Stage.status`, and visible everywhere: a chip in the app
+  bar on every page, pushed over `/api/live` so every open dashboard switches,
+  and "Provisional" on every PDF until Closed — a closed stage's result can
+  still move by a penalty or a protest (the per-stage rule stays on top).
+  Changed by explicit actions on
+  Setup → Rally only (the chip links there, so a tablet tap in the app bar
+  never ends a rally): **Start rally** opens the pre-start check (every stage
+  has a start and finish, gates online and synced, transponder gaps and
+  duplicates, entries without a class): few hard errors, mostly warnings, as
+  a marshal knows things the check doesn't. In Setup only stages outside the
+  overall can be activated; a counted one refuses and points to Start rally,
+  so a rally never starts unnoticed and trial runs leave nothing to delete.
+  Gate and transponder tests need no stage at all: detections without an
+  active assignment are stored untimed already, so the Hardware page shows
+  each gate's latest reads with the car they matched. Running locks only what
+  reinterprets results already timed (deleting/renaming classes, a timed
+  car's start number, start-order settings, `scoring` on a stage with
+  runs) — late entries, transponder swaps, withdrawals and corrections
+  stay open, or marshals unlock and forget. **Close rally** is refused while
+  a car is on stage and closes open stages after asking. Closed is the
+  valuable one: results official, no "Provisional", and **nothing that
+  changes a result** — no stage activation, corrections, penalties,
+  passing assignments, entry status, classes, start numbers, `scoring` or
+  notional setting. Detections are still stored (evidence) but time
+  nothing; what only changes how results look (a misspelt name, display
+  settings) stays open. **Reopen** returns to Running and is deliberate (a
+  protest), in the menu behind a confirmation — no reason field while
+  nothing would show it. There is no way back to Setup: that is the
+  deferred Reset event. Locks as a per-route decorator, and disabled
+  controls say why.
 - **Class and category badges in rankings** ("2WD · Rookie") on Results
   and the PDFs: only the classes the current filter doesn't already imply
   (filtered to 2WD, a 2WD badge says nothing), and no column at all while
