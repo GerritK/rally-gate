@@ -2,8 +2,10 @@
 import type { Gate } from '../api/gates';
 import {
   clockOffsetColor,
+  clockLagIcon,
   clockOffsetHint,
-  formatClockOffset,
+  formatClockLag,
+  ntpOffsetColor,
 } from '../format';
 
 defineProps<{ gate: Gate; correctionThresholdMs: number }>();
@@ -20,14 +22,9 @@ defineProps<{ gate: Gate; correctionThresholdMs: number }>();
         size="small"
         class="rg-timing"
         :color="clockOffsetColor(gate.clockOffsetMs, correctionThresholdMs)"
-        :prepend-icon="
-          gate.clockOffsetMs != null &&
-          Math.abs(gate.clockOffsetMs) >= correctionThresholdMs
-            ? 'mdi-clock-alert-outline'
-            : 'mdi-clock-check-outline'
-        "
+        :prepend-icon="clockLagIcon(gate.clockOffsetMs, correctionThresholdMs)"
       >
-        {{ formatClockOffset(gate.clockOffsetMs) }}
+        {{ formatClockLag(gate.clockOffsetMs) }}
       </v-chip>
     </template>
   </v-tooltip>
@@ -35,8 +32,8 @@ defineProps<{ gate: Gate; correctionThresholdMs: number }>();
     v-if="gate.ntpSynced != null"
     size="small"
     class="rg-timing ml-1"
-    :color="gate.ntpSynced ? 'success' : 'error'"
-    :prepend-icon="gate.ntpSynced ? 'mdi-sync' : 'mdi-sync-alert'"
+    :color="ntpOffsetColor(gate)"
+    :prepend-icon="gate.ntpSynced ? 'mdi-target' : 'mdi-crosshairs-off'"
     v-tooltip:top="
       gate.ntpSynced ? $t('gate.ntpSyncedHint') : $t('gate.ntpNotSyncedHint')
     "

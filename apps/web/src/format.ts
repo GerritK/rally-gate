@@ -27,13 +27,52 @@ import { driverName } from './crew';
  */
 export const CLOCK_OFFSET_WARN_THRESHOLD_MS = 250;
 
+/**
+ * A gate's NTP accuracy (`ntpOffsetMs`) past which it shows amber. Measured
+ * ESP32 and Pi gates sit around 0.5–2ms on rally Wi-Fi.
+ */
+export const NTP_OFFSET_WARN_THRESHOLD_MS = 5;
+
+function formatClockAmount(absMs: number): string {
+  return absMs < 1000 ? `${absMs} ms` : `${(absMs / 1000).toFixed(2)} s`;
+}
+
 export function formatClockOffset(offsetMs?: number | null): string {
   if (offsetMs === null || offsetMs === undefined) return t('gate.notMeasured');
-  const sign = offsetMs < 0 ? '-' : '+';
-  const abs = Math.abs(offsetMs);
-  return abs < 1000
-    ? `${sign}${abs} ms`
-    : `${sign}${(abs / 1000).toFixed(2)} s`;
+  return `${offsetMs < 0 ? '-' : '+'}${formatClockAmount(Math.abs(offsetMs))}`;
+}
+
+/** "3 ms nach" / "2 ms vor", as one says of a watch; positive = gate behind. */
+export function formatClockLag(offsetMs?: number | null): string {
+  if (offsetMs === null || offsetMs === undefined) return t('gate.notMeasured');
+  const amount = formatClockAmount(Math.abs(offsetMs));
+  if (offsetMs === 0) return amount;
+  return t(offsetMs > 0 ? 'gate.clockBehindBy' : 'gate.clockAheadBy', {
+    amount,
+  });
+}
+
+/** A clock turning back for a gate behind, forward for one ahead. */
+export function clockLagIcon(
+  offsetMs: number | null | undefined,
+  correctionThresholdMs: number,
+): string {
+  if (offsetMs === null || offsetMs === undefined) return 'mdi-clock-outline';
+  if (Math.abs(offsetMs) >= correctionThresholdMs) {
+    return 'mdi-clock-alert-outline';
+  }
+  if (offsetMs === 0) return 'mdi-clock-check-outline';
+  return offsetMs > 0 ? 'mdi-history' : 'mdi-update';
+}
+
+export function ntpOffsetColor(gate: {
+  ntpSynced?: boolean | null;
+  ntpOffsetMs?: number | null;
+}): string {
+  if (!gate.ntpSynced) return 'error';
+  return (gate.ntpOffsetMs ?? 0) >= NTP_OFFSET_WARN_THRESHOLD_MS
+    ? 'warning'
+    : 'success';
 }
 
 export function clockOffsetColor(
@@ -54,13 +93,10 @@ export function clockOffsetHint(
   if (offsetMs === null || offsetMs === undefined) {
     return t('gate.clockNotReported');
   }
-  const offset = formatClockOffset(offsetMs);
-  if (Math.abs(offsetMs) >= correctionThresholdMs) {
-    return offsetMs > 0
-      ? t('gate.clockBehind', { offset })
-      : t('gate.clockAhead', { offset });
-  }
-  return t('gate.clockWithinTolerance', { offset });
+  const lag = formatClockLag(offsetMs);
+  return Math.abs(offsetMs) >= correctionThresholdMs
+    ? t('gate.clockCorrected', { lag })
+    : t('gate.clockWithinTolerance', { lag });
 }
 
 export function formatDuration(ms?: number | null): string {
