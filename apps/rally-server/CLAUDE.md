@@ -29,9 +29,12 @@ Fields the DTOs leave out on purpose, because only the server may set them:
 - `Entry.id` — `update` merges with `Object.assign`; an id would retarget the save
 - `Gate.lastHeartbeatAt`/`capabilities` — gate-reported; writable, an offline gate would read online
 - `RallyInfo.id` — singleton
+- `RallyInfo.status` — moved by `RallyStatusService` start/close/reopen only
 - `StageRun.startManual`/`finishManual` — evidence of a hand-set time
 
 `src/config/dto-contracts.spec.ts` pins this list with the real pipe config — add a case there for each new server-owned field. Since unknown properties are a 400, **a DTO change is a breaking API change**: `apps/web` and `scripts/seed-demo-data.js` change in the same commit.
+
+**A change the rally status forbids** is `@LockedWhen(RallyStatus.X)` on the route (`rally-info/rally-lock.ts`, a global guard); where only some fields or keys are locked, `RallyInfoService.assertNotIn` in code. Rules: `docs/event-model.md` "Rally status".
 
 A missing stage is a 404 via `StagesService.findOneOrFail`; don't hand-roll the check again.
 

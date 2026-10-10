@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RallyStatus, StageStatus } from '@rally-gate/shared';
 import { onMounted, ref } from 'vue';
 import {
   createEvent,
@@ -7,15 +8,31 @@ import {
   waitForEvent,
   type EventInfo,
 } from '../api/event';
+import { fetchEntries } from '../api/entries';
+import { fetchEntryClasses } from '../api/entry-classes';
+import { fetchGateAssignments } from '../api/gate-assignments';
+import { fetchGates } from '../api/gates';
 import {
+  changeRallyStatus,
   fetchRallyInfo,
+  rallyStatus,
   saveRallyInfo,
   type RallyInfo,
 } from '../api/rally-info';
+import { fetchStages } from '../api/stages';
+import { serverNow } from '../api/time';
 import FormDialog from '../components/FormDialog.vue';
-import { eventName, required } from '../format';
+import StatusChip from '../components/StatusChip.vue';
+import {
+  eventName,
+  isOnline,
+  isReady,
+  RALLY_STATUS_DISPLAY,
+  required,
+} from '../format';
+import { preStartCheck, type CheckFinding } from '../pre-start-check';
 import { useUnsavedChanges } from '../unsaved-changes';
-import { currentLocale, notify, t } from '@rally-gate/ui';
+import { currentLocale, notify, t, useConfirm } from '@rally-gate/ui';
 
 function today(): string {
   const d = new Date();
@@ -31,6 +48,75 @@ const openDialog = ref(false);
 const newEvent = ref({ name: '', date: today() });
 const switchingTo = ref<string | null>(null);
 const { markSaved } = useUnsavedChanges(() => rallyInfo.value);
+const confirm = useConfirm();
+/** Null until Start rally is pressed: the check runs on the data as it is
+ *  then, not as it was when the page opened. */
+const findings = ref<CheckFinding[] | null>(null);
+const changing = ref(false);
+
+async function changeStatus(
+  action: 'start' | 'close' | 'reopen',
+  done: string,
+) {
+  changing.value = true;
+  try {
+    await changeRallyStatus(action);
+    findings.value = null;
+    notify(t(done));
+  } finally {
+    changing.value = false;
+  }
+}
+
+async function onStart() {
+  const [stages, assignments, gates, entries, classes] = await Promise.all([
+    fetchStages(),
+    fetchGateAssignments(),
+    fetchGates(),
+    fetchEntries(),
+    fetchEntryClasses(),
+  ]);
+  findings.value = preStartCheck({
+    stages,
+    assignments,
+    gates: gates.map((g) => ({
+      id: g.id,
+      name: g.name,
+      online: isOnline(g, serverNow.value),
+      ready: isReady(g, serverNow.value),
+    })),
+    entries,
+    anyClass: classes.length > 0,
+  });
+}
+
+/** Names the stages it closes; the server refuses while a car is on one. */
+async function onClose() {
+  const open = (await fetchStages())
+    .filter((s) => s.status === StageStatus.ACTIVE)
+    .map((s) => s.id);
+  const ok = await confirm({
+    title: t('rally.closeTitle'),
+    text: [
+      open.length > 0 && t('rally.closesStages', { stages: open.join(', ') }),
+      t('rally.closeText'),
+    ]
+      .filter(Boolean)
+      .join(' '),
+    confirmText: t('rally.close'),
+    color: 'error',
+  });
+  if (ok) return changeStatus('close', 'rally.closedNotice');
+}
+
+async function onReopen() {
+  const ok = await confirm({
+    title: t('rally.reopenTitle'),
+    text: t('rally.reopenText'),
+    confirmText: t('rally.reopen'),
+  });
+  if (ok) return changeStatus('reopen', 'rally.reopenedNotice');
+}
 
 async function onSave() {
   if (!rallyInfo.value.name || saving.value) return;
@@ -130,6 +216,100 @@ onMounted(async () => {
       </form>
     </v-card-text>
   </v-card>
+
+  <v-card class="mb-6">
+    <v-card-item>
+      <v-card-title>{{ $t('rally.title') }}</v-card-title>
+      <template #append>
+        <StatusChip :display="RALLY_STATUS_DISPLAY[rallyStatus]" />
+        <v-menu v-if="rallyStatus === RallyStatus.CLOSED">
+          <template #activator="{ props: menu }">
+            <v-btn
+              v-bind="menu"
+              icon="mdi-dots-vertical"
+              variant="text"
+              size="small"
+              class="ml-2"
+              :aria-label="$t('common.moreActions')"
+            />
+          </template>
+          <v-list density="compact">
+            <v-list-item
+              prepend-icon="mdi-lock-open-variant-outline"
+              :title="$t('rally.reopen')"
+              @click="onReopen"
+            />
+          </v-list>
+        </v-menu>
+      </template>
+    </v-card-item>
+    <v-card-text class="d-flex flex-wrap align-center ga-4">
+      <span class="flex-1-1">{{ $t(`rally.hint.${rallyStatus}`) }}</span>
+      <v-btn
+        v-if="rallyStatus === RallyStatus.SETUP"
+        color="success"
+        variant="outlined"
+        prepend-icon="mdi-play"
+        @click="onStart"
+      >
+        {{ $t('rally.start') }}
+      </v-btn>
+      <v-btn
+        v-else-if="rallyStatus === RallyStatus.RUNNING"
+        color="error"
+        variant="outlined"
+        prepend-icon="mdi-flag-checkered"
+        :loading="changing"
+        @click="onClose"
+      >
+        {{ $t('rally.close') }}
+      </v-btn>
+    </v-card-text>
+  </v-card>
+
+  <v-dialog
+    :model-value="!!findings"
+    max-width="600"
+    @update:model-value="findings = null"
+  >
+    <v-card v-if="findings" :title="$t('rally.checkTitle')">
+      <v-card-text>
+        <p v-if="findings.length === 0">{{ $t('rally.checkClean') }}</p>
+        <v-alert
+          v-for="f in findings"
+          :key="f.key + JSON.stringify(f.params)"
+          :type="f.error ? 'error' : 'warning'"
+          variant="tonal"
+          density="compact"
+          class="mb-2"
+        >
+          {{ $t(`rally.check.${f.key}`, f.params) }}
+        </v-alert>
+        <p class="text-body-2 text-medium-emphasis mt-4">
+          {{ $t('rally.startText') }}
+        </p>
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer />
+        <v-btn variant="text" @click="findings = null">
+          {{ $t('common.cancel') }}
+        </v-btn>
+        <v-btn
+          color="success"
+          variant="flat"
+          :loading="changing"
+          :disabled="findings.some((f) => f.error)"
+          @click="changeStatus('start', 'rally.startedNotice')"
+        >
+          {{
+            findings.length > 0 && !findings.some((f) => f.error)
+              ? $t('rally.startAnyway')
+              : $t('rally.start')
+          }}
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 
   <v-row>
     <v-col cols="12" sm="4">

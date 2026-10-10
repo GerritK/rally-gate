@@ -10,11 +10,12 @@ import {
   NotFoundException,
   Query,
 } from '@nestjs/common';
-import { ApiErrorCode, isOutOfEvent } from '@rally-gate/shared';
+import { ApiErrorCode, isOutOfEvent, RallyStatus } from '@rally-gate/shared';
 import { apiError } from '../../common/api-error';
 import { EntriesService } from '../entries/entries.service';
 import { CorrectStageRunDto, CreateStageRunDto } from './dto';
 import { StageRunsService } from './stage-runs.service';
+import { LockedWhen } from '../rally-info/rally-lock';
 
 @Controller('stage-runs')
 export class StageRunsController {
@@ -37,6 +38,7 @@ export class StageRunsController {
 
   /** Start now, or a time entered by hand. 409 for a car out of the event:
    *  a gate's passing wouldn't time it either (`EventsService.applyRules`). */
+  @LockedWhen(RallyStatus.CLOSED)
   @Post()
   async create(@Body() body: CreateStageRunDto) {
     const entry = await this.entriesService.findOne(body.entryId);
@@ -60,12 +62,14 @@ export class StageRunsController {
     return this.stageRunsService.createManual(body);
   }
 
+  @LockedWhen(RallyStatus.CLOSED)
   @Patch(':id')
   correct(@Param('id') id: string, @Body() body: CorrectStageRunDto) {
     return this.stageRunsService.correctRun(id, body);
   }
 
   /** Hand-timed finish, server-stamped. 409 if finished, voided or closed. */
+  @LockedWhen(RallyStatus.CLOSED)
   @Post(':id/finish')
   finishNow(@Param('id') id: string) {
     return this.stageRunsService.finishNow(id);
@@ -76,6 +80,7 @@ export class StageRunsController {
    * from results, and frees the entry so the start gate can open a re-run
    * on its next pass — see "StageRun" in `docs/event-model.md`.
    */
+  @LockedWhen(RallyStatus.CLOSED)
   @Post(':id/void')
   void(@Param('id') id: string) {
     return this.stageRunsService.voidRun(id);
@@ -86,11 +91,13 @@ export class StageRunsController {
    * already counts for that stage — an entry has at most one non-voided
    * attempt, so that one has to be voided first.
    */
+  @LockedWhen(RallyStatus.CLOSED)
   @Post(':id/unvoid')
   unvoid(@Param('id') id: string) {
     return this.stageRunsService.unvoidRun(id);
   }
 
+  @LockedWhen(RallyStatus.CLOSED)
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.stageRunsService.remove(id);

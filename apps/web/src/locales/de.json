@@ -535,7 +535,10 @@
     "gateIdHint": "Seine GATE_ID, z. B. START_WP2",
     "nameOptional": "Name (optional)",
     "powerOffRefused": "abgelehnt ({detail})",
-    "powerOffUnreachable": "nicht erreichbar"
+    "powerOffUnreachable": "nicht erreichbar",
+    "lastRead": "Letzte Erkennung",
+    "unknownTransponder": "{id} (keine Nennung)",
+    "beam": "Lichtschranke, kein Transponder"
   },
   "rowState": {
     "waiting": "Wartend",
@@ -585,6 +588,51 @@
     "eventFileNotFound": "Es gibt keine Veranstaltungsdatei {file}.",
     "eventFixedByConfig": "Die Veranstaltung dieses Servers ist durch seine Konfiguration festgelegt und lässt sich hier nicht wechseln.",
     "closeStageBeforeSwitch": "Eine WP ist aktiv. Schließe sie, bevor du die Veranstaltung wechselst.",
-    "knownHardwareStandaloneOnly": "Bekannte Hardware wird nur im Standalone-Paket gespeichert."
+    "knownHardwareStandaloneOnly": "Bekannte Hardware wird nur im Standalone-Paket gespeichert.",
+    "lockedWhileRunning": "Gesperrt, solange die Rallye läuft: Es würde schon gemessene Ergebnisse ändern.",
+    "lockedWhileClosed": "Die Rallye ist abgeschlossen, ihre Ergebnisse sind endgültig. Öffne sie in der Einrichtung wieder, um sie zu ändern.",
+    "startRallyFirst": "{stage} zählt zur Gesamtwertung. Starte zuerst die Rallye in der Einrichtung.",
+    "rallyStatusInvalid": "Der Rallye-Status hat sich inzwischen geändert. Lade die Seite neu.",
+    "carsOnStage": "Autos noch auf der WP: {count}. Beende oder annulliere zuerst ihre Läufe."
+  },
+  "rallyStatus": {
+    "setup": "Vorbereitung",
+    "running": "Läuft",
+    "closed": "Abgeschlossen",
+    "title": "Rallye-Status, geändert in der Einrichtung"
+  },
+  "rally": {
+    "title": "Rallye",
+    "hint": {
+      "SETUP": "Vor dem Start: WPs außerhalb der Gesamtwertung (Shakedown, Qualifying) können laufen, eine gewertete wartet auf Rallye starten. Gates und Transponder lassen sich ohne WP unter Hardware testen.",
+      "RUNNING": "Ergebnisse sind vorläufig. Gesperrt: Klassen umbenennen oder löschen, die Startnummer eines Autos, das schon gefahren ist, die Regeln der Startreihenfolge. Nachnennungen, Transpondertausch, Rückzüge und Korrekturen bleiben offen.",
+      "CLOSED": "Ergebnisse sind offiziell. Nichts, was ein Ergebnis ändert, ist möglich: keine WP, Korrektur, Strafe, kein Nennungsstatus, keine Klasse oder Startnummer. Namen und Anzeige-Einstellungen bleiben offen."
+    },
+    "start": "Rallye starten",
+    "startAnyway": "Trotzdem starten",
+    "startText": "Ab jetzt lassen sich gewertete WPs aktivieren, und Klassen, Startnummern gefahrener Autos und die Regeln der Startreihenfolge sind gesperrt.",
+    "checkTitle": "Rallye starten?",
+    "checkClean": "Alle Prüfungen bestanden.",
+    "check": {
+      "noEntries": "Keine Nennung ist in der Veranstaltung.",
+      "noCountedStage": "Keine WP zählt zur Gesamtwertung.",
+      "noStartGate": "Kein Start-Gate: {stages}. Starts nur von Hand.",
+      "noFinishGate": "Kein Ziel-Gate: {stages}. Zielankünfte nur von Hand.",
+      "gatesOffline": "Offline: {gates}.",
+      "gatesUnsynced": "Uhr nicht synchronisiert: {gates}.",
+      "noTransponder": "Kein Transponder: {numbers}.",
+      "sharedTransponder": "Transponder {transponder} ist an {numbers}; seine Durchfahrten warten auf einen Marshal.",
+      "noClass": "Keine Klasse: {numbers}."
+    },
+    "startedNotice": "Rallye gestartet",
+    "close": "Rallye abschließen",
+    "closeTitle": "Rallye abschließen?",
+    "closesStages": "Das schließt {stages}.",
+    "closeText": "Die Ergebnisse werden offiziell, und nichts, was ein Ergebnis ändert, ist mehr möglich, bis die Rallye wieder geöffnet wird.",
+    "closedNotice": "Rallye abgeschlossen",
+    "reopen": "Rallye wieder öffnen",
+    "reopenTitle": "Rallye wieder öffnen?",
+    "reopenText": "Für einen Protest: Die Ergebnisse sind wieder vorläufig und lassen sich ändern, bis die Rallye erneut abgeschlossen wird.",
+    "reopenedNotice": "Rallye wieder geöffnet"
   }
 }

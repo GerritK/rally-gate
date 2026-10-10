@@ -18,6 +18,8 @@ import {
   upsertGate,
   type Gate,
 } from '../api/gates';
+import { fetchEntries, type Entry } from '../api/entries';
+import { fetchRecentEvents, type DetectionEventRecord } from '../api/events';
 import { closeLiveStream, openLiveStream, upsert } from '../api/live';
 import { serverNow } from '../api/time';
 import {
@@ -47,7 +49,7 @@ import GateClockChips from '../components/GateClockChips.vue';
 import GateOnlineChip from '../components/GateOnlineChip.vue';
 import GateVersion from '../components/GateVersion.vue';
 import { useRouter } from 'vue-router';
-import { isOnline, required } from '../format';
+import { entryName, isOnline, required } from '../format';
 
 let gatesSource: EventSource;
 
@@ -97,6 +99,42 @@ function closePowerOff() {
 }
 
 const gateIds = computed(() => new Set(gates.value.map((g) => g.id)));
+
+/**
+ * Each gate's latest read with the car it matched, for testing gates and
+ * transponders before the rally: a gate on no active stage stores its
+ * passings untimed, but still matches them to an entry.
+ *
+ * ponytail: seeded from the latest 100 detections of all gates, so a gate
+ * quiet since then shows none until its next read; add a per-gate latest
+ * endpoint if that confuses anyone.
+ */
+const lastReads = ref(new Map<string, DetectionEventRecord>());
+const entries = ref<Entry[]>([]);
+
+function noteRead(read: DetectionEventRecord) {
+  const seen = lastReads.value.get(read.gateId);
+  if (!seen || seen.timestampServer <= read.timestampServer) {
+    lastReads.value.set(read.gateId, read);
+  }
+}
+
+async function refreshReads() {
+  const [recent, all] = await Promise.all([
+    fetchRecentEvents(),
+    fetchEntries(),
+  ]);
+  entries.value = all;
+  lastReads.value = new Map();
+  recent.forEach(noteRead);
+}
+
+function readLabel(read: DetectionEventRecord): string {
+  if (read.entryId) return entryName(entries.value, read.entryId);
+  return read.transponderId
+    ? t('hardware.unknownTransponder', { id: read.transponderId })
+    : t('hardware.beam');
+}
 
 /** Gates referenced by an ACTIVE/CLOSED stage's assignment — those
  * assignments can't be removed, so the gate can't be deleted at all. */
@@ -187,9 +225,13 @@ onMounted(async () => {
   autoDiscover.value = autoDiscoverSetting !== 'false';
   clockCorrectionThresholdMs.value = thresholdMs;
   gatesSource = openLiveStream(
-    { gate: (gate) => upsert(gates.value, gate, 'id') },
+    {
+      gate: (gate) => upsert(gates.value, gate, 'id'),
+      detection: noteRead,
+    },
     async () => {
       gates.value = await fetchGates();
+      await refreshReads();
     },
   );
 });
@@ -225,6 +267,7 @@ onUnmounted(() => {
             <th>{{ $t('stages.name') }}</th>
             <th>{{ $t('hardware.online') }}</th>
             <th>{{ $t('hardware.lastHeartbeat') }}</th>
+            <th>{{ $t('hardware.lastRead') }}</th>
             <th>{{ $t('gate.clock') }}</th>
             <th>{{ $t('gate.capabilities') }}</th>
             <th>{{ $t('gate.version') }}</th>
@@ -253,6 +296,25 @@ onUnmounted(() => {
                   ? formatRelativeTime(gate.lastHeartbeatAt, serverNow)
                   : $t('hardware.never')
               }}
+            </td>
+            <td>
+              <template v-if="lastReads.get(gate.id)">
+                <div>{{ readLabel(lastReads.get(gate.id)!) }}</div>
+                <div
+                  class="text-caption text-medium-emphasis"
+                  v-tooltip:top="
+                    formatClockTime(lastReads.get(gate.id)!.timestampServer)
+                  "
+                >
+                  {{
+                    formatRelativeTime(
+                      lastReads.get(gate.id)!.timestampServer,
+                      serverNow,
+                    )
+                  }}
+                </div>
+              </template>
+              <template v-else>-</template>
             </td>
             <td class="text-no-wrap">
               <GateClockChips
@@ -308,7 +370,7 @@ onUnmounted(() => {
             </td>
           </tr>
           <tr v-if="gates.length === 0">
-            <td colspan="8" class="rg-empty">
+            <td colspan="9" class="rg-empty">
               {{ $t('hardware.empty') }}
             </td>
           </tr>

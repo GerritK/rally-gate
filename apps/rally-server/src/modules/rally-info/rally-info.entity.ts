@@ -1,3 +1,4 @@
+import { RallyStatus } from '@rally-gate/shared';
 import { Column, Entity, PrimaryColumn } from 'typeorm';
 
 export const RALLY_INFO_ID = 'rally';
@@ -15,4 +16,8 @@ export class RallyInfo {
 
   @Column({ nullable: true })
   location?: string;
+
+  /** Moved by `RallyStatusService` only, never through the DTO. */
+  @Column({ type: 'varchar', default: RallyStatus.SETUP })
+  status: RallyStatus;
 }

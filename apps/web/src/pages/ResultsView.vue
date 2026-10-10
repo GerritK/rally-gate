@@ -7,7 +7,7 @@ import {
   type OverallPlacing,
   type StageResults,
 } from '../api/classification';
-import { StageScoring, StageStatus } from '@rally-gate/shared';
+import { RallyStatus, StageScoring, StageStatus } from '@rally-gate/shared';
 import { stageScoringLabel } from '../format';
 import { t } from '@rally-gate/ui';
 import {
@@ -22,7 +22,7 @@ import StageRanking from '../components/StageRanking.vue';
 import { fetchStages, type Stage } from '../api/stages';
 import { fetchEntryClasses, type EntryClass } from '../api/entry-classes';
 import { fetchEntries, type Entry } from '../api/entries';
-import { rallyName } from '../api/rally-info';
+import { rallyName, rallyStatus } from '../api/rally-info';
 import { overallPdf, printPdf, stagePdf } from '../pdf';
 
 /** Without a stage, the overall. */
@@ -79,13 +79,22 @@ async function print(all: boolean) {
       ).map(loadRanking),
     );
     const label = (r: Ranking) => classFilterLabel(classes.value, r.classIds);
+    // Until the rally closes a penalty or a protest can still move a result.
+    // A running stage already says so in its heading.
+    const provisional =
+      rallyStatus.value !== RallyStatus.CLOSED &&
+      stage.value?.status !== StageStatus.ACTIVE;
+    const subtitle = (r: Ranking) =>
+      [label(r), provisional && t('pdf.provisional')]
+        .filter(Boolean)
+        .join(' · ');
     return {
       sections: rankings.map((r) =>
         r.stage
-          ? stagePdf(heading.value, label(r), r.stage)
+          ? stagePdf(heading.value, subtitle(r), r.stage)
           : overallPdf(
               heading.value,
-              label(r),
+              subtitle(r),
               r.overall ?? [],
               entries.value,
               r.classIds,

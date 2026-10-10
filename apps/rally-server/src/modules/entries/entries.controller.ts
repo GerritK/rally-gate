@@ -1,10 +1,14 @@
 import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { RallyStatusService } from '../rally-info/rally-status.service';
 import { CreateEntryDto, UpdateEntryDto } from './dto';
 import { EntriesService } from './entries.service';
 
 @Controller('entries')
 export class EntriesController {
-  constructor(private readonly entriesService: EntriesService) {}
+  constructor(
+    private readonly entriesService: EntriesService,
+    private readonly rallyStatusService: RallyStatusService,
+  ) {}
 
   @Get()
   findAll() {
@@ -21,8 +25,13 @@ export class EntriesController {
     return this.entriesService.create(body);
   }
 
+  /** 409 for a change the rally's status locks, see `RallyStatusService`. */
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: UpdateEntryDto) {
+  async update(@Param('id') id: string, @Body() body: UpdateEntryDto) {
+    const entry = await this.entriesService.findOne(id);
+    if (entry) {
+      await this.rallyStatusService.assertEntryChangeAllowed(entry, body);
+    }
     return this.entriesService.update(id, body);
   }
 }

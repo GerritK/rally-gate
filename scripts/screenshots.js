@@ -266,6 +266,7 @@ async function seed(client, version) {
 
   // WP1: everyone through, then closed.
   const now = Date.now();
+  await call('POST', '/rally-info/start');
   await call('POST', '/stages/WP1/activate');
   for (const [i, e] of ENTRIES.entries()) {
     const start = now - 50 * 60_000 + i * 60_000;

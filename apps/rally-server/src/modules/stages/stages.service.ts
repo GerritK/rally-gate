@@ -5,10 +5,16 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ApiErrorCode, StageScoring, StageStatus } from '@rally-gate/shared';
+import {
+  ApiErrorCode,
+  RallyStatus,
+  StageScoring,
+  StageStatus,
+} from '@rally-gate/shared';
 import { Not, Repository } from 'typeorm';
 import { apiError } from '../../common/api-error';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
+import { RallyInfoService } from '../rally-info/rally-info.service';
 import { CreateStageDto, UpdateStageDto } from './dto';
 import { Stage } from './stage.entity';
 
@@ -19,6 +25,7 @@ export class StagesService {
     private readonly stages: Repository<Stage>,
     private readonly gateAssignmentsService: GateAssignmentsService,
     private readonly emitter: EventEmitter2,
+    private readonly rallyInfo: RallyInfoService,
   ) {}
 
   findAll(): Promise<Stage[]> {
@@ -149,9 +156,25 @@ export class StagesService {
    * anything still `STARTED` on it can never get a real finish detection
    * again; closing marks those DNF instead of leaving them stuck `STARTED`
    * forever (see `close`'s CANCELLED-on-close behavior).
+   *
+   * Before Start rally only a stage outside the overall runs (shakedown,
+   * qualifying), so a rally never starts unnoticed; once closed, none.
    */
   async activate(id: string, force: boolean): Promise<Stage> {
     const stage = await this.findOneOrFail(id);
+    await this.rallyInfo.assertNotIn(RallyStatus.CLOSED);
+    if (
+      stage.scoring === StageScoring.OVERALL &&
+      (await this.rallyInfo.status()) === RallyStatus.SETUP
+    ) {
+      throw new ConflictException(
+        apiError(
+          ApiErrorCode.START_RALLY_FIRST,
+          `Stage ${id} counts toward the overall; start the rally first`,
+          { stage: id },
+        ),
+      );
+    }
     if (stage.status === StageStatus.CLOSED) {
       throw new ConflictException(
         apiError(

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RallyStatus } from '@rally-gate/shared';
 import { computed, onMounted, ref } from 'vue';
 import {
   createEntryClass,
@@ -9,10 +10,15 @@ import {
 } from '../api/entry-classes';
 import { fetchEntries, type Entry } from '../api/entries';
 import FormDialog from '../components/FormDialog.vue';
+import { lockedWhen } from '../api/rally-info';
+import RallyLockAlert from '../components/RallyLockAlert.vue';
 import { required } from '../format';
 import { notify, t, useConfirm } from '@rally-gate/ui';
 
 const confirm = useConfirm();
+// Renaming or deleting regroups rankings already timed; adding doesn't.
+const editLocked = lockedWhen(RallyStatus.RUNNING, RallyStatus.CLOSED);
+const addLocked = lockedWhen(RallyStatus.CLOSED);
 
 const classes = ref<EntryClass[]>([]);
 const entries = ref<Entry[]>([]);
@@ -83,11 +89,17 @@ onMounted(refresh);
     {{ $t('setup.back') }}
   </v-btn>
 
+  <RallyLockAlert :when="[RallyStatus.RUNNING, RallyStatus.CLOSED]" />
   <v-card>
     <v-card-title class="d-flex align-center">
       {{ $t('classes.classes') }}
       <v-spacer />
-      <v-btn variant="tonal" prepend-icon="mdi-plus" @click="openDialog(null)">
+      <v-btn
+        variant="tonal"
+        prepend-icon="mdi-plus"
+        :disabled="addLocked"
+        @click="openDialog(null)"
+      >
         {{ $t('classes.add') }}
       </v-btn>
     </v-card-title>
@@ -133,6 +145,7 @@ onMounted(refresh);
                 size="small"
                 variant="text"
                 prepend-icon="mdi-pencil"
+                :disabled="editLocked"
                 @click="openDialog(entryClass)"
               >
                 {{ $t('common.edit') }}
@@ -142,6 +155,7 @@ onMounted(refresh);
                   <v-btn
                     v-bind="menu"
                     icon="mdi-dots-vertical"
+                    :disabled="editLocked"
                     size="small"
                     variant="text"
                     :aria-label="

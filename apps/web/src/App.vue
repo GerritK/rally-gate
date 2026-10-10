@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watchEffect } from 'vue';
+import { onMounted, ref, watch, watchEffect } from 'vue';
 import {
   currentLocale,
   LocaleMenu,
@@ -10,12 +10,12 @@ import {
   t,
 } from '@rally-gate/ui';
 import { fetchEventInfo } from './api/event';
-import { fetchRallyInfo, rallyName } from './api/rally-info';
+import { fetchRallyInfo, rallyName, rallyStatus } from './api/rally-info';
 import { liveStatus } from './api/live';
 import { serverNow, syncServerClock } from './api/time';
 import { fetchServerVersion, serverVersion } from './api/version';
 import { loadDisplaySettings } from './crew';
-import { eventName } from './format';
+import { eventName, RALLY_STATUS_DISPLAY } from './format';
 import { useRoute } from 'vue-router';
 import { NAV_ITEMS } from './router';
 
@@ -47,6 +47,13 @@ const LIVE_DISPLAY = {
   },
 } as const;
 
+// Pages with a live stream get a status change pushed; the others pick it
+// up here, on the next navigation.
+watch(
+  () => route.path,
+  () => fetchRallyInfo().catch(() => undefined),
+);
+
 onMounted(async () => {
   void fetchServerVersion();
   syncServerClock().catch(() => undefined);
@@ -74,6 +81,19 @@ onMounted(async () => {
         </div>
       </v-app-bar-title>
       <template #append>
+        <!-- Links to where it is changed; the change itself never sits in
+             the app bar, where a stray tap on a tablet would end a rally. -->
+        <v-chip
+          to="/setup"
+          :color="RALLY_STATUS_DISPLAY[rallyStatus].color"
+          :prepend-icon="RALLY_STATUS_DISPLAY[rallyStatus].icon"
+          size="small"
+          variant="tonal"
+          v-tooltip:bottom="t('rallyStatus.title')"
+        >
+          {{ RALLY_STATUS_DISPLAY[rallyStatus].label }}
+        </v-chip>
+        <v-divider vertical inset class="mx-4" />
         <v-chip
           v-if="liveStatus"
           :color="LIVE_DISPLAY[liveStatus].color"

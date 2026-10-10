@@ -1,5 +1,6 @@
-import { StageStatus } from '@rally-gate/shared';
+import { RallyStatus, StageScoring, StageStatus } from '@rally-gate/shared';
 import { FindOperator } from 'typeorm';
+import { RallyInfoService } from '../rally-info/rally-info.service';
 import { StagesService } from './stages.service';
 
 type StageRow = {
@@ -7,9 +8,13 @@ type StageRow = {
   status: StageStatus;
   stageNumber?: number;
   name?: string;
+  scoring?: StageScoring;
 };
 
-function makeService(initialStages: StageRow[]) {
+function makeService(
+  initialStages: StageRow[],
+  rally: RallyStatus = RallyStatus.RUNNING,
+) {
   const state: StageRow[] = initialStages.map((s) => ({ ...s }));
   const stages = {
     findOneBy: jest.fn(
@@ -60,6 +65,10 @@ function makeService(initialStages: StageRow[]) {
       stages as never,
       gateAssignmentsService as never,
       emitter as never,
+      new RallyInfoService(
+        { findOneBy: () => Promise.resolve({ status: rally }) } as never,
+        {} as never,
+      ),
     ),
     gateAssignmentsService,
     emitter,
@@ -277,6 +286,58 @@ describe('StagesService.activate', () => {
 
     await expect(service.activate('SS1', false)).rejects.toThrow(/closed/i);
     expect(gateAssignmentsService.activateForStage).not.toHaveBeenCalled();
+  });
+
+  it('refuses a counted stage before the rally starts, so it never starts unnoticed', async () => {
+    const { service, gateAssignmentsService } = makeService(
+      [
+        {
+          id: 'SS1',
+          status: StageStatus.NOT_STARTED,
+          scoring: StageScoring.OVERALL,
+        },
+      ],
+      RallyStatus.SETUP,
+    );
+
+    await expect(service.activate('SS1', false)).rejects.toMatchObject({
+      response: { code: 'startRallyFirst' },
+    });
+    expect(gateAssignmentsService.activateForStage).not.toHaveBeenCalled();
+  });
+
+  it('runs a shakedown before the rally starts', async () => {
+    const { service } = makeService(
+      [
+        {
+          id: 'SD',
+          status: StageStatus.NOT_STARTED,
+          scoring: StageScoring.NONE,
+        },
+      ],
+      RallyStatus.SETUP,
+    );
+
+    await expect(service.activate('SD', false)).resolves.toMatchObject({
+      status: StageStatus.ACTIVE,
+    });
+  });
+
+  it('activates nothing once the rally is closed', async () => {
+    const { service } = makeService(
+      [
+        {
+          id: 'SD',
+          status: StageStatus.NOT_STARTED,
+          scoring: StageScoring.NONE,
+        },
+      ],
+      RallyStatus.CLOSED,
+    );
+
+    await expect(service.activate('SD', false)).rejects.toMatchObject({
+      response: { code: 'lockedWhileClosed' },
+    });
   });
 
   it('closes a bumped stage when forced, not just deactivates it', async () => {

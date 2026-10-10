@@ -1,8 +1,9 @@
-import type { LiveEventType } from '@rally-gate/shared';
+import type { LiveEventType, RallyStatus } from '@rally-gate/shared';
 import { ref } from 'vue';
 import { API_BASE } from './client';
 import type { DetectionEventRecord } from './events';
 import type { Gate } from './gates';
+import { applyRallyInfo, fetchRallyInfo, type RallyInfo } from './rally-info';
 import type { StageRun, StageSplit } from './stage-runs';
 
 interface LivePayloads {
@@ -12,6 +13,7 @@ interface LivePayloads {
   gate: Gate;
   'pending-detections': { pending: DetectionEventRecord[] };
   'awaiting-detections': { awaiting: DetectionEventRecord[] };
+  rally: RallyInfo & { status: RallyStatus };
 }
 
 export type LiveHandlers = {
@@ -32,6 +34,7 @@ export const liveStatus = ref<'connecting' | 'live' | 'offline' | null>(null);
  *
  * `onOpen` fires on the first connect and on every automatic reconnect, i.e.
  * exactly when events may have been missed, so it is where a page refetches.
+ * Every stream also keeps the rally's status current for the app bar.
  */
 export function openLiveStream(
   handlers: LiveHandlers,
@@ -41,13 +44,17 @@ export function openLiveStream(
   liveStatus.value = 'connecting';
   source.onopen = () => {
     liveStatus.value = 'live';
+    void fetchRallyInfo();
     onOpen();
   };
   // EventSource reconnects by itself; this is the gap until it does.
   source.onerror = () => {
     liveStatus.value = 'offline';
   };
-  for (const [type, handler] of Object.entries(handlers)) {
+  for (const [type, handler] of Object.entries({
+    rally: applyRallyInfo,
+    ...handlers,
+  })) {
     source.addEventListener(type, (e) =>
       (handler as (data: unknown) => void)(
         JSON.parse((e as MessageEvent).data),

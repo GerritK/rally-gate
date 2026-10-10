@@ -3,6 +3,7 @@ import {
   DEFAULT_NOTIONAL_PENALTY_MS,
   NOTIONAL_PENALTY_MS_KEY,
   PenaltyScope,
+  RallyStatus,
   type PenaltyTier,
 } from '@rally-gate/shared';
 import { onMounted, ref } from 'vue';
@@ -15,6 +16,8 @@ import {
 } from '../api/penalties';
 import { fetchSetting, saveSetting } from '../api/settings';
 import FormDialog from '../components/FormDialog.vue';
+import { lockedWhen } from '../api/rally-info';
+import RallyLockAlert from '../components/RallyLockAlert.vue';
 import {
   formatWholeSeconds,
   parseWholeSeconds,
@@ -25,6 +28,8 @@ import { useUnsavedChanges } from '../unsaved-changes';
 import { notify, t, useConfirm } from '@rally-gate/ui';
 
 const confirm = useConfirm();
+// The notional penalty moves every DNF/DNS total, a type every penalty of it.
+const locked = lockedWhen(RallyStatus.CLOSED);
 
 const types = ref<PenaltyType[]>([]);
 const dialogOpen = ref(false);
@@ -147,6 +152,7 @@ onMounted(async () => {
     {{ $t('setup.back') }}
   </v-btn>
 
+  <RallyLockAlert :when="[RallyStatus.CLOSED]" />
   <v-card>
     <v-card-title>{{ $t('scoring.title') }}</v-card-title>
     <v-card-text>
@@ -184,6 +190,7 @@ onMounted(async () => {
           type="submit"
           color="primary"
           :loading="savingPenalty"
+          :disabled="locked"
           prepend-icon="mdi-content-save"
         >
           {{ $t('common.save') }}
@@ -228,6 +235,7 @@ onMounted(async () => {
                 size="small"
                 variant="text"
                 prepend-icon="mdi-pencil"
+                :disabled="locked"
                 @click="openDialog(type)"
               >
                 {{ $t('common.edit') }}
@@ -237,6 +245,7 @@ onMounted(async () => {
                   <v-btn
                     v-bind="menu"
                     icon="mdi-dots-vertical"
+                    :disabled="locked"
                     size="small"
                     variant="text"
                     :aria-label="$t('common.moreFor', { name: type.name })"

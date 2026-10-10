@@ -10,6 +10,8 @@ import {
 } from '@nestjs/common';
 import { CreatePenaltyDto, PenaltyTypeDto } from './dto';
 import { PenaltiesService } from './penalties.service';
+import { RallyStatus } from '@rally-gate/shared';
+import { LockedWhen } from '../rally-info/rally-lock';
 
 @Controller('penalty-types')
 export class PenaltyTypesController {
@@ -26,11 +28,13 @@ export class PenaltyTypesController {
   }
 
   /** Reprices every penalty of the type, already given ones included. */
+  @LockedWhen(RallyStatus.CLOSED)
   @Put(':id')
   update(@Param('id') id: string, @Body() body: PenaltyTypeDto) {
     return this.penaltiesService.updateType(id, body);
   }
 
+  @LockedWhen(RallyStatus.CLOSED)
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.penaltiesService.removeType(id);
@@ -46,11 +50,13 @@ export class PenaltiesController {
     return this.penaltiesService.findAll(entryId);
   }
 
+  @LockedWhen(RallyStatus.CLOSED)
   @Post()
   create(@Body() body: CreatePenaltyDto) {
     return this.penaltiesService.create(body);
   }
 
+  @LockedWhen(RallyStatus.CLOSED)
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.penaltiesService.remove(id);

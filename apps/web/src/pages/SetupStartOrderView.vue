@@ -6,11 +6,17 @@ import {
   StartOrderDirection,
   StartOrderGrouping,
   StartOrderKey,
+  RallyStatus,
 } from '@rally-gate/shared';
 import { computed, onMounted, ref } from 'vue';
 import { fetchSetting, saveSetting } from '../api/settings';
+import { lockedWhen } from '../api/rally-info';
+import RallyLockAlert from '../components/RallyLockAlert.vue';
 import { useUnsavedChanges } from '../unsaved-changes';
 import { notify, t } from '@rally-gate/ui';
+
+// Start lists of stages yet to run would reorder mid-rally.
+const locked = lockedWhen(RallyStatus.RUNNING, RallyStatus.CLOSED);
 
 const groupingOptions = computed(() => [
   { value: StartOrderGrouping.MAIN_CLASS, title: t('startOrder.byMainClass') },
@@ -80,6 +86,7 @@ onMounted(async () => {
     {{ $t('setup.back') }}
   </v-btn>
 
+  <RallyLockAlert :when="[RallyStatus.RUNNING, RallyStatus.CLOSED]" />
   <v-card>
     <v-card-title>{{ $t('startOrder.title') }}</v-card-title>
     <v-card-text>
@@ -94,6 +101,7 @@ onMounted(async () => {
         <v-select
           v-model="grouping"
           :items="groupingOptions"
+          :disabled="locked"
           :label="$t('startOrder.grouping')"
           :hint="$t('startOrder.groupingHint')"
           persistent-hint
@@ -102,6 +110,7 @@ onMounted(async () => {
         <v-select
           v-model="key"
           :items="keyOptions"
+          :disabled="locked"
           :label="$t('startOrder.orderWithin')"
           :hint="
             key === StartOrderKey.OVERALL_TIME
@@ -117,7 +126,7 @@ onMounted(async () => {
           v-model="direction"
           :items="directionOptions"
           :label="$t('startOrder.direction')"
-          :disabled="key === StartOrderKey.START_NUMBER"
+          :disabled="locked || key === StartOrderKey.START_NUMBER"
           style="max-width: 420px"
         />
         <div class="d-flex align-center ga-3">
@@ -125,6 +134,7 @@ onMounted(async () => {
             type="submit"
             color="primary"
             :loading="saving"
+            :disabled="locked"
             prepend-icon="mdi-content-save"
           >
             {{ $t('common.save') }}

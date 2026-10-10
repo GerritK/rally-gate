@@ -1,6 +1,7 @@
 import {
   GateRole,
   HEARTBEAT_ONLINE_THRESHOLD_MS,
+  RallyStatus,
   StageRunStatus,
   StageScoring,
   StageStatus,
@@ -112,6 +113,35 @@ export const STAGE_STATUS_DISPLAY: Record<
     },
     color: 'timing-idle',
     icon: 'mdi-check-circle-outline',
+  },
+};
+
+/** The app bar chip and Setup → Rally. Closed is not red: official results
+ *  are no race problem. */
+export const RALLY_STATUS_DISPLAY: Record<
+  RallyStatus,
+  { label: string; color: string; icon: string }
+> = {
+  [RallyStatus.SETUP]: {
+    get label() {
+      return t('rallyStatus.setup');
+    },
+    color: 'timing-idle',
+    icon: 'mdi-wrench-outline',
+  },
+  [RallyStatus.RUNNING]: {
+    get label() {
+      return t('rallyStatus.running');
+    },
+    color: 'success',
+    icon: 'mdi-flag-variant-outline',
+  },
+  [RallyStatus.CLOSED]: {
+    get label() {
+      return t('rallyStatus.closed');
+    },
+    color: 'secondary',
+    icon: 'mdi-flag-checkered',
   },
 };
 

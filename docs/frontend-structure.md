@@ -13,9 +13,9 @@ sharing `client.ts`). Audience is marshals and organisers only.
 | `/entries` | Entries | registration in a dialog, status, classes; per row the status's next step (Check in, Passed) and ⋮ for the rest (back a step, Withdraw, Disqualify, Reinstate); Check-in in the header; a row opens the entry |
 | `/entries/check-in` | Entries | check-in in two stations, Desk and Scrutineering (switch remembered per device), since the two happen at different tables and scrutineering doesn't go in entry order: how many are checked in and scrutineered, the cars still open at this station, a search by start number or name that finds every car (Enter picks the first match, exact number first, accents ignored), the picked car beside the list with its car, classes and transponder, its next step as the big button, Edit and ⋮. The desk also offers Check in and pass, and takes the transponders inline, saved with the step; one another car already has, or several of one kind, is allowed but warned about, as in the entry dialog. Switching station drops the picked car. After a step the search clears for the next car. However long the list, the picked car stays in view: beside the list it travels with the page, on a phone it sits above the list and the page scrolls up to it |
 | `/entries/:entryId` | Entries | one entry: door number and crew on top with Edit (the same dialog), then the dialog's parts as cards: Crew (names in full, flags with their country), Car (body, chassis), Registration (status, classes, transponders); below them Times: the overall standing, and per stage in stage order start, finish (hand-set marked), time (fastest marked), position and gap among all classes, a status where its time is missing (DNS, Waiting, Not started across Start and Finish; DNF, On stage under Finish), and a DNF or DNS with the notional time the overall charges for it under Time; then Penalties in counting order, each with what it costs (grey until its stage closes), Add penalties (the same dialog, the stage or the whole rally picked in it) and delete in ⋮. With the penalties the rows add up to the total. Result rows open it too |
-| `/hardware` | Hardware | gate roster: online, heartbeat, clock offset, version, add/delete, auto-discovery toggle, shut down all gates; a row opens the gate. Gates known to this computer: add to this event, forget (standalone only) |
+| `/hardware` | Hardware | gate roster: online, heartbeat, last read with the car it matched (gate and transponder tests before the rally), clock offset, version, add/delete, auto-discovery toggle, shut down all gates; a row opens the gate. Gates known to this computer: add to this event, forget (standalone only) |
 | `/hardware/gates/:gateId` | Hardware | one gate: status, clock, address with a link to its gate-config, version, rename; its assignments on every stage; its last 100 detections, live, with clock correction and what became of each |
-| `/setup` | Setup | the event: rally details, file name, New / Open Event dialogs (standalone only); tiles to Stages, Classes, Start order, Scoring and Display. The app bar's cog links here |
+| `/setup` | Setup | the event: rally details, file name, New / Open Event dialogs (standalone only); the rally status with what it locks, Start rally (behind the pre-start check), Close rally (confirmed, names the stages it closes), Reopen in ⋮ (confirmed); tiles to Stages, Classes, Start order, Scoring and Display. The app bar's cog links here |
 | `/setup/stages` | Setup | stage list, create |
 | `/setup/stages/:stageId` | Setup | edit stage (scoring included), its gate assignments (active state read-only) |
 | `/setup/classes` | Setup | entry classes table: add/rename/delete, main class or category, entry count. Assigned on Entries |
@@ -34,10 +34,12 @@ sharing `client.ts`). Audience is marshals and organisers only.
   URLs: track, class filter, card header, Print and "Print all" exist once.
   Only the table differs (`OverallRanking`, `StageRanking`), since the
   columns and the second table (not classified vs. DNF/DNS) really differ.
-- **The app bar** shows the open event, the server clock and the live
+- **The app bar** shows the open event, the rally status (a chip linking
+  to Setup, where it changes), the server clock and the live
   stream's state (see `design-system.md` "App bar"). The state comes from the
   page's own stream (`liveStatus` in `api/live.ts`), never a second
-  connection.
+  connection. The rally status rides on that stream too; a page without
+  one refetches it on navigation.
 - **Live Timing loads its data directly, not only when the live stream opens.**
   A browser allows six connections per host, and each dashboard tab holds one
   stream, so with enough tabs open the stream sits pending; waiting for it

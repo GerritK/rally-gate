@@ -34,7 +34,8 @@ async function assign(gateId, stageId, role, splitIndex) {
 async function main() {
   console.log(
     // No `status` — it's server-owned and starts NOT_STARTED; the API
-    // rejects unknown properties. Activation happens via /stages/WP1/activate.
+    // rejects unknown properties. Activation happens via /stages/WP1/activate,
+    // once the rally is started.
     await post('/stages', {
       id: 'WP1',
       name: 'Wilderness Pass 1',
@@ -44,6 +45,8 @@ async function main() {
   await assign('START_WP1', 'WP1', 'stage_start');
   await assign('SPLIT1_WP1', 'WP1', 'stage_split', 1);
   await assign('FINISH_WP1', 'WP1', 'stage_finish');
+  // WP1 counts toward the overall, so the rally has to be running first.
+  console.log(await post('/rally-info/start'));
   console.log(await post('/stages/WP1/activate'));
   console.log(
     await post('/entries', {

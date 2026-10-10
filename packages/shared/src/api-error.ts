@@ -46,6 +46,13 @@ export enum ApiErrorCode {
   EVENT_FIXED_BY_CONFIG = 'eventFixedByConfig',
   CLOSE_STAGE_BEFORE_SWITCH = 'closeStageBeforeSwitch',
   KNOWN_HARDWARE_STANDALONE_ONLY = 'knownHardwareStandaloneOnly',
+  LOCKED_WHILE_RUNNING = 'lockedWhileRunning',
+  LOCKED_WHILE_CLOSED = 'lockedWhileClosed',
+  START_RALLY_FIRST = 'startRallyFirst',
+  /** `params.status`: the rally's current one. */
+  RALLY_STATUS_INVALID = 'rallyStatusInvalid',
+  /** `params.count`: cars still on stage. */
+  CARS_ON_STAGE = 'carsOnStage',
 }
 
 /**

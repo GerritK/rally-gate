@@ -10,6 +10,9 @@ which the dashboard translates as `errors.<code>` with `params` filled in;
 `message` is English, for logs and curl. Validation 400s and 500s have no
 `code`.
 
+A change the rally status locks (`event-model.md` "Rally status") is a 409
+`lockedWhileRunning` or `lockedWhileClosed`.
+
 | Endpoint | Methods | Notes |
 |---|---|---|
 | `/version` | GET | `{ version }`, the server's build — see "Gate discovery & heartbeat" in `architecture.md` |
@@ -22,7 +25,7 @@ which the dashboard translates as `errors.<code>` with `params` filled in;
 | `/penalty-types` | GET, POST, `/:id` PUT/DELETE | `{ name, scope, tiers: [{ fromCount, seconds }] }`, tiers from 1 ascending (400), name unique (409). PUT reprices given penalties, DELETE deletes them |
 | `/penalties` | GET `?entryId=`, POST, `/:id` DELETE | `{ entryId, stageId?, typeId?, count?, seconds?, note? }`: a type, or free text with `seconds` and `note` (400). 409 on a stage not started. Read back with its computed `penaltyMs` (`event-model.md` "Penalties") |
 | `/stages` | GET, POST, `/:id` GET/PUT/DELETE | sorted by `stageNumber`; `status` is server-owned |
-| `/stages/:id/activate` | POST | activates the stage's gate assignments. 409 `otherStageActive` with `params.conflictingStageIds` if a gate is active elsewhere (`?force=true` closes that stage), 409 if already `CLOSED` |
+| `/stages/:id/activate` | POST | activates the stage's gate assignments. 409 `otherStageActive` with `params.conflictingStageIds` if a gate is active elsewhere (`?force=true` closes that stage), 409 if already `CLOSED`, `startRallyFirst` for a stage scored `OVERALL` before the rally starts, `lockedWhileClosed` once it is closed |
 | `/stages/:id/close` | POST | deactivates its gates, marks it `CLOSED`. Terminal |
 | `/stages/:id/start-order` | GET | `{ frozen, frozenAt, grouped, entries }`; computed live until frozen. See `event-model.md` "Start order" |
 | `/stages/:id/start-order/freeze` | POST | stores the snapshot; no-op if already frozen (activation also freezes) |
@@ -42,7 +45,8 @@ which the dashboard translates as `errors.<code>` with `params` filled in;
 | `/classification/stages/:stageId/split-gates` | GET | the stage's split points |
 | `/classification/stages/:stageId/splits/:splitIndex` | GET | live, includes `STARTED` runs, excludes `CANCELLED` |
 | `/classification/stages/:stageId/non-finishers` | GET | DNF; DNS only once the stage is `CLOSED`; DSQ for a disqualified car that drove it, at any time. Disqualified cars are in no ranking (`event-model.md` "Entry status") |
-| `/rally-info` | GET, PUT | the event's name/details; singleton, since one database is one event |
+| `/rally-info` | GET, PUT | the event's name/details and its `status` (server-owned); singleton, since one database is one event |
+| `/rally-info/start`, `/close`, `/reopen` | POST | `SETUP` → `RUNNING` → `CLOSED`, reopen back to `RUNNING`; 409 `rallyStatusInvalid` from any other status. Close 409s `carsOnStage` with `params.count`, else closes the running stages |
 | `/event` | GET, POST `{ name, date }`, `/open` POST `{ file }` | the open event file and the others in the folder, `switchable: false` when fixed by config. POST creates/opens by restarting the server (202, then poll GET); 409 while a stage is `ACTIVE` — see `deployment-modes.md` |
 | `/event/known-gates` | GET, `/:id` DELETE | gates this computer remembers across events (standalone only); DELETE forgets one, the open event keeps it |
 | `/settings/:key` | GET, PUT | `autoDiscoverGates`, `clockCorrectionThresholdMs`, `notionalPenaltyMs`, `startOrderGrouping`/`startOrderKey`/`startOrderDirection` (enums in `packages/shared/src/start-order.ts`; an unknown value reads as the default) |
@@ -61,6 +65,8 @@ reconnect.
 - `gate` — a `Gate` on each heartbeat
 - `pending-detections` — `{ pending }`, `awaiting-detections` — `{ awaiting }`:
   the whole list on every change, not a delta
+- `rally` — `RallyInfo` on every change, status included; every stream
+  carries it, so the app bar follows on any page with one
 
 A gate's own configuration is not here: `apps/gate-config` serves it on the gate
 itself, port 57439 (`/api/config`, `/api/status`, `/api/network`,

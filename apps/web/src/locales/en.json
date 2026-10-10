@@ -535,7 +535,10 @@
     "gateIdHint": "Its GATE_ID, e.g. START_WP2",
     "nameOptional": "Name (optional)",
     "powerOffRefused": "refused ({detail})",
-    "powerOffUnreachable": "not reachable"
+    "powerOffUnreachable": "not reachable",
+    "lastRead": "Last Read",
+    "unknownTransponder": "{id} (no entry)",
+    "beam": "Beam, no transponder"
   },
   "rowState": {
     "waiting": "Waiting",
@@ -585,6 +588,51 @@
     "eventFileNotFound": "There is no event file {file}.",
     "eventFixedByConfig": "This server's event is fixed by its configuration and can't be switched here.",
     "closeStageBeforeSwitch": "A stage is active. Close it before switching events.",
-    "knownHardwareStandaloneOnly": "Known hardware is only kept in the standalone package."
+    "knownHardwareStandaloneOnly": "Known hardware is only kept in the standalone package.",
+    "lockedWhileRunning": "Locked while the rally is running: it would change results already timed.",
+    "lockedWhileClosed": "The rally is closed and its results are final. Reopen it in Setup to change them.",
+    "startRallyFirst": "{stage} counts toward the overall. Start the rally in Setup first.",
+    "rallyStatusInvalid": "The rally status has changed in the meantime. Reload the page.",
+    "carsOnStage": "Cars still on stage: {count}. Finish or void their runs first."
+  },
+  "rallyStatus": {
+    "setup": "Setup",
+    "running": "Running",
+    "closed": "Closed",
+    "title": "Rally status, changed in Setup"
+  },
+  "rally": {
+    "title": "Rally",
+    "hint": {
+      "SETUP": "Before the start: stages outside the overall (shakedown, qualifying) can run, a counted one waits for Start rally. Gates and transponders can be tested on Hardware without any stage.",
+      "RUNNING": "Results are provisional. Locked: renaming or deleting classes, a start number once its car has driven, the start order rules. Late entries, transponder swaps, withdrawals and corrections stay open.",
+      "CLOSED": "Results are official. Nothing that changes a result can be done: no stage, correction, penalty, entry status, class or start number. Names and display settings stay open."
+    },
+    "start": "Start rally",
+    "startAnyway": "Start anyway",
+    "startText": "From now on counted stages can be activated, and classes, timed start numbers and the start order rules are locked.",
+    "checkTitle": "Start rally?",
+    "checkClean": "All checks passed.",
+    "check": {
+      "noEntries": "No entry is in the event.",
+      "noCountedStage": "No stage counts toward the overall.",
+      "noStartGate": "No start gate: {stages}. Starts only by hand.",
+      "noFinishGate": "No finish gate: {stages}. Finishes only by hand.",
+      "gatesOffline": "Offline: {gates}.",
+      "gatesUnsynced": "Clock not synchronised: {gates}.",
+      "noTransponder": "No transponder: {numbers}.",
+      "sharedTransponder": "Transponder {transponder} is on {numbers}; its passings wait for a marshal.",
+      "noClass": "No class: {numbers}."
+    },
+    "startedNotice": "Rally started",
+    "close": "Close rally",
+    "closeTitle": "Close the rally?",
+    "closesStages": "This closes {stages}.",
+    "closeText": "Results become official and nothing that changes a result can be done until the rally is reopened.",
+    "closedNotice": "Rally closed",
+    "reopen": "Reopen rally",
+    "reopenTitle": "Reopen the rally?",
+    "reopenText": "For a protest: results are provisional again and can be changed until the rally is closed once more.",
+    "reopenedNotice": "Rally reopened"
   }
 }

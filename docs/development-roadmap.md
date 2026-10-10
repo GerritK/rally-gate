@@ -27,6 +27,11 @@ What exists, with where its reasoning lives. History is in git.
   beside its name, never read by the overall or its penalties; a qualifying
   stage orders the first counted stage under "Overall time" (`event-model.md`
   "Stages outside the overall").
+- **Rally status:** Setup → Running → Closed on `RallyInfo`, a chip in the
+  app bar pushed over `/api/live`, Start rally behind a pre-start check,
+  Close and Reopen; route locks by `@LockedWhen`, "Provisional" on result
+  PDFs until Closed, each gate's latest read on Hardware for tests
+  (`event-model.md` "Rally status").
 - **Penalties:** a catalogue of types, flat or tiered, counted per stage or
   across the rally, plus free text; given on Live Timing or the entry page,
   added to the overall total only, priced on read (`event-model.md`
@@ -115,37 +120,6 @@ What exists, with where its reasoning lives. History is in git.
 
 ## Next
 
-- **Event-wide status** — Setup → Running → Closed, on `RallyInfo`,
-  server-owned like `Stage.status`, and visible everywhere: a chip in the app
-  bar on every page, pushed over `/api/live` so every open dashboard switches,
-  and "Provisional" on every PDF until Closed — a closed stage's result can
-  still move by a penalty or a protest (the per-stage rule stays on top).
-  Changed by explicit actions on
-  Setup → Rally only (the chip links there, so a tablet tap in the app bar
-  never ends a rally): **Start rally** opens the pre-start check (every stage
-  has a start and finish, gates online and synced, transponder gaps and
-  duplicates, entries without a class): few hard errors, mostly warnings, as
-  a marshal knows things the check doesn't. In Setup only stages outside the
-  overall can be activated; a counted one refuses and points to Start rally,
-  so a rally never starts unnoticed and trial runs leave nothing to delete.
-  Gate and transponder tests need no stage at all: detections without an
-  active assignment are stored untimed already, so the Hardware page shows
-  each gate's latest reads with the car they matched. Running locks only what
-  reinterprets results already timed (deleting/renaming classes, a timed
-  car's start number, start-order settings, `scoring` on a stage with
-  runs) — late entries, transponder swaps, withdrawals and corrections
-  stay open, or marshals unlock and forget. **Close rally** is refused while
-  a car is on stage and closes open stages after asking. Closed is the
-  valuable one: results official, no "Provisional", and **nothing that
-  changes a result** — no stage activation, corrections, penalties,
-  passing assignments, entry status, classes, start numbers, `scoring` or
-  notional setting. Detections are still stored (evidence) but time
-  nothing; what only changes how results look (a misspelt name, display
-  settings) stays open. **Reopen** returns to Running and is deliberate (a
-  protest), in the menu behind a confirmation — no reason field while
-  nothing would show it. There is no way back to Setup: that is the
-  deferred Reset event. Locks as a per-route decorator, and disabled
-  controls say why.
 - **Class and category badges in rankings** ("2WD · Rookie") on Results
   and the PDFs: only the classes the current filter doesn't already imply
   (filtered to 2WD, a 2WD badge says nothing), and no column at all while

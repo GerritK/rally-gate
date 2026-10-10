@@ -223,7 +223,8 @@ Values live in `theme.ts`. The rules:
   visible delete button per row invites a slip on a tablet.
 - **A menu has at least two entries**, otherwise its one entry becomes the
   direct action. Delete is the exception: a menu holding only Delete is
-  fine, by the rule above.
+  fine, by the rule above; so is Reopen rally, kept out of reach the same
+  way.
 - **A row with a detail page opens it on click**, so it needs no Edit
   button and the direct action stays free for the real one.
 - **Add sits top right in the table card's title** (`#append`): visible
@@ -245,7 +246,8 @@ Values live in `theme.ts`. The rules:
   gates during an active stage. A disabled button can't explain itself on
   touch, and a permanent caption beside it is noise for an exception.
   Disable only where the reason is already on screen beside it: Assign
-  with no entry picked, a stage's Save under "This stage is ACTIVE…", a
+  with no entry picked, a Setup page locked by the rally status under its
+  `RallyLockAlert`, a stage's Save under "This stage is ACTIVE…", a
   menu item with the reason as its subtitle.
 - **Ask when data is lost that can't be retyped from the screen or from
   memory:** delete a run or a passing, close a stage, unfreeze a published
@@ -292,7 +294,8 @@ Same in both apps: dark and flat, the logo, then the context that matters,
 status on the right.
 
 - `apps/web`: the open event's name alone; the logo names the product (its
-  alt text is "Rally Gate"). Right: live chip, server clock with date, a cog
+  alt text is "Rally Gate"). Right: rally status chip (a link to Setup,
+  never the action itself), live chip, server clock with date, a cog
   to Setup, separated by vertical dividers.
 - `gate-config`: "Gate Config" small above the gate's name. That line names
   the tool, not the product: the two apps look alike on purpose, and a

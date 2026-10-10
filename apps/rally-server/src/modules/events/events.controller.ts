@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { AssignEntryDto, RecentEventsQueryDto } from './dto';
 import { EventsService } from './events.service';
+import { RallyStatus } from '@rally-gate/shared';
+import { LockedWhen } from '../rally-info/rally-lock';
 
 @Controller('events')
 export class EventsController {
@@ -33,6 +35,7 @@ export class EventsController {
     return this.eventsService.findAwaitingEntry();
   }
 
+  @LockedWhen(RallyStatus.CLOSED)
   @Post(':eventId/assign')
   assign(@Param('eventId') eventId: string, @Body() body: AssignEntryDto) {
     return this.eventsService.assignEntry(eventId, body.entryId);

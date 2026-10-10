@@ -222,6 +222,40 @@ The one exception is the start order, and only for `QUALIFYING`: under
 latest closed qualifying stage before it. Qualifying sets the first stage,
 the overall the rest, with no extra start-order key.
 
+## Rally status
+
+`RallyInfo.status`: `SETUP` → `RUNNING` → `CLOSED`, moved only by Start,
+Close and Reopen on Setup (`POST /rally-info/start|close|reopen`). The app
+bar's chip only links there, so a tap on a tablet never ends a rally.
+
+- **Setup.** Only a stage outside the overall can be activated; a counted
+  one refuses (`startRallyFirst`), so a rally never starts unnoticed and
+  trial runs leave nothing to delete. Gate and transponder tests need no
+  stage: a passing at a gate with no active assignment is stored untimed,
+  but still matched to its car (Hardware shows each gate's latest read).
+- **Start** opens a check in the dashboard: no car or no counted stage
+  blocks it; a stage without a start or finish gate, a planned gate offline
+  or unsynced, cars without a transponder, sharing one or without a class
+  only warn, since a marshal knows things the check doesn't.
+- **Running** locks only what reinterprets results already timed: renaming
+  or deleting classes, a start number once its car has a run, the
+  start-order rules. Late entries, transponder swaps, withdrawals and
+  corrections stay open, or marshals would unlock and forget.
+- **Close** is refused while a car is on stage and closes the stages still
+  running (the dashboard names them before asking). **Closed** locks
+  everything that changes a result: stage activation, corrections,
+  penalties and penalty types, passing assignments, an entry's status,
+  classes and start number, the notional penalty. Detections are still
+  stored, as evidence, but time nothing (no stage is active). What only
+  changes how results look (a misspelt name, display settings) stays open.
+- **Reopen** returns to Running, for a protest. There is no way back to
+  Setup.
+
+Results PDFs say "Provisional" until Closed: a closed stage can still move
+by a penalty or a protest. Route locks are `@LockedWhen(...)` on the
+controller method; a lock on some fields only (an entry, one setting key)
+is checked in code, as a form sends every field.
+
 ## Classes
 
 Organiser-defined data (`EntryClass`: a name and a `main` flag), not an

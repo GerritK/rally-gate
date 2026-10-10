@@ -13,6 +13,7 @@ const LIVE_EVENTS: Record<LiveEventType, string> = {
   // again on the next change without replay.
   'pending-detections': 'detection.pending-changed',
   'awaiting-detections': 'detection.awaiting-changed',
+  rally: 'rally.updated',
 };
 
 @Controller('live')

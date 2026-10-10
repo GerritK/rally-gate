@@ -161,6 +161,13 @@ describe('server-owned fields are not settable through the API', () => {
     ],
     // Singleton pinned to RALLY_INFO_ID; an id could only make a stray row.
     ['RallyInfo.id', UpsertRallyInfoDto, { name: 'Rally', id: 'other' }, 'id'],
+    // Moved by Start / Close / Reopen only, each with its own checks.
+    [
+      'RallyInfo.status',
+      UpsertRallyInfoDto,
+      { name: 'Rally', status: 'CLOSED' },
+      'status',
+    ],
   ];
 
   it.each(forbidden)(
