@@ -11,7 +11,12 @@ import { fetchGates, type Gate } from '../api/gates';
 import { fetchStage, updateStage, type Stage } from '../api/stages';
 import FormDialog from '../components/FormDialog.vue';
 import StatusChip from '../components/StatusChip.vue';
-import { gateRoleLabel, required, STAGE_STATUS_DISPLAY } from '../format';
+import {
+  gateRoleLabel,
+  required,
+  STAGE_STATUS_DISPLAY,
+  stageScoringLabel,
+} from '../format';
 import {
   formatStageDuration,
   notify,
@@ -21,6 +26,7 @@ import {
 import {
   DEFAULT_MIN_STAGE_DURATION_MS,
   GateRole,
+  StageScoring,
   StageStatus,
 } from '@rally-gate/shared';
 import { useUnsavedChanges } from '../unsaved-changes';
@@ -41,6 +47,7 @@ const { markSaved } = useUnsavedChanges(() =>
     ? [
         stage.value.name,
         stage.value.stageNumber,
+        stage.value.scoring,
         expectedText.value,
         minText.value,
       ]
@@ -52,6 +59,12 @@ const newAssignment = ref<{
   role: GateRole;
   splitIndex?: number;
 }>({ gateId: '', role: GateRole.STAGE_START });
+const scoringOptions = computed(() =>
+  Object.values(StageScoring).map((value) => ({
+    value,
+    title: stageScoringLabel(value),
+  })),
+);
 const roleOptions = computed(() =>
   GATE_ROLES.map((role) => ({
     value: role,
@@ -112,6 +125,7 @@ async function onSaveStage() {
       await updateStage(stage.value.id, {
         name: stage.value.name,
         stageNumber: stage.value.stageNumber,
+        scoring: stage.value.scoring,
         expectedDurationMs: parseStageDuration(expectedText.value ?? ''),
         minDurationMs: parseStageDuration(minText.value ?? ''),
       }),
@@ -153,8 +167,13 @@ onMounted(load);
     {{ $t('stage.back') }}
   </v-btn>
 
-  <v-card v-if="stage" class="mb-6">
-    <v-card-title>{{ $t('stage.details') }}</v-card-title>
+  <v-card v-if="stage" class="mb-4">
+    <v-card-item>
+      <v-card-title>{{ $t('stage.details') }}</v-card-title>
+      <template #append>
+        <StatusChip :display="STAGE_STATUS_DISPLAY[stage.status]" />
+      </template>
+    </v-card-item>
     <v-card-text>
       <v-alert v-if="!stageEditable" type="info" variant="tonal" class="mb-4">
         {{
@@ -163,67 +182,77 @@ onMounted(load);
           })
         }}
       </v-alert>
-      <form
-        class="d-flex flex-wrap align-center ga-3"
-        @submit.prevent="onSaveStage"
-      >
-        <v-text-field
-          v-model.number="stage.stageNumber"
-          type="number"
-          min="1"
-          :label="$t('stages.number')"
-          density="comfortable"
-          hide-details
-          :disabled="!stageEditable"
-          style="max-width: 140px"
-        />
-        <v-text-field
-          v-model="stage.name"
-          :label="$t('stages.name')"
-          density="comfortable"
-          hide-details
-          :disabled="!stageEditable"
-          style="min-width: 220px"
-        />
-        <v-text-field
-          v-model="expectedText"
-          :label="$t('stage.expectedTime')"
-          placeholder="5:00"
-          class="rg-timing"
-          density="comfortable"
-          hide-details="auto"
-          clearable
-          :rules="[durationRule]"
-          :disabled="!stageEditable"
-          style="max-width: 200px"
-        />
-        <v-text-field
-          v-model="minText"
-          :label="$t('stage.minimumTime')"
-          :placeholder="formatStageDuration(DEFAULT_MIN_STAGE_DURATION_MS)"
-          persistent-placeholder
-          class="rg-timing"
-          density="comfortable"
-          hide-details="auto"
-          clearable
-          :rules="[durationRule]"
-          :disabled="!stageEditable"
-          style="max-width: 200px"
-        />
-        <StatusChip :display="STAGE_STATUS_DISPLAY[stage.status]" />
-        <v-btn
-          type="submit"
-          color="primary"
-          :loading="savingStage"
-          :disabled="!stageEditable"
-          prepend-icon="mdi-content-save"
-        >
-          {{ $t('common.save') }}
-        </v-btn>
+      <form class="rg-stage-form" @submit.prevent="onSaveStage">
+        <div class="rg-stage-sections">
+          <div class="rg-stage-fields">
+            <div class="rg-section-title">{{ $t('stage.general') }}</div>
+            <div class="d-flex ga-3">
+              <v-text-field
+                v-model.number="stage.stageNumber"
+                type="number"
+                min="1"
+                :label="$t('stages.number')"
+                hide-details
+                :disabled="!stageEditable"
+                style="max-width: 110px"
+              />
+              <v-text-field
+                v-model="stage.name"
+                :label="$t('stages.name')"
+                hide-details
+                :disabled="!stageEditable"
+              />
+            </div>
+          </div>
+          <div class="rg-stage-fields">
+            <div class="rg-section-title">{{ $t('stage.scoring') }}</div>
+            <v-select
+              v-model="stage.scoring"
+              :items="scoringOptions"
+              :label="$t('stage.scoring')"
+              :hint="$t('stage.scoringHint')"
+              persistent-hint
+              :disabled="!stageEditable"
+            />
+          </div>
+          <div class="rg-stage-fields">
+            <div class="rg-section-title">{{ $t('stage.times') }}</div>
+            <v-text-field
+              v-model="expectedText"
+              :label="$t('stage.expectedTime')"
+              placeholder="5:00"
+              class="rg-timing"
+              hide-details="auto"
+              clearable
+              :rules="[durationRule]"
+              :disabled="!stageEditable"
+            />
+            <v-text-field
+              v-model="minText"
+              :label="$t('stage.minimumTime')"
+              :placeholder="formatStageDuration(DEFAULT_MIN_STAGE_DURATION_MS)"
+              persistent-placeholder
+              :hint="$t('stage.minimumHint')"
+              persistent-hint
+              class="rg-timing"
+              clearable
+              :rules="[durationRule]"
+              :disabled="!stageEditable"
+            />
+          </div>
+        </div>
+        <div>
+          <v-btn
+            type="submit"
+            color="primary"
+            :loading="savingStage"
+            :disabled="!stageEditable"
+            prepend-icon="mdi-content-save"
+          >
+            {{ $t('common.save') }}
+          </v-btn>
+        </div>
       </form>
-      <div class="text-caption text-medium-emphasis mt-2">
-        {{ $t('stage.minimumHint') }}
-      </div>
     </v-card-text>
   </v-card>
 
@@ -349,3 +378,23 @@ onMounted(load);
     />
   </FormDialog>
 </template>
+
+<style scoped>
+.rg-stage-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+/* One column per topic, side by side as they fit; stacked on a phone. */
+.rg-stage-sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px 32px;
+  align-items: start;
+}
+.rg-stage-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+</style>

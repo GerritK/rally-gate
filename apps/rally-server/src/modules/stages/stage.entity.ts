@@ -1,4 +1,4 @@
-import { StageStatus } from '@rally-gate/shared';
+import { StageScoring, StageStatus } from '@rally-gate/shared';
 import { Column, Entity, PrimaryColumn } from 'typeorm';
 
 @Entity()
@@ -14,6 +14,9 @@ export class Stage {
 
   @Column({ type: 'varchar', default: StageStatus.NOT_STARTED })
   status: StageStatus;
+
+  @Column({ type: 'varchar', default: StageScoring.OVERALL })
+  scoring: StageScoring;
 
   @Column({ type: 'int', nullable: true })
   expectedDurationMs: number | null;

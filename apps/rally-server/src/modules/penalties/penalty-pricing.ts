@@ -1,4 +1,5 @@
-import { PenaltyScope, PenaltyTier } from '@rally-gate/shared';
+import { PenaltyScope, PenaltyTier, StageScoring } from '@rally-gate/shared';
+import { Stage } from '../stages/stage.entity';
 import { Penalty } from './penalty.entity';
 import { PenaltyType } from './penalty-type.entity';
 
@@ -11,14 +12,22 @@ function tierSeconds(tiers: PenaltyTier[], n: number): number {
  * Each penalty's price in ms, by id. Offences of a type are counted per
  * entry in stage order (penalties on no stage after every stage, then by
  * entry time), from 1 again per stage unless the type counts per rally. So
- * every penalty of the rally goes in, even to price one.
+ * every penalty of the rally goes in, even to price one. A stage outside the
+ * overall always counts on its own: a shakedown's offences never make a
+ * later one dearer.
  */
 export function pricePenalties(
   penalties: Penalty[],
   types: PenaltyType[],
-  stageOrder: string[],
+  stages: Pick<Stage, 'id' | 'scoring'>[],
 ): Map<string, number> {
   const typeById = new Map(types.map((type) => [type.id, type]));
+  const stageOrder = stages.map((stage) => stage.id);
+  const uncounted = new Set(
+    stages
+      .filter((stage) => stage.scoring !== StageScoring.OVERALL)
+      .map((stage) => stage.id),
+  );
   const position = (stageId: string | null) =>
     stageId === null ? Infinity : stageOrder.indexOf(stageId);
   const sorted = [...penalties].sort(
@@ -38,7 +47,10 @@ export function pricePenalties(
     const key = [
       penalty.entryId,
       type.id,
-      type.scope === PenaltyScope.RALLY ? '' : (penalty.stageId ?? ''),
+      type.scope === PenaltyScope.RALLY &&
+      !(penalty.stageId && uncounted.has(penalty.stageId))
+        ? ''
+        : (penalty.stageId ?? ''),
     ].join('|');
     const before = counted.get(key) ?? 0;
     let seconds = 0;

@@ -6,6 +6,7 @@ import {
   START_ORDER_DIRECTION_KEY,
   START_ORDER_GROUPING_KEY,
   START_ORDER_KEY_KEY,
+  StageScoring,
   StageStatus,
   StartOrder,
   StartOrderDirection,
@@ -16,7 +17,7 @@ import { apiError } from '../../common/api-error';
 import { ClassificationService } from '../classification/classification.service';
 import { SettingsService } from '../settings/settings.service';
 import { Stage } from '../stages/stage.entity';
-import { StagesService } from '../stages/stages.service';
+import { countsInOverall, StagesService } from '../stages/stages.service';
 import { Entry } from '../entries/entry.entity';
 import {
   compareClassNames,
@@ -172,25 +173,36 @@ export class StartOrderService {
 
   /**
    * Overall time comes from the group's own class ranking: notionals depend
-   * on the ranking, and the list has to agree with the class results.
+   * on the ranking, and the list has to agree with the class results. Until
+   * a counted stage has closed there is no overall, so the latest closed
+   * qualifying stage before this one orders it instead.
    */
   private async timesFor(
     key: StartOrderKey,
     stage: Stage,
     classId: string | null,
   ): Promise<Map<string, number>> {
+    const stages = await this.stagesService.findAll();
+    const before = stages.filter(
+      (s) =>
+        s.status === StageStatus.CLOSED && s.stageNumber < stage.stageNumber,
+    );
     let placings: { entryId: string; durationMs: number }[] = [];
     if (key === StartOrderKey.OVERALL_TIME) {
-      placings = await this.classificationService.getOverallClassification(
-        classId ? [classId] : [],
-      );
+      const qualifying = before
+        .filter((s) => s.scoring === StageScoring.QUALIFYING)
+        .at(-1);
+      placings =
+        qualifying && !stages.some(countsInOverall)
+          ? await this.classificationService.getStageClassification(
+              qualifying.id,
+            )
+          : await this.classificationService.getOverallClassification(
+              classId ? [classId] : [],
+            );
     } else if (key === StartOrderKey.LAST_STAGE_TIME) {
-      const previous = (await this.stagesService.findAll())
-        .filter(
-          (s) =>
-            s.status === StageStatus.CLOSED &&
-            s.stageNumber < stage.stageNumber,
-        )
+      const previous = before
+        .filter((s) => s.scoring === StageScoring.OVERALL)
         .at(-1);
       if (previous) {
         placings = await this.classificationService.getStageClassification(

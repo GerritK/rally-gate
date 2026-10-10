@@ -11,7 +11,7 @@ import { apiError } from '../../common/api-error';
 import { isUniqueViolation } from '../../common/db-errors';
 import { EntriesService } from '../entries/entries.service';
 import { Stage } from '../stages/stage.entity';
-import { StagesService } from '../stages/stages.service';
+import { countsInOverall, StagesService } from '../stages/stages.service';
 import { CreatePenaltyDto, PenaltyTypeDto } from './dto';
 import { pricePenalties } from './penalty-pricing';
 import { PenaltyType } from './penalty-type.entity';
@@ -74,7 +74,7 @@ export class PenaltiesService {
     const prices = pricePenalties(
       all,
       await this.findAllTypes(),
-      (await this.stagesService.findAll()).map((stage) => stage.id),
+      await this.stagesService.findAll(),
     );
     return all
       .filter((penalty) => !entryId || penalty.entryId === entryId)
@@ -153,23 +153,17 @@ export class PenaltiesService {
   }
 
   /**
-   * What the overall adds per entry: penalties on closed stages (the
-   * overall counts only those) and on no stage. Priced against all of them,
-   * since one on a stage still running can come before one that counts.
+   * What the overall adds per entry: penalties on stages it counts
+   * (`countsInOverall`) and on no stage. Priced against all of them, since
+   * one on a stage still running can come before one that counts.
    */
   async overallTotals(stages: Stage[]): Promise<Map<string, number>> {
-    const closed = new Set(
-      stages.filter((s) => s.status === StageStatus.CLOSED).map((s) => s.id),
-    );
+    const counted = new Set(stages.filter(countsInOverall).map((s) => s.id));
     const all = await this.penalties.find();
-    const prices = pricePenalties(
-      all,
-      await this.findAllTypes(),
-      stages.map((stage) => stage.id),
-    );
+    const prices = pricePenalties(all, await this.findAllTypes(), stages);
     const totals = new Map<string, number>();
     for (const penalty of all) {
-      if (penalty.stageId === null || closed.has(penalty.stageId)) {
+      if (penalty.stageId === null || counted.has(penalty.stageId)) {
         totals.set(
           penalty.entryId,
           (totals.get(penalty.entryId) ?? 0) + prices.get(penalty.id)!,

@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { StageRunStatus, StageStatus, EntryStatus } from '@rally-gate/shared';
+import {
+  StageRunStatus,
+  StageScoring,
+  StageStatus,
+  EntryStatus,
+} from '@rally-gate/shared';
 import { t, useConfirm } from '@rally-gate/ui';
 import {
   fetchOverallClassification,
@@ -35,6 +40,7 @@ import {
   formatDuration,
   formatGap,
   runStatusColor,
+  stageScoringLabel,
   TIMING_MARKS,
   type TimingMark,
   ENTRY_STATUS_DISPLAY,
@@ -151,8 +157,14 @@ const penaltyRows = computed(() => {
         name:
           penaltyTypes.value.find((type) => type.id === penalty.typeId)?.name ??
           penalty.note,
-        // The overall counts closed stages only, their penalties alike.
-        pending: !!stage && stage.status !== StageStatus.CLOSED,
+        // Muted with why, where the overall doesn't count it: not yet, or never.
+        muted: !stage
+          ? null
+          : stage.scoring !== StageScoring.OVERALL
+            ? t('penalties.notCounted')
+            : stage.status !== StageStatus.CLOSED
+              ? t('penalties.pending')
+              : null,
       };
     });
 });
@@ -373,6 +385,12 @@ onMounted(refresh);
                 >{{ stage.id }}</router-link
               >
               <span class="text-medium-emphasis"> · {{ stage.name }}</span>
+              <span
+                v-if="stage.scoring !== StageScoring.OVERALL"
+                class="text-medium-emphasis"
+              >
+                · {{ stageScoringLabel(stage.scoring) }}</span
+              >
             </td>
             <!-- A status stands where its time is missing: no start (DNS,
                  not yet started) across Start and Finish, no finish (DNF,
@@ -470,7 +488,7 @@ onMounted(refresh);
         </thead>
         <tbody>
           <tr
-            v-for="{ penalty, stage, name, pending } in penaltyRows"
+            v-for="{ penalty, stage, name, muted } in penaltyRows"
             :key="penalty.id"
           >
             <td>
@@ -485,8 +503,8 @@ onMounted(refresh);
             <td>{{ penalty.typeId ? (penalty.note ?? '') : '' }}</td>
             <td class="rg-time rg-timing text-no-wrap">
               <span
-                v-if="pending"
-                v-tooltip:top="$t('penalties.pending')"
+                v-if="muted"
+                v-tooltip:top="muted"
                 class="text-medium-emphasis"
                 >+{{ formatDuration(penalty.penaltyMs) }}</span
               >

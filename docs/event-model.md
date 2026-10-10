@@ -168,6 +168,7 @@ fewer: a quick crew can retire and still lead if the penalty is small. The
 penalty is the knob; roughly one stage duration is a sensible start.
 
 - Only `CLOSED` stages count, so the overall table moves when a stage closes.
+- Only stages scored `OVERALL` count ("Stages outside the overall").
 - A crew needs at least one completed stage to be classified, and must not
   be withdrawn or disqualified ("Entry status"). The rest are listed below
   the ranking as "Not classified", with no position or total.
@@ -200,10 +201,26 @@ on a stage is a time correction on its run, not a credit.
   correction on WP2 can reprice WP5, and editing a type reprices penalties
   already given (`pricePenalties`).
 - **Counted when the overall counts their stage:** a stage's penalties join
-  the total once it is closed, a whole-rally one at once.
+  the total once it is closed, a whole-rally one at once; on a stage outside
+  the overall, never.
 - Only on a stage that has started, which is also why deleting a stage (only
   possible before it starts) never orphans one. Deleting a type deletes its
   penalties.
+
+## Stages outside the overall
+
+`Stage.scoring` is `OVERALL` (default), `QUALIFYING` or `NONE` (shakedown,
+trial run). Any stage is timed, ranked, printed and podiumed alike; one
+outside the overall is marked "Qualifying" or "Not counted" beside its name,
+on its results and their PDF. **Nothing global reads it** (`countsInOverall`):
+the overall skips it, so driving only it classifies no one and it sets no
+notional; its penalties never reach a total and count from 1 on that stage
+alone, even for a type counted through the rally.
+
+The one exception is the start order, and only for `QUALIFYING`: under
+"overall time", while no counted stage has closed, a stage is ordered by the
+latest closed qualifying stage before it. Qualifying sets the first stage,
+the overall the rest, with no extra start-order key.
 
 ## Classes
 
@@ -298,9 +315,10 @@ entries at the end, are always ordered by start number. That also covers stage 1
 under "last stage time". **Overall time** comes from the group's own ranking
 (the main class ranking when grouping by class), because notionals depend on the
 ranking. Otherwise the list would contradict the class results posted next to
-it. **Last stage time** is from the most recent `CLOSED` stage with a lower
-`stageNumber`, which is consistent with overall time counting only closed
-stages. Nobody is left off: retired and DNS crews stay in the list, because at
+it. **Last stage time** is from the most recent `CLOSED` counted stage with a
+lower `stageNumber`, which is consistent with overall time counting only
+closed stages. A qualifying stage can order the first counted one ("Stages
+outside the overall"). Nobody is left off: retired and DNS crews stay in the list, because at
 a hobby event a crew that has fixed its car gets to drive again.
 
 **Frozen when published.** Until then the list is computed live, so a time

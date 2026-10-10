@@ -22,6 +22,11 @@ What exists, with where its reasoning lives. History is in git.
   entry classes as filtered rankings, splits as columns of the stage
   classification, crews without a counted stage listed
   as "Not classified" below the overall (`event-model.md`).
+- **Stages outside the overall:** `Stage.scoring` `QUALIFYING` or `NONE`
+  (shakedown), set on the stage page: timed and ranked on its own, marked
+  beside its name, never read by the overall or its penalties; a qualifying
+  stage orders the first counted stage under "Overall time" (`event-model.md`
+  "Stages outside the overall").
 - **Penalties:** a catalogue of types, flat or tiered, counted per stage or
   across the rally, plus free text; given on Live Timing or the entry page,
   added to the overall total only, priced on read (`event-model.md`
@@ -110,19 +115,6 @@ What exists, with where its reasoning lives. History is in git.
 
 ## Next
 
-- **Stages outside the overall** — `Stage.scoring`: `OVERALL` (default),
-  `QUALIFYING` or `NONE` (shakedown, trial run), set in the stage form. Such
-  a stage is timed, ranked, printed and podiumed like any other, marked "not
-  counted" or "qualifying" on screen and on its PDF, but **nothing global
-  ever reads it**: the overall skips it (no times, no notionals, driving
-  only it doesn't make a crew classified), its penalties never reach a
-  total, and they don't count as occurrences for a penalty tiered across
-  the rally. The only exception is the start order, and only by marking a
-  stage `QUALIFYING`: with "Overall time" set and no counted stage closed
-  yet, a stage is ordered by the latest closed qualifying stage before it
-  instead of by start number — qualifying sets the first stage, the overall
-  the rest, with no new start-order key. "Last stage time" means the last
-  counted stage. Comes before the event-wide status, which relies on it.
 - **Event-wide status** — Setup → Running → Closed, on `RallyInfo`,
   server-owned like `Stage.status`, and visible everywhere: a chip in the app
   bar on every page, pushed over `/api/live` so every open dashboard switches,

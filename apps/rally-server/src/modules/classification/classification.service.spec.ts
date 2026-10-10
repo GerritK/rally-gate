@@ -1,4 +1,4 @@
-import { StageStatus, EntryStatus } from '@rally-gate/shared';
+import { StageScoring, StageStatus, EntryStatus } from '@rally-gate/shared';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { GatesService } from '../gates/gates.service';
 import { PenaltiesService } from '../penalties/penalties.service';
@@ -46,7 +46,7 @@ function makeService(
 }
 
 function makeOverallService(
-  stages: { id: string; status: StageStatus }[],
+  stages: { id: string; status: StageStatus; scoring?: StageScoring }[],
   finishedRuns: unknown[],
   entries: unknown[],
   notionalPenaltyMs = SMALL_PENALTY_MS,
@@ -56,7 +56,11 @@ function makeOverallService(
     findAllFinished: jest.fn().mockResolvedValue(finishedRuns),
   } as unknown as StageRunsService;
   const stagesService = {
-    findAll: jest.fn().mockResolvedValue(stages),
+    findAll: jest
+      .fn()
+      .mockResolvedValue(
+        stages.map((stage) => ({ scoring: StageScoring.OVERALL, ...stage })),
+      ),
   } as unknown as StagesService;
   const entriesService = {
     findAll: jest.fn().mockResolvedValue(entries),
@@ -215,6 +219,25 @@ describe('ClassificationService.getOverallClassification', () => {
       ['v2', 60_000],
       ['v1', 100_000],
     ]);
+  });
+
+  it('ignores a closed stage outside the overall, classifying no one by it', async () => {
+    const service = makeOverallService(
+      [
+        { id: 'SD', status: StageStatus.CLOSED, scoring: StageScoring.NONE },
+        ...twoClosed,
+      ],
+      [...runs, { entryId: 'v3', stageId: 'SD', durationMs: 10_000 }],
+      [...entries, { id: 'v3', startNumber: 3 }],
+    );
+
+    const result = await service.getOverallClassification();
+
+    expect(result.map((e) => [e.entryId, e.durationMs])).toEqual([
+      ['v2', 190_000],
+      ['v1', 200_000],
+    ]);
+    expect(result[0].stageTimes.map((t) => t.stageId)).toEqual(['SS1', 'SS2']);
   });
 
   it('excludes a registered car that never completed a stage', async () => {

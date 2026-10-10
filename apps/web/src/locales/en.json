@@ -143,6 +143,11 @@
     "active": "Running",
     "closed": "Closed"
   },
+  "stageScoring": {
+    "overall": "Counts toward the overall",
+    "qualifying": "Qualifying",
+    "none": "Not counted"
+  },
   "entryStatus": {
     "registered": "Registered",
     "checkedIn": "Checked in",
@@ -374,7 +379,8 @@
     "nothingEntered": "Nothing entered: a count or a free-text penalty.",
     "wholePositive": "A whole number above 0",
     "deleteOneConfirm": "Delete penalty",
-    "deleteTypeConfirm": "Delete penalty type"
+    "deleteTypeConfirm": "Delete penalty type",
+    "notCounted": "Never counts in the overall: the stage is not counted"
   },
   "startOrder": {
     "title": "Start order",
@@ -386,11 +392,13 @@
     "lastStageTime": "Last stage time",
     "fastestFirst": "Fastest first",
     "slowestFirst": "Slowest first",
-    "explain": "Applies to every stage. A stage's list is {frozen} when it is frozen on Live Timing or the stage is first activated — changes here only affect lists not yet frozen. Crews without a time start at the end of their group, and ties go by start number, so \"Last stage time\" on the first stage is simply start-number order.",
+    "explain": "Applies to every stage. A stage's list is {frozen} when it is frozen on Live Timing or the stage is first activated — changes here only affect lists not yet frozen.",
     "frozen": "frozen",
     "grouping": "Grouping",
     "groupingHint": "Main classes start one after another, alphabetically; cars without a main class last.",
     "orderWithin": "Order within a group",
+    "orderWithinHint": "Before the first counted stage closes, the last qualifying stage gives the order. Crews without a time start at the end of their group; there, and on a tie, the start number decides.",
+    "orderWithinFallback": "Crews without a time start at the end of their group; there, and on a tie, the start number decides.",
     "direction": "Direction"
   },
   "stages": {
@@ -425,7 +433,7 @@
     "notEditable": "This stage is {status} and can only be edited before it starts.",
     "expectedTime": "Expected time",
     "minimumTime": "Minimum time",
-    "minimumHint": "Minimum time only matters at a combined start/finish gate: a passing sooner after the start is ignored as the same passing.",
+    "minimumHint": "Combined start/finish gate only: a passing this soon after the start is ignored.",
     "assignments": "Gate Assignments",
     "addAssignment": "Add Assignment",
     "assignmentAdded": "Assignment added",
@@ -438,7 +446,11 @@
     "isInactive": "inactive",
     "noAssignments": "No gates assigned yet.",
     "noAssignmentsAdd": "No gates assigned yet. Add one with + {action}.",
-    "splitNumber": "Split #"
+    "splitNumber": "Split #",
+    "scoring": "Scoring",
+    "scoringHint": "Ranked on its own, never counts toward the overall.",
+    "general": "General",
+    "times": "Times"
   },
   "runState": {
     "onStage": "On stage",

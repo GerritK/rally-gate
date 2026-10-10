@@ -103,6 +103,14 @@ onMounted(async () => {
           v-model="key"
           :items="keyOptions"
           :label="$t('startOrder.orderWithin')"
+          :hint="
+            key === StartOrderKey.OVERALL_TIME
+              ? $t('startOrder.orderWithinHint')
+              : key === StartOrderKey.LAST_STAGE_TIME
+                ? $t('startOrder.orderWithinFallback')
+                : undefined
+          "
+          persistent-hint
           style="max-width: 420px"
         />
         <v-select

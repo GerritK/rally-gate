@@ -17,7 +17,7 @@ sharing `client.ts`). Audience is marshals and organisers only.
 | `/hardware/gates/:gateId` | Hardware | one gate: status, clock, address with a link to its gate-config, version, rename; its assignments on every stage; its last 100 detections, live, with clock correction and what became of each |
 | `/setup` | Setup | the event: rally details, file name, New / Open Event dialogs (standalone only); tiles to Stages, Classes, Start order, Scoring and Display. The app bar's cog links here |
 | `/setup/stages` | Setup | stage list, create |
-| `/setup/stages/:stageId` | Setup | edit stage, its gate assignments (active state read-only) |
+| `/setup/stages/:stageId` | Setup | edit stage (scoring included), its gate assignments (active state read-only) |
 | `/setup/classes` | Setup | entry classes table: add/rename/delete, main class or category, entry count. Assigned on Entries |
 | `/setup/start-order` | Setup | start order rules: grouping, key, direction. Later planned start times |
 | `/setup/scoring` | Setup | notional time penalty; the penalty catalogue: types with their tiers and how they count (per stage or per rally), add/edit/delete (deleting takes its penalties) |

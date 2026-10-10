@@ -36,7 +36,7 @@ which the dashboard translates as `errors.<code>` with `params` filled in;
 | `/events/:eventId/assign` | POST `{ entryId }` | times the passing as that entry; 409 when the rules would do nothing (e.g. finish before start) |
 | `/events/:eventId/dismiss` | POST | the passing was no car |
 | `/events/pending` | GET, `/retry` POST | detections whose rules threw; retried every 30s, POST forces it and returns `{ recovered }` |
-| `/classification/overall` | GET | closed stages only, with notional times — see `event-model.md` |
+| `/classification/overall` | GET | closed counted stages only (`Stage.scoring`), with notional times — see `event-model.md` |
 | `/classification/...` | `?classId=` | every endpoint below and above; repeat it to combine classes (entries in *all* of them). Positions and gaps within that group; 404 on an unknown class |
 | `/classification/stages/:stageId` | GET | ranked with gaps |
 | `/classification/stages/:stageId/split-gates` | GET | the stage's split points |

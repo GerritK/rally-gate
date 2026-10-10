@@ -6,7 +6,11 @@ import {
   notClassified as unranked,
   type OverallPlacing,
 } from '../api/classification';
-import { StageStatus, type OverallStageTime } from '@rally-gate/shared';
+import {
+  StageScoring,
+  StageStatus,
+  type OverallStageTime,
+} from '@rally-gate/shared';
 import type { Stage } from '../api/stages';
 import type { Entry } from '../api/entries';
 import TableLegend from './TableLegend.vue';
@@ -74,7 +78,10 @@ const notClassified = computed(() =>
 
 /** Not in the overall at all until they close (only closed stages count). */
 const runningStages = computed(() =>
-  props.stages.filter((s) => s.status === StageStatus.ACTIVE),
+  props.stages.filter(
+    (s) =>
+      s.status === StageStatus.ACTIVE && s.scoring === StageScoring.OVERALL,
+  ),
 );
 </script>
 

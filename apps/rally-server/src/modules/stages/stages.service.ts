@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ApiErrorCode, StageStatus } from '@rally-gate/shared';
+import { ApiErrorCode, StageScoring, StageStatus } from '@rally-gate/shared';
 import { Not, Repository } from 'typeorm';
 import { apiError } from '../../common/api-error';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
@@ -183,4 +183,12 @@ export class StagesService {
       startOrderFrozenAt: entryIds ? new Date() : null,
     });
   }
+}
+
+/** Closed and scored `OVERALL`: what the overall, and every total, reads. */
+export function countsInOverall(stage: Stage): boolean {
+  return (
+    stage.status === StageStatus.CLOSED &&
+    stage.scoring === StageScoring.OVERALL
+  );
 }

@@ -2,6 +2,7 @@ import {
   GateRole,
   HEARTBEAT_ONLINE_THRESHOLD_MS,
   StageRunStatus,
+  StageScoring,
   StageStatus,
   EntryStatus,
 } from '@rally-gate/shared';
@@ -113,6 +114,18 @@ export const STAGE_STATUS_DISPLAY: Record<
     icon: 'mdi-check-circle-outline',
   },
 };
+
+/** Only a stage outside the overall carries this as a mark beside its name. */
+export function stageScoringLabel(scoring: StageScoring): string {
+  switch (scoring) {
+    case StageScoring.OVERALL:
+      return t('stageScoring.overall');
+    case StageScoring.QUALIFYING:
+      return t('stageScoring.qualifying');
+    case StageScoring.NONE:
+      return t('stageScoring.none');
+  }
+}
 
 /** Withdrawn and disqualified are race problems (red); the rest is entry
  *  paperwork. Labels are getters, so each read is in the current language. */

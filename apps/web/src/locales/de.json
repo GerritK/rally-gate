@@ -143,6 +143,11 @@
     "active": "Läuft",
     "closed": "Abgeschlossen"
   },
+  "stageScoring": {
+    "overall": "Zählt zur Gesamtwertung",
+    "qualifying": "Qualifying",
+    "none": "Nicht gewertet"
+  },
   "entryStatus": {
     "registered": "Genannt",
     "checkedIn": "Eingecheckt",
@@ -374,7 +379,8 @@
     "nothingEntered": "Nichts eingetragen: eine Anzahl oder eine Freitext-Strafe.",
     "wholePositive": "Eine ganze Zahl über 0",
     "deleteOneConfirm": "Strafe löschen",
-    "deleteTypeConfirm": "Strafentyp löschen"
+    "deleteTypeConfirm": "Strafentyp löschen",
+    "notCounted": "Zählt nie zur Gesamtwertung: die WP wird nicht gewertet"
   },
   "startOrder": {
     "title": "Startreihenfolge",
@@ -386,11 +392,13 @@
     "lastStageTime": "Zeit der letzten WP",
     "fastestFirst": "Schnellste zuerst",
     "slowestFirst": "Langsamste zuerst",
-    "explain": "Gilt für jede WP. Die Liste einer WP wird {frozen}, wenn sie in den Live-Zeiten festgeschrieben oder die WP zum ersten Mal aktiviert wird — Änderungen hier betreffen nur noch nicht festgeschriebene Listen. Teams ohne Zeit starten am Ende ihrer Gruppe, bei Gleichstand entscheidet die Startnummer; „Zeit der letzten WP“ ist auf der ersten WP also einfach die Startnummern-Reihenfolge.",
+    "explain": "Gilt für jede WP. Die Liste einer WP wird {frozen}, wenn sie in den Live-Zeiten festgeschrieben oder die WP zum ersten Mal aktiviert wird — Änderungen hier betreffen nur noch nicht festgeschriebene Listen.",
     "frozen": "festgeschrieben",
     "grouping": "Gruppierung",
     "groupingHint": "Hauptklassen starten nacheinander, alphabetisch; Autos ohne Hauptklasse zuletzt.",
     "orderWithin": "Reihenfolge innerhalb einer Gruppe",
+    "orderWithinHint": "Vor der ersten abgeschlossenen gewerteten WP zählt die letzte Qualifying-WP. Teams ohne Zeit starten am Ende ihrer Gruppe; dort und bei Gleichstand entscheidet die Startnummer.",
+    "orderWithinFallback": "Teams ohne Zeit starten am Ende ihrer Gruppe; dort und bei Gleichstand entscheidet die Startnummer.",
     "direction": "Richtung"
   },
   "stages": {
@@ -425,7 +433,7 @@
     "notEditable": "Diese WP ist „{status}“ und lässt sich nur vor ihrem Start bearbeiten.",
     "expectedTime": "Erwartete Zeit",
     "minimumTime": "Mindestzeit",
-    "minimumHint": "Die Mindestzeit zählt nur an einem kombinierten Start/Ziel-Gate: eine Durchfahrt kurz nach dem Start gilt als dieselbe Durchfahrt und wird ignoriert.",
+    "minimumHint": "Nur am kombinierten Start/Ziel-Gate: eine Durchfahrt so kurz nach dem Start wird ignoriert.",
     "assignments": "Gate-Zuordnungen",
     "addAssignment": "Zuordnung hinzufügen",
     "assignmentAdded": "Zuordnung hinzugefügt",
@@ -438,7 +446,11 @@
     "isInactive": "inaktiv",
     "noAssignments": "Noch keine Gates zugeordnet.",
     "noAssignmentsAdd": "Noch keine Gates zugeordnet. Lege eine an mit + {action}.",
-    "splitNumber": "Zwischenzeit-Nr."
+    "splitNumber": "Zwischenzeit-Nr.",
+    "scoring": "Wertung",
+    "scoringHint": "Wird für sich gewertet, zählt nie zur Gesamtwertung.",
+    "general": "Allgemein",
+    "times": "Zeiten"
   },
   "runState": {
     "onStage": "Auf der Strecke",

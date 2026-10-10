@@ -13,6 +13,7 @@ import {
   StageStatus,
   EntryStatus,
 } from '@rally-gate/shared';
+import { countsInOverall } from '../stages/stages.service';
 import { apiError } from '../../common/api-error';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { GatesService } from '../gates/gates.service';
@@ -92,6 +93,8 @@ export class ClassificationService {
    * Only **CLOSED** stages count, the same trigger `getNonFinishers` uses: a
    * stage still running has no result to penalise anyone against. So the
    * overall table moves when a stage closes, not continuously during one.
+   * And only those scored `OVERALL`: here a shakedown or qualifying stage is
+   * as if it never ran, so driving only one doesn't classify a crew.
    *
    * With `classIds`, runs are narrowed to entries in *all* of those classes
    * (Stock + Rookie + 2WD) *before* anything else, so who is classified,
@@ -105,9 +108,7 @@ export class ClassificationService {
     const inClass = await this.rankable(classIds, entries);
     const stages = await this.stagesService.findAll();
     const closedStageIds = new Set(
-      stages
-        .filter((stage) => stage.status === StageStatus.CLOSED)
-        .map((stage) => stage.id),
+      stages.filter(countsInOverall).map((stage) => stage.id),
     );
     if (closedStageIds.size === 0) {
       return [];

@@ -12,6 +12,12 @@
   font-feature-settings: 'zero' 1;
   letter-spacing: -0.01em;
 }
+/* On a text field only the value is a time, not its label or hint. */
+.rg-timing .v-label,
+.rg-timing .v-messages {
+  font-family: 'Barlow', sans-serif;
+  letter-spacing: normal;
+}
 
 /*
  * Every text link. The browser's own blue/purple clashes with the theme and

@@ -3,6 +3,7 @@ import {
   EntryStatus,
   START_ORDER_GROUPING_KEY,
   START_ORDER_KEY_KEY,
+  StageScoring,
   StageStatus,
   StartOrderDirection,
   StartOrderGrouping,
@@ -34,9 +35,15 @@ function makeService(
     startOrder: null,
   },
   entrants: unknown[] = entries,
+  firstScoring = StageScoring.OVERALL,
 ) {
   const stages = [
-    { id: 'SS1', stageNumber: 1, status: StageStatus.CLOSED },
+    {
+      id: 'SS1',
+      stageNumber: 1,
+      status: StageStatus.CLOSED,
+      scoring: firstScoring,
+    },
     { id: 'SS2', stageNumber: 2, status: StageStatus.NOT_STARTED, ...stage },
   ];
   const toPlacings = (map: Record<string, number> = {}) =>
@@ -143,6 +150,37 @@ describe('StartOrderService', () => {
       { stage: { e: 1 } },
     );
     expect(await order(service, 'SS1')).toEqual(['a', 'b', 'c', 'd', 'e']);
+    expect(classification.getStageClassification).not.toHaveBeenCalled();
+  });
+
+  it('orders by the qualifying stage under overall time until a counted stage closed', async () => {
+    const { service, classification } = makeService(
+      {
+        [START_ORDER_GROUPING_KEY]: StartOrderGrouping.NONE,
+        [START_ORDER_KEY_KEY]: StartOrderKey.OVERALL_TIME,
+      },
+      { stage: { e: 10, c: 20 } },
+      undefined,
+      entries,
+      StageScoring.QUALIFYING,
+    );
+    expect(await order(service)).toEqual(['e', 'c', 'a', 'b', 'd']);
+    expect(classification.getStageClassification).toHaveBeenCalledWith('SS1');
+    expect(classification.getOverallClassification).not.toHaveBeenCalled();
+  });
+
+  it('skips a stage outside the overall under last stage time', async () => {
+    const { service, classification } = makeService(
+      {
+        [START_ORDER_GROUPING_KEY]: StartOrderGrouping.NONE,
+        [START_ORDER_KEY_KEY]: StartOrderKey.LAST_STAGE_TIME,
+      },
+      { stage: { e: 1 } },
+      undefined,
+      entries,
+      StageScoring.NONE,
+    );
+    expect(await order(service)).toEqual(['a', 'b', 'c', 'd', 'e']);
     expect(classification.getStageClassification).not.toHaveBeenCalled();
   });
 

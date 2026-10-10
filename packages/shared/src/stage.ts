@@ -10,3 +10,15 @@ export enum StageStatus {
   ACTIVE = 'ACTIVE',
   CLOSED = 'CLOSED',
 }
+
+/**
+ * Whether a stage's times reach anything beyond its own results. Only
+ * `OVERALL` stages count toward the overall, its notionals and penalties
+ * tiered across the rally; a `QUALIFYING` stage may order the first counted
+ * stage's start list, a `NONE` one (shakedown) nothing at all.
+ */
+export enum StageScoring {
+  OVERALL = 'OVERALL',
+  QUALIFYING = 'QUALIFYING',
+  NONE = 'NONE',
+}

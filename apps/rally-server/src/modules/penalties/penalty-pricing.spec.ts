@@ -1,4 +1,4 @@
-import { PenaltyScope } from '@rally-gate/shared';
+import { PenaltyScope, StageScoring } from '@rally-gate/shared';
 import { pricePenalties } from './penalty-pricing';
 import { Penalty } from './penalty.entity';
 import { PenaltyType } from './penalty-type.entity';
@@ -31,6 +31,9 @@ function penalty(fields: Partial<Penalty>): Penalty {
   };
 }
 
+const stages = (...ids: string[]) =>
+  ids.map((id) => ({ id, scoring: StageScoring.OVERALL }));
+
 const total = (prices: Map<string, number>) =>
   [...prices.values()].reduce((sum, ms) => sum + ms, 0);
 
@@ -39,12 +42,12 @@ describe('pricePenalties', () => {
     const three = pricePenalties(
       [penalty({ count: 3 })],
       [jumpStart(PenaltyScope.STAGE)],
-      ['WP1'],
+      stages('WP1'),
     );
     const five = pricePenalties(
       [penalty({ count: 5 })],
       [jumpStart(PenaltyScope.STAGE)],
-      ['WP1'],
+      stages('WP1'),
     );
 
     expect(total(three)).toBe(70_000); // 0:10 + 0:30 + 0:30
@@ -60,12 +63,12 @@ describe('pricePenalties', () => {
     const perStage = pricePenalties(
       penalties,
       [jumpStart(PenaltyScope.STAGE)],
-      ['WP1', 'WP2'],
+      stages('WP1', 'WP2'),
     );
     const perRally = pricePenalties(
       penalties,
       [jumpStart(PenaltyScope.RALLY)],
-      ['WP1', 'WP2'],
+      stages('WP1', 'WP2'),
     );
 
     expect([...perStage.values()]).toEqual([10_000, 10_000]);
@@ -79,11 +82,25 @@ describe('pricePenalties', () => {
     const prices = pricePenalties(
       [onWp2, onWp1],
       [jumpStart(PenaltyScope.RALLY)],
-      ['WP1', 'WP2'],
+      stages('WP1', 'WP2'),
     );
 
     expect(prices.get(onWp1.id)).toBe(10_000);
     expect(prices.get(onWp2.id)).toBe(30_000);
+  });
+
+  it('counts a stage outside the overall on its own, even for a per-rally type', () => {
+    const onShakedown = penalty({ stageId: 'SD' });
+    const onWp1 = penalty({ stageId: 'WP1' });
+
+    const prices = pricePenalties(
+      [onShakedown, onWp1],
+      [jumpStart(PenaltyScope.RALLY)],
+      [{ id: 'SD', scoring: StageScoring.NONE }, ...stages('WP1')],
+    );
+
+    expect(prices.get(onShakedown.id)).toBe(10_000);
+    expect(prices.get(onWp1.id)).toBe(10_000);
   });
 
   it('counts penalties on no stage after every stage', () => {
@@ -93,7 +110,7 @@ describe('pricePenalties', () => {
     const prices = pricePenalties(
       [rallyWide, onWp2],
       [jumpStart(PenaltyScope.RALLY)],
-      ['WP1', 'WP2'],
+      stages('WP1', 'WP2'),
     );
 
     expect(prices.get(onWp2.id)).toBe(10_000);
@@ -104,7 +121,7 @@ describe('pricePenalties', () => {
     const prices = pricePenalties(
       [penalty({ entryId: 'v1' }), penalty({ entryId: 'v2' })],
       [jumpStart(PenaltyScope.RALLY)],
-      ['WP1'],
+      stages('WP1'),
     );
 
     expect([...prices.values()]).toEqual([10_000, 10_000]);
@@ -114,7 +131,7 @@ describe('pricePenalties', () => {
     const prices = pricePenalties(
       [penalty({ typeId: null, seconds: 45, note: 'Jury' })],
       [],
-      ['WP1'],
+      stages('WP1'),
     );
 
     expect(total(prices)).toBe(45_000);

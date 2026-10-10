@@ -7,7 +7,8 @@ import {
   type OverallPlacing,
   type StageResults,
 } from '../api/classification';
-import { StageStatus } from '@rally-gate/shared';
+import { StageScoring, StageStatus } from '@rally-gate/shared';
+import { stageScoringLabel } from '../format';
 import { t } from '@rally-gate/ui';
 import {
   classFilterLabel,
@@ -51,6 +52,10 @@ const heading = computed(() => {
   return [
     t('results.stageTitle'),
     s && ` — ${s.id} · ${s.name}`,
+    // On screen and on the PDF, which takes this heading.
+    s &&
+      s.scoring !== StageScoring.OVERALL &&
+      ` · ${stageScoringLabel(s.scoring)}`,
     s?.status === StageStatus.ACTIVE && ` (${t('pdf.provisional')})`,
   ]
     .filter(Boolean)

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { StageStatus } from '@rally-gate/shared';
+import { StageScoring, StageStatus } from '@rally-gate/shared';
 import {
   createStage,
   deleteStage,
@@ -10,7 +10,7 @@ import {
 } from '../api/stages';
 import FormDialog from '../components/FormDialog.vue';
 import StatusChip from '../components/StatusChip.vue';
-import { required, STAGE_STATUS_DISPLAY } from '../format';
+import { required, STAGE_STATUS_DISPLAY, stageScoringLabel } from '../format';
 import { notify, t, useConfirm } from '@rally-gate/ui';
 
 const confirm = useConfirm();
@@ -95,7 +95,15 @@ onMounted(refresh);
           >
             <td>{{ stage.stageNumber }}</td>
             <td>{{ stage.id }}</td>
-            <td>{{ stage.name }}</td>
+            <td>
+              {{ stage.name }}
+              <span
+                v-if="stage.scoring !== StageScoring.OVERALL"
+                class="text-medium-emphasis"
+              >
+                · {{ stageScoringLabel(stage.scoring) }}</span
+              >
+            </td>
             <td>
               <StatusChip :display="STAGE_STATUS_DISPLAY[stage.status]" />
             </td>

@@ -1,4 +1,6 @@
+import { StageScoring } from '@rally-gate/shared';
 import {
+  IsEnum,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -34,6 +36,10 @@ export class CreateStageDto {
   @IsInt()
   @Min(1)
   stageNumber: number;
+
+  @IsOptional()
+  @IsEnum(StageScoring)
+  scoring?: StageScoring;
 }
 
 export class UpdateStageDto {
@@ -44,6 +50,10 @@ export class UpdateStageDto {
   @IsInt()
   @Min(1)
   stageNumber: number;
+
+  @IsOptional()
+  @IsEnum(StageScoring)
+  scoring?: StageScoring;
 
   // null clears it; omitted leaves it as stored.
   @IsOptional()
