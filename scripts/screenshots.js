@@ -181,8 +181,8 @@ async function seed(client, version) {
           capabilities: 'beam',
           sentAt: new Date().toISOString(),
           version,
-          chronySynced: true,
-          chronyOffsetMs: +(Math.random() * 2).toFixed(1),
+          ntpSynced: true,
+          ntpOffsetMs: +(Math.random() * 2).toFixed(1),
         }),
       ),
     );

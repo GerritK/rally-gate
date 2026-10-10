@@ -15,10 +15,10 @@ export interface Gate {
    * arrives (an older gate-agent never reports one).
    */
   clockOffsetMs?: number | null;
-  /** chrony on the gate; null when the gate can't read it. */
-  chronySynced?: boolean | null;
-  /** chrony's own offset estimate, absolute ms. */
-  chronyOffsetMs?: number | null;
+  /** The gate's NTP sync; null when the gate can't report it. */
+  ntpSynced?: boolean | null;
+  /** RMS of the gate's recent NTP offsets, ms. */
+  ntpOffsetMs?: number | null;
 }
 
 export function fetchGates(): Promise<Gate[]> {

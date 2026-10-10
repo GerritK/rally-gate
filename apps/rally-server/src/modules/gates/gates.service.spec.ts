@@ -120,14 +120,14 @@ describe('GatesService.recordHeartbeat', () => {
     const { service } = makeService({ existingGate: { id: 'GATE1' } });
 
     const synced = await service.recordHeartbeat('GATE1', {
-      chronySynced: true,
-      chronyOffsetMs: 0.4,
+      ntpSynced: true,
+      ntpOffsetMs: 0.4,
     });
-    expect(synced).toMatchObject({ chronySynced: true, chronyOffsetMs: 0.4 });
+    expect(synced).toMatchObject({ ntpSynced: true, ntpOffsetMs: 0.4 });
 
     // Unknown, not "still synced": the last report may be long out of date.
     const unknown = await service.recordHeartbeat('GATE1', {});
-    expect(unknown).toMatchObject({ chronySynced: null, chronyOffsetMs: null });
+    expect(unknown).toMatchObject({ ntpSynced: null, ntpOffsetMs: null });
   });
 });
 

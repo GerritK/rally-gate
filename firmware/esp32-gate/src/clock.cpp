@@ -18,8 +18,13 @@ static bool everSet = false;
 static int syncs = 0;
 static uint32_t lastSyncMs = 0;
 static uint32_t nextPollMs = 0;
-static float lastOffsetMs = 0;
+// The last RMS_SAMPLES offsets, squared, for the heartbeat: one sample's Wi-Fi
+// noise (±1.5ms) says little, and chrony on a Pi reports RMS as well.
+static const int RMS_SAMPLES = 8;
+static float squaredMs[RMS_SAMPLES];
+static int squaredCount = 0;
 static gate::ClockRate rate;
+static gate::DelayFilter delays;
 
 static int64_t systemUs() {
   timeval tv;
@@ -31,7 +36,12 @@ int64_t wallUs() { return systemUs() + rate.correctionUs(esp_timer_get_time()); 
 
 bool clockSet() { return everSet; }
 bool clockFresh() { return everSet && millis() - lastSyncMs < FRESH_MS; }
-float clockOffsetMs() { return lastOffsetMs; }
+float clockOffsetMs() {
+  int n = squaredCount < RMS_SAMPLES ? squaredCount : RMS_SAMPLES;
+  float sum = 0;
+  for (int i = 0; i < n; i++) sum += squaredMs[i];
+  return n ? sqrtf(sum / n) : 0;
+}
 
 static bool sample(IPAddress server, gate::NtpSample &out) {
   uint8_t req[48] = {0};
@@ -97,11 +107,26 @@ void clockTick(IPAddress server) {
     nextPollMs = millis() + RETRY_MS;
     return;
   }
+  bool accepted = delays.accept(best.delayUs);
+  Serial.printf("[clock] offset %lld us, delay %lld us (min %lld), rate %.2f ppm%s\n", best.offsetUs,
+                best.delayUs, delays.minUs, rate.ppm, accepted ? "" : ", skipped");
+  if (!accepted) {
+    nextPollMs = millis() + RETRY_MS;
+    return;
+  }
 
-  rate.onSync(best.offsetUs, esp_timer_get_time(), apply(best.offsetUs));
+  int64_t phaseUs = gate::phaseCorrectionUs(best.offsetUs);
+  bool stepped = apply(phaseUs);
+  rate.onSync(phaseUs, esp_timer_get_time(), stepped);
+  // The first syncs set the clock (a reset leaves it up to seconds off), they
+  // aren't offsets it ran with; makestep's three updates draw the same line.
+  if (syncs == 3) squaredCount = 0;
+  if (!stepped) {
+    float ms = best.offsetUs / 1000.0f;
+    squaredMs[squaredCount++ % RMS_SAMPLES] = ms * ms;
+  }
   syncs++;
   everSet = true;
   lastSyncMs = millis();
-  lastOffsetMs = fabsf(best.offsetUs / 1000.0f);
   nextPollMs = millis() + POLL_MS;
 }

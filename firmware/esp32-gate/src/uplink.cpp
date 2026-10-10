@@ -151,8 +151,8 @@ static void heartbeat() {
     n += snprintf(json + n, sizeof json - n, ",\"sentAt\":\"%s\"", iso);
   }
   // Named for chrony, filled from our own client: same meaning, see gate-heartbeat.ts.
-  n += snprintf(json + n, sizeof json - n, ",\"chronySynced\":%s", clockFresh() ? "true" : "false");
-  if (clockFresh()) n += snprintf(json + n, sizeof json - n, ",\"chronyOffsetMs\":%.3f", clockOffsetMs());
+  n += snprintf(json + n, sizeof json - n, ",\"ntpSynced\":%s", clockFresh() ? "true" : "false");
+  if (clockFresh()) n += snprintf(json + n, sizeof json - n, ",\"ntpOffsetMs\":%.3f", clockOffsetMs());
   snprintf(json + n, sizeof json - n, "}");
 
   char topic[64];

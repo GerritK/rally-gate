@@ -22,13 +22,14 @@ export interface GateHeartbeat {
   version?: string;
 
   /**
-   * chrony's own view, from `chronyc tracking`: whether it is synchronised,
-   * and how far it estimates the gate's clock is from its source (absolute,
-   * ms). Unlike `sentAt` this is a round-trip measurement, so it resolves
-   * below network latency. Both absent when chrony can't be read.
+   * The gate's NTP sync: whether it is synchronised, and the RMS of its
+   * recent measured offsets (ms) — chrony's "RMS offset" on a Pi, the same
+   * figure computed by the ESP32 firmware. Unlike `sentAt` these are
+   * round-trip measurements, so they resolve below network latency. Both
+   * absent when the gate can't report them.
    */
-  chronySynced?: boolean;
-  chronyOffsetMs?: number;
+  ntpSynced?: boolean;
+  ntpOffsetMs?: number;
 }
 
 /** Past this without a heartbeat (sent every 15s), a gate counts as offline. */

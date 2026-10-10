@@ -26,8 +26,8 @@ export function refreshTimeSource(): void {
 }
 
 export interface ChronyState {
-  chronySynced: boolean;
-  chronyOffsetMs: number;
+  ntpSynced: boolean;
+  ntpOffsetMs: number;
 }
 
 /**
@@ -47,18 +47,20 @@ export function readChrony(): Promise<ChronyState | undefined> {
 }
 
 /**
- * `chronyc -c tracking` is one CSV line: field 4 is the system time offset in
- * seconds, the last field the leap status. The offset's sign is taken as
+ * `chronyc -c tracking` is one CSV line: field 6 is the RMS offset in seconds,
+ * the last field the leap status. RMS rather than field 4 (system time): that
+ * one is the distance to chrony's own filtered estimate, near zero once
+ * slewed, and not comparable with what an ESP32 gate reports. The offset's sign is taken as
  * absolute — which way the clock is off doesn't change whether it's usable.
  */
 export function parseTracking(csv: string): ChronyState | undefined {
   const fields = csv.trim().split(',');
-  const offsetS = Number(fields[4]);
+  const offsetS = Number(fields[6]);
   if (fields.length < 14 || Number.isNaN(offsetS)) {
     return undefined;
   }
   return {
-    chronySynced: fields[fields.length - 1] !== 'Not synchronised',
-    chronyOffsetMs: Math.abs(offsetS) * 1000,
+    ntpSynced: fields[fields.length - 1] !== 'Not synchronised',
+    ntpOffsetMs: Math.abs(offsetS) * 1000,
   };
 }

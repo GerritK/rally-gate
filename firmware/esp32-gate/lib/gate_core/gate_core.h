@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -46,33 +47,90 @@ inline NtpSample ntpSample(int64_t t1, int64_t t2, int64_t t3, int64_t t4) {
   return {((t2 - t1) + (t3 - t4)) / 2, (t4 - t1) - (t3 - t2)};
 }
 
+// How much of a measured offset adjtime() gets. One Wi-Fi sample is off by
+// ±1.5ms, about what the crystal drifts in a whole poll, so a small offset is
+// halved rather than trusted; a large one is a real error and taken whole.
+inline int64_t phaseCorrectionUs(int64_t offsetUs) {
+  return llabs(offsetUs) < 5000 ? offsetUs / 2 : offsetUs;
+}
+
 // The frequency half of the clock discipline; adjtime() on each sync is the
-// phase half. The phase half alone leaves the crystal's rate error (~37ppm
+// phase half. The phase half alone leaves the crystal's rate error (~30ppm
 // measured, 2.4ms per 64s poll) to pile up between syncs, and a beam time
 // subtracts two gates' clocks. Times monotonic µs since boot.
+//
+// The rate is everything corrected since a reference sync, divided by the time
+// since. A noisy sample's error is undone by the next sync's correction, so
+// the sum is off by about one sample's noise however long the window: ±3ppm
+// after 10 minutes. The window slides between 15 and 30 minutes, since the
+// rate follows temperature over a day.
 struct ClockRate {
+  static constexpr int64_t WINDOW_US = 30LL * 60 * 1000000;
+  struct Mark {
+    int64_t monoUs;  // -1: none
+    int64_t appliedUs;
+    int64_t correctionUs;
+  };
+
   double ppm = 0;
-  int64_t baseUs = 0;    // correction accumulated before anchorUs
-  int64_t anchorUs = 0;  // where the current ppm took over
-  int64_t lastSyncUs = -1;
+  int64_t baseUs = 0;     // correction accumulated before anchorUs
+  int64_t anchorUs = 0;   // where the current ppm took over
+  int64_t appliedUs = 0;  // phase corrections summed since boot
+  Mark ref = {-1, 0, 0}, next = {-1, 0, 0};
 
   int64_t correctionUs(int64_t monoUs) const {
     return baseUs + (int64_t)(ppm * (monoUs - anchorUs) / 1e6);
   }
 
-  // offsetUs is measured against the corrected clock, so it is what the rate
-  // estimate still misses. A step isn't drift and restarts the interval.
-  void onSync(int64_t offsetUs, int64_t monoUs, bool stepped) {
-    if (!stepped && lastSyncUs >= 0 && monoUs > lastSyncUs) {
-      baseUs = correctionUs(monoUs);
-      anchorUs = monoUs;
-      // Half the measured error per poll, so one sample on a slow Wi-Fi
-      // round trip can't swing the rate.
-      ppm += 0.5 * offsetUs * 1e6 / (monoUs - lastSyncUs);
-      if (ppm > 500) ppm = 500;
-      if (ppm < -500) ppm = -500;
+  // phaseUs: what adjtime() was handed on this sync. A step isn't drift and
+  // restarts the window.
+  void onSync(int64_t phaseUs, int64_t monoUs, bool stepped) {
+    if (stepped) {
+      ref = next = {-1, 0, 0};
+      return;
     }
-    lastSyncUs = monoUs;
+    int64_t corr = correctionUs(monoUs);
+    appliedUs += phaseUs;
+    Mark now = {monoUs, appliedUs, corr};
+    // An outlier on the reference sync would never be undone inside the
+    // window, so only a small correction may become one.
+    bool markable = llabs(phaseUs) < 5000;
+    if (ref.monoUs < 0) {
+      if (markable) ref = now;
+      return;
+    }
+    if (monoUs - ref.monoUs >= WINDOW_US && next.monoUs >= 0) {
+      ref = next;
+      next = {-1, 0, 0};
+    }
+    if (monoUs - ref.monoUs >= WINDOW_US / 2 && next.monoUs < 0 && markable) next = now;
+    if (monoUs <= ref.monoUs) return;
+
+    baseUs = corr;
+    anchorUs = monoUs;
+    ppm = (double)(appliedUs - ref.appliedUs + corr - ref.correctionUs) * 1e6 / (monoUs - ref.monoUs);
+    if (ppm > 500) ppm = 500;
+    if (ppm < -500) ppm = -500;
+  }
+};
+
+// An NTP offset is off by at most half the round trip. A round trip well above
+// the usual one (rally-server busy starting up or under load) is skipped, as
+// chrony's maxdelayratio does. After MAX_SKIPS in a row the path itself has
+// changed, so the new round trip becomes the usual one.
+struct DelayFilter {
+  static const int MAX_SKIPS = 12;
+  int64_t minUs = INT64_MAX;
+  int skips = 0;
+
+  bool accept(int64_t delayUs) {
+    if (delayUs < minUs) minUs = delayUs;
+    if (delayUs <= minUs * 2 + 4000 || ++skips > MAX_SKIPS) {
+      if (skips > MAX_SKIPS) minUs = delayUs;
+      skips = 0;
+      return true;
+    }
+    return false;
   }
 };
 

@@ -111,19 +111,52 @@ void test_json_escape() {
   TEST_ASSERT_TRUE(strlen(out) < 16);
 }
 
-void test_clock_rate_converges() {
-  // A crystal 37ppm slow, phase corrected at every 64s poll as adjtime does.
-  ClockRate rate;
+// A crystal 37ppm slow, synced every 64s for an hour (past the window slide),
+// each sample off by ±1.5ms as on Wi-Fi; `outlierAt` adds 150ms to one sample.
+// Returns the clock's error just before the last sync.
+static int64_t simulateClock(ClockRate &rate, int outlierAt) {
   const int64_t poll = 64000000;
-  int64_t sys = 0, offset = 0;
-  for (int64_t mono = poll; mono <= 20 * poll; mono += poll) {
+  int64_t sys = 0, error = 0;
+  for (int k = 1; k <= 60; k++) {
+    int64_t mono = k * poll;
     sys += poll - poll * 37 / 1000000;
-    offset = mono - (sys + rate.correctionUs(mono));
-    sys += offset;
-    rate.onSync(offset, mono, false);
+    error = mono - (sys + rate.correctionUs(mono));
+    int64_t phase = phaseCorrectionUs(error + (k % 2 ? 1500 : -1500) + (k == outlierAt ? 150000 : 0));
+    sys += phase;
+    rate.onSync(phase, mono, false);
   }
-  TEST_ASSERT_TRUE(llabs(offset) < 100);
+  return error;
+}
+
+void test_clock_rate_converges() {
+  ClockRate rate;
+  int64_t error = simulateClock(rate, 0);
   TEST_ASSERT_TRUE(rate.ppm > 36 && rate.ppm < 38);
+  TEST_ASSERT_TRUE(llabs(error) < 1500);
+}
+
+void test_clock_rate_outlier_cancels() {
+  // The next sync takes the 150ms back, so the sum doesn't keep it.
+  ClockRate rate;
+  simulateClock(rate, 40);
+  TEST_ASSERT_TRUE(rate.ppm > 36 && rate.ppm < 38);
+}
+
+void test_phase_correction() {
+  TEST_ASSERT_EQUAL_INT64(-700, phaseCorrectionUs(-1400));
+  TEST_ASSERT_EQUAL_INT64(150000, phaseCorrectionUs(150000));
+}
+
+void test_delay_filter() {
+  DelayFilter f;
+  TEST_ASSERT_TRUE(f.accept(5000));
+  TEST_ASSERT_TRUE(f.accept(13000));    // within 2x + 4ms
+  TEST_ASSERT_FALSE(f.accept(300000));  // server busy
+  TEST_ASSERT_TRUE(f.accept(6000));
+  // A path that stays slow is accepted after MAX_SKIPS and becomes the usual.
+  for (int i = 0; i < DelayFilter::MAX_SKIPS; i++) TEST_ASSERT_FALSE(f.accept(50000));
+  TEST_ASSERT_TRUE(f.accept(50000));
+  TEST_ASSERT_TRUE(f.accept(60000));
 }
 
 int main() {
@@ -141,5 +174,8 @@ int main() {
   RUN_TEST(test_valid_gate_id);
   RUN_TEST(test_json_escape);
   RUN_TEST(test_clock_rate_converges);
+  RUN_TEST(test_clock_rate_outlier_cancels);
+  RUN_TEST(test_phase_correction);
+  RUN_TEST(test_delay_filter);
   return UNITY_END();
 }

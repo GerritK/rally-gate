@@ -37,7 +37,7 @@ const MAX_CAPABILITIES_LENGTH = 64;
  *
  * One-way, so it cannot separate clock offset from transit time — the
  * deadband in `clockCorrectionMsFor` compensates. The precise figure is
- * chrony's own, reported separately as `chronyOffsetMs`.
+ * the gate's own NTP figure, reported separately as `ntpOffsetMs`.
  */
 export function measureClockOffsetMs(
   sentAt: string | undefined,
@@ -226,12 +226,10 @@ export class GatesService {
     }
     // Always overwritten: a gate that stops reporting chrony must read as
     // unknown, not keep its last "synced".
-    gate.chronySynced =
-      typeof heartbeat.chronySynced === 'boolean'
-        ? heartbeat.chronySynced
-        : null;
-    gate.chronyOffsetMs = Number.isFinite(heartbeat.chronyOffsetMs)
-      ? Math.abs(heartbeat.chronyOffsetMs as number)
+    gate.ntpSynced =
+      typeof heartbeat.ntpSynced === 'boolean' ? heartbeat.ntpSynced : null;
+    gate.ntpOffsetMs = Number.isFinite(heartbeat.ntpOffsetMs)
+      ? Math.abs(heartbeat.ntpOffsetMs as number)
       : null;
     const offsetMs = measureClockOffsetMs(heartbeat.sentAt, arrivedAt);
     if (offsetMs !== null) {

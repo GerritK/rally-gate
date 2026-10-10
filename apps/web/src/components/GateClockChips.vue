@@ -32,18 +32,18 @@ defineProps<{ gate: Gate; correctionThresholdMs: number }>();
     </template>
   </v-tooltip>
   <v-chip
-    v-if="gate.chronySynced != null"
+    v-if="gate.ntpSynced != null"
     size="small"
     class="rg-timing ml-1"
-    :color="gate.chronySynced ? 'success' : 'error'"
-    :prepend-icon="gate.chronySynced ? 'mdi-sync' : 'mdi-sync-alert'"
+    :color="gate.ntpSynced ? 'success' : 'error'"
+    :prepend-icon="gate.ntpSynced ? 'mdi-sync' : 'mdi-sync-alert'"
     v-tooltip:top="
-      gate.chronySynced ? $t('gate.chronySynced') : $t('gate.chronyNotSynced')
+      gate.ntpSynced ? $t('gate.ntpSyncedHint') : $t('gate.ntpNotSyncedHint')
     "
   >
     {{
-      gate.chronySynced
-        ? $t('gate.ntpOffset', { ms: (gate.chronyOffsetMs ?? 0).toFixed(1) })
+      gate.ntpSynced
+        ? $t('gate.ntpOffset', { ms: (gate.ntpOffsetMs ?? 0).toFixed(1) })
         : $t('gate.ntpNotSynced')
     }}
   </v-chip>

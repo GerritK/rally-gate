@@ -20,9 +20,9 @@ mode has nothing external to install.
 ## Gate discovery & heartbeat
 
 - `gate-agent` publishes a heartbeat every `HEARTBEAT_INTERVAL_MS` (15s) with
-  `sentAt`, `capabilities` (the adapter it runs), `version`, and chrony's state
-  (`chronySynced`, `chronyOffsetMs` from `chronyc -c tracking`; absent when
-  chrony can't be read, which the dashboard shows as unknown, not unsynced). A heartbeat from an unknown
+  `sentAt`, `capabilities` (the adapter it runs), `version`, and its NTP state
+  (`ntpSynced`, `ntpOffsetMs`: the RMS offset from `chronyc -c tracking`, or
+  the same figure from the ESP32 firmware; absent when it can't be read, which the dashboard shows as unknown, not unsynced). A heartbeat from an unknown
   `gateId` auto-creates a `Gate` row, unless the `autoDiscoverGates` setting is
   off. Gates can also be added by hand on the Hardware page.
 - Online/offline is `now - lastHeartbeatAt > 30s`

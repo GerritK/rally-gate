@@ -249,10 +249,10 @@ export function isOnline(
   return nowMs - new Date(gate.lastHeartbeatAt).getTime() < thresholdMs;
 }
 
-/** Fit to time: online, and chrony not known to be unsynced. A gate that
- * can't report chrony (unknown) still counts — the offset column covers it. */
+/** Fit to time: online, and NTP not known to be unsynced. A gate that
+ * can't report it (unknown) still counts — the offset column covers it. */
 export function isReady(gate: Gate, nowMs: number): boolean {
-  return isOnline(gate, nowMs) && gate.chronySynced !== false;
+  return isOnline(gate, nowMs) && gate.ntpSynced !== false;
 }
 
 export function gateStatusIcon(gate: Gate, nowMs: number): string {
