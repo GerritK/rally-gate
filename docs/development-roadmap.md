@@ -135,6 +135,17 @@ OpenStint (below) resumes when the hardware arrives.
 
 ## Deliberately deferred
 
+- **An event clock on rally-server that never steps** — every gate follows the
+  server host's clock, so a host time sync stepping it mid-event (a laptop
+  joining a phone hotspot, Windows correcting a weekly drift) moves Pi and
+  ESP32 gates over different spans (chrony slews ~24s for 2s, an ESP32 ~12s),
+  and a stage across that window is seconds off. The fix: serve NTP, heartbeat
+  `arrivedAt`, manual start/finish "now" and the web's `/api` now from a
+  monotonic clock that follows the system clock at ≤50ppm, optionally
+  persisting its offset across restarts. Deferred because rally Wi-Fi has no
+  internet, so the host has nothing to step to; until then `preciseNowMs`
+  logs every step past 50ms. Build it before an event whose server has
+  internet, or once a logged step shows up in the field.
 - **`OpenStintAdapter`**, then **beam + OpenStint** combined (designed in
   `decoder-adapters.md`) — on hold on branch `feature/openstint-adapter`
   until working RTL-SDR hardware arrives; merge only once a real car is timed

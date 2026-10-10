@@ -1,5 +1,7 @@
+import { Logger } from '@nestjs/common';
 import {
   buildNtpResponse,
+  preciseNowMs,
   readNtpTimestamp,
   writeNtpTimestamp,
 } from './ntp.service';
@@ -112,5 +114,25 @@ describe('buildNtpResponse', () => {
 
     expect(offset).toBeCloseTo(clientBehindMs, 0);
     expect(roundTrip).toBeCloseTo(oneWayLatencyMs * 2, 0);
+  });
+});
+
+describe('preciseNowMs', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('stays within the millisecond Date.now() reports', () => {
+    const before = Date.now();
+    const now = preciseNowMs();
+    expect(now).toBeGreaterThanOrEqual(before);
+    expect(now).toBeLessThan(Date.now() + 1);
+  });
+
+  it('follows the system clock when it is set, and warns about the step', () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    preciseNowMs();
+    const setMs = Date.now() + 5000;
+    jest.spyOn(Date, 'now').mockReturnValue(setMs);
+    expect(Math.floor(preciseNowMs())).toBe(setMs);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('moved by +'));
   });
 });

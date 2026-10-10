@@ -69,12 +69,14 @@ static bool sample(IPAddress server, gate::NtpSample &out) {
   return false;
 }
 
-// The gate clock policy from docs/decoder-adapters.md, as chrony's
-// `makestep 1 3`: step only within the first three syncs, slew from then on.
-// A step mid-event lands in every tap across it.
+// The gate clock policy from docs/decoder-adapters.md, as chrony's `makestep`:
+// step only within the first three syncs, slew from then on. A step mid-event
+// lands in every tap across it. The threshold is 5ms rather than chrony's 1s:
+// a reset leaves the clock up to seconds off, and slewing 1s takes 6s of taps
+// with wrong times, while nothing depends on the clock yet.
 // Returns whether it stepped.
 static bool apply(int64_t offsetUs) {
-  if (llabs(offsetUs) > 1000000 && syncs < 3) {
+  if (llabs(offsetUs) >= 5000 && syncs < 3) {
     // The system clock, not wallUs(): the rate correction stays on top of it.
     int64_t now = systemUs() + offsetUs;
     timeval tv = {(time_t)(now / 1000000), (suseconds_t)(now % 1000000)};
@@ -118,9 +120,7 @@ void clockTick(IPAddress server) {
   int64_t phaseUs = gate::phaseCorrectionUs(best.offsetUs);
   bool stepped = apply(phaseUs);
   rate.onSync(phaseUs, esp_timer_get_time(), stepped);
-  // The first syncs set the clock (a reset leaves it up to seconds off), they
-  // aren't offsets it ran with; makestep's three updates draw the same line.
-  if (syncs == 3) squaredCount = 0;
+  // A step is setting the clock, not an offset it ran with.
   if (!stepped) {
     float ms = best.offsetUs / 1000.0f;
     squaredMs[squaredCount++ % RMS_SAMPLES] = ms * ms;

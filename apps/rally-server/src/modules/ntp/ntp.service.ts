@@ -32,12 +32,48 @@ const OFFSET_TRANSMIT_TS = 40;
  */
 const STRATUM = 10;
 
-/** log2 seconds. Date.now() has millisecond resolution, so ~2^-10. */
-const PRECISION = -10;
+/** log2 seconds. `preciseNowMs` resolves microseconds, so ~2^-20. */
+const PRECISION = -20;
 
-/** 16.16 fixed-point seconds. ~1ms, matching PRECISION — not zero, which would
+/** 16.16 fixed-point seconds. ~1ms, a modest claim — not zero, which would
  * advertise this as a perfect source. */
 const ROOT_DISPERSION = 66;
+
+/** A system clock move this large is a step, not drift between the two clocks. */
+const CLOCK_STEP_WARN_MS = 50;
+
+const clockLogger = new Logger('ServerClock');
+let anchorMs = Date.now() - performance.now();
+
+/**
+ * The system clock with sub-millisecond resolution. Date.now() truncates to
+ * whole milliseconds, which skews every NTP sample by up to 1ms (0.5ms on
+ * average) — as much as an ESP32 gate's whole sync error. performance.now() is
+ * fine-grained but monotonic, so it is re-anchored whenever the system clock
+ * has moved away from it.
+ *
+ * A large move is the host's time sync stepping the clock that every gate
+ * follows, at different speeds, so stages across it may be off — logged until
+ * the server keeps its own event clock (development-roadmap.md, "Deliberately
+ * deferred").
+ */
+export function preciseNowMs(): number {
+  const wallMs = Date.now();
+  const nowMs = anchorMs + performance.now();
+  if (nowMs >= wallMs && nowMs < wallMs + 1) {
+    return nowMs;
+  }
+  const movedMs = wallMs - nowMs;
+  if (Math.abs(movedMs) >= CLOCK_STEP_WARN_MS) {
+    clockLogger.warn(
+      `System clock moved by ${movedMs > 0 ? '+' : ''}${Math.round(movedMs)}ms. ` +
+        'Gates follow it over the next seconds to minutes, at different speeds: ' +
+        'check stage runs timed around now.',
+    );
+  }
+  anchorMs = wallMs - performance.now();
+  return wallMs;
+}
 
 /** Reference id for an undisciplined local clock, by convention. */
 const REFERENCE_ID = 'LOCL';
@@ -142,8 +178,8 @@ export class NtpService implements OnModuleInit, OnModuleDestroy {
     const socket = createSocket({ type: 'udp6', ipv6Only: false });
 
     socket.on('message', (request, remote) => {
-      const receivedAt = Date.now();
-      const response = buildNtpResponse(request, receivedAt, Date.now());
+      const receivedAt = preciseNowMs();
+      const response = buildNtpResponse(request, receivedAt, preciseNowMs());
       if (!response) {
         return;
       }

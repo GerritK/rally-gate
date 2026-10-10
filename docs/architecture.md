@@ -64,14 +64,15 @@ visible.
 
 Two mechanisms with different jobs:
 
-1. **Real sync is NTP.** Gates run chrony against rally-server's embedded SNTP
+1. **Real sync is NTP.** Pi gates run chrony, ESP32 gates their own client
+   (`firmware/esp32-gate/src/clock.cpp`), against rally-server's embedded SNTP
    server as their only source — see `deployment-modes.md` "Time sync".
 2. **Measured offset, for visibility and gross failures.** `GatesService`
    stores `arrivedAt - sentAt` of each heartbeat as `Gate.clockOffsetMs`
    (positive = gate behind). The Hardware page shows it, amber past 250ms, red
-   once it is being corrected. Next to it, the gate's own chrony report
-   (synced, and its round-trip offset) — that is how anyone notices chrony
-   *isn't* working.
+   once it is being corrected. Next to it, the gate's own NTP report
+   (synced, and the RMS of its round-trip offsets) — that is how anyone
+   notices sync *isn't* working.
 
 **Deadband, not always-correct.** The measurement is one-way, so it is offset
 plus network latency and cannot separate the two; correcting below that would

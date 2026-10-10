@@ -46,16 +46,19 @@ first start (macOS: right-click → Open). No Intel Mac build.
 
 ## Time sync
 
-Gates run chrony with rally-server as their **only** source: `gate-config`
+Pi gates run chrony with rally-server as their **only** source: `gate-config`
 writes `server <MQTT_HOST> port 57432 iburst prefer ...` into
 `/run/chrony-rally` and the gate installer comments out Debian's `pool` and DHCP
 sources. Only-source rather than preferred, because gates agreeing with *each
 other* matters more than being absolutely right — with internet sources in the
 mix, chrony marked a laptop server 3.5s off as a falseticker, and gates with and
-without internet diverged.
+without internet diverged. ESP32 gates have their own NTP client with the same
+policy and no other source (`esp32-gate.md`).
 
 The server side is `NtpService`, an embedded SNTP server on **57432/udp**, not
 123, which needs admin rights a double-clicked executable doesn't have. It
+stamps with sub-millisecond resolution (`preciseNowMs`): `Date.now()` truncates
+to whole milliseconds, as much as an ESP32 gate's whole sync error. It
 answers only client-mode packets (modes 6/7 are the classic reflection
 amplifier) with a reply the size of the request. A bind failure logs and
 continues: a gate without a time source still delivers detections, and the
