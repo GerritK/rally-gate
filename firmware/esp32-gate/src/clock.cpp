@@ -1,6 +1,7 @@
 // Own NTP client rather than ESP-IDF's SNTP: lwIP's port is fixed at 123 at
 // compile time, and rally-server answers on 57432 (port table in CLAUDE.md).
 #include <WiFiUdp.h>
+#include <esp_timer.h>
 #include <sys/time.h>
 
 #include "gate.h"
@@ -18,12 +19,15 @@ static int syncs = 0;
 static uint32_t lastSyncMs = 0;
 static uint32_t nextPollMs = 0;
 static float lastOffsetMs = 0;
+static gate::ClockRate rate;
 
-int64_t wallUs() {
+static int64_t systemUs() {
   timeval tv;
   gettimeofday(&tv, nullptr);
   return (int64_t)tv.tv_sec * 1000000 + tv.tv_usec;
 }
+
+int64_t wallUs() { return systemUs() + rate.correctionUs(esp_timer_get_time()); }
 
 bool clockSet() { return everSet; }
 bool clockFresh() { return everSet && millis() - lastSyncMs < FRESH_MS; }
@@ -58,18 +62,21 @@ static bool sample(IPAddress server, gate::NtpSample &out) {
 // The gate clock policy from docs/decoder-adapters.md, as chrony's
 // `makestep 1 3`: step only within the first three syncs, slew from then on.
 // A step mid-event lands in every tap across it.
-static void apply(int64_t offsetUs) {
+// Returns whether it stepped.
+static bool apply(int64_t offsetUs) {
   if (llabs(offsetUs) > 1000000 && syncs < 3) {
-    int64_t now = wallUs() + offsetUs;
+    // The system clock, not wallUs(): the rate correction stays on top of it.
+    int64_t now = systemUs() + offsetUs;
     timeval tv = {(time_t)(now / 1000000), (suseconds_t)(now % 1000000)};
     settimeofday(&tv, nullptr);
     Serial.printf("[clock] stepped by %lld ms\n", offsetUs / 1000);
-  } else {
-    // ponytail: ESP-IDF slews at 1/6 of real time, so 60ms takes 360ms. Fine
-    // for check-in; measure it before a beam gate relies on it.
-    timeval delta = {(time_t)(offsetUs / 1000000), (suseconds_t)(offsetUs % 1000000)};
-    if (adjtime(&delta, nullptr) != 0) Serial.printf("[clock] adjtime refused %lld ms\n", offsetUs / 1000);
+    return true;
   }
+  // ESP-IDF slews at 1/6 of real time, so 60ms takes 360ms. With ClockRate
+  // settled the residual is well under a millisecond.
+  timeval delta = {(time_t)(offsetUs / 1000000), (suseconds_t)(offsetUs % 1000000)};
+  if (adjtime(&delta, nullptr) != 0) Serial.printf("[clock] adjtime refused %lld ms\n", offsetUs / 1000);
+  return false;
 }
 
 void clockTick(IPAddress server) {
@@ -91,7 +98,7 @@ void clockTick(IPAddress server) {
     return;
   }
 
-  apply(best.offsetUs);
+  rate.onSync(best.offsetUs, esp_timer_get_time(), apply(best.offsetUs));
   syncs++;
   everSet = true;
   lastSyncMs = millis();

@@ -46,6 +46,36 @@ inline NtpSample ntpSample(int64_t t1, int64_t t2, int64_t t3, int64_t t4) {
   return {((t2 - t1) + (t3 - t4)) / 2, (t4 - t1) - (t3 - t2)};
 }
 
+// The frequency half of the clock discipline; adjtime() on each sync is the
+// phase half. The phase half alone leaves the crystal's rate error (~37ppm
+// measured, 2.4ms per 64s poll) to pile up between syncs, and a beam time
+// subtracts two gates' clocks. Times monotonic µs since boot.
+struct ClockRate {
+  double ppm = 0;
+  int64_t baseUs = 0;    // correction accumulated before anchorUs
+  int64_t anchorUs = 0;  // where the current ppm took over
+  int64_t lastSyncUs = -1;
+
+  int64_t correctionUs(int64_t monoUs) const {
+    return baseUs + (int64_t)(ppm * (monoUs - anchorUs) / 1e6);
+  }
+
+  // offsetUs is measured against the corrected clock, so it is what the rate
+  // estimate still misses. A step isn't drift and restarts the interval.
+  void onSync(int64_t offsetUs, int64_t monoUs, bool stepped) {
+    if (!stepped && lastSyncUs >= 0 && monoUs > lastSyncUs) {
+      baseUs = correctionUs(monoUs);
+      anchorUs = monoUs;
+      // Half the measured error per poll, so one sample on a slow Wi-Fi
+      // round trip can't swing the rate.
+      ppm += 0.5 * offsetUs * 1e6 / (monoUs - lastSyncUs);
+      if (ppm > 500) ppm = 500;
+      if (ppm < -500) ppm = -500;
+    }
+    lastSyncUs = monoUs;
+  }
+};
+
 // "2026-10-08T21:04:05.123Z", what the server parses as timestampGate/sentAt.
 inline void isoTime(int64_t unixUs, char out[25]) {
   time_t seconds = (time_t)(unixUs / 1000000);

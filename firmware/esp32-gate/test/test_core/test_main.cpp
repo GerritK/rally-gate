@@ -1,4 +1,5 @@
 #include <gate_core.h>
+#include <stdlib.h>
 #include <unity.h>
 
 using namespace gate;
@@ -110,6 +111,21 @@ void test_json_escape() {
   TEST_ASSERT_TRUE(strlen(out) < 16);
 }
 
+void test_clock_rate_converges() {
+  // A crystal 37ppm slow, phase corrected at every 64s poll as adjtime does.
+  ClockRate rate;
+  const int64_t poll = 64000000;
+  int64_t sys = 0, offset = 0;
+  for (int64_t mono = poll; mono <= 20 * poll; mono += poll) {
+    sys += poll - poll * 37 / 1000000;
+    offset = mono - (sys + rate.correctionUs(mono));
+    sys += offset;
+    rate.onSync(offset, mono, false);
+  }
+  TEST_ASSERT_TRUE(llabs(offset) < 100);
+  TEST_ASSERT_TRUE(rate.ppm > 36 && rate.ppm < 38);
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_ntp_timestamp_roundtrip);
@@ -124,5 +140,6 @@ int main() {
   RUN_TEST(test_detection_json);
   RUN_TEST(test_valid_gate_id);
   RUN_TEST(test_json_escape);
+  RUN_TEST(test_clock_rate_converges);
   return UNITY_END();
 }

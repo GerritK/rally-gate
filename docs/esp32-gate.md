@@ -104,7 +104,7 @@ workspaces with its own CI build. What each part of the Pi stack becomes:
 |---|---|
 | `GATE_ID` from the installer | derived from the MAC address, so nothing to enter |
 | mDNS `rally-server.local` | ESP-IDF mDNS component, still zero-config |
-| chrony against rally-server's SNTP (57432/udp) | own NTP client (`clock.cpp`), since lwIP's SNTP port is fixed at 123 at compile time. Best of 4 samples every 64s; steps only within the first three syncs and slews after, as chrony's `makestep 1 3` (`decoder-adapters.md` clock policy). Wi-Fi power save off: it adds latency jitter to every sample |
+| chrony against rally-server's SNTP (57432/udp) | own NTP client (`clock.cpp`), since lwIP's SNTP port is fixed at 123 at compile time. Best of 4 samples every 64s; steps only within the first three syncs and slews after, as chrony's `makestep 1 3` (`decoder-adapters.md` clock policy). Like chrony it also estimates the crystal's rate error (`ClockRate`) and corrects for it between syncs. Wi-Fi power save off: it adds latency jitter to every sample |
 | QoS 1, persistent session | esp-mqtt QoS 1, but its outbox is RAM, so **every tap is written to flash first** (`/q` in LittleFS) and deleted only on PUBACK. Unacked taps are sent again on reconnect and after 30s, which the server's `eventId` dedup makes safe. Flash is the outbox, so no persistent session is needed |
 | `gate-config` on 57439 + hotspot fallback | SoftAP captive portal for Wi-Fi, and a small status page on **57439**, so the dashboard's gate link (`gateConfigUrl`) works unchanged |
 | `POST /api/power-off` | deep sleep, so "Shut down all gates" works for every gate. There is no SD card to protect, so it only saves the battery |
@@ -166,9 +166,11 @@ an upload through the status page for now, and from rally-server once
 ## Light barrier later
 
 The same board can time a beam: a GPIO interrupt with `esp_timer_get_time()`
-is microsecond-exact, better than `gpiomon` on Linux. What is unproven is
-**Wi-Fi NTP accuracy on the ESP32**, and how ESP-IDF's `adjtime` slews: at
-1/6 of real time, so a 60ms correction runs the clock 17% off for 360ms. That
-is harmless for check-in and decides a stage time on a beam. Until it is measured, timing stays on
+is microsecond-exact, better than `gpiomon` on Linux. The clock was the weak
+part: correcting only the offset, the first board's crystal (~37ppm) was
+2.4ms off before every 64s sync, and a stage time adds two gates' errors.
+`ClockRate` now corrects the rate as well, and the heartbeat's `chronyOffsetMs`
+shows what is left. What is still unproven is **Wi-Fi NTP accuracy on the
+ESP32**: an asymmetric path is invisible to the gate's own estimate. Until it is measured, timing stays on
 the Pi (Zero 2 W is enough). Measure it with a Pi gate and an ESP32 gate on
 the same beam and compare `timestampGate` over a few hundred passings.
