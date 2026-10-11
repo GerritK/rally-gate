@@ -256,8 +256,8 @@ async function refresh() {
   chip($('serverChip'), s.serverConnected ? 'success' : 'error', s.serverConnected ? 'Online' : 'Offline');
   chip($('server'), s.serverConnected ? 'success' : 'error',
     s.serverConnected ? `${s.serverHost} (${s.serverIp})` : s.serverIp ? `${s.serverHost} not answering` : `${s.serverHost} not found`);
-  // As the dashboard words it; 5 is NTP_OFFSET_WARN_THRESHOLD_MS in packages/shared.
-  chip($('clock'), !s.clockSynced ? 'error' : s.clockOffsetMs >= 5 ? 'warning' : 'success',
+  // As the dashboard words it; 3 is NTP_OFFSET_WARN_THRESHOLD_MS in packages/shared.
+  chip($('clock'), !s.clockSynced ? 'error' : s.clockOffsetMs >= 3 ? 'warning' : 'success',
     s.clockSynced ? `accurate to ±${s.clockOffsetMs.toFixed(1)} ms` : 'Clock not synced');
   chip($('reader'), s.readerFound ? 'success' : 'error', s.readerFound ? 'Found' : 'Not found, check wiring');
   $('buffered').textContent = s.buffered;
