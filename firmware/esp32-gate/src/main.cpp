@@ -205,6 +205,8 @@ static void readerTick() {
   uint8_t uid[10];
   uint8_t len = 0;
   if (!nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &len, 50) || len == 0 || len > 10) return;
+  // ISO 14443-3 random ID: phones (HCE) send a new one per tap, so it identifies nothing.
+  if (len == 4 && uid[0] == 0x08) return;
 
   // Both clocks first, before anything slow.
   int64_t mono = esp_timer_get_time();

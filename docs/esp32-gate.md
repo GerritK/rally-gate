@@ -70,7 +70,9 @@ stored, three mean it is **not** (buffer full or flash failed).
 **An NFC sticker on the driver's RC transmitter** is the tag: it is in the
 driver's hand anyway, needs no phone, battery or app, and costs ~EUR 0.30.
 The tag's UID is the `transponderId`. NTAG UIDs are 7 bytes, fixed and not
-writable. An entry already takes several transponders of different kinds
+writable. The gate ignores random UIDs (4 bytes starting `08`, ISO 14443-3):
+a phone held to the reader sends a new one per tap. Any other foreign card is
+read like a tag. An entry already takes several transponders of different kinds
 (`event-model.md` "Transponders"), so an NFC sticker sits beside the car's RC
 transponder, and a replacement sticker is added rather than swapped.
 
