@@ -33,6 +33,7 @@ extern bool readerFound;
 extern bool hotspotUp;
 extern RecentTap recentTaps[5];
 void saveSettings(const Settings &s);
+void powerOff();
 
 // clock.cpp
 void clockTick(IPAddress server);

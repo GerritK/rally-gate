@@ -5,9 +5,12 @@
 #include <Preferences.h>
 #include <SPI.h>
 #include <WiFi.h>
+#include <driver/gpio.h>
 #include <esp_mac.h>
+#include <esp_sleep.h>
 #include <esp_random.h>
 #include <esp_timer.h>
+#include <mdns.h>
 
 #include "gate.h"
 
@@ -83,6 +86,35 @@ static bool startReader() {
   return true;
 }
 
+// Deep sleep with no wake source, until reset or power cycle. The PN532 stays
+// on the 3V3 rail, so it is sent to its own power-down first; the next boot's
+// nfc.begin() wakes it by pulling chip select low.
+void powerOff() {
+  if (readerFound) {
+    uint8_t cmd[] = {PN532_COMMAND_POWERDOWN, 0x20};  // wake source: SPI
+    if (nfc.sendCommandCheckAck(cmd, sizeof cmd)) {
+      // The PN532 powers down only once its reply has been read, and the
+      // library keeps that read private. Same bus settings as the library.
+      Adafruit_SPIDevice spi(PIN_PN532_SS, 1000000, SPI_BITORDER_LSBFIRST, SPI_MODE0);
+      spi.begin();
+      uint8_t op = PN532_SPI_STATREAD, status = 0;
+      for (int i = 0; i < 20 && status != PN532_SPI_READY; i++) {
+        spi.write_then_read(&op, 1, &status, 1);
+        delay(5);
+      }
+      uint8_t reply[10];  // 00 00 FF 03 FD D5 17 status DCS 00
+      op = PN532_SPI_DATAREAD;
+      spi.write_then_read(&op, 1, reply, sizeof reply);
+    }
+  }
+  // A floating chip select in deep sleep looks like SPI traffic and wakes the
+  // reader again.
+  digitalWrite(PIN_PN532_SS, HIGH);
+  gpio_hold_en((gpio_num_t)PIN_PN532_SS);
+  gpio_deep_sleep_hold_en();
+  esp_deep_sleep_start();
+}
+
 static void startHotspot() {
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP(("rally-gate-" + hostname()).c_str(), settings.hotspotPass.c_str());
@@ -104,25 +136,49 @@ static void wifiTick() {
     startHotspot();
 }
 
-static IPAddress resolveServer() {
-  IPAddress ip;
-  const String &host = settings.serverHost;
-  if (ip.fromString(host)) return ip;
-  if (host.endsWith(".local")) return MDNS.queryHost(host.substring(0, host.length() - 6), 2000);
-  if (WiFi.hostByName(host.c_str(), ip)) return ip;
-  return IPAddress();
+static void setServerIp(IPAddress ip) {
+  if (ip == IPAddress() || ip == serverIp) return;
+  serverIp = ip;
+  Serial.printf("[server] %s is %s\n", settings.serverHost.c_str(), ip.toString().c_str());
+}
+
+// MDNS.queryHost waits up to 2s for an answer, and so does the loop reading
+// tags, every 30s for as long as the server is missing. The async query is
+// polled instead.
+static mdns_search_once_t *mdnsSearch = nullptr;
+
+static void mdnsTick() {
+  mdns_result_t *results = nullptr;
+  if (!mdns_query_async_get_results(mdnsSearch, 0, &results)) return;
+  IPAddress found;
+  for (mdns_result_t *r = results; r; r = r->next)
+    for (mdns_ip_addr_t *a = r->addr; a && found == IPAddress(); a = a->next)
+      if (a->addr.type == ESP_IPADDR_TYPE_V4) found = IPAddress(a->addr.u_addr.ip4.addr);
+  setServerIp(found);
+  mdns_query_results_free(results);
+  mdns_query_async_delete(mdnsSearch);
+  mdnsSearch = nullptr;
 }
 
 static void serverTick() {
   if (WiFi.status() != WL_CONNECTED) return;
+  if (mdnsSearch) return mdnsTick();
   bool due = serverIp == IPAddress() || !uplinkConnected();
   if (!due || (int32_t)(millis() - nextResolveMs) < 0) return;
   nextResolveMs = millis() + RESOLVE_EVERY_MS;
-  IPAddress ip = resolveServer();
-  if (ip != IPAddress() && ip != serverIp) {
-    serverIp = ip;
-    Serial.printf("[server] %s is %s\n", settings.serverHost.c_str(), ip.toString().c_str());
+
+  IPAddress ip;
+  const String &host = settings.serverHost;
+  if (ip.fromString(host)) return setServerIp(ip);
+  if (host.endsWith(".local")) {
+    mdnsSearch = mdns_query_async_new(host.substring(0, host.length() - 6).c_str(), nullptr, nullptr,
+                                      MDNS_TYPE_A, 2000, 1, nullptr);
+    return;
   }
+  // ponytail: a plain DNS name still blocks while lwIP waits for its DNS
+  // server; rally setups use .local or an IP. dns_gethostbyname's callback if
+  // a DNS-named server becomes common.
+  if (WiFi.hostByName(host.c_str(), ip)) setServerIp(ip);
 }
 
 static void readerTick() {
@@ -206,6 +262,10 @@ void setup() {
   // Power save off: it holds packets for the next beacon, which is latency
   // jitter on every NTP sample.
   WiFi.setSleep(false);
+  // The default joins the first access point with this SSID it hears; on a
+  // mesh that can be a far one at -80 dBm while another sits at -35.
+  WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+  WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
   if (!settings.wifiSsid.isEmpty()) WiFi.begin(settings.wifiSsid.c_str(), settings.wifiPass.c_str());
   wifiDownSinceMs = millis();
   MDNS.begin(hostname().c_str());

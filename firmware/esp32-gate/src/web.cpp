@@ -56,6 +56,12 @@ static void handleStatus() {
   server.send(200, "application/json", json);
 }
 
+// The page shows the message under the field with this name. Both are
+// literals here, so nothing needs escaping.
+static void rejectField(const char *field, const char *message) {
+  server.send(400, "application/json", String("{\"field\":\"") + field + "\",\"message\":\"" + message + "\"}");
+}
+
 static void handleSettings() {
   Settings s = settings;
   if (server.hasArg("gateId")) s.gateId = server.arg("gateId");
@@ -65,11 +71,11 @@ static void handleSettings() {
   s.serverHost.trim();
 
   if (!gate::validGateId(s.gateId.c_str()))
-    return server.send(400, "text/plain", "Gate name: A-Z, 0-9 and _ only, at most 32");
+    return rejectField("gateId", "A-Z, 0-9 and _ only, at most 32 characters.");
   if (s.serverHost.isEmpty() || s.serverHost.length() > 63 || s.serverHost.indexOf(' ') >= 0)
-    return server.send(400, "text/plain", "Server: a host name or IP address");
+    return rejectField("serverHost", "A host name or IP address.");
   if (s.hotspotPass.length() < 8 || s.hotspotPass.length() > 63)
-    return server.send(400, "text/plain", "Hotspot password: 8 to 63 characters");
+    return rejectField("hotspotPass", "8 to 63 characters.");
 
   saveSettings(s);
   server.send(200, "text/plain", "Saved, restarting");
@@ -81,34 +87,48 @@ static void handleWifi() {
   s.wifiSsid = server.arg("ssid");
   s.wifiPass = server.arg("pass");
   if (s.wifiSsid.isEmpty() || s.wifiSsid.length() > 32)
-    return server.send(400, "text/plain", "Network name: 1 to 32 characters");
+    return rejectField("ssid", "1 to 32 characters.");
   if (!s.wifiPass.isEmpty() && (s.wifiPass.length() < 8 || s.wifiPass.length() > 63))
-    return server.send(400, "text/plain", "Password: empty or 8 to 63 characters");
+    return rejectField("pass", "Empty, or 8 to 63 characters.");
   saveSettings(s);
   server.send(200, "text/plain", "Saved, restarting to join");
   restartSoon();
 }
 
+// With no network saved, the gate raises its emergency Wi-Fi straight at boot.
+static void handleWifiReset() {
+  Settings s = settings;
+  s.wifiSsid = "";
+  s.wifiPass = "";
+  saveSettings(s);
+  server.send(200, "text/plain", "Network forgotten, restarting with emergency Wi-Fi");
+  restartSoon();
+}
+
+// Async, so the loop keeps reading tags during the seconds a scan takes: the
+// page asks with ?start=1, then polls while it gets 202.
 static void handleScan() {
-  int n = WiFi.scanNetworks();
+  int n = WiFi.scanComplete();
+  if (server.hasArg("start") && n != WIFI_SCAN_RUNNING) n = WiFi.scanNetworks(true);
+  if (n == WIFI_SCAN_RUNNING) return server.send(202, "text/plain", "Scanning");
+  if (n < 0) return server.send(500, "text/plain", "Scan failed");
   String json = "[";
   for (int i = 0; i < n; i++) {
     char escaped[80];
     gate::jsonEscape(WiFi.SSID(i).c_str(), escaped, sizeof escaped);
-    json += String(i ? "," : "") + "{\"ssid\":\"" + escaped + "\",\"rssi\":" + WiFi.RSSI(i) + "}";
+    json += String(i ? "," : "") + "{\"ssid\":\"" + escaped + "\",\"rssi\":" + WiFi.RSSI(i) +
+            ",\"open\":" + (WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "true" : "false") + "}";
   }
   json += "]";
-  WiFi.scanDelete();
   server.send(200, "application/json", json);
 }
 
 // "Shut down all gates" on the Hardware page. There is no SD card to protect,
-// so this only saves the battery: deep sleep with no wake source, until reset
-// or power cycle.
+// so this only saves the battery.
 static void handlePowerOff() {
   server.send(200, "application/json", "{\"started\":true}");
   delay(300);
-  esp_deep_sleep_start();
+  powerOff();
 }
 
 void webBegin() {
@@ -120,6 +140,7 @@ void webBegin() {
   server.on("/api/settings", HTTP_POST, handleSettings);
   server.on("/api/wifi", HTTP_POST, handleWifi);
   server.on("/api/wifi/scan", HTTP_GET, handleScan);
+  server.on("/api/wifi/reset", HTTP_POST, handleWifiReset);
   server.on("/api/power-off", HTTP_POST, handlePowerOff);
   server.onNotFound([] { server.send(404, "text/plain", "Not found"); });
   server.begin();

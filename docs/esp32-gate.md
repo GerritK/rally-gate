@@ -107,7 +107,7 @@ workspaces with its own CI build. What each part of the Pi stack becomes:
 | chrony against rally-server's SNTP (57432/udp) | own NTP client (`clock.cpp`), since lwIP's SNTP port is fixed at 123 at compile time. Best of 4 samples every 64s; steps only within the first three syncs and slews after, as chrony's `makestep` (`decoder-adapters.md` clock policy), but from 5ms rather than 1s: a reset leaves the clock up to seconds off, and slewing that takes seconds of taps with wrong times. Like chrony it also estimates the crystal's rate error (`ClockRate`, over a 15–30 minute window, since one Wi-Fi sample is off by about what the crystal drifts in a whole poll) and corrects for it between syncs; a small offset is only half applied for the same reason. A sync whose round trip is well above the usual one is skipped (`DelayFilter`, chrony's `maxdelayratio`), and a large correction never becomes the window's reference, where it would never be undone. Each sync is logged on serial (`[clock] offset … delay … rate …`). Wi-Fi power save off: it adds latency jitter to every sample |
 | QoS 1, persistent session | esp-mqtt QoS 1, but its outbox is RAM, so **every tap is written to flash first** (`/q` in LittleFS) and deleted only on PUBACK. Unacked taps are sent again on reconnect and after 30s, which the server's `eventId` dedup makes safe. Flash is the outbox, so no persistent session is needed |
 | `gate-config` on 57439 + hotspot fallback | SoftAP captive portal for Wi-Fi, and a small status page on **57439**, so the dashboard's gate link (`gateConfigUrl`) works unchanged |
-| `POST /api/power-off` | deep sleep, so "Shut down all gates" works for every gate. There is no SD card to protect, so it only saves the battery |
+| `POST /api/power-off` | deep sleep, so "Shut down all gates" works for every gate. There is no SD card to protect, so it only saves the battery. The PN532 shares the 3V3 rail, so it gets its own `PowerDown` command first, with chip select held high through the sleep (floating, it wakes the reader). The reader board's power LED keeps drawing a few mA; only switching the reader's supply (a MOSFET on a GPIO) removes that |
 | `ntpSynced` / `ntpOffsetMs` | the RMS of the last 8 measured offsets, the figure chrony reports as "RMS offset" on a Pi |
 | `eventId` | random UUIDv4 from `esp_random()` |
 | `source` / `capabilities` | `nfc` |
@@ -115,15 +115,34 @@ workspaces with its own CI build. What each part of the Pi stack becomes:
 The status page is its own small page rather than a port of gate-config:
 systemd, chrony and journalctl don't exist here. It shows server connection,
 clock, reader, buffer fill and the last tags read, and sets Wi-Fi, gate name,
-server and the emergency Wi-Fi password. Every change restarts the gate. For
-now it is plain HTML (`web/index.html`) in the rallyGateDark colours, not
-`packages/ui`, and `prebuild.py` gzips it into the image. The Vuetify version
-from the flash budget below comes later.
+server and the emergency Wi-Fi password. Reset Wi-Fi forgets the network, so
+the gate comes back up on its emergency Wi-Fi. Every change restarts the gate. It
+is plain HTML (`web/index.html`), English only, styled after gate-config's
+Vuetify page by hand: the rallyGateDark colours, Vuetify's card, outlined
+field, chip and alert look, MDI paths inline, and the latin woff2 subsets of
+Barlow, Barlow Condensed and JetBrains Mono (`web/fonts/`, copied from
+`@fontsource` so the firmware build needs no `node_modules`). `prebuild.py`
+inlines the fonts and gzips it into the image, about 95 KB. Vuetify itself
+stays out: Node in the firmware build and a few hundred KB more over the
+emergency Wi-Fi, for one page.
 
 Emergency Wi-Fi as on a Pi: `rally-gate-<name>` with password `rally-gate`,
 raised when no network is configured or after 60s without one, with a
 captive portal on 80 redirecting to 57439. It goes down once the gate joins
-a network. The default gate name is `ESP32_` plus the last three MAC bytes: what the
+a network.
+
+On a mesh or any network with several access points, the gate joins the
+strongest (all-channel scan, sorted by signal; the default takes the first
+one it hears), and again on every reconnect. It doesn't roam while
+connected: a gate stands still for an event, and a mesh moves its clients
+itself.
+
+The loop that polls the PN532 must not wait on the network: a card held on
+the reader only while the loop is blocked is never seen. So the page's Wi-Fi
+scan and the mDNS lookup of
+`rally-server.local` run in the background and are polled. A beam would not
+depend on this: its time comes from the GPIO interrupt, and a blocked loop
+only delays sending it. The default gate name is `ESP32_` plus the last three MAC bytes: what the
 device is, not what it does. `capabilities` reports the reader and the
 assignment gives the role, and one board may later run a beam as well.
 
@@ -151,13 +170,9 @@ inaccurate RC oscillator and doesn't survive power loss. A DS3231 (I²C,
 | NVS (Wi-Fi credentials) + LittleFS (detection buffer, ~200 B per tap) | rest |
 
 The page lives inside the firmware image so one OTA updates both, and there
-is never a page from a different firmware version. Today's gate-config build
-would not fit: 5.8 MB raw, 3.2 MB gzipped. Most of that is the MDI font in
-four formats (3.6 MB; browsers load only the 403 KB woff2) plus every Barlow
-and JetBrains Mono subset in woff and woff2. Ship woff2 only, the `latin`
-subset only (umlauts and ß are in it), and MDI cut down to the icons used
-(which also drops most of the 850 KB CSS). That lands around 300–500 KB
-gzipped.
+is never a page from a different firmware version. gate-config's Vuetify
+build would not fit as it is (3.2 MB gzipped, mostly MDI and every font
+subset), which is the other reason the page is hand-styled HTML.
 
 OTA can't come from GitHub in the field, since rally Wi-Fi is closed. It is
 an upload through the status page for now, and from rally-server once

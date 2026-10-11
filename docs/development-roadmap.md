@@ -128,8 +128,8 @@ What exists, with where its reasoning lives. History is in git.
 - **ESP32 NFC check-in gate** — firmware in `firmware/esp32-gate` runs on
   a XIAO ESP32-S3 with a PN532: Wi-Fi, server discovery, clock sync and a
   tap through to rally-server. Then: a server-side
-  meaning for a check-in tap (no role sets entry status yet), OTA, and the
-  status page on `packages/ui` (`esp32-gate.md`).
+  meaning for a check-in tap (no role sets entry status yet) and OTA
+  (`esp32-gate.md`).
 
 OpenStint (below) resumes when the hardware arrives.
 
