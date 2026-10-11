@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { parseTracking } from './time-sync';
+import { parseTracking } from '@rally-gate/shared';
 
 test('reads a synced tracking line', () => {
   const sync = parseTracking(

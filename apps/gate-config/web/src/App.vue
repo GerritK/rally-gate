@@ -9,6 +9,11 @@ import {
   useConfirm,
 } from '@rally-gate/ui';
 
+import {
+  type ChronyState,
+  NTP_OFFSET_WARN_THRESHOLD_MS,
+} from '@rally-gate/shared';
+
 import type {
   CommandResult,
   DeviceStatus,
@@ -30,6 +35,8 @@ const errors = ref<Record<string, FieldError>>({});
 const status = ref<{
   agent: CommandResult;
   clock: CommandResult;
+  /** null off a Pi, or when chrony doesn't answer. */
+  sync: ChronyState | null;
   log: CommandResult;
   version: string;
 } | null>(null);
@@ -71,6 +78,25 @@ const wifiError = (field: 'ssid' | 'password') =>
 let statusTimer: ReturnType<typeof setInterval> | undefined;
 
 const agentOnline = computed(() => status.value?.agent.output === 'active');
+
+// Wording, icons and threshold as the dashboard's GateClockChips.
+const clockChip = computed(() => {
+  const sync = status.value?.sync;
+  if (!sync) return null;
+  if (!sync.ntpSynced) {
+    return {
+      color: 'error',
+      icon: 'mdi-crosshairs-off',
+      text: t('gateConfig.clockNotSynced'),
+    };
+  }
+  return {
+    color:
+      sync.ntpOffsetMs >= NTP_OFFSET_WARN_THRESHOLD_MS ? 'warning' : 'success',
+    icon: 'mdi-target',
+    text: t('gateConfig.clockAccuracy', { ms: sync.ntpOffsetMs.toFixed(1) }),
+  };
+});
 
 // The saved id, deliberately, not what is currently typed in the field: this
 // names which gate you are looking at, and following keystrokes would claim the
@@ -422,80 +448,80 @@ onUnmounted(() => clearInterval(statusTimer));
           @click:close="notice = null"
         />
 
-        <!-- One form across both cards: they are two halves of the same PUT, so
-             the save button sits after them rather than in either one. -->
-        <v-form v-model="formValid">
-          <v-card class="mb-6">
-            <v-card-title>{{ t('gateConfig.settings') }}</v-card-title>
-            <v-card-text>
-              <template v-for="[name, spec] in fieldsIn('general')" :key="name">
-                <v-text-field
-                  v-model="values[name]"
-                  :label="fieldText(name, 'label')"
-                  :hint="fieldText(name, 'hint')"
-                  :rules="rulesFor(name, spec)"
-                  :error-messages="serverError(name)"
-                  persistent-hint
-                  class="mb-4"
-                  @update:model-value="clearServerError(name)"
-                />
-              </template>
+        <!-- Status first: in the field a gate's page is opened to check it or
+             to fix its Wi-Fi; settings are set once. Same order as the ESP32
+             gate's page (firmware/esp32-gate/web/index.html). -->
+        <v-card class="mb-6">
+          <v-card-title>{{ t('gateConfig.status') }}</v-card-title>
+          <v-card-text>
+            <dl class="rg-facts">
+              <dt>{{ t('gateConfig.agent') }}</dt>
+              <dd>
+                <v-chip
+                  :color="agentOnline ? 'success' : 'error'"
+                  :prepend-icon="
+                    agentOnline ? 'mdi-check-circle' : 'mdi-alert-circle'
+                  "
+                  size="small"
+                  variant="flat"
+                >
+                  {{
+                    agentOnline
+                      ? t('gateConfig.running')
+                      : (status?.agent.output ?? t('gateConfig.unknown'))
+                  }}
+                </v-chip>
+              </dd>
+              <dt>{{ t('gateConfig.clock') }}</dt>
+              <dd>
+                <v-chip
+                  v-if="clockChip"
+                  :color="clockChip.color"
+                  :prepend-icon="clockChip.icon"
+                  size="small"
+                  variant="flat"
+                >
+                  {{ clockChip.text }}
+                </v-chip>
+                <span v-else class="text-medium-emphasis">
+                  {{ t('gateConfig.unavailable') }}
+                </span>
+              </dd>
+              <dt>{{ t('gateConfig.version') }}</dt>
+              <dd class="rg-timing">
+                {{ status?.version ?? t('gateConfig.unavailable') }}
+                <a
+                  :href="REPO_URL"
+                  target="_blank"
+                  class="text-medium-emphasis ml-2"
+                  :aria-label="t('gateConfig.onGithub')"
+                >
+                  <v-icon icon="mdi-github" size="small" />
+                </a>
+              </dd>
+            </dl>
 
-              <v-alert
-                v-if="gateIdChanged"
-                type="warning"
-                variant="tonal"
-                density="comfortable"
-                :text="t('gateConfig.gateIdChanged')"
-              />
-            </v-card-text>
-          </v-card>
+            <!-- mt, not mb on the dl: .rg-facts resets its own margin. -->
+            <div class="text-medium-emphasis text-caption mt-6 mb-1">
+              {{ t('gateConfig.clockDetails') }}
+            </div>
+            <pre class="rg-timing status-block mb-4">{{
+              status?.clock.output || t('gateConfig.unavailable')
+            }}</pre>
 
-          <!-- Separate from the settings above because it is the one group that
-               changes with the hardware in the box rather than with the rally. -->
-          <v-card class="mb-6">
-            <v-card-title>{{ t('gateConfig.decoder') }}</v-card-title>
-            <v-card-text>
-              <template v-for="[name, spec] in fieldsIn('decoder')" :key="name">
-                <v-select
-                  v-if="spec.oneOf"
-                  v-model="values[name]"
-                  :items="spec.oneOf"
-                  :label="fieldText(name, 'label')"
-                  :hint="fieldText(name, 'hint')"
-                  :rules="rulesFor(name, spec)"
-                  :error-messages="serverError(name)"
-                  persistent-hint
-                  class="mb-4"
-                  @update:model-value="clearServerError(name)"
-                />
-                <v-text-field
-                  v-else
-                  v-model="values[name]"
-                  :label="fieldText(name, 'label')"
-                  :hint="fieldText(name, 'hint')"
-                  :rules="rulesFor(name, spec)"
-                  :error-messages="serverError(name)"
-                  persistent-hint
-                  class="mb-4"
-                  @update:model-value="clearServerError(name)"
-                />
-              </template>
-            </v-card-text>
-          </v-card>
-
-          <div class="d-flex justify-end mb-6">
-            <v-btn
-              :loading="saving"
-              :disabled="formValid === false"
-              color="primary"
-              variant="flat"
-              @click="save"
-            >
-              {{ t('gateConfig.saveAndApply') }}
+            <div class="text-medium-emphasis text-caption mb-1">
+              {{ t('gateConfig.recentLog') }}
+            </div>
+            <pre class="status-block">{{
+              status?.log.output || t('gateConfig.unavailable')
+            }}</pre>
+          </v-card-text>
+          <v-card-actions>
+            <v-btn variant="text" prepend-icon="mdi-power" @click="powerOff">
+              {{ t('gateConfig.shutDown') }}
             </v-btn>
-          </div>
-        </v-form>
+          </v-card-actions>
+        </v-card>
 
         <v-card class="mb-6">
           <v-card-title class="d-flex align-center">
@@ -583,44 +609,80 @@ onUnmounted(() => clearInterval(statusTimer));
           </v-card-actions>
         </v-card>
 
-        <v-card>
-          <v-card-title>{{ t('gateConfig.status') }}</v-card-title>
-          <v-card-text>
-            <div class="text-medium-emphasis text-caption mb-1">
-              {{ t('gateConfig.version') }}
-            </div>
-            <div class="rg-timing mb-4">
-              {{ status?.version ?? t('gateConfig.unavailable') }}
-              <a
-                :href="REPO_URL"
-                target="_blank"
-                class="text-medium-emphasis ml-2"
-                :aria-label="t('gateConfig.onGithub')"
-              >
-                <v-icon icon="mdi-github" size="small" />
-              </a>
-            </div>
+        <!-- One form across both cards: they are two halves of the same PUT, so
+             the save button sits after them rather than in either one. -->
+        <v-form v-model="formValid">
+          <v-card class="mb-6">
+            <v-card-title>{{ t('gateConfig.settings') }}</v-card-title>
+            <v-card-text>
+              <template v-for="[name, spec] in fieldsIn('general')" :key="name">
+                <v-text-field
+                  v-model="values[name]"
+                  :label="fieldText(name, 'label')"
+                  :hint="fieldText(name, 'hint')"
+                  :rules="rulesFor(name, spec)"
+                  :error-messages="serverError(name)"
+                  persistent-hint
+                  class="mb-4"
+                  @update:model-value="clearServerError(name)"
+                />
+              </template>
 
-            <div class="text-medium-emphasis text-caption mb-1">
-              {{ t('gateConfig.clock') }}
-            </div>
-            <pre class="rg-timing status-block mb-4">{{
-              status?.clock.output || t('gateConfig.unavailable')
-            }}</pre>
+              <v-alert
+                v-if="gateIdChanged"
+                type="warning"
+                variant="tonal"
+                density="comfortable"
+                :text="t('gateConfig.gateIdChanged')"
+              />
+            </v-card-text>
+          </v-card>
 
-            <div class="text-medium-emphasis text-caption mb-1">
-              {{ t('gateConfig.recentLog') }}
-            </div>
-            <pre class="status-block">{{
-              status?.log.output || t('gateConfig.unavailable')
-            }}</pre>
-          </v-card-text>
-          <v-card-actions>
-            <v-btn variant="text" prepend-icon="mdi-power" @click="powerOff">
-              {{ t('gateConfig.shutDown') }}
+          <!-- Separate from the settings above because it is the one group that
+               changes with the hardware in the box rather than with the rally. -->
+          <v-card class="mb-6">
+            <v-card-title>{{ t('gateConfig.decoder') }}</v-card-title>
+            <v-card-text>
+              <template v-for="[name, spec] in fieldsIn('decoder')" :key="name">
+                <v-select
+                  v-if="spec.oneOf"
+                  v-model="values[name]"
+                  :items="spec.oneOf"
+                  :label="fieldText(name, 'label')"
+                  :hint="fieldText(name, 'hint')"
+                  :rules="rulesFor(name, spec)"
+                  :error-messages="serverError(name)"
+                  persistent-hint
+                  class="mb-4"
+                  @update:model-value="clearServerError(name)"
+                />
+                <v-text-field
+                  v-else
+                  v-model="values[name]"
+                  :label="fieldText(name, 'label')"
+                  :hint="fieldText(name, 'hint')"
+                  :rules="rulesFor(name, spec)"
+                  :error-messages="serverError(name)"
+                  persistent-hint
+                  class="mb-4"
+                  @update:model-value="clearServerError(name)"
+                />
+              </template>
+            </v-card-text>
+          </v-card>
+
+          <div class="d-flex justify-end mb-6">
+            <v-btn
+              :loading="saving"
+              :disabled="formValid === false"
+              color="primary"
+              variant="flat"
+              @click="save"
+            >
+              {{ t('gateConfig.saveAndApply') }}
             </v-btn>
-          </v-card-actions>
-        </v-card>
+          </div>
+        </v-form>
       </v-container>
     </v-main>
     <RallyFeedback />

@@ -31,7 +31,11 @@ unreachable with no error.
 ## What the page shows
 
 Status first: gate-agent active/failed, `chronyc tracking`, the Wi-Fi state and
-the last 20 journal lines, each probe failing independently. "Connected to the
+the last 20 journal lines, each probe failing independently. The clock also
+shows as a chip, from `chronyc -c tracking` through the same `parseTracking`
+(`packages/shared`) as gate-agent's heartbeat, worded and coloured like the
+dashboard's. The card order (Status, Network, Settings) is the ESP32 gate's
+page's too. "Connected to the
 broker" is read from the log panel, deliberately not parsed into a field — log
 text is not an interface. If a real indicator is ever needed, gate-agent should
 write a small status file instead.

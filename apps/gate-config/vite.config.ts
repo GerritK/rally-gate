@@ -16,4 +16,8 @@ export default defineConfig({
     // production the same Node service serves both from web/dist.
     proxy: { '/api': 'http://localhost:57439' },
   },
+  // See apps/web/vite.config.ts: shared is CommonJS.
+  optimizeDeps: {
+    include: ['@rally-gate/shared'],
+  },
 });

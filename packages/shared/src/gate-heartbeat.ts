@@ -32,6 +32,14 @@ export interface GateHeartbeat {
   ntpOffsetMs?: number;
 }
 
+/**
+ * A gate's NTP accuracy (`ntpOffsetMs`) past which it shows amber, on the
+ * dashboard and on the gate's own page. Measured ESP32 and Pi gates sit
+ * around 0.5–2ms on rally Wi-Fi. The ESP32 page has its own copy of this
+ * number, since nothing compiles shared into the firmware.
+ */
+export const NTP_OFFSET_WARN_THRESHOLD_MS = 5;
+
 /** Past this without a heartbeat (sent every 15s), a gate counts as offline. */
 export const HEARTBEAT_ONLINE_THRESHOLD_MS = 30_000;
 

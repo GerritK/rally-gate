@@ -1,6 +1,7 @@
 import {
   GateRole,
   HEARTBEAT_ONLINE_THRESHOLD_MS,
+  NTP_OFFSET_WARN_THRESHOLD_MS,
   RallyStatus,
   StageRunStatus,
   StageScoring,
@@ -26,12 +27,6 @@ import { driverName } from './crew';
  * duplicating.
  */
 export const CLOCK_OFFSET_WARN_THRESHOLD_MS = 250;
-
-/**
- * A gate's NTP accuracy (`ntpOffsetMs`) past which it shows amber. Measured
- * ESP32 and Pi gates sit around 0.5–2ms on rally Wi-Fi.
- */
-export const NTP_OFFSET_WARN_THRESHOLD_MS = 5;
 
 function formatClockAmount(absMs: number): string {
   return absMs < 1000 ? `${absMs} ms` : `${(absMs / 1000).toFixed(2)} s`;

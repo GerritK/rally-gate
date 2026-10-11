@@ -45,6 +45,10 @@
     "unavailable": "nicht verfügbar",
     "onGithub": "Rally Gate auf GitHub",
     "clock": "Uhr",
+    "agent": "Gate-Agent",
+    "clockAccuracy": "genau auf ±{ms} ms",
+    "clockNotSynced": "Uhr nicht synchron",
+    "clockDetails": "chrony tracking",
     "recentLog": "Letzte Einträge im gate-agent-Log",
     "shutDown": "Herunterfahren",
     "writeFailed": "Speichern fehlgeschlagen: {detail}"

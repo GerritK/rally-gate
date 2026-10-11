@@ -1,4 +1,5 @@
 import {
+  ChronyState,
   detectionTopicFor,
   heartbeatTopicFor,
   DetectionEvent,
@@ -9,7 +10,6 @@ import mqtt, { MqttClient } from 'mqtt';
 import { ulid } from 'ulid';
 import { config } from './config';
 import { log } from './log';
-import { ChronyState } from './time-sync';
 
 /** The gate's MQTT link to rally-server: heartbeats and detections out. */
 export class Uplink {

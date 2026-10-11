@@ -1,4 +1,4 @@
-import { GATE_CONFIG_PORT, VERSION } from '@rally-gate/shared';
+import { GATE_CONFIG_PORT, parseTracking, VERSION } from '@rally-gate/shared';
 import express from 'express';
 import { existsSync } from 'fs';
 import { createServer } from 'http';
@@ -16,6 +16,7 @@ import {
   agentActive,
   applyTimeSource,
   clockTracking,
+  clockTrackingCsv,
   networkStatus,
   powerOff,
   recentLog,
@@ -78,12 +79,14 @@ app.put('/api/config', async (req, res) => {
 });
 
 app.get('/api/status', async (_req, res) => {
-  const [agent, clock, log] = await Promise.all([
+  const [agent, clock, clockCsv, log] = await Promise.all([
     agentActive(),
     clockTracking(),
+    clockTrackingCsv(),
     recentLog(),
   ]);
-  res.json({ agent, clock, log, version: VERSION });
+  const sync = clockCsv.ok ? (parseTracking(clockCsv.output) ?? null) : null;
+  res.json({ agent, clock, sync, log, version: VERSION });
 });
 
 /**

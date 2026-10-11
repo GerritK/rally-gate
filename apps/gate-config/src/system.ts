@@ -58,6 +58,11 @@ export function clockTracking(): Promise<CommandResult> {
   return attempt('chronyc', ['tracking']);
 }
 
+/** The same, as the one CSV line `parseTracking` reads. */
+export function clockTrackingCsv(): Promise<CommandResult> {
+  return attempt('chronyc', ['-c', 'tracking']);
+}
+
 export function recentLog(lines = 20): Promise<CommandResult> {
   return attempt('journalctl', [
     '-u',

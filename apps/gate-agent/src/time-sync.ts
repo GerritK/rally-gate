@@ -1,3 +1,4 @@
+import { ChronyState, parseTracking } from '@rally-gate/shared';
 import { execFile } from 'child_process';
 import { log } from './log';
 
@@ -25,11 +26,6 @@ export function refreshTimeSource(): void {
   });
 }
 
-export interface ChronyState {
-  ntpSynced: boolean;
-  ntpOffsetMs: number;
-}
-
 /**
  * chrony's tracking state, for the heartbeat. `tracking` is a monitoring
  * command, so no sudo. Undefined off Linux or when chronyc fails — the
@@ -44,23 +40,4 @@ export function readChrony(): Promise<ChronyState | undefined> {
       resolve(err ? undefined : parseTracking(stdout)),
     );
   });
-}
-
-/**
- * `chronyc -c tracking` is one CSV line: field 6 is the RMS offset in seconds,
- * the last field the leap status. RMS rather than field 4 (system time): that
- * one is the distance to chrony's own filtered estimate, near zero once
- * slewed, and not comparable with what an ESP32 gate reports. The offset's sign is taken as
- * absolute — which way the clock is off doesn't change whether it's usable.
- */
-export function parseTracking(csv: string): ChronyState | undefined {
-  const fields = csv.trim().split(',');
-  const offsetS = Number(fields[6]);
-  if (fields.length < 14 || Number.isNaN(offsetS)) {
-    return undefined;
-  }
-  return {
-    ntpSynced: fields[fields.length - 1] !== 'Not synchronised',
-    ntpOffsetMs: Math.abs(offsetS) * 1000,
-  };
 }
