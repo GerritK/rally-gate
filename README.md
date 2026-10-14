@@ -79,7 +79,9 @@ flowchart LR
 
 ## Not yet
 
-- **ESP32 NFC check-in gate**: firmware written, not yet run on hardware
+- **ESP32 NFC check-in gate**: runs on hardware, and a tap is a passing like
+  any other, so it times a car at a start or finish. What's missing is
+  check-in: a tap doesn't set a car's status yet
   ([docs/esp32-gate.md](docs/esp32-gate.md)).
 - Time controls, Parc Fermé and penalties.
 - Any login.
