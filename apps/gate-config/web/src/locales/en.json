@@ -44,6 +44,12 @@
     "version": "Version",
     "unavailable": "unavailable",
     "onGithub": "Rally Gate on GitHub",
+    "decoderSignal": "Decoder signal",
+    "decoderNoise": "Noise floor: {value} dBFS",
+    "decoderFrames": "Frames decoded: {processed} of {received} per second",
+    "decoderDc": "DC offset: {value}",
+    "decoderHint": "Frames only appear with a powered transponder at the loop.",
+    "decoderStale": "No report from the decoder for {seconds} s.",
     "clock": "Clock",
     "agent": "Gate agent",
     "clockAccuracy": "accurate to ±{ms} ms",
@@ -85,7 +91,7 @@
     "ADAPTER": {
       "label": "Decoder",
       "message": "Pick one of the listed decoders.",
-      "hint": "beam: a light barrier on a GPIO pin — times passings, a marshal assigns the car."
+      "hint": "beam: a light barrier on a GPIO pin — times passings, a marshal assigns the car. openstint: transponder loop on an RTL-SDR."
     },
     "BEAM_GPIO": {
       "label": "Light barrier GPIO",
@@ -111,6 +117,11 @@
       "label": "Simulated interval (ms)",
       "message": "Must be between 250 and 3600000 ms.",
       "hint": "Leave empty to publish no simulated detections."
+    },
+    "OPENSTINT_GAIN": {
+      "label": "RTL-SDR gain (dB)",
+      "message": "Must be between 0 and 40 dB.",
+      "hint": "Default 20. Lower it if passings report an RSSI above -3 (clipping)."
     },
     "HOTSPOT_PASSWORD": {
       "label": "Hotspot password",

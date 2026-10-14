@@ -10,10 +10,10 @@ It is built for clubs running a small rally on their own ground: no internet,
 no timing company, and hardware a club can build and own. Everything runs on
 the rally's own closed Wi-Fi.
 
-> **Status: early development.** Timing works end to end with simulated gates
-> and with a light barrier on a gate's GPIO pin; RC transponders aren't
-> supported yet (see [What works today](#what-works-today)). Don't time a real
-> event without a paper backup.
+> **Status: early development.** Timing works end to end with simulated gates,
+> with a light barrier on a gate's GPIO pin and with RC transponders on a loop
+> (see [What works today](#what-works-today)). Don't time a real event without
+> a paper backup.
 
 ![Live Timing: who's up next, who's on stage, and every time as it comes in](docs/images/live.png)
 
@@ -64,6 +64,9 @@ flowchart LR
   A light barrier can't tell cars apart, so a marshal confirms each passing's
   car on Live Timing, which suggests it from the start order. Verified on a Pi
   with an Omron E3Z-T61.
+- **RC transponder gates** (RC3/RC4): a Raspberry Pi with an RTL-SDR and a
+  loop, decoded by [OpenStint](https://github.com/zsellera/openstint). Each
+  passing names its car. Verified on a Pi with a real car through a loop.
 - Gate clock sync against the server, with offsets shown on the Hardware page.
 - A config page on every gate (name, sensor, Wi-Fi); a gate that finds no
   known Wi-Fi opens its own hotspot so you can reach that page.
@@ -76,8 +79,6 @@ flowchart LR
 
 ## Not yet
 
-- **RC transponder decoding** (RC3/RC4, via OpenStint and an SDR), waiting
-  on working SDR hardware.
 - **ESP32 NFC check-in gate**: firmware written, not yet run on hardware
   ([docs/esp32-gate.md](docs/esp32-gate.md)).
 - Time controls, Parc Fermé and penalties.
@@ -90,8 +91,9 @@ What comes when: [docs/development-roadmap.md](docs/development-roadmap.md).
 - **A server:** a laptop (Windows, macOS on Apple Silicon, or Linux), or a
   Raspberry Pi. The dashboard runs in any browser on the same network.
 - **Per gate:** a Raspberry Pi with Raspberry Pi OS Lite and a light barrier
-  (Omron E3Z-T61, wiring in
-  [docs/decoder-adapters.md](docs/decoder-adapters.md)). A DS3231 RTC module is
+  (Omron E3Z-T61), or an RTL-SDR with a loop for RC transponders
+  ([OpenStint](https://github.com/zsellera/openstint)); details in
+  [docs/decoder-adapters.md](docs/decoder-adapters.md). A DS3231 RTC module is
   optional and keeps the clock across power cuts.
 - **A Wi-Fi network** that the server and all gates join. It does not need
   internet access.

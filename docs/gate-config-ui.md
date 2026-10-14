@@ -38,7 +38,11 @@ dashboard's. The card order (Status, Network, Settings) is the ESP32 gate's
 page's too. "Connected to the
 broker" is read from the log panel, deliberately not parsed into a field — log
 text is not an interface. If a real indicator is ever needed, gate-agent should
-write a small status file instead.
+write a small status file instead — as it does for the decoder: with OpenStint,
+the decoder card shows the latest `S` line (noise floor, frames received/decoded, DC
+offset) from `/run/rally-gate-agent/openstint-status`, a warning once it is
+older than 3 s, and nothing for any other adapter. It polls `/api/decoder` every
+second, only while OpenStint is the selected decoder.
 
 ## Applying a change
 

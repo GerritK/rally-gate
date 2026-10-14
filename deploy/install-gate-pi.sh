@@ -304,6 +304,29 @@ run "Installing git" sudo apt-get install -y git
 # gpio group is what lets the unprivileged service open /dev/gpiochip*.
 run "Installing sensor tools" sudo apt-get install -y gpiod
 getent group gpio >/dev/null && sudo usermod -aG gpio "$USER"
+# openstint: the transponder adapter spawns its openstint_rtlsdr itself, so the
+# package's own service is masked — two decoders can't share one SDR, and a
+# merely disabled one still gets started and crash-loops on port 5556. Upstream
+# only publishes arm64; plugdev opens the SDR, users writes /var/lib/openstint.
+if [ "$(dpkg --print-architecture)" = arm64 ]; then
+  echo 'deb [trusted=yes arch=arm64] https://repo.lapbeeps.com/apt/ /' | sudo tee /etc/apt/sources.list.d/openstint.list >/dev/null
+  run "Adding the OpenStint source" sudo apt-get update
+  run "Installing OpenStint" sudo apt-get install -y openstint
+  sudo systemctl mask --now openstint.service >/dev/null 2>&1 || true
+  sudo usermod -aG plugdev,users "$USER"
+  # Our own rule rather than trusting the distro's: those may grant the SDR via
+  # TAG+="uaccess" only, i.e. to the logged-in seat user, which leaves a system
+  # service with usb_open error -3 (LIBUSB_ERROR_ACCESS). 0bda:2838 is the RTL-SDR
+  # Blog V4 and most RTL2832U dongles, 2832 the rest.
+  sudo tee /etc/udev/rules.d/60-rally-gate-rtlsdr.rules >/dev/null <<'EOF'
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2838", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2832", MODE="0660", GROUP="plugdev"
+EOF
+  sudo udevadm control --reload
+  sudo udevadm trigger --subsystem-match=usb
+else
+  note "Not arm64: skipping OpenStint, ADAPTER=openstint won't run on this gate"
+fi
 
 step "Installing Node.js"
 if command -v node >/dev/null; then
@@ -378,6 +401,11 @@ Restart=always
 # gate whose sensor or SDR was unplugged at boot would never come back.
 RestartSec=5
 User=$USER
+# Lets the openstint adapter run its decoder SCHED_FIFO (chrt) without root.
+LimitRTPRIO=70
+# /run/rally-gate-agent: the decoder's latest status, read by gate-config.
+# Removed when the agent stops, so a stopped decoder reads as no status at all.
+RuntimeDirectory=rally-gate-agent
 
 [Install]
 WantedBy=multi-user.target

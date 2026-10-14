@@ -44,6 +44,12 @@
     "version": "Version",
     "unavailable": "nicht verfügbar",
     "onGithub": "Rally Gate auf GitHub",
+    "decoderSignal": "Decoder-Signal",
+    "decoderNoise": "Grundrauschen: {value} dBFS",
+    "decoderFrames": "Dekodierte Frames: {processed} von {received} pro Sekunde",
+    "decoderDc": "DC-Offset: {value}",
+    "decoderHint": "Frames erscheinen nur mit einem eingeschalteten Transponder an der Schleife.",
+    "decoderStale": "Seit {seconds} s keine Meldung vom Decoder.",
     "clock": "Uhr",
     "agent": "Gate-Agent",
     "clockAccuracy": "genau auf ±{ms} ms",
@@ -72,7 +78,7 @@
     "ADAPTER": {
       "label": "Decoder",
       "message": "Einen der aufgeführten Decoder wählen.",
-      "hint": "beam: eine Lichtschranke an einem GPIO-Pin — nimmt Durchfahrten, ein Sportwart ordnet das Auto zu."
+      "hint": "beam: eine Lichtschranke an einem GPIO-Pin — nimmt Durchfahrten, ein Sportwart ordnet das Auto zu. openstint: Transponder-Schleife an einem RTL-SDR."
     },
     "BEAM_GPIO": {
       "label": "GPIO der Lichtschranke",
@@ -98,6 +104,11 @@
       "label": "Simulationsintervall (ms)",
       "message": "Muss zwischen 250 und 3600000 ms liegen.",
       "hint": "Leer lassen, um keine simulierten Erfassungen zu senden."
+    },
+    "OPENSTINT_GAIN": {
+      "label": "RTL-SDR-Verstärkung (dB)",
+      "message": "Muss zwischen 0 und 40 dB liegen.",
+      "hint": "Standard 20. Senken, wenn Durchfahrten einen RSSI über -3 melden (Übersteuerung)."
     },
     "HOTSPOT_PASSWORD": {
       "label": "Hotspot-Passwort",

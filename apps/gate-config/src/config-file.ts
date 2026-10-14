@@ -41,7 +41,12 @@ export const FIELDS = {
   },
   ADAPTER: {
     group: 'decoder',
-    oneOf: ['simulated', 'beam'] as const,
+    oneOf: ['simulated', 'beam', 'openstint'] as const,
+  },
+  OPENSTINT_GAIN: {
+    group: 'decoder',
+    adapter: 'openstint',
+    range: [0, 40] as const,
   },
   BEAM_GPIO: {
     group: 'decoder',

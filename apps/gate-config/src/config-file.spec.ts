@@ -84,7 +84,7 @@ describe('validate', () => {
   it.each([
     ['a port above range', 'MQTT_PORT', '70000'],
     ['a non-numeric port', 'MQTT_PORT', 'abc'],
-    ['an unknown adapter', 'ADAPTER', 'openstint'],
+    ['an unknown adapter', 'ADAPTER', 'mylaps'],
     ['a gate id with a space', 'GATE_ID', 'CLUB START'],
     [
       'a heartbeat slower than the offline threshold',
@@ -217,7 +217,8 @@ describe('fieldDescriptors', () => {
     ['MQTT_PORT', '70000', false],
     ['MQTT_PORT', '574.31', false],
     ['ADAPTER', 'simulated', true],
-    ['ADAPTER', 'openstint', false],
+    ['ADAPTER', 'openstint', true],
+    ['ADAPTER', 'mylaps', false],
     ['TRANSPONDERS', '1234567', true],
     ['TRANSPONDERS', '1234567,7654321', true],
     ['TRANSPONDERS', '1234567,', false],

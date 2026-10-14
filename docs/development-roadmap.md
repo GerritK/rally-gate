@@ -39,6 +39,10 @@ What exists, with where its reasoning lives. History is in git.
 - **Light barrier:** `BeamAdapter` (E3Z-T61 via GPIO), unassigned passings
   assigned by a marshal (`decoder-adapters.md`, `event-model.md`). Verified on
   a Pi with the E3Z-T61, marshal assignment included.
+- **RC transponders:** `OpenStintAdapter` runs `openstint_rtlsdr` on an
+  RTL-SDR and reads its passings from stdout; gate-config shows the decoder's
+  signal (`decoder-adapters.md`). Verified on a Pi with a real car through a
+  loop, reaching the server and its entry, offline buffering included.
 - **Stages and gates:** gate auto-discovery via heartbeat, gate assignments as a
   plan with per-stage activation, close as terminal (`architecture.md`).
   Optional expected stage time; Live Timing flags a `STARTED` run past it as
@@ -131,8 +135,6 @@ What exists, with where its reasoning lives. History is in git.
   meaning for a check-in tap (no role sets entry status yet) and OTA
   (`esp32-gate.md`).
 
-OpenStint (below) resumes when the hardware arrives.
-
 ## Deliberately deferred
 
 - **An event clock on rally-server that never steps** — every gate follows the
@@ -146,10 +148,9 @@ OpenStint (below) resumes when the hardware arrives.
   internet, so the host has nothing to step to; until then `preciseNowMs`
   logs every step past 50ms. Build it before an event whose server has
   internet, or once a logged step shows up in the field.
-- **`OpenStintAdapter`**, then **beam + OpenStint** combined (designed in
-  `decoder-adapters.md`) — on hold on branch `feature/openstint-adapter`
-  until working RTL-SDR hardware arrives; merge only once a real car is timed
-  through a loop. Settle the `-t` question first.
+- **Beam + OpenStint** combined (designed in `decoder-adapters.md`) — the
+  beam's edge for the time, the transponder for the car. Build once a gate
+  needs both.
 - **Browser flashing for ESP32 gates** — CI builds one image per supported
   board onto the GitHub release, and a static page with ESP Web Tools
   installs it over USB, so nobody needs PlatformIO. Wanted once someone other
@@ -211,7 +212,7 @@ OpenStint (below) resumes when the hardware arrives.
   rename makes `synchronize` create new tables and every existing event file
   opens empty. The overall keeps summing stage-rally times only; ranking
   across formats needs a points scheme, decided when needed. Circuit races
-  also need a transponder decoder first (OpenStint, above): a light barrier
+  need the transponder decoder (OpenStint), not a beam: a light barrier
   can't tell cars apart once several are on track, and the decoder has to
   separate simultaneous passings.
 - **Manual start-order edits** on the frozen snapshot (late entry, car moved

@@ -11,6 +11,7 @@ import {
   validate,
   writeConfig,
 } from './config-file';
+import { readDecoderStatus } from './decoder-status';
 import { parseDeviceStatus, parseWifiList, validateWifi } from './network';
 import {
   agentActive,
@@ -87,6 +88,12 @@ app.get('/api/status', async (_req, res) => {
   ]);
   const sync = clockCsv.ok ? (parseTracking(clockCsv.output) ?? null) : null;
   res.json({ agent, clock, sync, log, version: VERSION });
+});
+
+// Apart from /api/status because the page polls it every second while
+// setting up a loop, and that must not run chronyc and journalctl each time.
+app.get('/api/decoder', (_req, res) => {
+  res.json(readDecoderStatus());
 });
 
 /**

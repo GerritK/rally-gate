@@ -69,5 +69,5 @@ reconnect.
   carries it, so the app bar follows on any page with one
 
 A gate's own configuration is not here: `apps/gate-config` serves it on the gate
-itself, port 57439 (`/api/config`, `/api/status`, `/api/network`,
+itself, port 57439 (`/api/config`, `/api/status`, `/api/decoder`, `/api/network`,
 `/api/network/reset`) — see `gate-config-ui.md`.
