@@ -14,6 +14,6 @@ The Vue 3 dashboard. Read `docs/frontend-structure.md` before changing routes or
 
 ## `@rally-gate/shared` under Vite
 
-`shared` ships CommonJS, so it must stay in `optimizeDeps.include` (`vite.config.ts`); otherwise Vite loads the raw CJS as ESM and named imports fail. After adding an export, `SyntaxError: ... does not provide an export named 'X'` means a stale optimizer cache, not a missing export: stop Vite, delete `node_modules/.vite`, restart.
+`shared` ships CommonJS, so it must stay in `optimizeDeps.include` (`vite.config.ts`); otherwise Vite loads the raw CJS as ESM and named imports fail. After adding an export, `SyntaxError: ... does not provide an export named 'X'` or `Cannot read properties of undefined` on an enum from `shared` means a stale optimizer cache, not a missing export: stop Vite, delete `apps/web/node_modules/.vite`, restart.
 
 `@rally-gate/ui` must **not** be in that list — see `packages/ui/CLAUDE.md`.
