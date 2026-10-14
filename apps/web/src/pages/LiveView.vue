@@ -219,13 +219,10 @@ const rows = computed<Row[]>(() => {
     return { starter, run, voidedRuns, state };
   });
 
-  // Next = the first waiting car after the last one that started, so a
-  // no-show is skipped rather than holding up everyone behind it.
+  // Next = the first waiting car, even before one that started: an early start
+  // doesn't move anyone else's slot, and a no-show stays Next so the gap shows.
   if (stage.value?.status === StageStatus.ACTIVE) {
-    const lastStarted = base.reduce((last, row, i) => (row.run ? i : last), -1);
-    const next = base.findIndex(
-      (row, i) => i > lastStarted && row.state === 'WAITING',
-    );
+    const next = base.findIndex((row) => row.state === 'WAITING');
     if (next !== -1) base[next].state = 'NEXT';
   }
 
@@ -341,16 +338,10 @@ const onStage = computed(() =>
     ),
 );
 
-/**
- * Cars yet to start, from the next one on. Before activation there is no
- * "next" yet, so it's simply the start list's waiting cars.
- */
-const dueToStart = computed(() => {
-  const nextIndex = rows.value.findIndex((row) => row.state === 'NEXT');
-  return rows.value
-    .slice(Math.max(nextIndex, 0))
-    .filter((row) => row.state === 'NEXT' || row.state === 'WAITING');
-});
+/** Cars yet to start, in start order. */
+const dueToStart = computed(() =>
+  rows.value.filter((row) => row.state === 'NEXT' || row.state === 'WAITING'),
+);
 
 // ---- Unassigned passings, with a suggested entry -----------------------
 
