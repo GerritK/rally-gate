@@ -3,7 +3,7 @@
 `apps/gate-config`: a page on each gate Pi, at
 `http://<gate-hostname>.local:57439`, so a marshal can check and reconfigure a
 gate without SSH or re-running the installer — or from the link next to an
-online gate on the dashboard's Hardware page. Built and verified on a Pi.
+online gate on the dashboard's Hardware page.
 
 **Separate from `gate-agent` on purpose.** gate-agent runs under
 `Restart=always`, so a config that makes it exit becomes a crash loop — and a UI
@@ -35,11 +35,9 @@ the last 20 journal lines, each probe failing independently. The clock also
 shows as a chip, from `chronyc -c tracking` through the same `parseTracking`
 (`packages/shared`) as gate-agent's heartbeat, worded and coloured like the
 dashboard's. The card order (Status, Network, Settings) is the ESP32 gate's
-page's too. "Connected to the
-broker" is read from the log panel, deliberately not parsed into a field — log
-text is not an interface. If a real indicator is ever needed, gate-agent should
-write a small status file instead — as it does for the decoder: with OpenStint,
-the decoder card shows the latest `S` line (noise floor, frames received/decoded, DC
+page's too. "Connected to the broker" is only visible in the log panel: log
+text is not an interface, so anything the page reads from gate-agent is a
+status file. With OpenStint, the decoder card shows the latest `S` line (noise floor, frames received/decoded, DC
 offset) from `/run/rally-gate-agent/openstint-status`, a warning once it is
 older than 3 s, and nothing for any other adapter. It polls `/api/decoder` every
 second, only while OpenStint is the selected decoder.

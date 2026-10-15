@@ -110,7 +110,7 @@ and upstream may append more, so only a minimum length is checked.
   lagging receipt by more than 5s, or ahead of it, falls back to receipt time
   with a warning (decoder without `-t`, or a stepped clock).
 - `transponder_type` is `OPN` or `AMB` (RC3 — RC4 hybrids are read through
-  their RC3 frames). Only the id is published; see "Multiple IDs per vehicle".
+  their RC3 frames). Only the id is published; see "OpenStint OPN and AMB ids".
 - Each passing is logged with `rssi`, `hits` and `mer` — what to look at
   while setting up a loop. Upstream: RSSI above -3 dB is clipping (lower the
   gain); MER below 3 dB is bad, above 6 dB good.
@@ -133,22 +133,11 @@ one SDR. The gate user joins `plugdev` (SDR) and `users` (`/var/lib/openstint`).
 |---|---|---|
 | `OPENSTINT_GAIN` | `20` | RTL-SDR tuner gain in dB, 0-40 |
 
-## Other adapter ideas
+## OpenStint OPN and AMB ids
 
-- **ESP32 checkpoint gates** for check-in, Parc Fermé and pre-start, where
-  presence matters and timing doesn't. A gate is anything that publishes the
-  right JSON to `rally/gates/<gateId>/detections`, so no gate-agent is needed.
-  The NFC one is designed in `esp32-gate.md`.
-
-### Multiple IDs per entry
-
-Built: an entry has a list of transponders, each with a kind (RC, NFC) from
-`TransponderKind` in `packages/shared`, and a detection matches only its own
-kind. The adapter states the kind as `DetectionEvent.transponderKind` — not
-derived from `source`, which names the adapter (beam + OpenStint reads RC) —
-and absent means RC. OpenStint's `OPN`/`AMB` split is still open: two ID
-namespaces within RC, so either two kinds or a prefixed identifier, settled
-with the adapter.
+Transponder kinds and matching: `event-model.md` "Transponders". Still open:
+OpenStint's `OPN`/`AMB` are two ID namespaces within RC, so either two kinds
+or a prefixed identifier, settled with the adapter.
 
 ## Gate system clock policy
 

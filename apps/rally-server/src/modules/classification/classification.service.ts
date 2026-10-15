@@ -48,10 +48,7 @@ function idsWithStatus(entries: Entry[], status: EntryStatus): Set<string> {
   return new Set(entries.filter((e) => e.status === status).map((e) => e.id));
 }
 
-/**
- * Every public method loads the entries once and hands them down: the
- * helpers below each used to load them again.
- */
+/** Every public method loads the entries once and hands them down. */
 @Injectable()
 export class ClassificationService {
   constructor(

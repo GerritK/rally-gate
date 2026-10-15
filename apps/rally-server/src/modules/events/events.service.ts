@@ -283,9 +283,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Publishes the current backlog to the live feed, so the dashboard learns
-   * about a failure the moment it happens instead of asking on a timer. Same
-   * shape as every other cross-cutting signal here — emit, and let
-   * `LiveController` be the thing that listens.
+   * about a failure the moment it happens instead of asking on a timer.
    *
    * Never throws: this runs from the catch path of an ingest that is already
    * going wrong, and failing to refresh a banner must not compound that.

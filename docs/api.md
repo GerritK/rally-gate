@@ -52,7 +52,7 @@ A change the rally status locks (`event-model.md` "Rally status") is a 409
 | `/settings/:key` | GET, PUT | `autoDiscoverGates`, `clockCorrectionThresholdMs`, `notionalPenaltyMs`, `startOrderGrouping`/`startOrderKey`/`startOrderDirection` (enums in `packages/shared/src/start-order.ts`; an unknown value reads as the default) |
 
 Every mutating endpoint binds a DTO class, and unknown fields are a 400 — see
-`CLAUDE.md` for which fields are deliberately absent.
+`apps/rally-server/CLAUDE.md` for which fields are deliberately absent.
 
 Live: **one** SSE stream, `GET /live`, with the kind of update as the SSE
 event type (`LiveEventType` in `packages/shared`). One stream, not one per kind:

@@ -128,9 +128,8 @@ which times were hand-set, so Live Timing marks them. Assigning an
 unassigned passing doesn't set them: the time is still the gate's. Clearing a
 finish clears its flag.
 
-Duplicate starts and finishes without an active run are logged and ignored —
-delivery is at-least-once, so the rules must be idempotent. Marshals correct
-runs via `PATCH`/`POST`/`DELETE /stage-runs`.
+Duplicate starts, and finishes without an active run, are logged and
+ignored. Marshals correct runs via `PATCH`/`POST`/`DELETE /stage-runs`.
 
 ### Voiding, and how a re-run starts
 
@@ -345,16 +344,14 @@ each other:
 - **Direction**: fastest first or slowest first. It has no effect when the key
   is the start number.
 
-Entries with no value for the key go to the end of their group. Ties, and those
-entries at the end, are always ordered by start number. That also covers stage 1
-under "last stage time". **Overall time** comes from the group's own ranking
-(the main class ranking when grouping by class), because notionals depend on the
-ranking. Otherwise the list would contradict the class results posted next to
-it. **Last stage time** is from the most recent `CLOSED` counted stage with a
-lower `stageNumber`, which is consistent with overall time counting only
-closed stages. A qualifying stage can order the first counted one ("Stages
-outside the overall"). Nobody is left off: retired and DNS crews stay in the list, because at
-a hobby event a crew that has fixed its car gets to drive again.
+Entries with no value for the key (everyone on stage 1 under "last stage
+time") go to the end of their group; ties and those are ordered by start
+number. **Overall time** comes from the group's own ranking, since notionals
+depend on it, so the list matches the class results posted beside it. **Last
+stage time** is from the most recent `CLOSED` counted stage before this one.
+A qualifying stage can order the first counted one ("Stages outside the
+overall"). Nobody is left off: at a hobby event a retired crew that has fixed
+its car drives again.
 
 **Frozen when published.** Until then the list is computed live, so a time
 correction on an earlier stage still moves it. Freezing stores it on the stage

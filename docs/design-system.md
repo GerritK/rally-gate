@@ -53,14 +53,26 @@ Values live in `theme.ts`. The rules:
 - **Colour is never the only signal.** Red-green colour blindness is common,
   so every status pairs colour with an icon and text, and timing highlights
   (`timing-best`/`timing-personal`) get a second cue too.
-- **A tooltip only where it adds something**, and then only an
-  explanation (what an icon or state means) or an unimportant extra (the
-  gap to the fastest, a heartbeat's clock time). Never for anything a
-  marshal needs: a tooltip doesn't show on touch or on paper, and on a
-  disabled button not at all (see Confirmations). A gate's problem state is
-  a line of text under it. Never
-  a tooltip repeating what's already on screen (a gate's name under it, a
-  ★ the legend explains).
+- **Semantic colours over hex:** `timing-*` and `flag-*` in the theme, so
+  components say what they mean ("timing-idle"), not what they look like.
+- **Borders** use the theme's `border-color` at full opacity. That's why
+  `utilities.css` sets `v-divider` to it: the divider otherwise draws in the
+  text colour and came out solid white.
+
+## Tooltips, legends and links
+
+- **A tooltip only adds**: an explanation (what an icon means) or an
+  unimportant extra (the gap to the fastest). Never anything a marshal
+  needs: tooltips don't show on touch, on paper or on a disabled button.
+  A gate's problem state is a line of text under it. Never a tooltip
+  repeating what's on screen.
+- **Tooltips are Vuetify's, never `title`**: `v-tooltip:top="'…'"` (the
+  directive), `:bottom` in the app bar; a conditional one passes `''`, not
+  `undefined`, which shows the element's own text. `title` stays only as a
+  component's label prop (`v-list-item`, `FormDialog`).
+- **A table's icons are explained by a legend under it** (`TableLegend`),
+  listing only the icons it currently shows; on Results it is the footer
+  row. Icon, colour and label come from `TIMING_MARKS` (`format.ts`).
 - **Text links are `.rg-link`** (`utilities.css`): the surrounding text's
   colour, underlined, never the browser's blue and purple, which clash with
   the theme and with an alert's own colour. One look for every inline link,
@@ -68,25 +80,6 @@ Values live in `theme.ts`. The rules:
   hint is such a link, not a button; a button in an alert is an action
   (Retry now). Back buttons, nav and list items that navigate are
   Vuetify's and need nothing.
-- **Tooltips are Vuetify's, never the browser's `title`**: one look and
-  one delay everywhere. `v-tooltip:top="'…'"` on the element (the
-  directive), `:bottom` in the app bar; a conditional one passes `''`, not
-  `undefined`, which shows the element's own text. `title` stays only where
-  it is a component's label prop (`v-list-item`, `FormDialog`).
-- **A table with icons has a legend under it** (`TableLegend`), listing
-  only the icons that table currently shows. Tooltips don't work reliably
-  on touch and don't exist on paper, so the legend is what explains an
-  icon; a tooltip only adds a value (the gap to the fastest). Icon, colour
-  and label come from `TIMING_MARKS` (`format.ts`), for the cells and the
-  legend alike.
-- **Results show the time driven**, the gap to the fastest in its tooltip:
-  a posted result and a protest go by the time, and a crew checks it
-  against their stopwatch. The Gap column covers the comparison.
-- **Semantic colours over hex:** `timing-*` and `flag-*` in the theme, so
-  components say what they mean ("timing-idle"), not what they look like.
-- **Borders** use the theme's `border-color` at full opacity. That's why
-  `utilities.css` sets `v-divider` to it: the divider otherwise draws in the
-  text colour and came out solid white.
 
 ## Type
 
@@ -211,9 +204,9 @@ Values live in `theme.ts`. The rules:
   slot. Every time in that column gets the slot, empty where there is no
   icon, so the times stay in line either way; the header too, or it ends
   a slot's width right of them.
-- **A legend explains a table's icons** (`TableLegend`), only those the
-  table actually shows: a legend listing absent icons is noise that gets
-  skipped. Under the table; on Results it is the table's footer row.
+- **Results show the time driven**, the gap to the fastest in its tooltip:
+  a posted result and a protest go by the time, and a crew checks it
+  against their stopwatch. The Gap column covers the comparison.
 - **Actions sit in the last column**, kept to its minimum width
   (`width="1%"`, `text-no-wrap`) so it really ends the row.
 - **At most one direct action and one ⋮ menu** per row, either alone is
@@ -329,112 +322,63 @@ inconsistencies the first draft had:
 
 Everything on paper is a PDF, built from the data by jsPDF +
 `jspdf-autotable` in the browser (`apps/web/src/pdf.ts`, loaded only on
-click): no server, works offline, no print CSS anywhere. The browser's print
-can't paginate a table it doesn't know the page size for, and every attempt
-to make it (measuring the screen, estimating the page) was a workaround; a
-PDF lays out the pages itself, on A4 whatever the print dialog says. Ctrl+P
-on a page prints the screen as it is, dark; anything meant for paper has a
-button.
+click): no server, works offline, A4 whatever the print dialog says, no
+print CSS anywhere. The browser's print can't paginate a table it doesn't
+know the page size for. Ctrl+P prints the screen as it is, dark; anything
+meant for paper has a button.
 
-- Deliberately plain, for the notice board, but in the app's fonts:
-  Barlow for text and JetBrains Mono for every time, so digits line up down
-  a column as `.rg-timing` does on screen. Both are embedded (TTFs in
-  `apps/web/src/assets/fonts`, fetched only on print), since the PDF base
-  fonts know Western European letters only and one ř or Ł garbles a whole
-  line. No flags, no podium. Fastest times bold, notional times in
-  parentheses, a one-line legend at the foot of every sheet.
-- Every sheet is headed with what it is (a ranking or "Start list — WP3 ·
-  name"), the rally, the class filter or "Provisional", the part it holds
-  ("Pos 16–18 · WP1–WP13", named only where it is actually split), and
-  "3 / 4" top right, numbered per section; that number is the only "more
-  follows", no "continues on" line repeating it. The foot has the legend
-  and below it, in grey, the logo with "Rally Gate" on the left and when it
-  is from on the right (a start list's publish time, the print time by the
-  server clock). "Print all" puts every ranking in one PDF, each
-  starting a new sheet.
-- Results: Pos/#/Crew and the totals (Total, Gap, Stages) come first and
-  repeat on every sheet, so each sheet is a complete standing; a vertical
-  line sets them apart from the stage times, which follow and split across
-  sheets. Sheets go across first, then down
-  (`horizontalPageBreakBehaviour: 'immediately'`), so they hang as a grid.
-- The start list: Pos, #, Crew, Car (body above chassis), Class when not
-  grouped; main classes as full-width header rows, posted top to bottom.
-- Portrait unless a table needs the width, decided from the measured
-  column widths, not a column count.
-- Every table spans the sheet: the columns get their measured content
-  width and the text columns (Crew, Car) share the rest, so times stay
-  together on the right. A table too wide for one sheet is split evenly,
-  the same number of stage columns on each sheet, widened to fill it,
-  rather than autotable's greedy split that leaves a lone column on the
-  last sheet.
-- Nothing runs off the sheet: the heading is cut short before "x / y",
-  the details line and the legend wrap onto a second line. Widths carry 0.2 mm of slack (`SLACK`) against floating-point
-  rounding, so a time never wraps by a hair.
-- It opens in a new tab, to print, save or share; the tab is opened by the
-  click itself, since one opened after an `await` is a blocked popup.
+- Deliberately plain, for the notice board: no flags, no podium. Barlow and
+  JetBrains Mono embedded as TTFs (`apps/web/src/assets/fonts`), since the
+  PDF base fonts garble a whole line over one ř or Ł. Fastest times bold,
+  notional times in parentheses, a legend at the foot of every sheet.
+- Every sheet says what it is (ranking or start list, rally, class filter or
+  "Provisional", the part it holds) and "3 / 4" top right, numbered per
+  section — the only "more follows". The foot has the logo, and when it is
+  from: a start list's publish time, else the print time by the server
+  clock. "Print all" puts every ranking in one PDF.
+- Results: Pos/#/Crew and the totals repeat on every sheet, so each sheet
+  is a complete standing; stage times split across sheets, across first,
+  then down, so they hang as a grid.
+- Start list: Pos, #, Crew, Car, Class when not grouped; main classes as
+  full-width header rows.
+- Portrait unless a table needs the width. Layout mechanics (column fitting,
+  even splits, slack) are documented in `pdf.ts`.
 
 ## Shared components (`apps/web/src/components`)
 
-Extract a component once it is actually used twice, not before.
+Extract a component once it is actually used twice, not before. Before
+writing UI, check this list:
 
-- `StagePicker`: the rally's progress as a track of stages, the same
-  picture as the gate line one level up: closed ✓, running ● (green),
-  upcoming ○. The shapes differ, so the status needs no label. Progress
-  first, selection second: a neutral ring marks the stage shown, a click
-  switches. Stage details such as a published start list belong in the
-  stage's own header, not on the track. It sits above every card, since the
-  stage scopes the whole page. Each stage is labelled by its id alone (the
-  organiser's own code, "WP3"), the same as the overall table's columns; a
-  name truncates at track width, so it goes in the tooltip and in the
-  stage's header as "WP3 · Waldweg Nord". Live Timing and both Results
-  pages. On
-  Results the track ends in **Overall** (`overall` prop): a checkered flag
-  behind a dashed last leg, since the overall is a result and not another
-  stage. It is ringed on the overall page, so the track is the one switch
-  between all results.
-- `ClassPicker`: one classes field, main class first and exclusive, for
-  assigning classes on Entries.
-- `ClassFilter`: the Results filter, one click per choice. A row of main
-  classes (exactly one, "All" by default) and a row of categories (any
-  number), ANDed as the server filters. The selection lives in
-  `?classes=` (`useClassQuery`), so it carries between Overall and a stage.
-  Every results card names it as its subtitle, "All classes" included, and
-  so does every printed sheet.
-- `StartNumber`: the door plate, sized by the surrounding font.
-- `CrewName`: the crew, driver above a smaller co-driver; every table's
-  Crew column, Live Timing's Up next and On stage, the entry page. Built
-  from `PersonName`, one person's flag and name per the Display settings
-  (`useDisplay()`: the event's, or what a page provides under `DISPLAY`;
-  Setup → Display provides its unsaved form, so its example crew shows a
-  change before it is saved).
-  No flag chosen shows the chequered flag. Flags are `flag-icons` (4:3) plus
-  our own in `src/assets/flags`, all freely usable (`THIRD_PARTY_NOTICES.md`);
-  never flag emoji, which Windows renders as two letters.
-- `ClassChip`: an entry class, main classes in secondary with a star.
-  Live Timing puts a car's main class at the right of Up next and Then.
-- `ResultsPodium`: the first three of a ranking above its table, steps
-  2-1-3, trophies in `podium-gold`/`-silver`/`-bronze` (`theme.ts`, used
-  nowhere else). A click opens the entry, as a row does.
-- `EntryDialog`: add and edit an entry, on Entries and the entry's page.
-- `EntryStatusActions`: an entry's status changes, the next step as the
-  direct action and the rest in ⋮ (`statusActions` in `entry-status.ts`).
-  Small in a table row (with a short label, "Passed", the full one its
-  tooltip), `large` in the check-in card's footer. There `alsoShow` puts
-  further steps beside the next one, `withStep` saves fields with a step
-  forward. Only Disqualify asks first.
-- `ManualMark`: the hand-timed icon.
-- `TableLegend`: the icons a table shows, explained under it (see Tables).
-- `PassingBlock`: the oldest unidentified passing with its entry picker,
-  Assign and a ⋮ for Not a car, in On stage; later ones wait
-  below it as a count; "Dismiss all" (confirmed) discards it and them.
-- `GateClockChips`: a gate's measured offset (tooltip says whether it is
-  being corrected) and chrony state, on Hardware and the gate's page.
-- `FormDialog`: every add/edit dialog. Saves on its submit (Enter), shows
-  `loading` while saving, keeps a server error inside the dialog, asks
-  before Esc/outside/Cancel throws away changes, confirms with the snackbar
-  and goes fullscreen on phones. The page passes the draft and a `save`
-  function that throws on failure. A long form goes wide rather than tall
-  (`maxWidth`): `EntryDialog` sets its sections in pairs, Driver |
-  Co-driver and Car | Registration, one column on a phone, so it fits a laptop
-  screen without scrolling. Before it outgrows that, its editing moves to
-  the record's page.
+- `StagePicker`: the rally as a track of stages (closed ✓, running ●,
+  upcoming ○), a ring on the one shown, a click switches; labelled by stage
+  id, the name in the tooltip. On Results it ends in **Overall** (`overall`
+  prop). Live Timing and Results.
+- `ClassPicker`: assigning classes on Entries, main class first and
+  exclusive.
+- `ClassFilter`: the Results filter, one main class and any categories,
+  ANDed, kept in `?classes=` (`useClassQuery`) across Overall and stages.
+  Every results card and printed sheet names the selection.
+- `StartNumber`, `CrewName`/`PersonName`, `CarName` (body above chassis),
+  `ClassChip`: see Type. Crew
+  display follows `useDisplay()` (Setup → Display provides its unsaved
+  form). No flag chosen shows the chequered flag; flags are `flag-icons`
+  plus `src/assets/flags`, never emoji (Windows renders two letters).
+- `ResultsPodium`: steps 2-1-3 above a ranking, `podium-*` colours.
+- `EntryDialog`, `EntryStatusActions` (next step direct, the rest in ⋮;
+  only Disqualify asks), `TransponderList`/`TransponderFields`, `FlagPicker`.
+- `StatusChip` (any `*_DISPLAY` map), `ClockTime` (a time with its hand-set
+  mark), `ManualMark`, `GateOnlineChip`, `GateVersion`, `GateClockChips`.
+- `TableLegend`: see Tooltips, legends and links.
+- `RallyLockAlert`: above a page the rally status locks, the reason its
+  controls are disabled.
+- `RunningTime`: a running stage time ticking in tenths, its own timer so
+  only it re-renders.
+- Live Timing's own: `GateFlow` (the gate line), `RunCorrectionDialog`,
+  `PenaltyDialog` (also on the entry page).
+- `PassingBlock`: the oldest unidentified passing with its picker, Assign
+  and ⋮, later ones as a count, "Dismiss all".
+- `FormDialog`: every add/edit dialog (see Editing): saves on Enter, keeps
+  a server error inside, asks before discarding, fullscreen on phones. The
+  page passes the draft and a `save` that throws. A long form goes wide
+  (`maxWidth`, sections in pairs) rather than tall; once it outgrows that,
+  editing moves to the record's page.

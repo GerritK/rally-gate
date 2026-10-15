@@ -3,8 +3,8 @@
 A second kind of gate: an ESP32 with its own firmware instead of a Pi running
 `gate-agent` and `gate-config`. First target is an **NFC check-in gate**, where
 presence matters and milliseconds don't. Firmware in `firmware/esp32-gate`,
-runs on a first board: it joins Wi-Fi, finds the server, syncs its clock and
-has sent a PN532 tap through to rally-server.
+runs on hardware: it joins Wi-Fi, finds the server, syncs its clock, and its
+taps reach rally-server and time a car like any gate's.
 
 ```bash
 cd firmware/esp32-gate
@@ -106,7 +106,7 @@ workspaces with its own CI build. What each part of the Pi stack becomes:
 |---|---|
 | `GATE_ID` from the installer | derived from the MAC address, so nothing to enter |
 | mDNS `rally-server.local` | ESP-IDF mDNS component, still zero-config |
-| chrony against rally-server's SNTP (57432/udp) | own NTP client (`clock.cpp`), since lwIP's SNTP port is fixed at 123 at compile time. Best of 4 samples every 64s; steps only within the first three syncs and slews after, as chrony's `makestep` (`decoder-adapters.md` clock policy), but from 5ms rather than 1s: a reset leaves the clock up to seconds off, and slewing that takes seconds of taps with wrong times. Like chrony it also estimates the crystal's rate error (`ClockRate`, over a 15–30 minute window, since one Wi-Fi sample is off by about what the crystal drifts in a whole poll) and corrects for it between syncs; a small offset is only half applied for the same reason. A sync whose round trip is well above the usual one is skipped (`DelayFilter`, chrony's `maxdelayratio`), and a large correction never becomes the window's reference, where it would never be undone. Each sync is logged on serial (`[clock] offset … delay … rate …`). Wi-Fi power save off: it adds latency jitter to every sample |
+| chrony against rally-server's SNTP (57432/udp) | own NTP client (`clock.cpp`), since lwIP's SNTP port is fixed at 123 at compile time — see "Clock" below |
 | QoS 1, persistent session | esp-mqtt QoS 1, but its outbox is RAM, so **every tap is written to flash first** (`/q` in LittleFS) and deleted only on PUBACK. Unacked taps are sent again on reconnect and after 30s, which the server's `eventId` dedup makes safe. Flash is the outbox, so no persistent session is needed |
 | `gate-config` on 57439 + hotspot fallback | SoftAP captive portal for Wi-Fi, and a small status page on **57439**, so the dashboard's gate link (`gateConfigUrl`) works unchanged |
 | `POST /api/power-off` | deep sleep, so "Shut down all gates" works for every gate. There is no SD card to protect, so it only saves the battery. The PN532 shares the 3V3 rail, so it gets its own `PowerDown` command first, with chip select held high through the sleep (floating, it wakes the reader). The reader board's power LED keeps drawing a few mA; only switching the reader's supply (a MOSFET on a GPIO) removes that |
@@ -147,6 +147,23 @@ depend on this: its time comes from the GPIO interrupt, and a blocked loop
 only delays sending it. The default gate name is `ESP32_` plus the last three MAC bytes: what the
 device is, not what it does. `capabilities` reports the reader and the
 assignment gives the role, and one board may later run a beam as well.
+
+### Clock
+
+Best of 4 samples every 64s. Steps only within the first three syncs and
+slews after, as chrony's `makestep` (`decoder-adapters.md` clock policy), but
+from 5ms rather than 1s: a reset leaves the clock up to seconds off, and
+slewing that takes seconds of taps with wrong times.
+
+- **Rate:** like chrony it estimates the crystal's rate error (`ClockRate`,
+  over a 15–30 minute window, since one Wi-Fi sample is off by about what
+  the crystal drifts in a whole poll) and corrects for it between syncs. A
+  small offset is only half applied for the same reason.
+- **Delay filter:** a sync whose round trip is well above the usual one is
+  skipped (`DelayFilter`, chrony's `maxdelayratio`), and a large correction
+  never becomes the window's reference, where it would never be undone.
+- Each sync is logged on serial (`[clock] offset … delay … rate …`). Wi-Fi
+  power save is off: it adds latency jitter to every sample.
 
 ### Time without an RTC
 

@@ -22,9 +22,8 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
  * be visible: a superseded run would show FINISHED with a duration while
  * being absent from the results.
  *
- * It also still backstops the race the original plain unique constraint
- * covered, where two detections for the same passing are processed
- * concurrently and both clear the `findActive` check.
+ * It also catches two detections of one passing processed concurrently,
+ * which both clear the `findActive` check.
  */
 @Index(['entryId', 'stageId'], {
   unique: true,
@@ -35,23 +34,9 @@ export class StageRun {
   id: string;
 
   /**
-   * 1 for an entry's first go at this stage, incrementing for each re-run.
-   * Highest attempt wins — see `latestAttempts` in `stage-runs.service.ts`.
-   *
-   * An explicit counter rather than a creation timestamp, for two reasons.
-   * `@CreateDateColumn` writes only second precision on sqlite — verified:
-   * it stores `2026-08-23 00:07:54` where an application-set `Date` on the
-   * same `datetime` type stores `10:00:00.123` — so two attempts recorded in
-   * the same second compared *equal* and "latest" became whichever row the
-   * driver happened to return first. Note this is a property of
-   * `@CreateDateColumn`, **not** of `datetime` columns generally:
-   * `startTime`/`finishTime` keep their milliseconds, which is what makes
-   * tenth-of-a-second stage times possible at all (see
-   * `src/config/timestamp-precision.spec.ts`).
-   *
-   * `startTime` can't serve either, since the correction endpoints can edit
-   * it, and which run supersedes which must not change because a marshal
-   * fixed a timestamp.
+   * 1 for an entry's first go at this stage, incrementing for each re-run;
+   * highest wins (`latestAttempts`). Not a creation timestamp or `startTime`:
+   * see "StageRun" in `docs/event-model.md`.
    */
   @Column({ type: 'int', default: 1 })
   attempt: number;
@@ -86,29 +71,12 @@ export class StageRun {
   @Column()
   stageId: string;
 
-  /**
-   * `type: Date` (the constructor), not `'datetime'`: `'datetime'` is
-   * sqlite-only and fails Postgres metadata validation at startup, while
-   * `Date` normalizes to `datetime` on sqlite and `timestamp` on Postgres.
-   * Same reason `'timestamp'` is wrong here — it's the Postgres-only mirror.
-   */
   @Column({ type: Date })
   startTime: Date;
 
-  /**
-   * `| null`, not just optional: TypeORM's save() skips properties that are
-   * `undefined` (leaves the DB column untouched) but writes `null` fields
-   * as SQL NULL. Clearing a finish time needs the latter — see
-   * StageRunsService.correctRun.
-   */
   @Column({ type: Date, nullable: true })
   finishTime?: Date | null;
 
-  /**
-   * Explicit `type: 'int'` needed: reflect-metadata reduces a `number |
-   * null` property type to generic `Object`, which better-sqlite3 rejects
-   * as a column type when TypeORM tries to infer it from the TS type.
-   */
   @Column({ type: 'int', nullable: true })
   durationMs?: number | null;
 }

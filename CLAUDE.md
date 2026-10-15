@@ -109,8 +109,7 @@ Gate hardware (or SimulatedAdapter)
 `StageRun.durationMs` subtracts timestamps from **two physically separate gate clocks**.
 
 - **A duration must never be zero or negative.** Classification sorts ascending, so a skewed clock or a mistyped correction doesn't error — it *wins the rally*. Every path that computes or accepts a duration checks `finish > start` first.
-- **Clock offset is measured and partly corrected — know which half you touch.** Heartbeats carry `sentAt`; the server stores `arrivedAt - sentAt` as `Gate.clockOffsetMs` and applies it at ingest only past a threshold, since a one-way measurement can't separate offset from latency. `timestampGate` stays raw and the applied amount is stored per detection as `clockCorrectionMs`: **effective time is always `timestampGate + clockCorrectionMs`**. Never overwrite `timestampGate` — the pair makes a result recomputable. Rationale: `docs/architecture.md` "Clock offset".
-- Clock sync (chrony, an RTC) reduces drift but never guarantees two gates agree; the offset correction is a safety net for gross failures, not a substitute for sync — it can't resolve below network latency, which exceeds a winning margin.
+- **Effective time is always `timestampGate + clockCorrectionMs`.** Never overwrite `timestampGate`: the raw time and the applied correction together make a result recomputable. The correction is a deadband safety net for gross clock failures, not a substitute for sync — `docs/architecture.md` "Clock offset".
 
 ### Detections are at-least-once, so everything is idempotent
 

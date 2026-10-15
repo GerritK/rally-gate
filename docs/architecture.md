@@ -1,18 +1,6 @@
 # Architecture
 
-```
-Gate hardware (or SimulatedAdapter)
-  -> gate-agent (DetectionEvent + heartbeat over MQTT)
-  -> embedded Aedes broker inside rally-server
-  -> EventsService (stores DetectionEventRecord, looks up gate + entry)
-  -> rule engine (active GateAssignment.role -> start/finish/split a StageRun)
-  -> EventEmitter2 ("detection.created", "stage-run.updated", "stage-run.split")
-  -> LiveController (one SSE stream, /api/live) -> web dashboard
-```
-
-Gates are dumb: a gate-agent only knows its own `GATE_ID` and publishes to
-`rally/gates/<gateId>/detections` and `.../heartbeat`. What a gate *is* —
-start, finish, split — is assigned on the server through `GateAssignment`.
+The pipeline and "gates are dumb" are in the root `CLAUDE.md` "Architecture".
 
 The broker runs in-process rather than as a separate Mosquitto, so standalone
 mode has nothing external to install.
@@ -106,8 +94,7 @@ gate installer installs and checks with `getent hosts`.
   `ENOTFOUND rally-server.local` while the server log says it is advertising.
 - A typed `MQTT_HOST` still wins, for networks that block multicast.
 - Headless mode runs rally-server with `network_mode: host`, because a bridged
-  container can't multicast to the LAN. Consequences in `CLAUDE.md` "Field
-  deployment scripts". Docker Desktop's "host" is a VM, so there gates still
+  container can't multicast to the LAN. Consequences in `deploy/CLAUDE.md`. Docker Desktop's "host" is a VM, so there gates still
   need a typed IP.
 - The name is fixed, so two rally-servers on one network collide; `MDNS_HOST`
   is the escape hatch.

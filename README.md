@@ -70,6 +70,8 @@ flowchart LR
 - Gate clock sync against the server, with offsets shown on the Hardware page.
 - A config page on every gate (name, sensor, Wi-Fi); a gate that finds no
   known Wi-Fi opens its own hotspot so you can reach that page.
+- Penalties from a catalogue (flat or tiered, per stage or for the rally)
+  or as free text, added to the overall.
 - Creating and switching events from the dashboard.
 
 | Results | Entries | Hardware |
@@ -83,7 +85,7 @@ flowchart LR
   any other, so it times a car at a start or finish. What's missing is
   check-in: a tap doesn't set a car's status yet
   ([docs/esp32-gate.md](docs/esp32-gate.md)).
-- Time controls, Parc Fermé and penalties.
+- Time controls and Parc Fermé.
 - Any login.
 
 What comes when: [docs/development-roadmap.md](docs/development-roadmap.md).

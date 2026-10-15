@@ -281,8 +281,8 @@ export class StageRunsService {
         throw err;
       }
       // Lost a race with a concurrent detection for the same passing — the
-      // partial unique index on (entryId, stageId) where finishTime IS NULL
-      // is what catches it, since both callers can clear `findActive` first.
+      // partial unique index (one non-voided attempt per entry and stage)
+      // catches it, since both callers can clear `findActive` first.
       const raced =
         (await this.findActive(entryId, stageId)) ??
         (await this.findFinished(entryId, stageId));
@@ -571,8 +571,7 @@ export class StageRunsService {
   ): Promise<StageRunSplitPair[]> {
     // Through findByStage, not a direct query: that is what applies
     // `latestAttempts`, so a voided attempt's splits stop appearing on the
-    // live split leaderboard. Querying the repository here instead is
-    // precisely how they kept showing up.
+    // live split leaderboard.
     const runs = await this.findByStage(stageId);
     const stageClosed = await this.isStageClosed(stageId);
     const activeRuns = runs.filter(
