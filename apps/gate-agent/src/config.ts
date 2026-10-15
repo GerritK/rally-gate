@@ -16,10 +16,13 @@ export const config = {
       : undefined,
   },
   beam: {
-    line: process.env.BEAM_GPIO ?? 'GPIO17',
+    line: `GPIO${process.env.BEAM_GPIO ?? 17}`,
     edge: (process.env.BEAM_EDGE ?? 'rising') as BeamEdge,
     lockoutMs: Number(process.env.BEAM_LOCKOUT_MS ?? 500),
   },
+  buzzerLine: process.env.BUZZER_GPIO
+    ? `GPIO${process.env.BUZZER_GPIO}`
+    : undefined,
   openstint: {
     gain: Number(process.env.OPENSTINT_GAIN ?? 20),
   },

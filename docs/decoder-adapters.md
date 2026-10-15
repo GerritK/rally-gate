@@ -34,7 +34,7 @@ arguments; the adapter detects which.
 
 | Setting | Default | |
 |---|---|---|
-| `BEAM_GPIO` | `GPIO17` | BCM line name (physical pin 11) — the same on every Pi model |
+| `BEAM_GPIO` | `17` | BCM number (physical pin 11), used as line name `GPIO17` — the same on every Pi model |
 | `BEAM_EDGE` | `rising` | which edge means "beam broken" |
 | `BEAM_LOCKOUT_MS` | `500` | further edges within this window are the same car — a body breaks the beam several times (wheels, wing) |
 
@@ -67,6 +67,19 @@ Dark-ON is the reverse → `falling`. Original E3Z receivers have an L/D
 selector; clones vary. To check, hold a hand in the beam for two seconds: the
 gate-agent log should show the detection when the hand goes *in*, not when it
 comes out. If not, flip `BEAM_EDGE`.
+
+## Buzzer
+
+Any adapter: `BUZZER_GPIO` (a BCM number, unset by default, set from gate-config)
+names a line with an active buzzer, which beeps 120ms on every published passing, as
+the ESP32 gate does. gate-agent drives it with libgpiod's `gpioset` after
+publishing, so it never touches the timing, and a failing buzzer only logs.
+Passings during a beep queue up (at most 3) and beep after it, 100ms apart.
+
+**Not straight off the pin:** an active buzzer draws ~30mA, a Pi GPIO is good
+for ~16mA. Use a buzzer module with its own transistor (3 pins: VCC, GND, I/O;
+take a high-level-trigger one), or an NPN (e.g. 2N2222, 1kΩ to the base) with
+the buzzer on 5V. GPIO27 (physical pin 13) is free beside the beam's GPIO17.
 
 ## Beam + OpenStint (planned)
 

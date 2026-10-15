@@ -1,5 +1,6 @@
-import { ChildProcess, execFileSync, spawn } from 'child_process';
+import { ChildProcess, spawn } from 'child_process';
 import { createInterface } from 'readline';
+import { findLine, isLibgpiodV1 } from '../gpio';
 import { DecoderAdapter, DetectionCallback } from './decoder-adapter';
 
 export type BeamEdge = 'rising' | 'falling';
@@ -85,22 +86,13 @@ export class BeamAdapter implements DecoderAdapter {
   }
 }
 
-/**
- * libgpiod v1 (Pi OS Bookworm) and v2 (Trixie) take different arguments: v1
- * needs chip + offset, looked up with `gpiofind`; v2 takes the line name.
- * Both report monotonic event timestamps.
- */
+/** Both libgpiod versions report monotonic event timestamps. */
 function gpiomonCommand({ line, edge }: BeamAdapterOptions): {
   command: string;
   args: string[];
 } {
-  const version = execFileSync('gpiomon', ['--version'], { encoding: 'utf8' });
-  if (/v1\./.test(version)) {
-    const [chip, offset] = execFileSync('gpiofind', [line], {
-      encoding: 'utf8',
-    })
-      .trim()
-      .split(/\s+/);
+  if (isLibgpiodV1()) {
+    const [chip, offset] = findLine(line);
     return {
       command: 'gpiomon',
       args: [

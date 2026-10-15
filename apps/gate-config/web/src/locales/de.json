@@ -82,8 +82,13 @@
     },
     "BEAM_GPIO": {
       "label": "GPIO der Lichtschranke",
-      "message": "Ein GPIO-Leitungsname, z. B. GPIO17.",
-      "hint": "BCM-Name des Pins, an dem der Sensorausgang hängt. Standard GPIO17."
+      "message": "Eine GPIO-Nummer zwischen 2 und 27.",
+      "hint": "BCM-Nummer des Pins, an dem der Sensorausgang hängt (GPIO17 = 17). Standard 17."
+    },
+    "BUZZER_GPIO": {
+      "label": "GPIO des Summers",
+      "message": "Eine GPIO-Nummer zwischen 2 und 27.",
+      "hint": "BCM-Nummer des Pins, an dem ein aktiver Summer hängt; er piept bei jeder Durchfahrt. Leer: kein Summer."
     },
     "BEAM_EDGE": {
       "label": "Auslöseflanke der Lichtschranke",

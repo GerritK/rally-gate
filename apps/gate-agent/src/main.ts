@@ -1,4 +1,5 @@
 import { createAdapter } from './adapters/create-adapter';
+import { Buzzer } from './buzzer';
 import { config } from './config';
 import { log } from './log';
 import { readChrony, refreshTimeSource } from './time-sync';
@@ -21,9 +22,12 @@ uplink.onConnect(() => {
 });
 const heartbeatTimer = setInterval(sendHeartbeat, config.heartbeatIntervalMs);
 
-void adapter.start((transponderId, timestamp) =>
-  uplink.publishDetection(transponderId, timestamp),
-);
+const buzzer = config.buzzerLine ? new Buzzer(config.buzzerLine) : undefined;
+
+void adapter.start((transponderId, timestamp) => {
+  uplink.publishDetection(transponderId, timestamp);
+  buzzer?.beep();
+});
 
 // SIGTERM is what systemd sends on stop/restart; SIGINT is Ctrl+C in dev.
 async function shutdown() {

@@ -95,8 +95,13 @@
     },
     "BEAM_GPIO": {
       "label": "Light barrier GPIO",
-      "message": "A GPIO line name, e.g. GPIO17.",
-      "hint": "BCM name of the pin the sensor output is wired to. Default GPIO17."
+      "message": "A GPIO number between 2 and 27.",
+      "hint": "BCM number of the pin the sensor output is wired to (GPIO17 = 17). Default 17."
+    },
+    "BUZZER_GPIO": {
+      "label": "Buzzer GPIO",
+      "message": "A GPIO number between 2 and 27.",
+      "hint": "BCM number of the pin an active buzzer is wired to, beeping on every passing. Empty: no buzzer."
     },
     "BEAM_EDGE": {
       "label": "Light barrier trigger edge",

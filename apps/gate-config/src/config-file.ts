@@ -51,9 +51,9 @@ export const FIELDS = {
   BEAM_GPIO: {
     group: 'decoder',
     adapter: 'beam',
-    // A line name rather than a pin number: the same on every Pi model, where
-    // chip offsets are not.
-    pattern: /^GPIO[0-9]{1,2}$/,
+    // The BCM number, as in the line name `GPIO17`: the same on every Pi
+    // model, where chip offsets are not. 2-27 are the header's GPIOs.
+    range: [2, 27] as const,
   },
   BEAM_EDGE: {
     group: 'decoder',
@@ -78,6 +78,10 @@ export const FIELDS = {
     // Lower bound because the simulator drives the real publish path: a 1ms
     // interval is a flood at the broker, not a test.
     range: [250, 3_600_000] as const,
+  },
+  BUZZER_GPIO: {
+    group: 'decoder',
+    range: [2, 27] as const,
   },
   HOTSPOT_PASSWORD: {
     // WPA2's own limits: 8-63 printable ASCII. Not a generated secret — the
