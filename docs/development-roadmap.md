@@ -7,120 +7,52 @@
   runs on a laptop or a Pi — and reconfiguring one happens in `gate-config`,
   never by re-running the installer. Check any new gate-side work against this
   rather than adding another install prompt.
+- **The laptop comes first.** Standalone is the primary mode
+  (`deployment-modes.md`); a server on a Pi is supported, not prioritised.
 
 ## Built
 
-What exists, with where its reasoning lives. History is in git.
+One line each; the linked doc has the detail. History is in git.
 
-- **Pipeline:** gate-agent → embedded MQTT → ingest → rule engine → stage runs →
-  SSE → dashboard; QoS 1 persistent sessions, idempotent rules, failed
-  detections retried and surfaced (`CLAUDE.md`, `event-model.md`).
-- **Timing:** start/finish/split roles, a combined start/finish gate with an
-  optional minimum stage time (`event-model.md`), stage/split/overall classification, DNF/DNS,
-  manual corrections (a time of day or a stage time), a missed start
-  entered from finish and stage time, voiding and gate-timed re-runs, notional times,
-  entry classes as filtered rankings, splits as columns of the stage
-  classification, crews without a counted stage listed
-  as "Not classified" below the overall (`event-model.md`).
-- **Stages outside the overall:** `Stage.scoring` `QUALIFYING` or `NONE`
-  (shakedown), set on the stage page: timed and ranked on its own, marked
-  beside its name, never read by the overall or its penalties; a qualifying
-  stage orders the first counted stage under "Overall time" (`event-model.md`
-  "Stages outside the overall").
-- **Rally status:** Setup → Running → Closed on `RallyInfo`, a chip in the
-  app bar pushed over `/api/live`, Start rally behind a pre-start check,
-  Close and Reopen; route locks by `@LockedWhen`, "Provisional" on result
-  PDFs until Closed, each gate's latest read on Hardware for tests
+- **Pipeline:** gate-agent → MQTT → ingest → rule engine → stage runs → SSE →
+  dashboard; QoS 1, idempotent rules, failed detections retried
+  (`CLAUDE.md`, `event-model.md`).
+- **Timing:** start/finish/split and combined start/finish gates,
+  stage/split/overall classification, DNF/DNS, corrections, missed starts,
+  voiding and re-runs, notional times, class rankings (`event-model.md`).
+- **Stages outside the overall:** qualifying and shakedown (`event-model.md`).
+- **Rally status:** Setup → Running → Closed with route locks
   (`event-model.md` "Rally status").
-- **Penalties:** a catalogue of types, flat or tiered, counted per stage or
-  across the rally, plus free text; given on Live Timing or the entry page,
-  added to the overall total only, priced on read (`event-model.md`
-  "Penalties").
-- **Light barrier:** `BeamAdapter` (E3Z-T61 via GPIO), unassigned passings
-  assigned by a marshal (`decoder-adapters.md`, `event-model.md`). Verified on
-  a Pi with the E3Z-T61, marshal assignment included.
-- **RC transponders:** `OpenStintAdapter` runs `openstint_rtlsdr` on an
-  RTL-SDR and reads its passings from stdout; gate-config shows the decoder's
-  signal (`decoder-adapters.md`). Verified on a Pi with a real car through a
-  loop, reaching the server and its entry, offline buffering included.
-- **Stages and gates:** gate auto-discovery via heartbeat, gate assignments as a
-  plan with per-stage activation, close as terminal (`architecture.md`).
-  Optional expected stage time; Live Timing flags a `STARTED` run past it as
-  overdue (client-side only).
-- **Clocks:** chrony on gates with rally-server's embedded SNTP server as the
-  only source, measured per-gate offset with a server-side correction deadband
-  (`architecture.md` "Clock offset", `deployment-modes.md` "Time sync").
-- **Discovery:** mDNS `rally-server.local`, so a gate install needs no address
-  (`architecture.md` "Server discovery").
-- **Start order:** integer start numbers, per-stage start list grouped by main
-  class and sorted by start number, overall or last stage time in either
-  direction, frozen by hand when posted or on first activation (`event-model.md`
-  "Start order").
-- **Marshal view:** Live Timing is laid out like the stage: "Up next" with
-  Start now beside the cars on stage in expected arrival order, above one
-  table of every entry in start order with run state, corrections and
-  Start now per row, and unassigned passings pre-selected from the start
-  order (never auto-assigned). Prints as the posted start list (`frontend-structure.md`).
-- **Overall stage headers** link to that stage's results, class filter
-  kept. Header only: a row click is kept free for an entry detail page.
-- **Printing:** start lists and results (Overall, each stage) as PDFs
-  built in the browser (jsPDF), on numbered sheets with what each holds,
-  the print time, and "Provisional" while a stage runs or a start list
-  isn't frozen; "Print all" puts every class's ranking in one PDF. Saved
-  class combinations ("2WD + Rookie") wait until someone needs one; the
-  filter is a link (`design-system.md` "Print").
-- **Dashboard:** multi-page `apps/web` — Live Timing, Results, Setup, Hardware,
-  Entries (`frontend-structure.md`).
-- **UI guidelines** (`design-system.md`): shared confirm dialog and
-  snackbar in both apps, add/edit forms in `FormDialog`, one direct action
-  plus a menu per row, unsaved changes guarded on page forms.
-- **Gate config UI:** settings, status, Wi-Fi, hotspot fallback, Wi-Fi reset;
-  verified on a Pi. Shutdown built, not yet tried on a Pi (`gate-config-ui.md`).
-- **Gate health:** chrony state in the heartbeat, each gate's state on Live
-  Timing's gate line, "Shut down all gates" on the Hardware page via gate-config
-  (`architecture.md`). Not yet tried on a Pi.
-- **Versions:** git build stamped into `packages/shared`, reported by gates in
-  the heartbeat, shown in gate-config and the dashboard, mismatch flagged
-  (`architecture.md`).
-- **Deployment:** SQLite standalone and Postgres headless from one codebase,
-  rally-server serving the dashboard under one port, Windows firewall rules on
-  first start, Pi installers for server and gates (`deployment-modes.md`).
-- **Standalone packages:** Windows and macOS zip, Linux tarball with
-  bundled node, built and smoke-tested in CI (`deployment-modes.md`).
-- **Events:** new / open event in the dashboard, one file each, switched by
-  restarting under `start.js`; gates remembered per computer, picked into
-  each event on the Hardware page (`deployment-modes.md` "New / open event").
-- **Crews:** driver and co-driver as first/last name with a flag each, body
-  and chassis; names in the event's format and flags shown or off on
-  screen (Setup → Display; printed PDFs never show flags); an entry page,
-  opened from Entries and Results rows, with its crew, car, entry and
-  times per stage (`frontend-structure.md`, `design-system.md`). Flags are
-  freely usable only: `flag-icons` for countries, own SVGs for the
-  chequered default and the Pride, Progress Pride and trans flags
-  (`THIRD_PARTY_NOTICES.md`). Not the International Flag of Planet Earth:
-  its terms forbid it standing for a person.
-- **Check-in:** entry status from the Entries list, the entry page
-  and a check-in page with Desk and Scrutineering stations, the desk
-  taking the transponder (Registered → Checked in → Scrutineered, or both
-  at once; Withdraw, Disqualify, Reinstate). Withdrawn and
-  disqualified cars leave computed start lists and start no run;
-  disqualified ones leave every result, listed as DSQ. Not yet scrutineered
-  still starts, marked on Live Timing, and Freeze/Activate ask
+- **Penalties:** a catalogue of flat or tiered types, per stage or per rally,
+  plus free text (`event-model.md` "Penalties").
+- **Light barrier:** `BeamAdapter`, passings assigned by a marshal
+  (`decoder-adapters.md`). Verified on a Pi with an E3Z-T61.
+- **RC transponders:** `OpenStintAdapter` on an RTL-SDR
+  (`decoder-adapters.md`). Verified on a Pi with a real car through a loop.
+- **Stages and gates:** auto-discovery by heartbeat, assignments as a plan
+  with per-stage activation, expected stage time (`architecture.md`).
+- **Clocks:** chrony against rally-server's SNTP, measured offset with a
+  correction deadband (`architecture.md` "Clock offset").
+- **Discovery:** mDNS `rally-server.local` (`architecture.md`).
+- **Start order:** computed per stage, frozen when posted (`event-model.md`).
+- **Dashboard:** Live Timing (the marshal view), Results with podium,
+  Entries with check-in, Hardware, Setup (`frontend-structure.md`).
+- **Printing:** start lists and results as PDFs (`design-system.md` "Print").
+- **Crews:** names and flags in the event's format, entry pages
+  (`design-system.md`).
+- **Check-in:** Desk and Scrutineering, withdraw and disqualify
   (`event-model.md` "Entry status").
-- **Transponders:** several per entry, each with a kind (RC, NFC) and an
-  optional label, a detection matching only its own kind; one transponder on
-  several cars holds its passings for a marshal like a beam passing, the
-  picker offering just those cars (`event-model.md` "Transponders").
-- **Podium** above the Overall and each stage's results, following the class
-  filter: steps 2-1-3 with gold/silver/bronze trophies, crew, body, time and
-  gap; a click opens the entry. On screen only, or off; the printed
-  result is a plain table (`design-system.md`).
-- **CI:** build, format, lint, tests, and a headless-stack job against real
-  Postgres (`CLAUDE.md`).
-- **English and German** in both web UIs (vue-i18n, Vuetify's own texts
-  included), picked per browser: its language, or the viewer's choice in the
-  app bar. Printed PDFs follow it. Server refusals arrive as codes and are
-  translated too; only validation 400s stay English (`api.md`).
+- **Transponders:** several per entry, each with a kind (`event-model.md`).
+- **Gate config UI:** settings, status, Wi-Fi, hotspot fallback, shutdown
+  (`gate-config-ui.md`). Shutdown not yet tried on a Pi.
+- **Gate health:** chrony state and versions in the heartbeat, "Shut down
+  all gates" (`architecture.md`). Not yet tried on a Pi.
+- **Deployment:** SQLite standalone and Postgres headless, Pi installers,
+  standalone packages built in CI, new / open event, known gates
+  (`deployment-modes.md`).
+- **English and German** in both web UIs, PDFs included (`api.md` for
+  server error codes).
+- **CI:** build, format, lint, tests, headless stack against Postgres.
 
 ## Next
 
@@ -277,6 +209,12 @@ What exists, with where its reasoning lives. History is in git.
   open: picked on the page, or a gate role that never times, which could
   also check in a known tag. Server side needs nothing new: the taps are
   plain detections with no entry.
-- Online/spectator mode (`deployment-modes.md`).
+- **Saved class combinations** ("2WD + Rookie") for printing — the class
+  filter is a link, which covers it until someone asks.
+- **The International Flag of Planet Earth** as a crew flag: its terms
+  forbid it standing for a person.
+- Online/spectator mode: a one-way push from the local rally-server to a
+  cloud service, so spectators get live timing while the rally network stays
+  closed.
 - Rule engine DSL (hardcoded branching in `EventsService` is fine at this scale),
   RC4 learning registry / transponder management UI.

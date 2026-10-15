@@ -10,6 +10,12 @@ One codebase, two ways to run `rally-server`, switched by config
 2. **Headless** — `deploy/docker-compose.yml` with Postgres, on a Pi or mini PC,
    managed through the same web UI.
 
+**Standalone on a laptop is the primary mode**: most clubs will run the
+event from a laptop they already have. It gets the polish (packages,
+first-start experience, Windows and macOS quirks) and is what a feature is
+tried on first. Headless keeps working — CI boots it against Postgres — but
+a gap there is lower priority, and nothing should be designed around it.
+
 In both, the MQTT broker, the time server and mDNS discovery run inside
 rally-server, so **a gate never needs to know which kind of machine the server
 is**. rally-server also serves the built dashboard on its API port; the
@@ -109,12 +115,6 @@ fixed and the buttons are hidden.
   the file, it is seeded from the open event's gates. A plain file so a club
   can copy it to a second laptop.
 
-Not built: carrying entries/stages over from the previous event, and
-switching under Postgres (it would need `CREATE DATABASE`; Docker's restart
-policy would already do the restart).
-
-## Future: online/spectator mode
-
-Not built. One-way push from the local rally-server to a cloud service, so
-spectators get live timing without joining the rally network, which stays
-closed.
+Switching under Postgres would need `CREATE DATABASE`; Docker's restart
+policy would already do the restart. Not built, like carrying entries over and
+an online/spectator mode: `development-roadmap.md` "Deliberately deferred".
