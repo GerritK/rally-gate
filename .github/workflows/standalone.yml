@@ -54,11 +54,11 @@ jobs:
           up '2026-01-01 Smoke.sqlite'
           echo "packaged rally-server is up and switches events"
 
-      # archive: false, or GitHub zips the zip again on download. The file
-      # name becomes the artifact name.
+      # Zipped (the default): the release job's download of an unzipped .tar.gz
+      # fails on its checksum.
       - uses: actions/upload-artifact@v7
         with:
-          archive: false
+          name: package-${{ matrix.os }}
           path: |
             dist-standalone/*.zip
             dist-standalone/*.tar.gz

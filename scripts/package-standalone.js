@@ -7,7 +7,10 @@ const { dirname, join } = require('node:path');
 const { execFileSync } = require('node:child_process');
 
 const root = join(__dirname, '..');
-const { version } = require(join(root, 'package.json'));
+// The git-stamped version (v0.1.0 on a tag), not package.json's.
+const version = require(
+  join(root, 'packages/shared/dist/version.js'),
+).VERSION.replace(/^v/, '');
 const windows = process.platform === 'win32';
 const platform =
   { win32: 'windows', darwin: 'macos' }[process.platform] ?? process.platform;
