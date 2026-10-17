@@ -10,10 +10,12 @@ It is built for clubs running a small rally on their own ground: no internet,
 no timing company, and hardware a club can build and own. Everything runs on
 the rally's own closed Wi-Fi.
 
-> **Status: early development.** Timing works end to end with simulated gates,
-> with a light barrier on a gate's GPIO pin and with RC transponders on a loop
-> (see [What works today](#what-works-today)). Don't time a real event without
-> a paper backup.
+> **Status: alpha.** Timing works end to end with simulated gates, with a
+> light barrier on a gate's GPIO pin and with RC transponders on a loop
+> (see [What works today](#what-works-today)). Breaking changes can come with
+> any release, including event files an older version wrote: finish an event
+> on the version you started it with. Don't time a real event without a paper
+> backup.
 
 ![Live Timing: who's up next, who's on stage, and every time as it comes in](docs/images/live.png)
 
@@ -118,8 +120,8 @@ On first start Windows asks once for permission to open the firewall for the
 gates. The package isn't code-signed yet, so Windows SmartScreen and macOS warn
 the first time (on macOS: right-click → Open).
 
-No release has been published yet. Until then, build the package yourself
-(Node.js 22):
+Download it from [Releases](https://github.com/GerritK/rally-gate/releases),
+or build it yourself (Node.js 22):
 
 ```bash
 npm ci

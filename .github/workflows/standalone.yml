@@ -63,3 +63,25 @@ jobs:
             dist-standalone/*.zip
             dist-standalone/*.tar.gz
           if-no-files-found: error
+
+  # Tag pushes only: a manual run is for trying the packages, not publishing them.
+  release:
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          path: dist
+          merge-multiple: true
+      # A tag with a suffix (v0.1.0-alpha.1) is a pre-release.
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=()
+          [[ "$GITHUB_REF_NAME" == *-* ]] && flags+=(--prerelease)
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" --generate-notes "${flags[@]}" \
+            --notes "**Alpha.** Breaking changes can happen in any release: an event file from an older version may not open in a newer one. Finish an event on the version you started it with, and keep a paper backup."
