@@ -39,6 +39,7 @@
     "wifiPasswordHint": "Wird von NetworkManager gespeichert, nicht in der Konfigurationsdatei des Gates.",
     "onHotspot": "Du bist mit dem eigenen Hotspot dieses Gates verbunden. Beim Verbinden mit einem Netz geht der Hotspot aus, diese Seite ist dann nicht mehr erreichbar — das ist zu erwarten. Kann das Gate nicht beitreten, startet es den Hotspot innerhalb einer Minute wieder.",
     "resetWifi": "WLAN zurücksetzen",
+    "rescan": "Scannen",
     "join": "Verbinden",
     "status": "Status",
     "version": "Version",

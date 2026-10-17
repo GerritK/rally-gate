@@ -30,8 +30,9 @@ export function useConfirm() {
     });
 }
 
-export function notify(text: string) {
-  notice.value = { text, error: false };
+/** `error` for a failure reported as text, e.g. a command's output. */
+export function notify(text: string, error = false) {
+  notice.value = { text, error };
 }
 
 /** A notice is about the page it was raised on; leaving it, it goes too. */

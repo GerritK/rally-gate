@@ -84,6 +84,11 @@
   .alert[hidden] { display: none; }
   .alert > span { flex: 1; }
   .alert button { width: 28px; height: 28px; padding: 0; margin: -2px -4px 0 0; border-radius: 50%; color: inherit; }
+  /* Vuetify's v-snackbar, as RallyFeedback shows it: pinned to the bottom, so
+     a result is seen wherever on the page its button was. */
+  #notice { position: fixed; z-index: 2; left: 50%; bottom: 8px; transform: translateX(-50%); width: calc(100% - 16px); max-width: 672px; margin: 0; padding: 6px 8px 6px 16px; align-items: center; background: #2A313B; color: #B9C2CE; box-shadow: 0 3px 5px -1px rgba(0,0,0,.2), 0 6px 10px rgba(0,0,0,.14), 0 1px 18px rgba(0,0,0,.12); }
+  #notice.error { background: var(--error); color: var(--on-error); }
+  #notice button { margin: 0; width: 36px; height: 36px; }
   a.repo { display: inline-flex; vertical-align: -2px; margin-left: 8px; color: var(--muted); }
   .alert.tonal { position: relative; padding: 12px 16px; background: transparent; margin: 0 0 16px; }
   .alert.tonal::before { content: ''; position: absolute; inset: 0; border-radius: inherit; background: currentColor; opacity: .12; }
@@ -111,7 +116,7 @@
 </header>
 
 <main>
-  <div id="notice" class="alert" hidden></div>
+  <div id="notice" class="alert" role="status" hidden></div>
 
   <section class="card">
     <h2>Status</h2>
@@ -223,14 +228,20 @@ function alert(el, kind, text, tonal) {
   el.append(span(text));
   el.hidden = false;
 }
-// The banner at the top closes; the notes inside a card come and go by themselves.
+// The snackbar closes itself, an error later; the notes inside a card come
+// and go by themselves. Same timeouts as RallyFeedback.
+let noticeTimer;
 function notice(kind, text) {
-  alert($('notice'), kind, text);
+  const el = $('notice');
+  el.className = kind === 'error' ? 'alert error' : 'alert';
+  el.replaceChildren(span(text));
   const close = Object.assign(document.createElement('button'), { type: 'button', innerHTML: svg('close') });
   close.setAttribute('aria-label', 'Close');
-  close.onclick = () => { $('notice').hidden = true; };
-  $('notice').append(close);
-  scrollTo({ top: 0, behavior: 'smooth' });
+  close.onclick = () => { el.hidden = true; };
+  el.append(close);
+  el.hidden = false;
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => { el.hidden = true; }, kind === 'error' ? 8000 : 3000);
 }
 
 // Under the field, in place of its hint, as on gate-config.

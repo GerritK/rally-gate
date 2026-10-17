@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import {
   LocaleMenu,
   logoUrl,
+  notify,
   RallyFeedback,
   REPO_URL,
   useConfirm,
@@ -46,16 +47,13 @@ const saving = ref(false);
 // null until Vuetify has validated; only an explicit false means "known bad",
 // so the button is never disabled just because nothing has been touched yet.
 const formValid = ref<boolean | null>(null);
-const notice = ref<{
-  type: 'success' | 'error' | 'warning';
-  text: string;
-} | null>(null);
 const originalGateId = ref('');
 
 const network = ref<NetworkState | null>(null);
 const joinSsid = ref('');
 const joinPassword = ref('');
 const joining = ref(false);
+const scanning = ref(false);
 const wifiErrors = ref<Record<string, WifiError>>({});
 
 const confirm = useConfirm();
@@ -226,9 +224,19 @@ async function loadNetwork() {
   }
 }
 
+// The scan only happens on this request, so a network switched on after the
+// page loaded needs a way to show up without a reload.
+async function rescan() {
+  scanning.value = true;
+  try {
+    await loadNetwork();
+  } finally {
+    scanning.value = false;
+  }
+}
+
 async function join() {
   joining.value = true;
-  notice.value = null;
   wifiErrors.value = {};
   try {
     const response = await fetch('/api/network', {
@@ -242,18 +250,14 @@ async function join() {
     const result = await response.json();
     if (!response.ok) {
       wifiErrors.value = result.errors ?? {};
-      notice.value = { type: 'error', text: t('gateConfig.joinCheck') };
+      notify(t('gateConfig.joinCheck'), true);
       return;
     }
-    notice.value = result.joined
-      ? {
-          type: 'success',
-          text: t('gateConfig.joined', { ssid: joinSsid.value }),
-        }
-      : {
-          type: 'error',
-          text: result.output || t('gateConfig.joinFailed'),
-        };
+    if (result.joined) {
+      notify(t('gateConfig.joined', { ssid: joinSsid.value }));
+    } else {
+      notify(result.output || t('gateConfig.joinFailed'), true);
+    }
     joinPassword.value = '';
     await loadNetwork();
   } catch {
@@ -261,10 +265,7 @@ async function join() {
     // joining takes that hotspot down, so the reply has no route back. Saying
     // "failed" here would send a marshal to re-enter a password that is in fact
     // being used.
-    notice.value = {
-      type: 'warning',
-      text: t('gateConfig.lostWhileJoining', { ssid: joinSsid.value }),
-    };
+    notify(t('gateConfig.lostWhileJoining', { ssid: joinSsid.value }));
   } finally {
     joining.value = false;
   }
@@ -280,23 +281,18 @@ async function resetWifi() {
     }))
   )
     return;
-  notice.value = null;
   try {
     const result = await (
       await fetch('/api/network/reset', { method: 'POST' })
     ).json();
-    notice.value = result.started
-      ? { type: 'success', text: t('gateConfig.resetDone') }
-      : {
-          type: 'error',
-          text: result.output || t('gateConfig.hotspotFailed'),
-        };
+    if (result.started) {
+      notify(t('gateConfig.resetDone'));
+    } else {
+      notify(result.output || t('gateConfig.hotspotFailed'), true);
+    }
     await loadNetwork();
   } catch {
-    notice.value = {
-      type: 'warning',
-      text: t('gateConfig.lostAfterReset'),
-    };
+    notify(t('gateConfig.lostAfterReset'));
   }
 }
 
@@ -310,26 +306,18 @@ async function powerOff() {
     }))
   )
     return;
-  notice.value = null;
-  const done = {
-    type: 'success' as const,
-    text: t('gateConfig.shuttingDown'),
-  };
   try {
     const result = await (
       await fetch('/api/power-off', { method: 'POST' })
     ).json();
     if (!result.started) {
-      notice.value = {
-        type: 'error',
-        text: result.output || t('gateConfig.shutDownFailed'),
-      };
+      notify(result.output || t('gateConfig.shutDownFailed'), true);
       return;
     }
-    notice.value = done;
+    notify(t('gateConfig.shuttingDown'));
   } catch {
     // The gate may take the network down before the reply gets out.
-    notice.value = done;
+    notify(t('gateConfig.shuttingDown'));
   }
   // Polling a gate that is going away would only flip the chip to "unknown".
   clearInterval(statusTimer);
@@ -368,7 +356,6 @@ watch(
 
 async function save() {
   saving.value = true;
-  notice.value = null;
   errors.value = {};
   try {
     const response = await fetch('/api/config', {
@@ -377,19 +364,18 @@ async function save() {
       body: JSON.stringify(values.value),
     }).catch(() => null);
     if (!response) {
-      notice.value = { type: 'error', text: t('gateConfig.unreachable') };
+      notify(t('gateConfig.unreachable'), true);
       return;
     }
     const result = await response.json();
     if (!response.ok) {
       errors.value = result.errors ?? {};
-      notice.value = {
-        type: 'error',
-        text:
-          result.error === 'writeFailed'
-            ? t('gateConfig.writeFailed', { detail: result.detail })
-            : t('gateConfig.notSaved'),
-      };
+      notify(
+        result.error === 'writeFailed'
+          ? t('gateConfig.writeFailed', { detail: result.detail })
+          : t('gateConfig.notSaved'),
+        true,
+      );
       return;
     }
     // Saved and applied are separate outcomes: the file is already written by
@@ -403,19 +389,21 @@ async function save() {
         ? t('gateConfig.timeFailed', { output: result.time.output })
         : null,
     ].filter(Boolean);
-    notice.value = failed.length
-      ? {
-          type: 'warning',
-          text: t('gateConfig.savedButFailed', {
-            failed: failed.join(t('gateConfig.and')),
-          }),
-        }
-      : { type: 'success', text: t('gateConfig.saved') };
+    if (failed.length) {
+      notify(
+        t('gateConfig.savedButFailed', {
+          failed: failed.join(t('gateConfig.and')),
+        }),
+        true,
+      );
+    } else {
+      notify(t('gateConfig.saved'));
+    }
     originalGateId.value = values.value.GATE_ID ?? '';
     await loadStatus();
   } catch {
     // The gate answered, but not as expected: whether it saved is unknown.
-    notice.value = { type: 'error', text: t('ui.somethingWentWrong') };
+    notify(t('ui.somethingWentWrong'), true);
   } finally {
     saving.value = false;
   }
@@ -469,15 +457,6 @@ onUnmounted(() => {
 
     <v-main>
       <v-container class="py-6" style="max-width: 720px">
-        <v-alert
-          v-if="notice"
-          :type="notice.type"
-          :text="notice.text"
-          class="mb-4"
-          closable
-          @click:close="notice = null"
-        />
-
         <!-- Status first: in the field a gate's page is opened to check it or
              to fix its Wi-Fi; settings are set once. Same order as the ESP32
              gate's page (firmware/esp32-gate/web/index.html). -->
@@ -597,6 +576,16 @@ onUnmounted(() => {
                 persistent-hint
                 class="mb-4"
               />
+              <!-- Under the field, as on the ESP32 gate's page. -->
+              <v-btn
+                :loading="scanning"
+                variant="text"
+                prepend-icon="mdi-refresh"
+                class="mt-n2 mb-4"
+                @click="rescan"
+              >
+                {{ t('gateConfig.rescan') }}
+              </v-btn>
               <v-text-field
                 v-if="selectedSecured"
                 v-model="joinPassword"

@@ -39,6 +39,7 @@
     "wifiPasswordHint": "Stored by NetworkManager, not in the gate's config file.",
     "onHotspot": "You are connected to this gate's own hotspot. Joining a network takes the hotspot down, so this page will go unreachable — that is expected. If the gate cannot join, it raises the hotspot again within a minute.",
     "resetWifi": "Reset Wi-Fi",
+    "rescan": "Scan",
     "join": "Join",
     "status": "Status",
     "version": "Version",
