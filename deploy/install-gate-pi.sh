@@ -3,18 +3,19 @@
 # Runs bare-metal (not Docker) so it has direct access to the RTL-SDR/USB
 # decoder and any GPIO sensors — see apps/gate-agent/Dockerfile for why.
 #
-# Usage: curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-gate-pi.sh | bash
+# Usage: curl -fsSL https://github.com/GerritK/rally-gate/releases/latest/download/install-gate-pi.sh | bash
 # Prompts can be skipped by pre-setting the env vars, e.g.:
-#   GATE_ID=CLUB_START_WP1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-gate-pi.sh)"
+#   GATE_ID=CLUB_START_WP1 bash -c "$(curl -fsSL https://github.com/GerritK/rally-gate/releases/latest/download/install-gate-pi.sh)"
 # MQTT_HOST is only needed where mDNS is blocked; it defaults to the name
 # rally-server advertises for itself.
 # GATE_ID should be globally unique — prefix it with your club's short code
 # (see "Gate discovery & heartbeat" in docs/architecture.md).
 # Re-running it updates the gate; the prompts then default to its current
 # settings (/etc/rally-gate/gate.env), so pressing Enter keeps them.
-# BRANCH=<name> switches the clone to that branch, and later updates stay on it;
-# unset, an update keeps the clone's branch. The URL picks the installer, BRANCH
-# the code it installs, so a branch test sets both:
+# The release copy has RELEASE pinned to its tag, so script and code match;
+# re-running a newer release's script updates to it. For development, the raw
+# copy of a branch with BRANCH=<name> follows that branch (unset: the clone's
+# branch, or master for a clone on a release):
 #   curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/<name>/deploy/install-gate-pi.sh | BRANCH=<name> bash
 # Build/apt output is hidden unless a step fails; -v shows it all:
 #   curl -fsSL <url> | bash -s -- -v
@@ -31,6 +32,8 @@ done
 REPO_URL="${REPO_URL:-https://github.com/GerritK/rally-gate.git}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/rally-gate}"
 BRANCH="${BRANCH:-}"
+# Set by the release job on the copy it attaches (.github/workflows/standalone.yml).
+RELEASE="${RELEASE:-}"
 
 # ---------------------------------------------------------------------------
 # Output helpers. Colour and animation only on a real terminal (NO_COLOR
@@ -342,13 +345,22 @@ if [ -d "$INSTALL_DIR/.git" ]; then
   # Not `pull`: it refuses on a rewritten upstream history or on a lockfile an
   # older installer's `npm install` left modified. Nobody edits this clone on
   # purpose — config lives in /etc, build output is gitignored.
-  run "Fetching the latest version" git -C "$INSTALL_DIR" fetch
-  if [ -n "$BRANCH" ]; then
-    run "Switching to $BRANCH" git -C "$INSTALL_DIR" checkout -f -B "$BRANCH" --track "origin/$BRANCH"
+  run "Fetching the latest version" git -C "$INSTALL_DIR" fetch --tags --force
+  if [ -n "$RELEASE" ]; then
+    run "Switching to $RELEASE" git -C "$INSTALL_DIR" checkout -f --detach "refs/tags/$RELEASE"
+  else
+    # A clone on a release has no branch, so nothing to reset to.
+    if [ -z "$BRANCH" ] && ! git -C "$INSTALL_DIR" symbolic-ref -q HEAD >/dev/null; then
+      BRANCH=master
+    fi
+    if [ -n "$BRANCH" ]; then
+      run "Switching to $BRANCH" git -C "$INSTALL_DIR" checkout -f -B "$BRANCH" --track "origin/$BRANCH"
+    fi
+    run "Updating files" git -C "$INSTALL_DIR" reset --hard '@{u}'
   fi
-  run "Updating files" git -C "$INSTALL_DIR" reset --hard '@{u}'
 else
-  run "Downloading" git clone ${BRANCH:+--branch "$BRANCH"} "$REPO_URL" "$INSTALL_DIR"
+  REF="${RELEASE:-$BRANCH}"
+  run "Downloading" git clone ${REF:+--branch "$REF"} "$REPO_URL" "$INSTALL_DIR"
 fi
 
 step "Building the gate software"

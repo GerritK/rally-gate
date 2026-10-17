@@ -1,6 +1,6 @@
 # deploy
 
-`install-server-pi.sh` and `install-gate-pi.sh` are one-shot `curl | bash` installers for real Raspberry Pis, run off master — never from this working directory. They hardcode assumptions about the codebase that **no build or test checks**; update them by hand whenever the corresponding thing changes:
+`install-server-pi.sh` and `install-gate-pi.sh` are one-shot `curl | bash` installers for real Raspberry Pis, never run from this working directory. Users get them from the latest GitHub release, where the release job pins `RELEASE` to the tag, so script and code match; the raw master copy is for development. They hardcode assumptions about the codebase that **no build or test checks**; update them by hand whenever the corresponding thing changes:
 
 - **`install-server-pi.sh`** assumes `docker-compose.yml` exists and `docker compose up -d --build` works; prints port 57430.
 - **`docker-compose.yml`** runs rally-server on `network_mode: host` so its mDNS advertisement reaches the LAN (a bridged container can't multicast). It therefore publishes no ports and reaches Postgres over `127.0.0.1`, and Postgres is published on `127.0.0.1:5432` — **that address prefix is the entire protection**. Don't "tidy" it into `5432:5432`, and don't move rally-server back to bridge networking without re-checking discovery.

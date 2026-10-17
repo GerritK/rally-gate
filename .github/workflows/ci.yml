@@ -1,8 +1,8 @@
 name: CI
 
-# The install path for this project is `curl | bash` straight off master
-# (deploy/install-*.sh), so master being green is load-bearing rather than
-# cosmetic — a broken commit is one a marshal can pull onto a Pi at an event.
+# Development Pis install `curl | bash` straight off master (deploy/install-*.sh),
+# and every release is tagged from it, so master being green is load-bearing
+# rather than cosmetic — a broken commit is one that can reach a Pi at an event.
 on:
   push:
     branches: [master]

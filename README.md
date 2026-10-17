@@ -135,7 +135,7 @@ node scripts/package-standalone.js   # -> dist-standalone/
 On a fresh Raspberry Pi OS Lite:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-server-pi.sh | bash
+curl -fsSL https://github.com/GerritK/rally-gate/releases/latest/download/install-server-pi.sh | bash
 ```
 
 Runs the server with Docker and PostgreSQL. The dashboard is at
@@ -147,7 +147,7 @@ creating and switching events from the dashboard is standalone-only for now.
 On each gate's Raspberry Pi:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/GerritK/rally-gate/master/deploy/install-gate-pi.sh | bash
+curl -fsSL https://github.com/GerritK/rally-gate/releases/latest/download/install-gate-pi.sh | bash
 ```
 
 It asks for a **gate ID** — pick one prefixed with your club's short code,
@@ -155,7 +155,8 @@ like `CLUB_START_WP1`, so gates never clash if clubs share hardware — plus a
 hotspot password and whether an RTC module is fitted. Nothing about the rally:
 the server address defaults to `rally-server.local`, which the server
 announces on the network itself, so press Enter there. Re-run the same command
-to update a gate; it offers the current settings as defaults.
+to update a gate to the latest release; it offers the current settings as
+defaults.
 
 Everything else is set on the gate's own config page at
 `http://<gate-name>.local:57439`: the sensor, Wi-Fi networks, and a status

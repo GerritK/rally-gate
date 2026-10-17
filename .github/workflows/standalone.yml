@@ -64,7 +64,6 @@ jobs:
             dist-standalone/*.tar.gz
           if-no-files-found: error
 
-  # Tag pushes only: a manual run is for trying the packages, not publishing them.
   release:
     needs: package
     if: startsWith(github.ref, 'refs/tags/v')
@@ -72,16 +71,35 @@ jobs:
     permissions:
       contents: write
     steps:
+      # The whole history with tags, for the commits since the previous release.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/download-artifact@v7
         with:
           path: dist
           merge-multiple: true
-      # A tag with a suffix (v0.1.0-alpha.1) is a pre-release.
+      - run: |
+          for script in install-gate-pi.sh install-server-pi.sh; do
+            sed "s/^RELEASE=.*/RELEASE=\"\${RELEASE:-$GITHUB_REF_NAME}\"/" "deploy/$script" > "dist/$script"
+            grep -qx "RELEASE=\"\${RELEASE:-$GITHUB_REF_NAME}\"" "dist/$script"
+          done
+      # A suffixed tag (v0.2.0-rc.1) is a pre-release, which /releases/latest/ skips.
       - env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          {
+            echo "**Alpha.** Breaking changes can happen in any release: an event file from an older version may not open in a newer one. Finish an event on the version you started it with, and keep a paper backup."
+            echo
+            if prev=$(git describe --tags --abbrev=0 "$GITHUB_REF_NAME^" 2>/dev/null); then
+              echo "## Changes since $prev"
+              echo
+              git log --no-merges --format='- %s' "$prev..$GITHUB_REF_NAME" | grep -Ev '^- (Docs|Roadmap):' || true
+            else
+              echo "First release. What it does: [What works today](https://github.com/$GITHUB_REPOSITORY#what-works-today)."
+            fi
+          } > notes.md
           flags=()
           [[ "$GITHUB_REF_NAME" == *-* ]] && flags+=(--prerelease)
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
-            --title "$GITHUB_REF_NAME" --generate-notes "${flags[@]}" \
-            --notes "**Alpha.** Breaking changes can happen in any release: an event file from an older version may not open in a newer one. Finish an event on the version you started it with, and keep a paper backup."
+            --title "$GITHUB_REF_NAME" --notes-file notes.md "${flags[@]}"
