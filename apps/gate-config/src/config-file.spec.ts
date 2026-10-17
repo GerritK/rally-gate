@@ -218,6 +218,7 @@ describe('fieldDescriptors', () => {
     ['MQTT_PORT', '574.31', false],
     ['ADAPTER', 'simulated', true],
     ['ADAPTER', 'openstint', true],
+    ['ADAPTER', 'beam-openstint', true],
     ['ADAPTER', 'mylaps', false],
     ['TRANSPONDERS', '1234567', true],
     ['TRANSPONDERS', '1234567,7654321', true],
@@ -260,13 +261,13 @@ describe('field groups', () => {
     // A field whose adapter can never be selected would never be shown.
     const descriptors = fieldDescriptors();
     const orphaned = Object.entries(descriptors)
-      .filter(
-        ([, d]) => d.adapter && !descriptors.ADAPTER.oneOf!.includes(d.adapter),
+      .filter(([, d]) =>
+        d.adapters?.some((a) => !descriptors.ADAPTER.oneOf!.includes(a)),
       )
       .map(([name]) => name);
     expect(orphaned).toEqual([]);
-    expect(descriptors.BEAM_GPIO.adapter).toBe('beam');
-    expect(descriptors.TRANSPONDERS.adapter).toBe('simulated');
+    expect(descriptors.BEAM_GPIO.adapters).toContain('beam');
+    expect(descriptors.TRANSPONDERS.adapters).toEqual(['simulated']);
   });
 
   it('keeps the simulator settings with the decoder', () => {

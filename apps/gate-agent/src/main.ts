@@ -24,8 +24,8 @@ const heartbeatTimer = setInterval(sendHeartbeat, config.heartbeatIntervalMs);
 
 const buzzer = config.buzzerLine ? new Buzzer(config.buzzerLine) : undefined;
 
-void adapter.start((transponderId, timestamp) => {
-  uplink.publishDetection(transponderId, timestamp);
+void adapter.start((transponderId, timestamp, metadata) => {
+  uplink.publishDetection(transponderId, timestamp, metadata);
   buzzer?.beep();
 });
 

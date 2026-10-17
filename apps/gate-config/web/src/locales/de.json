@@ -79,7 +79,7 @@
     "ADAPTER": {
       "label": "Decoder",
       "message": "Einen der aufgeführten Decoder wählen.",
-      "hint": "beam: eine Lichtschranke an einem GPIO-Pin — nimmt Durchfahrten, ein Sportwart ordnet das Auto zu. openstint: Transponder-Schleife an einem RTL-SDR."
+      "hint": "beam: eine Lichtschranke an einem GPIO-Pin — nimmt Durchfahrten, ein Sportwart ordnet das Auto zu. openstint: Transponder-Schleife an einem RTL-SDR. beam-openstint: beides an einer Stelle — die Lichtschranke nimmt die Zeit, die Schleife erkennt das Auto."
     },
     "BEAM_GPIO": {
       "label": "GPIO der Lichtschranke",
@@ -100,6 +100,11 @@
       "label": "Sperrzeit der Lichtschranke (ms)",
       "message": "Muss zwischen 50 und 10000 ms liegen.",
       "hint": "Weitere Auslösungen innerhalb dieser Zeit zählen als dasselbe Auto. Standard 500."
+    },
+    "PAIR_WINDOW_MS": {
+      "label": "Zuordnungsfenster (ms)",
+      "message": "Zwischen 20 und 2000 ms.",
+      "hint": "Wie weit Lichtschranke und Transponder-Lesung auseinander liegen dürfen und trotzdem dasselbe Auto sind. Zu groß, und das nachfolgende Auto fällt hinein. Standard 500."
     },
     "TRANSPONDERS": {
       "label": "Simulierte Transponder",

@@ -92,7 +92,7 @@
     "ADAPTER": {
       "label": "Decoder",
       "message": "Pick one of the listed decoders.",
-      "hint": "beam: a light barrier on a GPIO pin — times passings, a marshal assigns the car. openstint: transponder loop on an RTL-SDR."
+      "hint": "beam: a light barrier on a GPIO pin — times passings, a marshal assigns the car. openstint: transponder loop on an RTL-SDR. beam-openstint: both at one spot — the beam times, the loop names the car."
     },
     "BEAM_GPIO": {
       "label": "Light barrier GPIO",
@@ -113,6 +113,11 @@
       "label": "Light barrier lockout (ms)",
       "message": "Must be between 50 and 10000 ms.",
       "hint": "Further triggers within this time count as the same car. Default 500."
+    },
+    "PAIR_WINDOW_MS": {
+      "label": "Pairing window (ms)",
+      "message": "Between 20 and 2000 ms.",
+      "hint": "How far apart a beam break and a transponder read may be and still be the same car. Too wide and the car behind falls into it. Default 500."
     },
     "TRANSPONDERS": {
       "label": "Simulated transponders",

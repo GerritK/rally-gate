@@ -128,7 +128,7 @@ function fieldsIn(group: 'general' | 'decoder') {
   return Object.entries(fields.value).filter(
     ([, spec]) =>
       (spec.group ?? 'general') === group &&
-      (!spec.adapter || spec.adapter === adapter),
+      (!spec.adapters || spec.adapters.includes(adapter)),
   );
 }
 
@@ -343,7 +343,7 @@ async function loadDecoder() {
 // Every second, matching OpenStint's own status rate, so moving a transponder
 // over the loop shows at once — but only while OpenStint is the selected decoder.
 watch(
-  () => values.value.ADAPTER === 'openstint',
+  () => ['openstint', 'beam-openstint'].includes(values.value.ADAPTER),
   (openstint) => {
     clearInterval(decoderTimer);
     decoder.value = null;

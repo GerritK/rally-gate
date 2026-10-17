@@ -29,6 +29,8 @@ One line each; the linked doc has the detail. History is in git.
   (`decoder-adapters.md`). Verified on a Pi with an E3Z-T61.
 - **RC transponders:** `OpenStintAdapter` on an RTL-SDR
   (`decoder-adapters.md`). Verified on a Pi with a real car through a loop.
+- **Beam + OpenStint** at one gate: the beam's time, the transponder's car
+  (`decoder-adapters.md`). Not yet tried on hardware.
 - **Stages and gates:** auto-discovery by heartbeat, assignments as a plan
   with per-stage activation, expected stage time (`architecture.md`).
 - **Clocks:** chrony against rally-server's SNTP, measured offset with a
@@ -80,9 +82,6 @@ One line each; the linked doc has the detail. History is in git.
   internet, so the host has nothing to step to; until then `preciseNowMs`
   logs every step past 50ms. Build it before an event whose server has
   internet, or once a logged step shows up in the field.
-- **Beam + OpenStint** combined (designed in `decoder-adapters.md`) — the
-  beam's edge for the time, the transponder for the car. Build once a gate
-  needs both.
 - **Browser flashing for ESP32 gates** — CI builds one image per supported
   board onto the GitHub release, and a static page with ESP Web Tools
   installs it over USB, so nobody needs PlatformIO. Wanted once someone other

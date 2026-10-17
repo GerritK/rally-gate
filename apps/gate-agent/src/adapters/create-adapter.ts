@@ -1,4 +1,5 @@
 import { config } from '../config';
+import { BeamOpenStintAdapter } from './beam-openstint.adapter';
 import { BeamAdapter } from './beam.adapter';
 import { DecoderAdapter } from './decoder-adapter';
 import { OpenStintAdapter } from './openstint.adapter';
@@ -13,6 +14,12 @@ export function createAdapter(): DecoderAdapter | null {
       return new BeamAdapter(config.beam);
     case 'openstint':
       return new OpenStintAdapter(config.openstint);
+    case 'beam-openstint':
+      return new BeamOpenStintAdapter({
+        beam: config.beam,
+        openstint: config.openstint,
+        windowMs: config.pairWindowMs,
+      });
     default:
       return null;
   }

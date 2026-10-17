@@ -12,8 +12,8 @@ export const CONFIG_PATH =
  * This file is read by systemd as `EnvironmentFile=` for the gate-agent unit,
  * so every key in it becomes an environment variable of that process.
  *
- * `group` decides which card on the page a field lands in, and `adapter` that
- * it only shows while that decoder is selected; both are here rather than in
+ * `group` decides which card on the page a field lands in, and `adapters` that
+ * it only shows while one of those decoders is selected; both are here rather than in
  * the Vue component so the two cannot disagree about where a new setting
  * belongs. Anything without a group goes in the general card. Labels, hints
  * and messages are the page's (`fields.<NAME>` in its locales), which
@@ -41,40 +41,47 @@ export const FIELDS = {
   },
   ADAPTER: {
     group: 'decoder',
-    oneOf: ['simulated', 'beam', 'openstint'] as const,
+    oneOf: ['simulated', 'beam', 'openstint', 'beam-openstint'] as const,
   },
   OPENSTINT_GAIN: {
     group: 'decoder',
-    adapter: 'openstint',
+    adapters: ['openstint', 'beam-openstint'],
     range: [0, 40] as const,
   },
   BEAM_GPIO: {
     group: 'decoder',
-    adapter: 'beam',
+    adapters: ['beam', 'beam-openstint'],
     // The BCM number, as in the line name `GPIO17`: the same on every Pi
     // model, where chip offsets are not. 2-27 are the header's GPIOs.
     range: [2, 27] as const,
   },
   BEAM_EDGE: {
     group: 'decoder',
-    adapter: 'beam',
+    adapters: ['beam', 'beam-openstint'],
     oneOf: ['rising', 'falling'] as const,
   },
   BEAM_LOCKOUT_MS: {
     group: 'decoder',
-    adapter: 'beam',
+    adapters: ['beam', 'beam-openstint'],
     // Lower bound because a car body breaks the beam several times (wheels,
     // wing); upper because a second car closer than this is lost.
     range: [50, 10_000] as const,
   },
+  PAIR_WINDOW_MS: {
+    group: 'decoder',
+    adapters: ['beam-openstint'],
+    // Wide enough for the beam and the loop not being at quite the same spot,
+    // narrow enough that the car behind is not in it.
+    range: [20, 2_000] as const,
+  },
   TRANSPONDERS: {
     group: 'decoder',
-    adapter: 'simulated',
+    adapters: ['simulated'],
     pattern: /^[0-9]+(,[0-9]+)*$/,
   },
   SIMULATE_INTERVAL_MS: {
     group: 'decoder',
-    adapter: 'simulated',
+    adapters: ['simulated'],
     // Lower bound because the simulator drives the real publish path: a 1ms
     // interval is a flood at the broker, not a test.
     range: [250, 3_600_000] as const,
@@ -118,7 +125,7 @@ export function fieldDescriptors(): Record<FieldName, FieldDescriptor> {
       name,
       {
         group: 'group' in spec ? spec.group : 'general',
-        adapter: 'adapter' in spec ? spec.adapter : undefined,
+        adapters: 'adapters' in spec ? [...spec.adapters] : undefined,
         oneOf: 'oneOf' in spec ? [...spec.oneOf] : undefined,
         // Source rather than the RegExp itself: JSON cannot carry one, and the
         // client rebuilds it with `new RegExp(...)`.

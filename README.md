@@ -67,6 +67,8 @@ flowchart LR
 - **RC transponder gates** (RC3/RC4): a Raspberry Pi with an RTL-SDR and a
   loop, decoded by [OpenStint](https://github.com/zsellera/openstint). Each
   passing names its car. Verified on a Pi with a real car through a loop.
+- **Both at one gate**: the light barrier takes the time, the loop names the
+  car. Not yet tried on hardware.
 - Gate clock sync against the server, with offsets shown on the Hardware page.
 - A config page on every gate (name, sensor, Wi-Fi); a gate that finds no
   known Wi-Fi opens its own hotspot so you can reach that page.

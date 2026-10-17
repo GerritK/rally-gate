@@ -72,13 +72,18 @@ export class Uplink {
     );
   }
 
-  publishDetection(transponderId: string | undefined, timestamp: Date): void {
+  publishDetection(
+    transponderId: string | undefined,
+    timestamp: Date,
+    metadata?: Record<string, unknown>,
+  ): void {
     const event: DetectionEvent = {
       eventId: ulid(),
       gateId: config.gateId,
       transponderId,
       timestampGate: timestamp.toISOString(),
       source: config.adapter,
+      metadata,
     };
     // QoS 1: a lost detection is a driver with no time, and at-least-once is
     // safe because the server pipeline is idempotent — DetectionEventRecord is

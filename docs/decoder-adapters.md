@@ -18,6 +18,7 @@ ever sees a `DetectionEvent`.
   one without a transponder.
 - `beam` — a light barrier, below.
 - `openstint` — a transponder loop on an RTL-SDR, below.
+- `beam-openstint` — both at one spot, below.
 
 ## BeamAdapter (light barrier)
 
@@ -81,25 +82,36 @@ for ~16mA. Use a buzzer module with its own transistor (3 pins: VCC, GND, I/O;
 take a high-level-trigger one), or an NPN (e.g. 2N2222, 1kΩ to the base) with
 the buzzer on 5V. GPIO27 (physical pin 13) is free beside the beam's GPIO17.
 
-## Beam + OpenStint (planned)
+## Beam + OpenStint
 
-Light barrier for the time, OpenStint for the identity — the beam's edge is
-sharper than a radio read, and the transponder names the car. A composite
-adapter wrapping the two, no server change:
+`beam-openstint`: a light barrier for the time, OpenStint for the identity, at
+one spot — the beam's edge is sharper than a radio read, and the transponder
+names the car. It runs both adapters below unchanged and pairs their output;
+no server change. Beam settings (`BEAM_*`) and `OPENSTINT_GAIN` apply as
+they do alone.
 
-- On each beam trigger, wait up to a window W (order 1s — OpenStint reports a
-  passing when it ends) for OpenStint reads timed within ±W of the edge.
-- **One read:** publish once, beam timestamp + that transponder.
-- **No read:** publish the beam trigger without a transponder, so it lands with
-  the marshal — the existing unassigned-passing flow.
-- **Several reads** (cars nose to tail): don't guess. Publish without a
-  transponder, candidates in `metadata`, for the marshal.
-- **A read without a beam trigger** (beam missed, misaligned): publish with
-  OpenStint's own timestamp and mark it in `metadata`, so it still times, less
-  precisely, rather than being lost.
+A beam edge and a read are a **pair** when the beam has exactly one read
+within `PAIR_WINDOW_MS` and that read has exactly one beam. Anything else
+would be a guess, and a guessed pairing hands one car another's time.
 
-W and the beam lockout interact: two cars inside one lockout are one trigger.
-Settle W against real hardware.
+- **Pair:** published once, beam timestamp + transponder,
+  `metadata.readOffsetMs` = read minus beam — what to look at when settling
+  the window on real hardware.
+- **Beam without a pair:** no transponder, so it lands with the marshal
+  (unassigned passing); reads in its window as `metadata.candidates`.
+- **Read without a pair:** published with OpenStint's own timestamp and
+  `metadata.beam` `missed` (no beam near) or `ambiguous`, so the car still
+  times, less precisely, rather than being lost. Two cars inside one beam
+  lockout are one edge and two reads: both time this way, and the edge goes
+  to the marshal as well.
+
+A detection goes out once nothing still on its way could change its pairing:
+`2 × PAIR_WINDOW_MS` plus 1s for OpenStint's report lag after the timestamp.
+Live Timing shows such a gate's passings ~2s late; the times are unaffected.
+
+| Setting | Default | |
+|---|---|---|
+| `PAIR_WINDOW_MS` | `500` | a beam edge and a read further apart are different cars. Not yet settled on hardware |
 
 ## OpenStintAdapter
 

@@ -10,8 +10,8 @@ export type FieldGroup = 'general' | 'decoder';
  *  label, hint and message are the page's, under `fields.<NAME>`. */
 export interface FieldDescriptor {
   group: FieldGroup;
-  /** Shown only while ADAPTER has this value. */
-  adapter?: string;
+  /** Shown only while ADAPTER is one of these. */
+  adapters?: string[];
   oneOf?: string[];
   pattern?: string;
   range?: [number, number];
