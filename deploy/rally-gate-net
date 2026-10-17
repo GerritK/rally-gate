@@ -70,6 +70,16 @@ case "${1:-}" in
     # while the radio was associated or in AP mode that cache can hold little
     # more than the current network — so a typed name would be "not found".
     nmcli device wifi list --rescan yes ifname "$IFACE" >/dev/null 2>&1 || true
+    # A saved profile for this SSID (e.g. left by an earlier failed join) makes
+    # `wifi connect` update it instead of creating one, and it then fails with
+    # "802-11-wireless-security.key-mgmt: property is missing". The password is
+    # being entered again anyway, so start clean. Same UUID loop as `reset`.
+    nmcli -g UUID,TYPE connection show | while IFS=: read -r uuid type; do
+      [ "$type" = "802-11-wireless" ] || continue
+      [ "$(nmcli -g connection.id connection show uuid "$uuid")" = "$HOTSPOT_CON" ] && continue
+      [ "$(nmcli -g 802-11-wireless.ssid connection show uuid "$uuid")" = "$ssid" ] || continue
+      nmcli connection delete uuid "$uuid" >/dev/null
+    done
     if [ -n "$password" ]; then
       nmcli --wait 30 device wifi connect "$ssid" password "$password" ifname "$IFACE"
     else
