@@ -66,11 +66,25 @@ case "${1:-}" in
     # watchdog does that within a minute, which is also what recovers a gate
     # whose saved network stops working at the next event.
     nmcli connection down "$HOTSPOT_CON" >/dev/null 2>&1 || true
+    # `wifi connect` only finds an SSID in NetworkManager's scan cache, and
+    # while the radio was associated or in AP mode that cache can hold little
+    # more than the current network — so a typed name would be "not found".
+    nmcli device wifi list --rescan yes ifname "$IFACE" >/dev/null 2>&1 || true
     if [ -n "$password" ]; then
       nmcli --wait 30 device wifi connect "$ssid" password "$password" ifname "$IFACE"
     else
       nmcli --wait 30 device wifi connect "$ssid" ifname "$IFACE"
     fi
+    ;;
+
+  scan)
+    # Here rather than unprivileged in gate-config: a rescan needs polkit rights
+    # a session-less service does not have, and `--rescan auto` then silently
+    # returns the stale cache — on a connected gate, just the current network.
+    # Never forced while the hotspot is up: it would drop the marshal on it.
+    rescan=yes
+    hotspot_active && rescan=no
+    nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY device wifi list --rescan "$rescan" ifname "$IFACE"
     ;;
 
   reset)
@@ -100,7 +114,7 @@ case "${1:-}" in
     ;;
 
   *)
-    echo "usage: rally-gate-net join <ssid> [password] | reset | watchdog" >&2
+    echo "usage: rally-gate-net join <ssid> [password] | scan | reset | watchdog" >&2
     exit 64
     ;;
 esac

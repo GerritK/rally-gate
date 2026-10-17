@@ -112,8 +112,7 @@ export async function applyTimeSource(host: string): Promise<CommandResult> {
  * network / start the hotspot" instead of "be root" — see
  * docs/gate-config-ui.md, "Applying a change".
  *
- * The read-only calls deliberately do not go through it, since scanning and
- * reading device state need no privilege at all.
+ * Reading device state needs no privilege and does not go through it.
  */
 const NET_WRAPPER = process.env.NET_WRAPPER ?? '/usr/local/sbin/rally-gate-net';
 
@@ -128,23 +127,13 @@ export function networkStatus(): Promise<CommandResult> {
 }
 
 /**
- * `--rescan auto` rather than `yes`: a forced rescan is a privileged action
- * under polkit, and it also takes the radio off its current network for a few
- * seconds — which, when the marshal is reading this page over the gate's own
- * hotspot, disconnects them mid-scan. `auto` reuses a recent scan and triggers
- * a new one only when the cache is stale.
+ * Through the wrapper although it only reads: unprivileged, nmcli cannot
+ * trigger a rescan and returns the stale cache, which on a connected gate is
+ * just the current network. The wrapper skips the rescan while the hotspot is
+ * up. A forced rescan waits for the scan to finish, hence the longer timeout.
  */
 export function wifiScan(): Promise<CommandResult> {
-  return attempt('nmcli', [
-    '-t',
-    '-f',
-    'IN-USE,SSID,SIGNAL,SECURITY',
-    'device',
-    'wifi',
-    'list',
-    '--rescan',
-    'auto',
-  ]);
+  return attempt('sudo', [NET_WRAPPER, 'scan'], 20_000);
 }
 
 export function wifiJoin(

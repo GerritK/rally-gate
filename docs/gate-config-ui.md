@@ -84,15 +84,19 @@ A sudoers rule for `nmcli` needs a wildcard, and that is a root shell:
 and control of routing/DNS on a gate is a man-in-the-middle on timing. Polkit is
 no narrower in capability.
 
-So `deploy/rally-gate-net` has three subcommands — `join`, `reset`, `watchdog` —
+So `deploy/rally-gate-net` has four subcommands — `join`, `scan`, `reset`,
+`watchdog` —
 and **every `nmcli` argument is a literal except the SSID and Wi-Fi password**.
 The hotspot password is read from `gate.env` by the wrapper, never passed in, so
 the grant can't raise an AP with a password only the caller knows. Keep it that
 way: a subcommand passing a property name through would undo all of this.
 
-Read-only calls (`device status`, `wifi list`) run unprivileged. The scan uses
-`--rescan auto`: a forced rescan is privileged and drops the radio for seconds,
-disconnecting a marshal who is on the hotspot.
+`device status` runs unprivileged. The scan goes through the wrapper (`scan`)
+although it only reads: unprivileged, nmcli cannot trigger a rescan and returns
+the stale cache — on a connected gate, just the current network. `join` rescans
+before connecting for the same reason, since `wifi connect` only finds an SSID
+that is in that cache. Neither forces a rescan while the hotspot is up: that
+drops the radio for seconds, disconnecting a marshal who is on it.
 
 ## Hotspot fallback
 
