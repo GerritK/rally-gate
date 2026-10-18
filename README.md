@@ -88,7 +88,8 @@ flowchart LR
 - **ESP32 NFC check-in gate**: runs on hardware, and a tap is a passing like
   any other, so it times a car at a start or finish. What's missing is
   check-in: a tap doesn't set a car's status yet
-  ([docs/esp32-gate.md](docs/esp32-gate.md)).
+  ([docs/esp32-gate.md](docs/esp32-gate.md)). Install the firmware from
+  the browser: [gerritk.github.io/rally-gate](https://gerritk.github.io/rally-gate/).
 - Time controls and Parc Fermé.
 - Any login.
 
