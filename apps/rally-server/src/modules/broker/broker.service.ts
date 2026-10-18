@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { createServer, Server, Socket } from 'net';
-import Aedes from 'aedes';
+import { Aedes } from 'aedes';
 
 @Injectable()
 export class BrokerService implements OnModuleInit, OnModuleDestroy {
@@ -18,7 +18,7 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     const port = Number(process.env.MQTT_PORT ?? 57431);
-    this.aedes = new Aedes();
+    this.aedes = await Aedes.createBroker();
     this.server = createServer(this.aedes.handle);
 
     this.aedes.on('publish', (packet, client) => {
