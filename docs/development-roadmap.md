@@ -50,7 +50,9 @@ One line each; the linked doc has the detail. History is in git.
 - **Gate health:** chrony state and versions in the heartbeat, "Shut down
   all gates" (`architecture.md`). Not yet tried on a Pi.
 - **Deployment:** SQLite standalone and Postgres headless, Pi installers,
-  standalone packages built in CI, new / open event, known gates
+  standalone packages built in CI, new / open event, known gates; ESP32
+  gate images on every release, flashed from the browser (`esp32-gate.md`
+  "Installing")
   (`deployment-modes.md`).
 - **English and German** in both web UIs, PDFs included (`api.md` for
   server error codes).
@@ -82,14 +84,6 @@ One line each; the linked doc has the detail. History is in git.
   internet, so the host has nothing to step to; until then `preciseNowMs`
   logs every step past 50ms. Build it before an event whose server has
   internet, or once a logged step shows up in the field.
-- **Browser flashing for ESP32 gates** — CI builds one image per supported
-  board onto the GitHub release, and a static page with ESP Web Tools
-  installs it over USB, so nobody needs PlatformIO. Wanted once someone other
-  than a developer flashes gates, or a second board is supported. Variants
-  are per board only, never per feature: one firmware carries NFC and beam,
-  the reader is detected and the beam switched on at runtime, as `ADAPTER` on
-  a Pi. A per-feature builder would save no flash worth having (1.0 MB of a
-  2.5 MB slot) and turn every gate into a question of which build it runs.
 - **GPS/PPS per gate** — waiting on hardware (`decoder-adapters.md` "Hardware
   notes").
 - **Gate updates from the server** — rally WiFi is closed, so gates can't reach

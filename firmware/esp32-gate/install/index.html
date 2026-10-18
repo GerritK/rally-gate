@@ -1,0 +1,60 @@
+<!doctype html>
+<!-- Browser flasher for ESP32 gates, published to GitHub Pages by
+     .github/workflows/standalone.yml together with manifest.json, the merged
+     image and web/fonts/. Styled like web/index.html. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rally Gate ESP32 Install</title>
+<script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
+<style>
+  @font-face { font-family: Barlow; font-weight: 400; src: url(fonts/barlow-latin-400-normal.woff2) format('woff2'); }
+  @font-face { font-family: 'Barlow Condensed'; font-weight: 600; src: url(fonts/barlow-condensed-latin-600-normal.woff2) format('woff2'); }
+  @font-face { font-family: 'JetBrains Mono'; font-weight: 400; src: url(fonts/jetbrains-mono-latin-400-normal.woff2) format('woff2'); }
+
+  :root {
+    color-scheme: dark;
+    --bg: #0B0D10; --surface: #14181E; --border: #2A313B;
+    --text: #E6EAF0; --muted: rgba(230, 234, 240, .72);
+    --primary: #FF6B00; --on-primary: #1A0A00; --warning: #FFC300;
+    /* ESP Web Tools' dialog */
+    --mdc-theme-primary: var(--primary); --mdc-theme-on-primary: var(--on-primary);
+    --mdc-theme-surface: var(--surface); --mdc-theme-text-primary-on-background: var(--text);
+    --mdc-dialog-heading-ink-color: var(--text); --mdc-dialog-content-ink-color: var(--muted);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 Barlow, system-ui, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font: 600 2rem/1.2 'Barlow Condensed', sans-serif; margin: 0 0 24px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; }
+  .muted { color: var(--muted); }
+  ol { padding-left: 20px; }
+  li { margin-bottom: 8px; }
+  button { height: 44px; padding: 0 20px; border: 0; border-radius: 4px; background: var(--primary); color: var(--on-primary); font: 600 1rem 'Barlow Condensed', sans-serif; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
+  [slot=unsupported] { color: var(--warning); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Install an ESP32 gate</h1>
+  <div class="card">
+    <p class="muted">Firmware <span class="mono" id="version"></span> for the Seeed XIAO ESP32-S3.</p>
+    <ol>
+      <li>Connect the board by USB-C, in Chrome or Edge on a laptop.</li>
+      <li>Install, pick the board's port, and choose to erase the device on a first install.</li>
+      <li>After a restart the gate raises the Wi-Fi <span class="mono">rally-gate-…</span> (password <span class="mono">rally-gate</span>). Join it to set the rally network.</li>
+    </ol>
+    <esp-web-install-button manifest="manifest.json">
+      <button slot="activate">Install</button>
+      <p slot="unsupported">This browser can't flash over USB. Use Chrome or Edge on a laptop.</p>
+      <p slot="not-allowed">Flashing needs this page over HTTPS.</p>
+    </esp-web-install-button>
+  </div>
+</main>
+<script>
+  fetch('manifest.json').then((r) => r.json()).then((m) => (document.getElementById('version').textContent = m.version));
+</script>
+</body>
+</html>

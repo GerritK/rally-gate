@@ -197,6 +197,22 @@ OTA can't come from GitHub in the field, since rally Wi-Fi is closed. It is
 an upload through the status page for now, and from rally-server once
 "Gate updates from the server" (`development-roadmap.md`) exists.
 
+## Installing
+
+Every release carries one merged image per supported board
+(`rally-gate-<version>-esp32-xiao-s3.bin`, offset 0), and its job publishes
+`firmware/esp32-gate/install` to GitHub Pages with that image: Chrome or Edge,
+USB-C, Install, nothing else on the laptop. It lives on Pages, not on the
+release, because Web Serial needs HTTPS and release assets can't be fetched
+cross-origin. Pre-releases get the image but don't replace the page.
+
+Variants are per board only, never per feature: one firmware carries NFC and
+beam, the reader is detected and the beam switched on at runtime, as `ADAPTER`
+on a Pi. A per-feature builder would save no flash worth having (1.0 MB of a
+3 MB slot) and turn every gate into a question of which build it runs. A
+second board with another chip is a second `builds` entry in the manifest the
+`pages` job writes; one with the same chip needs its own manifest and button.
+
 ## Light barrier later
 
 The same board can time a beam: a GPIO interrupt with `esp_timer_get_time()`

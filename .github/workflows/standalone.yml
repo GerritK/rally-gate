@@ -64,8 +64,38 @@ jobs:
             dist-standalone/*.tar.gz
           if-no-files-found: error
 
+  # One image per supported board, merged from offset 0 (bootloader, partition
+  # table, boot_app0, app) so esptool or the browser flasher writes one file.
+  firmware:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firmware/esp32-gate
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # git describe in prebuild.py needs the tags
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: pip install platformio
+      - run: pio run -e xiao_esp32s3
+      - run: |
+          b=.pio/build/xiao_esp32s3
+          mkdir -p "$GITHUB_WORKSPACE/dist-firmware"
+          python ~/.platformio/packages/tool-esptoolpy/esptool.py --chip esp32s3 merge_bin \
+            -o "$GITHUB_WORKSPACE/dist-firmware/rally-gate-$(git describe --tags --always)-esp32-xiao-s3.bin" \
+            0x0 $b/bootloader.bin 0x8000 $b/partitions.bin \
+            0xe000 ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin \
+            0x10000 $b/firmware.bin
+      - uses: actions/upload-artifact@v7
+        with:
+          name: firmware
+          path: dist-firmware/*.bin
+          if-no-files-found: error
+
   release:
-    needs: package
+    needs: [package, firmware]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -103,3 +133,40 @@ jobs:
           [[ "$GITHUB_REF_NAME" == *-* ]] && flags+=(--prerelease)
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
             --title "$GITHUB_REF_NAME" --notes-file notes.md "${flags[@]}"
+
+  # The browser flasher (firmware/esp32-gate/install) with the latest release's
+  # image. GitHub Pages, because Web Serial needs HTTPS and release assets
+  # can't be fetched cross-origin.
+  pages:
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v7
+        with:
+          name: firmware
+          path: site
+      - run: |
+          cp firmware/esp32-gate/install/index.html site/
+          cp -r firmware/esp32-gate/web/fonts site/
+          bin=$(cd site && ls *-esp32-xiao-s3.bin)
+          cat > site/manifest.json <<JSON
+          {
+            "name": "Rally Gate ESP32 gate",
+            "version": "$GITHUB_REF_NAME",
+            "new_install_prompt_erase": true,
+            "builds": [{ "chipFamily": "ESP32-S3", "parts": [{ "path": "$bin", "offset": 0 }] }]
+          }
+          JSON
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v5
