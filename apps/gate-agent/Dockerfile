@@ -2,7 +2,7 @@
 # Real gate deployments on a Pi run this directly via a systemd unit instead,
 # since the OpenStint/RCHourglass adapters need raw USB/SDR device access
 # that's awkward to pass through a container.
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /repo
 
 # See apps/rally-server/Dockerfile for why every workspace manifest and the
@@ -22,7 +22,7 @@ RUN npm run build --workspace=@rally-gate/gate-agent
 
 RUN npm prune --omit=dev
 
-FROM node:22-alpine
+FROM node:24-alpine
 WORKDIR /repo
 ENV NODE_ENV=production
 

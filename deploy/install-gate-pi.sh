@@ -332,10 +332,10 @@ else
 fi
 
 step "Installing Node.js"
-if command -v node >/dev/null; then
+if command -v node >/dev/null && [ "$(node -p "process.versions.node.split('.')[0]")" -ge 24 ]; then
   info "Node.js $(node --version) already installed"
 else
-  run "Downloading Node.js setup" curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
+  run "Downloading Node.js setup" curl -fsSL https://deb.nodesource.com/setup_24.x -o /tmp/nodesource_setup.sh
   run "Adding Node.js source" sudo -E bash /tmp/nodesource_setup.sh
   run "Installing Node.js" sudo apt-get install -y nodejs
 fi

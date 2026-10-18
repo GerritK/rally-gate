@@ -1,4 +1,4 @@
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /repo
 
 # The lockfile plus *every* workspace manifest, so `npm ci` sees exactly the
@@ -34,7 +34,7 @@ RUN npm run build:deploy --workspace=@rally-gate/web
 # not. Pruning here keeps them out of the image copied below.
 RUN npm prune --omit=dev
 
-FROM node:22-alpine
+FROM node:24-alpine
 WORKDIR /repo
 ENV NODE_ENV=production
 

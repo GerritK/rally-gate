@@ -14,11 +14,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # 22 to match what actually gets deployed: node:22-alpine in both
-      # Dockerfiles, and setup_22.x in deploy/install-gate-pi.sh.
+      # 24 to match what actually gets deployed: node:24-alpine in both
+      # Dockerfiles, and setup_24.x in deploy/install-gate-pi.sh.
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - run: npm ci

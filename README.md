@@ -121,7 +121,7 @@ gates. The package isn't code-signed yet, so Windows SmartScreen and macOS warn
 the first time (on macOS: right-click → Open).
 
 Download it from [Releases](https://github.com/GerritK/rally-gate/releases),
-or build it yourself (Node.js 22):
+or build it yourself (Node.js 24):
 
 ```bash
 npm ci
