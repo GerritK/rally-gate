@@ -18,10 +18,22 @@
     --bg: #0B0D10; --surface: #14181E; --border: #2A313B;
     --text: #E6EAF0; --muted: rgba(230, 234, 240, .72);
     --primary: #FF6B00; --on-primary: #1A0A00; --warning: #FFC300;
-    /* ESP Web Tools' dialog */
-    --mdc-theme-primary: var(--primary); --mdc-theme-on-primary: var(--on-primary);
-    --mdc-theme-surface: var(--surface); --mdc-theme-text-primary-on-background: var(--text);
-    --mdc-dialog-heading-ink-color: var(--text); --mdc-dialog-content-ink-color: var(--muted);
+  }
+  /* The dialog sets light Material 3 colours on its own :host, which only a
+     rule on the element itself overrides. */
+  ewt-install-dialog {
+    --roboto-font: Barlow, system-ui, sans-serif; --text-color: var(--muted);
+    --md-sys-color-primary: var(--primary); --md-sys-color-on-primary: var(--on-primary);
+    --md-sys-color-primary-container: #4A2000;
+    --md-sys-color-secondary: var(--primary); --md-sys-color-secondary-container: #2A313B; --md-sys-color-on-secondary-container: var(--text);
+    --md-sys-color-tertiary: var(--primary); --md-sys-color-tertiary-container: #4A2000;
+    --md-sys-color-surface: var(--surface); --md-sys-color-surface-container: var(--surface);
+    --md-sys-color-surface-container-high: var(--surface); --md-sys-color-surface-container-highest: #1C2129;
+    --md-sys-color-on-surface: var(--text); --md-sys-color-on-surface-variant: var(--muted);
+    --md-sys-color-outline-variant: var(--border);
+    --md-sys-color-error: #FF3B30; --md-sys-color-on-error-container: #FFDAD6;
+    --md-sys-color-scrim: #000; --md-sys-color-shadow: #000;
+    --md-ref-typeface-plain: Barlow, system-ui, sans-serif;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 Barlow, system-ui, sans-serif; }
