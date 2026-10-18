@@ -25,7 +25,7 @@ build time.
 ## Standalone packages
 
 `scripts/package-standalone.js` builds, for the OS it runs on: a Windows `.zip`
-with `Rally Gate.cmd`, a macOS `.zip` with `Rally Gate.command`, or a Linux
+with `Rally Gate.exe`, a macOS `.zip` with `Rally Gate.command`, or a Linux
 `.tar.gz` with `rally-gate.sh`. No Windows installer for now: with ~100 files
 a zip unpacks quickly, and it needs no admin rights beyond the firewall
 prompt. What it costs: no Start menu entry, and Explorer lets a marshal
@@ -34,11 +34,16 @@ double-click the launcher *inside* the zip, where it fails. CI builds all three
 one as a smoke test.
 
 A package is a plain folder of ~100 files (~100MB, most of it the node
-binary): rally-server bundled into one `main.js` by rolldown, better-sqlite3
-beside it as the only `node_modules` entry (a native addon can't be bundled),
-and the built dashboard. Not a single executable: Node SEA/`pkg` can't load a
-native addon from inside themselves. The bundle is built from the tsc output
-so decorator metadata survives, and with `keepNames` and no minification,
+binary). The top level holds only the launcher, everything else is in `app/`:
+rally-server bundled into one `main.js` by rolldown, better-sqlite3 beside it
+as the only `node_modules` entry (a native addon can't be bundled), and the
+built dashboard. On Windows the launcher is a Node single executable (SEA): a
+copy of node with `start.js` baked in and our icon and name set by rcedit, so
+Explorer and Task Manager show "Rally Gate" instead of a batch file or
+node.exe. It runs the server as a second process of itself and loads it from
+`app/` on disk, which is why the native addon needs no embedding. macOS and
+Linux keep a shell script beside `app/node`. The bundle is built from the tsc
+output so decorator metadata survives, and with `keepNames` and no minification,
 because TypeORM derives table names from entity class names.
 
 Starting it opens a console window (closing it stops the server) and the

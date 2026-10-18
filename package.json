@@ -23,6 +23,8 @@
     "screenshots": "node scripts/screenshots.js"
   },
   "devDependencies": {
+    "postject": "1.0.0-alpha.6",
+    "rcedit": "~5.0.2",
     "rolldown": "~1.1.3"
   }
 }

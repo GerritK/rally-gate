@@ -1,8 +1,16 @@
 // Packages rally-server + the built dashboard + the node binary running this
 // script into dist-standalone/, for the OS/arch it runs on (no cross-builds:
 // better-sqlite3 is native). Needs `npm run build:shared` and the server and
-// web builds first. See docs/deployment-modes.md.
-const { chmodSync, cpSync, existsSync, rmSync } = require('node:fs');
+// web builds first. The top level holds only the launcher, everything else is
+// in app/. See docs/deployment-modes.md.
+const {
+  chmodSync,
+  cpSync,
+  existsSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} = require('node:fs');
 const { dirname, join } = require('node:path');
 const { execFileSync } = require('node:child_process');
 
@@ -80,21 +88,17 @@ async function main() {
   cpSync(join(root, 'apps/web/dist'), join(app, 'web/dist'), {
     recursive: true,
   });
-  cpSync(join(root, 'deploy/standalone/start.js'), join(app, 'start.js'));
-
-  cpSync(process.execPath, join(pkg, windows ? 'node.exe' : 'node'));
-  cpSync(join(root, 'LICENSE'), join(pkg, 'LICENSE'));
+  cpSync(join(root, 'LICENSE'), join(app, 'LICENSE'));
   cpSync(
     join(root, 'THIRD_PARTY_NOTICES.md'),
-    join(pkg, 'THIRD_PARTY_NOTICES.md'),
+    join(app, 'THIRD_PARTY_NOTICES.md'),
   );
 
   if (windows) {
-    cpSync(
-      join(root, 'deploy/standalone/Rally Gate.cmd'),
-      join(pkg, 'Rally Gate.cmd'),
-    );
+    await buildExe(join(pkg, 'Rally Gate.exe'));
   } else {
+    cpSync(join(root, 'deploy/standalone/start.js'), join(app, 'start.js'));
+    cpSync(process.execPath, join(app, 'node'));
     const launcher = join(
       pkg,
       platform === 'macos' ? 'Rally Gate.command' : 'rally-gate.sh',
@@ -119,6 +123,40 @@ async function main() {
     execFileSync('tar', ['-czf', `${pkg}.tar.gz`, '-C', outDir, name]);
   }
   console.log(`Packaged ${pkg}`);
+}
+
+// start.js baked into a copy of this node binary (a Node single executable),
+// with our icon and name for Explorer and Task Manager. It
+// loads the server from app/ on disk, so better-sqlite3 needs no embedding.
+async function buildExe(exe) {
+  const config = join(outDir, 'sea-config.json');
+  const blob = join(outDir, 'sea.blob');
+  writeFileSync(
+    config,
+    JSON.stringify({
+      main: join(root, 'deploy/standalone/start.js'),
+      output: blob,
+      disableExperimentalSEAWarning: true,
+    }),
+  );
+  execFileSync(process.execPath, ['--experimental-sea-config', config]);
+  cpSync(process.execPath, exe);
+  // Before postject: rewriting the resources afterwards could drop the blob.
+  const { rcedit } = await import('rcedit');
+  await rcedit(exe, {
+    icon: join(root, 'deploy/standalone/rally-gate.ico'),
+    'version-string': {
+      ProductName: 'Rally Gate',
+      FileDescription: 'Rally Gate',
+      OriginalFilename: 'Rally Gate.exe',
+      ProductVersion: version,
+    },
+  });
+  await require('postject').inject(exe, 'NODE_SEA_BLOB', readFileSync(blob), {
+    sentinelFuse: 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2',
+  });
+  rmSync(config);
+  rmSync(blob);
 }
 
 main().catch((err) => {

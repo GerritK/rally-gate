@@ -30,14 +30,16 @@ jobs:
 
       - run: node scripts/package-standalone.js
 
-      # Starts the packaged folder with its own node, so a missing module or an
-      # addon built for the wrong ABI fails here rather than on a marshal's laptop.
-      # Then creates an event, which only works if start.js restarts the server.
+      # Starts the packaged folder through its launcher, so a broken exe, a missing
+      # module or an addon built for the wrong ABI fails here rather than on a
+      # marshal's laptop. Then creates an event, which only works if start.js
+      # restarts the server.
       - name: Smoke test
         shell: bash
         run: |
           dir=$(ls -d dist-standalone/rally-gate-*/ | head -1)
-          OPEN_BROWSER=0 EVENTS_DIR="$RUNNER_TEMP/events" "$dir/node" "$dir/app/start.js" > "$RUNNER_TEMP/smoke.log" 2>&1 &
+          for launcher in "$dir"*.exe "$dir"*.command "$dir"*.sh; do [ -e "$launcher" ] && break; done
+          OPEN_BROWSER=0 EVENTS_DIR="$RUNNER_TEMP/events" "$launcher" > "$RUNNER_TEMP/smoke.log" 2>&1 &
           up() {
             for _ in $(seq 1 60); do
               if curl -fsS http://localhost:57430/api/event | grep -q "$1" &&

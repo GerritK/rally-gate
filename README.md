@@ -111,7 +111,7 @@ What comes when: [docs/development-roadmap.md](docs/development-roadmap.md).
 ### Server on a laptop
 
 The standalone package needs nothing else installed: unzip it and
-double-click **Rally Gate** (`Rally Gate.cmd` on Windows, `Rally Gate.command`
+double-click **Rally Gate** (`Rally Gate.exe` on Windows, `Rally Gate.command`
 on macOS, `rally-gate.sh` on Linux). A console window opens — closing it stops
 the server — and the dashboard opens in your browser at
 `http://localhost:57430`. Event files are kept in `Documents/Rally Gate`.
