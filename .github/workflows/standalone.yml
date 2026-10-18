@@ -79,7 +79,7 @@ jobs:
           fetch-depth: 0 # git describe in prebuild.py needs the tags
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: '3.14'
       - run: pip install platformio
       - run: pio run -e xiao_esp32s3
       - run: |
