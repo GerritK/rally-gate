@@ -84,7 +84,7 @@ jobs:
           b=.pio/build/xiao_esp32s3
           mkdir -p "$GITHUB_WORKSPACE/dist-firmware"
           python ~/.platformio/packages/tool-esptoolpy/esptool.py --chip esp32s3 merge_bin \
-            -o "$GITHUB_WORKSPACE/dist-firmware/rally-gate-$(git describe --tags --always)-esp32-xiao-s3.bin" \
+            -o "$GITHUB_WORKSPACE/dist-firmware/rally-gate-$(git describe --tags --always | sed "s/^v//")-esp32-xiao-s3.bin" \
             0x0 $b/bootloader.bin 0x8000 $b/partitions.bin \
             0xe000 ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin \
             0x10000 $b/firmware.bin
