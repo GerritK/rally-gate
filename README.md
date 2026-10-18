@@ -88,8 +88,7 @@ flowchart LR
 - **ESP32 NFC check-in gate**: runs on hardware, and a tap is a passing like
   any other, so it times a car at a start or finish. What's missing is
   check-in: a tap doesn't set a car's status yet
-  ([docs/esp32-gate.md](docs/esp32-gate.md)). Install the firmware from
-  the browser: [gerritk.github.io/rally-gate](https://gerritk.github.io/rally-gate/).
+  ([docs/esp32-gate.md](docs/esp32-gate.md)).
 - Time controls and Parc Fermé.
 - Any login.
 
@@ -163,6 +162,12 @@ Everything else is set on the gate's own config page at
 `http://<gate-name>.local:57439`: the sensor, Wi-Fi networks, and a status
 panel. Only where the network blocks discovery (some access points do) does a
 gate need the server's IP address entered there.
+
+An **ESP32 NFC gate** (XIAO ESP32-S3 with a PN532) needs no installer: plug
+it in by USB-C and flash it from Chrome or Edge at
+[gerritk.github.io/rally-gate](https://gerritk.github.io/rally-gate/). It then
+raises the Wi-Fi `rally-gate-…` (password `rally-gate`) to set the rally
+network.
 
 ### On the day
 
