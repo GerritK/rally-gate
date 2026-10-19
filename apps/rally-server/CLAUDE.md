@@ -8,9 +8,11 @@ NestJS API, embedded MQTT broker (Aedes), SNTP server, mDNS advertisement and th
 npm run lint                 # eslint --fix incl. prettier — run before finishing any server change
 npm run lint:check           # what CI runs (--fix in CI would repair the tree and report success)
 npm test                     # jest, all *.spec.ts under src/
-npx jest gates.service       # one test file (substring match on path)
+npm test -- gates.service    # one test file (substring match on path)
 npm run build                # nest build
 ```
+
+Jest runs under `--experimental-vm-modules` (the `test` script) because Nest 12 is ESM-only: that flag is what lets Jest `require()` it, so a bare `npx jest` fails on the first `@nestjs` import. The tsconfig lists `types: ["node", "jest"]` because TypeScript 6 no longer picks up `@types/*` by itself.
 
 `no-unsafe-assignment` errors usually come from a raw `JSON.parse(...)` or a `{...} as any` jest mock: cast (`JSON.parse(x) as Foo`, `as unknown as Service`) rather than disabling the rule.
 

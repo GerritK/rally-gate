@@ -60,6 +60,8 @@ async function main() {
       // dodge a collision would silently point it at a new, empty table.
       // Never minify for the same reason.
       keepNames: true,
+      // Nest loads its optional packages with import(); keep it one file.
+      codeSplitting: false,
     },
   });
 
