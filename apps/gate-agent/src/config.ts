@@ -27,4 +27,5 @@ export const config = {
     gain: Number(process.env.OPENSTINT_GAIN ?? 20),
   },
   pairWindowMs: Number(process.env.PAIR_WINDOW_MS ?? 500),
+  forwardBeamOnly: process.env.FORWARD_BEAM_ONLY === 'on',
 };

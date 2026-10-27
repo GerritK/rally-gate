@@ -6,6 +6,7 @@ export interface BeamOpenStintAdapterOptions {
   beam: BeamAdapterOptions;
   openstint: OpenStintAdapterOptions;
   windowMs: number;
+  forwardBeamOnly: boolean;
 }
 
 /** How late an OpenStint passing may arrive after its own timestamp: ~250ms
@@ -101,6 +102,16 @@ export class PassingMatcher {
   }
 }
 
+/**
+ * A read without its beam has only a radio time, so it never times. A beam
+ * with reads near is a car for the marshal; one with none may be a phantom,
+ * and goes out only for a field where some cars carry no transponder.
+ */
+export function forwarded(e: Emission, forwardBeamOnly: boolean): boolean {
+  if (e.transponderId) return !e.metadata.beam;
+  return forwardBeamOnly || 'candidates' in e.metadata;
+}
+
 /** Either decoder failing exits gate-agent, as it does alone. */
 export class BeamOpenStintAdapter implements DecoderAdapter {
   private readonly beam: BeamAdapter;
@@ -115,10 +126,12 @@ export class BeamOpenStintAdapter implements DecoderAdapter {
     this.matcher = new PassingMatcher(options.windowMs);
   }
 
-  start(onDetection: DetectionCallback): void {
+  /** The beam times a passing, so only the beam beeps. */
+  start(onDetection: DetectionCallback, onSense?: () => void): void {
     this.onDetection = onDetection;
-    this.beam.start((_, timestamp) =>
-      this.matcher.addBeam(timestamp.getTime()),
+    this.beam.start(
+      (_, timestamp) => this.matcher.addBeam(timestamp.getTime()),
+      onSense,
     );
     this.openstint.start((id, timestamp) =>
       this.matcher.addRead(id!, timestamp.getTime()),
@@ -139,11 +152,13 @@ export class BeamOpenStintAdapter implements DecoderAdapter {
 
   private emit(nowMs: number): void {
     for (const e of this.matcher.flush(nowMs)) {
-      if (!e.transponderId || e.metadata.beam) {
+      const send = forwarded(e, this.options.forwardBeamOnly);
+      if (!send || !e.transponderId) {
         console.warn(
-          `[beam-openstint] unpaired ${e.transponderId ? `read ${e.transponderId}` : 'beam'}: ${JSON.stringify(e.metadata)}`,
+          `[beam-openstint] ${send ? 'unpaired' : 'dropped'} ${e.transponderId ? `read ${e.transponderId}` : 'beam'}: ${JSON.stringify(e.metadata)}`,
         );
       }
+      if (!send) continue;
       this.onDetection?.(e.transponderId, new Date(e.timestampMs), e.metadata);
     }
   }

@@ -19,6 +19,7 @@ export function createAdapter(): DecoderAdapter | null {
         beam: config.beam,
         openstint: config.openstint,
         windowMs: config.pairWindowMs,
+        forwardBeamOnly: config.forwardBeamOnly,
       });
     default:
       return null;

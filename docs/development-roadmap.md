@@ -107,6 +107,11 @@ One line each; the linked doc has the detail. History is in git.
 
 ## Deliberately deferred
 
+- **A dead beam on a `beam-openstint` gate in the heartbeat** — it drops
+  every read, so the dashboard shows a quiet gate and only the gate's log
+  says why (`decoder-adapters.md` "Beam + OpenStint"). Waits for it to
+  happen in the field.
+
 - **An event clock on rally-server that never steps** — every gate follows the
   server host's clock, so a host time sync stepping it mid-event (a laptop
   joining a phone hotspot, Windows correcting a weekly drift) moves Pi and

@@ -28,7 +28,7 @@ export class BeamAdapter implements DecoderAdapter {
 
   constructor(private readonly options: BeamAdapterOptions) {}
 
-  start(onDetection: DetectionCallback): void {
+  start(onDetection: DetectionCallback, onSense?: () => void): void {
     // Without gpiomon the gate times nothing, so exit and let systemd's restart
     // loop put the reason in the log gate-config shows.
     const fail = (reason: string) => {
@@ -61,6 +61,7 @@ export class BeamAdapter implements DecoderAdapter {
         undefined,
         new Date(toWallClockMs(eventNs, process.hrtime.bigint(), Date.now())),
       );
+      onSense?.();
     });
     this.child.stderr!.on('data', (chunk) =>
       console.error(`[beam] gpiomon: ${String(chunk).trim()}`),

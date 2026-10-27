@@ -31,7 +31,7 @@ export class OpenStintAdapter implements DecoderAdapter {
 
   constructor(private readonly options: OpenStintAdapterOptions) {}
 
-  start(onDetection: DetectionCallback): void {
+  start(onDetection: DetectionCallback, onSense?: () => void): void {
     const fail = (reason: string) => {
       console.error(
         `[openstint] ${reason} — is the openstint package installed?`,
@@ -77,6 +77,7 @@ export class OpenStintAdapter implements DecoderAdapter {
         passing.transponderId,
         new Date(toWallClockMs(passing.timestampMs, Date.now())),
       );
+      onSense?.();
     });
     this.child.stderr!.on('data', (chunk) =>
       console.error(`[openstint] ${String(chunk).trim()}`),

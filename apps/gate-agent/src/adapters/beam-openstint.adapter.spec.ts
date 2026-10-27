@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { PassingMatcher } from './beam-openstint.adapter';
+import { forwarded, PassingMatcher } from './beam-openstint.adapter';
 
 const W = 500;
 const LATER = 1_000_000;
@@ -97,4 +97,28 @@ test('pairs whichever arrives first', () => {
     m.flush(LATER).map((e) => [e.transponderId, e.timestampMs]),
     [['7', 1000]],
   );
+});
+
+test('only pairs and beams with reads near go out, unless beam-only is on', () => {
+  // A pair, two cars in one beam edge, a lone beam, a lone read.
+  const m = new PassingMatcher(W);
+  [1000, 5000, 9000].forEach((t) => m.addBeam(t));
+  m.addRead('7', 1000);
+  m.addRead('8', 5100);
+  m.addRead('9', 5200);
+  m.addRead('6', 13000);
+  const all = m.flush(LATER);
+  const sent = (beamOnly: boolean) =>
+    all
+      .filter((e) => forwarded(e, beamOnly))
+      .map((e) => [e.transponderId, e.timestampMs]);
+  assert.deepEqual(sent(false), [
+    ['7', 1000],
+    [undefined, 5000],
+  ]);
+  assert.deepEqual(sent(true), [
+    ['7', 1000],
+    [undefined, 5000],
+    [undefined, 9000],
+  ]);
 });

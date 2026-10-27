@@ -74,6 +74,11 @@ export const FIELDS = {
     // narrow enough that the car behind is not in it.
     range: [20, 2_000] as const,
   },
+  FORWARD_BEAM_ONLY: {
+    group: 'decoder',
+    adapters: ['beam-openstint'],
+    oneOf: ['off', 'on'] as const,
+  },
   TRANSPONDERS: {
     group: 'decoder',
     adapters: ['simulated'],

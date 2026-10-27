@@ -8,7 +8,15 @@ export type DetectionCallback = (
   metadata?: Record<string, unknown>,
 ) => void;
 
+/**
+ * `onSense` fires the moment the sensor that times a passing triggers, for the
+ * buzzer: a combined gate publishes only once beam and read are paired, which
+ * is too late to tell a marshal the car was seen.
+ */
 export interface DecoderAdapter {
-  start(onDetection: DetectionCallback): void | Promise<void>;
+  start(
+    onDetection: DetectionCallback,
+    onSense?: () => void,
+  ): void | Promise<void>;
   stop(): void | Promise<void>;
 }

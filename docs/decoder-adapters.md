@@ -72,9 +72,12 @@ comes out. If not, flip `BEAM_EDGE`.
 ## Buzzer
 
 Any adapter: `BUZZER_GPIO` (a BCM number, unset by default, set from gate-config)
-names a line with an active buzzer, which beeps 120ms on every published passing, as
-the ESP32 gate does. gate-agent drives it with libgpiod's `gpioset` after
-publishing, so it never touches the timing, and a failing buzzer only logs.
+names a line with an active buzzer, which beeps 120ms the moment a passing is
+detected, as the ESP32 gate does. On `beam-openstint` the beam beeps, not the read:
+that passing is published only once paired, up to a second later, which in the
+field read as a missed car. A beam that is then dropped has still beeped, which
+helps aligning it. gate-agent drives it with libgpiod's `gpioset` after
+taking the timestamp, so it never touches the timing, and a failing buzzer only logs.
 Passings during a beep queue up (at most 3) and beep after it, 100ms apart.
 
 **Not straight off the pin:** an active buzzer draws ~30mA, a Pi GPIO is good
@@ -97,13 +100,21 @@ would be a guess, and a guessed pairing hands one car another's time.
 - **Pair:** published once, beam timestamp + transponder,
   `metadata.readOffsetMs` = read minus beam — what to look at when settling
   the window on real hardware.
-- **Beam without a pair:** no transponder, so it lands with the marshal
-  (unassigned passing); reads in its window as `metadata.candidates`.
-- **Read without a pair:** published with OpenStint's own timestamp and
-  `metadata.beam` `missed` (no beam near) or `ambiguous`, so the car still
-  times, less precisely, rather than being lost. Two cars inside one beam
-  lockout are one edge and two reads: both time this way, and the edge goes
-  to the marshal as well.
+- **Beam with reads near but no pair:** no transponder, so it lands with the
+  marshal (unassigned passing), the reads in its window as
+  `metadata.candidates`. Two cars inside one beam lockout are one edge and
+  two reads: the marshal assigns the edge to one of them, the other car has
+  no passing here.
+- **Beam with no read near:** dropped, since nothing says a car was there
+  (people, grass, sun). `FORWARD_BEAM_ONLY=on` sends it to the marshal
+  instead, for a field where some cars carry no transponder.
+- **Read without a pair:** dropped. A radio time alone is not precise enough
+  to rank on, and a read from a car parked near the loop would time a car
+  that never drove through.
+
+Every drop is a `dropped` warning in the gate's log, which gate-config
+shows. A dead beam drops every read: the dashboard shows only a
+quiet gate.
 
 A detection goes out once nothing still on its way could change its pairing:
 `2 × PAIR_WINDOW_MS` plus 1s for OpenStint's report lag after the timestamp.
@@ -112,6 +123,7 @@ Live Timing shows such a gate's passings ~2s late; the times are unaffected.
 | Setting | Default | |
 |---|---|---|
 | `PAIR_WINDOW_MS` | `500` | a beam edge and a read further apart are different cars. Not yet settled on hardware |
+| `FORWARD_BEAM_ONLY` | `off` | `on`: a beam with no read near goes to the marshal rather than being dropped |
 
 ## OpenStintAdapter
 

@@ -31,7 +31,7 @@ export function beepCommands(
   return [['gpioset', ['-t', `${ms}ms,0`, `${line}=1`]]];
 }
 
-/** Never in the timing path: it beeps after publishing, and a failure only logs. */
+/** Never in the timing path: it beeps after the timestamp is taken, and a failure only logs. */
 export class Buzzer {
   private readonly commands: Command[] = [];
   private busy = false;

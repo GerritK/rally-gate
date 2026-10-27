@@ -24,10 +24,11 @@ const heartbeatTimer = setInterval(sendHeartbeat, config.heartbeatIntervalMs);
 
 const buzzer = config.buzzerLine ? new Buzzer(config.buzzerLine) : undefined;
 
-void adapter.start((transponderId, timestamp, metadata) => {
-  uplink.publishDetection(transponderId, timestamp, metadata);
-  buzzer?.beep();
-});
+void adapter.start(
+  (transponderId, timestamp, metadata) =>
+    uplink.publishDetection(transponderId, timestamp, metadata),
+  () => buzzer?.beep(),
+);
 
 // SIGTERM is what systemd sends on stop/restart; SIGINT is Ctrl+C in dev.
 async function shutdown() {

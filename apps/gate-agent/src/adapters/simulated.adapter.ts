@@ -10,7 +10,7 @@ export class SimulatedAdapter implements DecoderAdapter {
 
   constructor(private readonly options: SimulatedAdapterOptions) {}
 
-  start(onDetection: DetectionCallback): void {
+  start(onDetection: DetectionCallback, onSense?: () => void): void {
     if (!this.options.intervalMs) {
       return;
     }
@@ -20,6 +20,7 @@ export class SimulatedAdapter implements DecoderAdapter {
         this.options.transponderIds[i % this.options.transponderIds.length];
       i += 1;
       onDetection(transponderId, new Date());
+      onSense?.();
     }, this.options.intervalMs);
   }
 

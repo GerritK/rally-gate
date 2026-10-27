@@ -119,6 +119,11 @@
       "message": "Between 20 and 2000 ms.",
       "hint": "How far apart a beam break and a transponder read may be and still be the same car. Too wide and the car behind falls into it. Default 500."
     },
+    "FORWARD_BEAM_ONLY": {
+      "label": "Forward beam without transponder",
+      "message": "off or on.",
+      "hint": "on only when part of the field carries no transponder: a beam break without a read then goes to the marshal to assign. off drops it, so phantoms (people, grass) don't land there. A read without a beam break is always dropped. Default off."
+    },
     "TRANSPONDERS": {
       "label": "Simulated transponders",
       "message": "Comma-separated digits, e.g. 1234567,7654321.",
