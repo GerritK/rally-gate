@@ -10,7 +10,14 @@ import {
   NotFoundException,
   Query,
 } from '@nestjs/common';
-import { ApiErrorCode, isOutOfEvent, RallyStatus } from '@rally-gate/shared';
+import {
+  AccessRole,
+  ApiErrorCode,
+  isOutOfEvent,
+  RallyStatus,
+} from '@rally-gate/shared';
+import { CurrentPrincipal, Roles } from '../auth/auth.guard';
+import { assertMayChangeStage, type Principal } from '../auth/auth.service';
 import { apiError } from '../../common/api-error';
 import { EntriesService } from '../entries/entries.service';
 import { CorrectStageRunDto, CreateStageRunDto } from './dto';
@@ -39,8 +46,13 @@ export class StageRunsController {
   /** Start now, or a time entered by hand. 409 for a car out of the event:
    *  a gate's passing wouldn't time it either (`EventsService.applyRules`). */
   @LockedWhen(RallyStatus.CLOSED)
+  @Roles(AccessRole.TIMING, AccessRole.STAGE_MARSHAL)
   @Post()
-  async create(@Body() body: CreateStageRunDto) {
+  async create(
+    @Body() body: CreateStageRunDto,
+    @CurrentPrincipal() principal: Principal,
+  ) {
+    assertMayChangeStage(principal, body.stageId);
     const entry = await this.entriesService.findOne(body.entryId);
     if (!entry) {
       throw new NotFoundException(
@@ -63,15 +75,26 @@ export class StageRunsController {
   }
 
   @LockedWhen(RallyStatus.CLOSED)
+  @Roles(AccessRole.TIMING, AccessRole.STAGE_MARSHAL)
   @Patch(':id')
-  correct(@Param('id') id: string, @Body() body: CorrectStageRunDto) {
+  async correct(
+    @Param('id') id: string,
+    @Body() body: CorrectStageRunDto,
+    @CurrentPrincipal() principal: Principal,
+  ) {
+    assertMayChangeStage(principal, await this.stageRunsService.stageIdOf(id));
     return this.stageRunsService.correctRun(id, body);
   }
 
   /** Hand-timed finish, server-stamped. 409 if finished, voided or closed. */
   @LockedWhen(RallyStatus.CLOSED)
+  @Roles(AccessRole.TIMING, AccessRole.STAGE_MARSHAL)
   @Post(':id/finish')
-  finishNow(@Param('id') id: string) {
+  async finishNow(
+    @Param('id') id: string,
+    @CurrentPrincipal() principal: Principal,
+  ) {
+    assertMayChangeStage(principal, await this.stageRunsService.stageIdOf(id));
     return this.stageRunsService.finishNow(id);
   }
 
@@ -81,6 +104,7 @@ export class StageRunsController {
    * on its next pass — see "StageRun" in `docs/event-model.md`.
    */
   @LockedWhen(RallyStatus.CLOSED)
+  @Roles(AccessRole.TIMING)
   @Post(':id/void')
   void(@Param('id') id: string) {
     return this.stageRunsService.voidRun(id);
@@ -92,12 +116,14 @@ export class StageRunsController {
    * attempt, so that one has to be voided first.
    */
   @LockedWhen(RallyStatus.CLOSED)
+  @Roles(AccessRole.TIMING)
   @Post(':id/unvoid')
   unvoid(@Param('id') id: string) {
     return this.stageRunsService.unvoidRun(id);
   }
 
   @LockedWhen(RallyStatus.CLOSED)
+  @Roles(AccessRole.TIMING)
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.stageRunsService.remove(id);

@@ -595,7 +595,16 @@
     "lockedWhileClosed": "The rally is closed and its results are final. Reopen it in Setup to change them.",
     "startRallyFirst": "{stage} counts toward the overall. Start the rally in Setup first.",
     "rallyStatusInvalid": "The rally status has changed in the meantime. Reload the page.",
-    "carsOnStage": "Cars still on stage: {count}. Finish or void their runs first."
+    "carsOnStage": "Cars still on stage: {count}. Finish or void their runs first.",
+    "loginRequired": "Log in first: scan the QR code from your invitation.",
+    "roleNotAllowed": "Your login may not change this.",
+    "stageNotYours": "Your login may only change the stages on your invitation.",
+    "invitationInvalid": "This code is unknown or has been blocked.",
+    "passwordWrong": "Wrong password.",
+    "setupLinkInvalid": "This setup link is no longer valid. Use the newest one from the server log.",
+    "invitationNotFound": "This invitation no longer exists.",
+    "deviceNotFound": "This device no longer exists.",
+    "foreignOrigin": "Refused: this request came from another web page."
   },
   "rallyStatus": {
     "setup": "Setup",

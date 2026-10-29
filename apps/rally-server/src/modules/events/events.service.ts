@@ -234,6 +234,18 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     return record;
   }
 
+  /**
+   * The stage a waiting passing would time, for the stage marshal check:
+   * its gate's active assignment, null when there is none.
+   */
+  async stageIdOfAwaiting(eventId: string): Promise<string | null> {
+    const record = await this.findAwaitingOrThrow(eventId);
+    const assignment = await this.gateAssignmentsService.findActiveForGate(
+      record.gateId,
+    );
+    return assignment?.stageId ?? null;
+  }
+
   private async findAwaitingOrThrow(
     eventId: string,
   ): Promise<DetectionEventRecord> {

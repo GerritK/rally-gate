@@ -17,6 +17,7 @@
     "dev:gate-config-web": "npm run dev:config-web --workspace=@rally-gate/gate",
     "simulate": "npm run simulate --workspace=@rally-gate/gate --",
     "seed-demo-data": "node scripts/seed-demo-data.js",
+    "reset-admin": "npm run reset-admin --workspace=@rally-gate/rally-server",
     "build": "npm run build --workspaces --if-present",
     "format": "npm run format:check -- --write",
     "format:check": "prettier --config apps/rally-server/.prettierrc --check \"apps/gate/src/**/*.ts\" \"apps/gate/web/src/**/*.{ts,vue}\" \"apps/web/src/**/*.{ts,vue}\" \"packages/shared/src/**/*.ts\" \"packages/ui/src/**/*.{ts,vue,css}\"",

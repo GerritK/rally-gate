@@ -82,17 +82,29 @@ One line each; the linked doc has the detail. History is in git.
      bound anything once gate-config or gate-agent runs foreign code. Fix: a
      system user (`useradd --system --groups gpio,plugdev rally-gate`) as
      `User=` of both units, owning `/etc/rally-gate`.
-  4. *`enableCors({ origin: '*' })` on the unauthenticated API* lets any web
-     page open on a server laptop with internet read and change results via
-     `localhost:57430`. Fix: drop it, proxy `/api` in `apps/web`'s Vite
-     config as gate-config does, `API_BASE` always `/api`.
-  5. *From the 11th open dashboard* the console shows `possible EventEmitter
+  4. *From the 11th open dashboard* the console shows `possible EventEmitter
      memory leak detected` (EventEmitter2 allows 10 listeners per event).
      Fix: `EventEmitterModule.forRoot({ maxListeners: 100 })`.
-  6. *A correction across midnight is refused:* start 23:58, finish typed as
+  5. *A correction across midnight is refused:* start 23:58, finish typed as
      00:03:10 lands on the start's day, before the start (entering the stage
      time works). Fix: in `combineDateAndTime` callers, add a day when the
      finish isn't after the start; test in `format.spec.ts`.
+
+- **Access and authentication** (`auth.md`), before the first real event, in
+  three steps, each shippable:
+  1. API and dashboard. Built: the server side (roles on every change,
+     invitations and devices, organiser by localhost or password with a setup
+     QR, `reset-admin`). Next, each its own commit: the dashboard for it
+     (redeem page with camera, invitations with printable QR codes, devices,
+     password login and `/setup` page; until then only the server machine
+     can change anything), the device id on every correction, penalty and
+     assignment, then the public page with internal reads behind the login.
+  2. Broker and gates: self-generated gate key, pairing and approval,
+     detections of waiting gates held, `autoDiscoverGates` removed,
+     `GATES_AUTO_ACCEPT` for dev. Check how mqtt.js backs off on a refused
+     connect.
+  3. gate-config and ESP32: signed pass, the 3-minute power-on window, the
+     same on `web.cpp`. Check whether browser flashing erases NVS.
 
 - **Class and category badges in rankings** ("2WD · Rookie") on Results
   and the PDFs: only the classes the current filter doesn't already imply
@@ -188,9 +200,9 @@ One line each; the linked doc has the detail. History is in git.
   car in start order and a split/finish one the first car on stage
   (`LiveView.vue` `suggestedEntryIds`). Planned start times could narrow it
   by time window.
-- **Auth** on broker, API and dashboard — the closed rally network is the
-  boundary until the timing pipeline is solid. Gates would authenticate against
-  rally-server itself.
+- **Beyond the auth design** (`auth.md`): TLS on the LAN, the login for the
+  online mode's cloud push, carrying invitations over to a new event, rights
+  per single action instead of per role.
 - **Reset event** — clear a rally that was only a trial so the same file can
   be used for real. Clears detections, stage runs and splits, sets stages
   back to NOT_STARTED with their gates inactive, and unfreezes start lists;

@@ -61,6 +61,11 @@ services:
       PORT: 57430
       MQTT_PORT: 57431
       NTP_PORT: 57432
+      # The organiser password lives outside the event database (docs/auth.md).
+      CONFIG_DIR: /var/lib/rally-gate
+    volumes:
+      - rally-server-config:/var/lib/rally-gate
 
 volumes:
   postgres-data:
+  rally-server-config:

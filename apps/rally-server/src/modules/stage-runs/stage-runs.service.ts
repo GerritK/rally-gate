@@ -138,6 +138,11 @@ export class StageRunsService {
     private readonly emitter: EventEmitter2,
   ) {}
 
+  /** For the stage marshal check, before anything is changed. */
+  async stageIdOf(id: string): Promise<string> {
+    return (await this.findOneOrFail(id)).stageId;
+  }
+
   private async findOneOrFail(id: string): Promise<StageRun> {
     const run = await this.stageRuns.findOneBy({ id });
     if (!run) {

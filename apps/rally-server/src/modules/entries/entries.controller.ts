@@ -1,9 +1,12 @@
 import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { AccessRole } from '@rally-gate/shared';
+import { Roles } from '../auth/auth.guard';
 import { RallyStatusService } from '../rally-info/rally-status.service';
 import { CreateEntryDto, UpdateEntryDto } from './dto';
 import { EntriesService } from './entries.service';
 
 @Controller('entries')
+@Roles(AccessRole.CHECK_IN)
 export class EntriesController {
   constructor(
     private readonly entriesService: EntriesService,

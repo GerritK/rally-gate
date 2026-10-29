@@ -13,8 +13,28 @@ which the dashboard translates as `errors.<code>` with `params` filled in;
 A change the rally status locks (`event-model.md` "Rally status") is a 409
 `lockedWhileRunning` or `lockedWhileClosed`.
 
+Every request except GET needs a login (`auth.md`): the server machine itself
+(loopback socket) is the organiser, anyone else sends the `rally_gate_device`
+cookie. None is 401 `loginRequired`, a role the route doesn't allow 403
+`roleNotAllowed`, a stage marshal outside its stages 403 `stageNotYours`, and
+a browser change whose `Origin` isn't this server 403 `foreignOrigin`.
+Changes are the organiser's unless `@Roles` on the route says otherwise:
+Timing may assign and dismiss passings, retry pending, add and delete
+penalties, activate and close stages and change stage runs; a stage marshal
+may assign and dismiss passings and create, correct and finish runs on its
+stages; Check-in may create and edit entries. GETs stay open until the public
+page lands, except the invitation and device lists.
+
 | Endpoint | Methods | Notes |
 |---|---|---|
+| `/auth/session` | GET | `AuthSession`: role (null when not logged in), device, label, marshal stages, `passwordSet` |
+| `/auth/redeem` | POST `{ code }` | an invitation's code (case, spaces and dashes ignored) sets the device cookie; 401 `invitationInvalid` if unknown or blocked. The same browser again keeps its device |
+| `/auth/login` | POST `{ password }` | organiser password, makes a device too; 401 `passwordWrong` |
+| `/auth/logout` | POST | clears the cookie; the device stays listed |
+| `/auth/setup` | POST `{ token, password }` | the first password, with the token from the setup link the server logs; 401 `setupLinkInvalid` |
+| `/auth/password` | PUT `{ password }` | the organiser sets a new one, at least 8 characters |
+| `/auth/invitations` | GET, POST, `/:id` PATCH | `{ label, role, stageIds? }`, the server makes the `code`. PATCH `{ blocked }`; never deleted. Organiser only, GET too |
+| `/auth/devices` | GET, `/:id` PATCH | redeemed devices and password logins (`invitationId` null), PATCH `{ blocked }`. Organiser only, GET too |
 | `/version` | GET | `{ version }`, the server's build — see "Gate discovery & heartbeat" in `architecture.md` |
 | `/time` | GET | `{ now }`, the server clock; the dashboard shows it instead of the device's, since gates sync to the server |
 | `/gates` | GET, `/:id` GET/PUT/DELETE | hardware identity only (PUT sets the name). Auto-created from a first heartbeat unless `autoDiscoverGates` is off |

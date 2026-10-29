@@ -19,6 +19,8 @@ import { Entry } from '../modules/entries/entry.entity';
 import { EntryTransponder } from '../modules/entries/entry-transponder.entity';
 import { Penalty } from '../modules/penalties/penalty.entity';
 import { PenaltyType } from '../modules/penalties/penalty-type.entity';
+import { Invitation } from '../modules/auth/invitation.entity';
+import { Device } from '../modules/auth/device.entity';
 
 const ENTITIES = [
   DetectionEventRecord,
@@ -34,6 +36,8 @@ const ENTITIES = [
   EntryTransponder,
   Penalty,
   PenaltyType,
+  Invitation,
+  Device,
 ];
 
 /**

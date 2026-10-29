@@ -3,6 +3,7 @@ dist/
 dist-standalone/
 *.sqlite
 *.sqlite-journal
+organiser.json
 .env
 .env.local
 

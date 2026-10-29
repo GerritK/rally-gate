@@ -16,3 +16,4 @@ export * from './settings';
 export * from './penalty';
 export * from './api-error';
 export * from './rally';
+export * from './auth';

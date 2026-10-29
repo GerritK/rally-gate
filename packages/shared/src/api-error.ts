@@ -54,6 +54,15 @@ export enum ApiErrorCode {
   RALLY_STATUS_INVALID = 'rallyStatusInvalid',
   /** `params.count`: cars still on stage. */
   CARS_ON_STAGE = 'carsOnStage',
+  LOGIN_REQUIRED = 'loginRequired',
+  ROLE_NOT_ALLOWED = 'roleNotAllowed',
+  STAGE_NOT_YOURS = 'stageNotYours',
+  INVITATION_INVALID = 'invitationInvalid',
+  PASSWORD_WRONG = 'passwordWrong',
+  SETUP_LINK_INVALID = 'setupLinkInvalid',
+  INVITATION_NOT_FOUND = 'invitationNotFound',
+  DEVICE_NOT_FOUND = 'deviceNotFound',
+  FOREIGN_ORIGIN = 'foreignOrigin',
 }
 
 /**

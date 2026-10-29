@@ -595,7 +595,16 @@
     "lockedWhileClosed": "Die Rallye ist abgeschlossen, ihre Ergebnisse sind endgültig. Öffne sie in der Einrichtung wieder, um sie zu ändern.",
     "startRallyFirst": "{stage} zählt zur Gesamtwertung. Starte zuerst die Rallye in der Einrichtung.",
     "rallyStatusInvalid": "Der Rallye-Status hat sich inzwischen geändert. Lade die Seite neu.",
-    "carsOnStage": "Autos noch auf der WP: {count}. Beende oder annulliere zuerst ihre Läufe."
+    "carsOnStage": "Autos noch auf der WP: {count}. Beende oder annulliere zuerst ihre Läufe.",
+    "loginRequired": "Melde dich zuerst an: Scanne den QR-Code deiner Einladung.",
+    "roleNotAllowed": "Deine Anmeldung darf das nicht ändern.",
+    "stageNotYours": "Deine Anmeldung darf nur die WPs deiner Einladung ändern.",
+    "invitationInvalid": "Dieser Code ist unbekannt oder wurde gesperrt.",
+    "passwordWrong": "Falsches Passwort.",
+    "setupLinkInvalid": "Dieser Einrichtungslink gilt nicht mehr. Nimm den neuesten aus dem Server-Log.",
+    "invitationNotFound": "Diese Einladung gibt es nicht mehr.",
+    "deviceNotFound": "Dieses Gerät gibt es nicht mehr.",
+    "foreignOrigin": "Abgelehnt: Diese Anfrage kam von einer anderen Webseite."
   },
   "rallyStatus": {
     "setup": "Vorbereitung",

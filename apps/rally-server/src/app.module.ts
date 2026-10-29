@@ -3,6 +3,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { buildDatabaseConfig } from './config/database.config';
+import { AuthModule } from './modules/auth/auth.module';
 import { BrokerModule } from './modules/broker/broker.module';
 import { ClassificationModule } from './modules/classification/classification.module';
 import { DiscoveryModule } from './modules/discovery/discovery.module';
@@ -23,6 +24,8 @@ import { EntriesModule } from './modules/entries/entries.module';
   imports: [
     EventEmitterModule.forRoot(),
     TypeOrmModule.forRoot(buildDatabaseConfig()),
+    // First, so its guard answers 401 before RallyLockGuard answers 409.
+    AuthModule,
     BrokerModule,
     NtpModule,
     DiscoveryModule,
