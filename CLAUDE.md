@@ -20,6 +20,7 @@ The "why" lives in `docs/` — read the relevant one first:
 - `decoder-adapters.md` — adapters, hardware, gate clock policy
 - `deployment-modes.md` — standalone vs headless, one database per event
 - `api.md` — REST/SSE endpoints
+- `auth.md` — roles, invitations, organiser login, gate keys and pairing, gate-config passes (designed, not built)
 - `frontend-structure.md` — routes and nav of `apps/web`
 - `design-system.md` — colour, type, layout, status, confirmation and print rules for every web UI
 - `gate-config-ui.md` — the on-gate config service, Wi-Fi and hotspot
