@@ -46,7 +46,9 @@ export function restartAgent(): Promise<CommandResult> {
   return attempt('sudo', ['systemctl', 'restart', AGENT_UNIT]);
 }
 
-export function powerOff(): Promise<CommandResult> {
+/** Beeps first, so a marshal knows when the plug can be pulled; the beep is installed by install-gate-pi.sh. */
+export async function powerOff(): Promise<CommandResult> {
+  await attempt('/usr/local/bin/rally-gate-beep', ['shutdown']);
   return attempt('sudo', ['systemctl', 'poweroff']);
 }
 

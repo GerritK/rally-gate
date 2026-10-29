@@ -23,6 +23,7 @@ export const config = {
   buzzerLine: process.env.BUZZER_GPIO
     ? `GPIO${process.env.BUZZER_GPIO}`
     : undefined,
+  buzzerStatus: process.env.BUZZER_STATUS !== 'off',
   openstint: {
     gain: Number(process.env.OPENSTINT_GAIN ?? 20),
   },

@@ -1,5 +1,6 @@
 import { ChildProcess, spawn } from 'child_process';
 import { createInterface } from 'readline';
+import { EXIT_DECODER_FAILED } from '../exit-codes';
 import { findLine, isLibgpiodV1 } from '../gpio';
 import { DecoderAdapter, DetectionCallback } from './decoder-adapter';
 
@@ -33,7 +34,7 @@ export class BeamAdapter implements DecoderAdapter {
     // loop put the reason in the log gate-config shows.
     const fail = (reason: string) => {
       console.error(`[beam] ${reason} — is the gpiod package installed?`);
-      process.exit(1);
+      process.exit(EXIT_DECODER_FAILED);
     };
     let command: { command: string; args: string[] };
     try {
@@ -72,7 +73,7 @@ export class BeamAdapter implements DecoderAdapter {
     this.child.on('exit', (code) => {
       if (this.child) {
         console.error(`[beam] gpiomon exited with code ${code}`);
-        process.exit(1);
+        process.exit(EXIT_DECODER_FAILED);
       }
     });
     console.log(

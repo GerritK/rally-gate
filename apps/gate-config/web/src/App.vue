@@ -211,7 +211,10 @@ async function load() {
   fields.value = await (await fetch('/api/fields')).json();
   const config = await (await fetch('/api/config')).json();
   values.value = Object.fromEntries(
-    Object.keys(fields.value).map((key) => [key, config[key] ?? '']),
+    Object.entries(fields.value).map(([key, spec]) => [
+      key,
+      config[key] ?? spec.toggle ?? '',
+    ]),
   );
   originalGateId.value = config.GATE_ID ?? '';
 }
@@ -663,8 +666,21 @@ onUnmounted(() => {
             <v-card-title>{{ t('gateConfig.decoder') }}</v-card-title>
             <v-card-text>
               <template v-for="[name, spec] in fieldsIn('decoder')" :key="name">
+                <v-switch
+                  v-if="spec.toggle"
+                  :model-value="values[name] === 'on'"
+                  :label="fieldText(name, 'label')"
+                  :hint="fieldText(name, 'hint')"
+                  :error-messages="serverError(name)"
+                  persistent-hint
+                  class="mb-4"
+                  @update:model-value="
+                    values[name] = $event ? 'on' : 'off';
+                    clearServerError(name);
+                  "
+                />
                 <v-select
-                  v-if="spec.oneOf"
+                  v-else-if="spec.oneOf"
                   v-model="values[name]"
                   :items="spec.oneOf"
                   :label="fieldText(name, 'label')"

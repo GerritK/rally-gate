@@ -159,6 +159,42 @@ void test_delay_filter() {
   TEST_ASSERT_TRUE(f.accept(60000));
 }
 
+void test_status_ready_then_lost_then_ready() {
+  StatusTracker s;
+  TEST_ASSERT_EQUAL(Status::None, s.next(0, false, true, true));
+  TEST_ASSERT_EQUAL(Status::Ready, s.next(1000, true, true, true));
+  TEST_ASSERT_EQUAL(Status::None, s.next(2000, true, true, true));
+  // A hiccup under 15s is silent both ways.
+  TEST_ASSERT_EQUAL(Status::None, s.next(3000, false, true, true));
+  TEST_ASSERT_EQUAL(Status::None, s.next(17999, false, true, true));
+  TEST_ASSERT_EQUAL(Status::None, s.next(18000, true, true, true));
+  // Longer is heard once, and the return is announced.
+  TEST_ASSERT_EQUAL(Status::None, s.next(20000, false, true, true));
+  TEST_ASSERT_EQUAL(Status::ConnectionLost, s.next(35000, false, true, true));
+  TEST_ASSERT_EQUAL(Status::None, s.next(40000, false, true, true));
+  TEST_ASSERT_EQUAL(Status::Ready, s.next(50000, true, true, true));
+}
+
+void test_status_never_connected_is_silent() {
+  StatusTracker s;
+  for (int64_t t = 0; t < 300000; t += 1000) TEST_ASSERT_EQUAL(Status::None, s.next(t, false, true, true));
+}
+
+void test_status_clock_withholds_ready_and_warns_once() {
+  StatusTracker s;
+  TEST_ASSERT_EQUAL(Status::None, s.next(0, true, true, false));
+  TEST_ASSERT_EQUAL(Status::None, s.next(59999, true, true, false));
+  TEST_ASSERT_EQUAL(Status::ClockUnsynced, s.next(60000, true, true, false));
+  TEST_ASSERT_EQUAL(Status::None, s.next(61000, true, true, false));
+  TEST_ASSERT_EQUAL(Status::Ready, s.next(62000, true, true, true));
+}
+
+void test_status_reader_missing_withholds_ready() {
+  StatusTracker s;
+  TEST_ASSERT_EQUAL(Status::None, s.next(0, true, false, true));
+  TEST_ASSERT_EQUAL(Status::Ready, s.next(1000, true, true, true));
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_ntp_timestamp_roundtrip);
@@ -177,5 +213,9 @@ int main() {
   RUN_TEST(test_clock_rate_outlier_cancels);
   RUN_TEST(test_phase_correction);
   RUN_TEST(test_delay_filter);
+  RUN_TEST(test_status_ready_then_lost_then_ready);
+  RUN_TEST(test_status_never_connected_is_silent);
+  RUN_TEST(test_status_clock_withholds_ready_and_warns_once);
+  RUN_TEST(test_status_reader_missing_withholds_ready);
   return UNITY_END();
 }

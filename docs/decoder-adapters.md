@@ -80,6 +80,28 @@ helps aligning it. gate-agent drives it with libgpiod's `gpioset` after
 taking the timestamp, so it never touches the timing, and a failing buzzer only logs.
 Passings during a beep queue up (at most 3) and beep after it, 100ms apart.
 
+**Status sounds** tell whoever stands at the gate what it is doing. A passing is
+always the single 120ms beep; every status sound holds a long tone (400ms,
+short is 80ms), which a queue of passings can't sound like. The ESP32 gate plays
+the same ones (its extra `3×80ms` means a tap was *not* stored).
+
+| Sound | Means |
+|---|---|
+| long | Power on: the agent started. Always sounds. |
+| short short long | Ready: server connected, decoder running, clock synced. Again after the connection or the clock came back. |
+| long long | Connection to the server lost for 15s (shorter dropouts are silent). Once, no repeat. |
+| long long long | Clock not synced for 60s. Once, no repeat. |
+| long short | Emergency Wi-Fi (hotspot) raised, by `rally-gate-net`. |
+| long short long | Decoder failed to run; systemd restarts, so it repeats until fixed. Pi only. |
+| short long | Shutting down from the settings page. Pi only. |
+
+No *ready* after power on means one of those three is missing. A server never
+reached is not announced as lost; the missing *ready* is the sign. An unreadable
+clock is not a warning, as on the dashboard. `BUZZER_STATUS=off` (gate-config)
+mutes all but power on and passings. The signals and their timing are
+`packages/shared/src/buzzer-signals.ts`; the firmware copy is checked by a
+gate-agent test. `rally-gate-beep <signal>` plays one from outside the agent.
+
 **Not straight off the pin:** an active buzzer draws ~30mA, a Pi GPIO is good
 for ~16mA. Use a buzzer module with its own transistor (3 pins: VCC, GND, I/O;
 take a high-level-trigger one), or an NPN (e.g. 2N2222, 1kΩ to the base) with

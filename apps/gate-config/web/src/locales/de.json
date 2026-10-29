@@ -91,6 +91,11 @@
       "message": "Eine GPIO-Nummer zwischen 2 und 27.",
       "hint": "BCM-Nummer des Pins, an dem ein aktiver Summer hängt; er piept bei jeder Durchfahrt. Leer: kein Summer."
     },
+    "BUZZER_STATUS": {
+      "label": "Statussignale des Summers",
+      "message": "on oder off.",
+      "hint": "on: der Summer meldet auch, wenn das Gate bereit ist, den Server verliert, keine synchrone Uhr hat, sein Not-WLAN öffnet oder herunterfährt. off: nur Durchfahrten und der Ton beim Einschalten. Standard on."
+    },
     "BEAM_EDGE": {
       "label": "Auslöseflanke der Lichtschranke",
       "message": "rising oder falling.",

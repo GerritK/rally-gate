@@ -63,7 +63,10 @@ but no longer reads needs a power cycle (seen once, right after flashing).
 
 Buzzer on D1, LED on D2 (through a resistor), both to GND. The LED is lit
 while the gate is connected to the server. One beep means the tap is
-stored, three mean it is **not** (buffer full or flash failed).
+stored, three mean it is **not** (buffer full or flash failed). The buzzer also
+plays the status sounds of the Pi gates (table in `decoder-adapters.md`,
+"Buzzer"), except decoder failed and shutdown; ready here needs the NFC reader
+found. They can be turned off on the status page, power on can't.
 
 ## Identifying a driver
 

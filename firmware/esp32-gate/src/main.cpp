@@ -12,6 +12,7 @@
 #include <esp_timer.h>
 #include <mdns.h>
 
+#include "buzzer_signals.h"
 #include "gate.h"
 
 // XIAO ESP32-S3. SPI is the board's default SCK/MISO/MOSI (D8/D9/D10).
@@ -60,6 +61,7 @@ static void loadSettings() {
   // Predictable on purpose, as on the Pi: it goes on a sticker on the box.
   settings.hotspotPass = prefs.getString("hotspotPass", "rally-gate");
   settings.serverHost = prefs.getString("serverHost", "rally-server.local");
+  settings.buzzerStatus = prefs.getBool("buzzerStatus", true);
 }
 
 void saveSettings(const Settings &s) {
@@ -68,6 +70,7 @@ void saveSettings(const Settings &s) {
   prefs.putString("wifiPass", s.wifiPass);
   prefs.putString("hotspotPass", s.hotspotPass);
   prefs.putString("serverHost", s.serverHost);
+  prefs.putBool("buzzerStatus", s.buzzerStatus);
 }
 
 static void beep(int times, int ms) {
@@ -76,6 +79,55 @@ static void beep(int times, int ms) {
     delay(ms);
     digitalWrite(PIN_BUZZER, LOW);
     if (i + 1 < times) delay(ms);
+  }
+}
+
+// Status sounds are played from loop(), so the tags keep being read meanwhile.
+// The tap beep above stays blocking: it is the answer to a tap, and 120ms.
+struct Queued {
+  const uint16_t *tones;
+  size_t count;
+};
+static Queued soundQueue[4];
+static size_t queued = 0;
+static size_t toneIndex = 0;
+static bool toneOn = false;
+static uint32_t toneUntilMs = 0;
+
+template <size_t N>
+static void play(const uint16_t (&tones)[N], bool always = false) {
+  if ((settings.buzzerStatus || always) && queued < 4) soundQueue[queued++] = {tones, N};
+}
+
+static void soundTick() {
+  if (queued == 0 || (int32_t)(millis() - toneUntilMs) < 0) return;
+  Queued &q = soundQueue[0];
+  if (!toneOn) {
+    digitalWrite(PIN_BUZZER, HIGH);
+    toneOn = true;
+    toneUntilMs = millis() + q.tones[toneIndex];
+    return;
+  }
+  digitalWrite(PIN_BUZZER, LOW);
+  toneOn = false;
+  toneUntilMs = millis() + BUZZER_GAP_MS;
+  if (++toneIndex == q.count) {
+    toneIndex = 0;
+    memmove(soundQueue, soundQueue + 1, --queued * sizeof soundQueue[0]);
+  }
+}
+
+static gate::StatusTracker statusTracker;
+static uint32_t nextStatusMs = 0;
+
+static void statusTick() {
+  if ((int32_t)(millis() - nextStatusMs) < 0) return;
+  nextStatusMs = millis() + 1000;
+  switch (statusTracker.next(esp_timer_get_time() / 1000, uplinkConnected(), readerFound, clockFresh())) {
+    case gate::Status::ConnectionLost: play(buzzer_signals::connectionLost); break;
+    case gate::Status::ClockUnsynced: play(buzzer_signals::clockUnsynced); break;
+    case gate::Status::Ready: play(buzzer_signals::ready); break;
+    case gate::Status::None: break;
   }
 }
 
@@ -119,6 +171,7 @@ static void startHotspot() {
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP(("rally-gate-" + hostname()).c_str(), settings.hotspotPass.c_str());
   hotspotUp = true;
+  play(buzzer_signals::hotspot);
   Serial.printf("[wifi] hotspot up at %s\n", WiFi.softAPIP().toString().c_str());
 }
 
@@ -254,6 +307,7 @@ void setup() {
   bootId = prefs.getUInt("bootId", 0) + 1;
   prefs.putUInt("bootId", bootId);
   loadSettings();
+  play(buzzer_signals::powerOn, true);
   Serial.printf("[gate] %s %s boot %lu\n", settings.gateId.c_str(), FIRMWARE_VERSION, (unsigned long)bootId);
 
   if (!LittleFS.begin(true)) Serial.println("[gate] LittleFS failed, taps can't be stored");
@@ -286,5 +340,7 @@ void loop() {
     uplinkTick(serverIp);
   }
   readerTick();
+  statusTick();
+  soundTick();
   digitalWrite(PIN_LED, uplinkConnected() ? HIGH : LOW);
 }

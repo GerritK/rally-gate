@@ -53,6 +53,11 @@ export class Uplink {
     });
   }
 
+  /** Fires on every closed attempt too, so a listener must be idempotent. */
+  onDisconnect(listener: () => void): void {
+    this.client.on('close', listener);
+  }
+
   publishHeartbeat(chrony?: ChronyState): void {
     // Deliberately QoS 0: a heartbeat is a liveness ping that repeats every
     // HEARTBEAT_INTERVAL_MS, so a missed one is self-healing and queueing it

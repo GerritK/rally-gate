@@ -13,6 +13,8 @@ export interface FieldDescriptor {
   /** Shown only while ADAPTER is one of these. */
   adapters?: string[];
   oneOf?: string[];
+  /** A yes/no setting, rendered as a switch; this is its position while unset. */
+  toggle?: 'on' | 'off';
   pattern?: string;
   range?: [number, number];
 }

@@ -47,6 +47,8 @@ start_hotspot() {
   # Otherwise NetworkManager races the saved Wi-Fi connection at every boot and
   # the gate comes up on its own island instead of the rally network.
   nmcli connection modify "$HOTSPOT_CON" connection.autoconnect no
+  # Tells whoever stands at the gate; absent without a buzzer, and never a reason to fail.
+  /usr/local/bin/rally-gate-beep hotspot >/dev/null 2>&1 || true
 }
 
 hotspot_active() {

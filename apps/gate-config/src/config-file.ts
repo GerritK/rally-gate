@@ -25,6 +25,14 @@ export const CONFIG_PATH =
  * docs/gate-config-ui.md "Access"), so the whitelist *is* the boundary. Never
  * widen this to "anything the form posted".
  */
+/**
+ * A yes/no setting. The file keeps `on`/`off` (what gate-agent reads); `initial`
+ * is gate-agent's default, which the page shows as a switch in that position
+ * while the key is unset.
+ */
+const toggle = (initial: 'on' | 'off') =>
+  ({ oneOf: ['on', 'off'] as const, toggle: initial }) as const;
+
 export const FIELDS = {
   GATE_ID: {
     // Matches what the server accepts as a Gate primary key, and stays within
@@ -77,7 +85,7 @@ export const FIELDS = {
   FORWARD_BEAM_ONLY: {
     group: 'decoder',
     adapters: ['beam-openstint'],
-    oneOf: ['off', 'on'] as const,
+    ...toggle('off'),
   },
   TRANSPONDERS: {
     group: 'decoder',
@@ -94,6 +102,10 @@ export const FIELDS = {
   BUZZER_GPIO: {
     group: 'decoder',
     range: [2, 27] as const,
+  },
+  BUZZER_STATUS: {
+    group: 'decoder',
+    ...toggle('on'),
   },
   HOTSPOT_PASSWORD: {
     // WPA2's own limits: 8-63 printable ASCII. Not a generated secret — the
@@ -132,6 +144,7 @@ export function fieldDescriptors(): Record<FieldName, FieldDescriptor> {
         group: 'group' in spec ? spec.group : 'general',
         adapters: 'adapters' in spec ? [...spec.adapters] : undefined,
         oneOf: 'oneOf' in spec ? [...spec.oneOf] : undefined,
+        toggle: 'toggle' in spec ? spec.toggle : undefined,
         // Source rather than the RegExp itself: JSON cannot carry one, and the
         // client rebuilds it with `new RegExp(...)`.
         pattern: 'pattern' in spec ? spec.pattern.source : undefined,

@@ -104,6 +104,11 @@
       "message": "A GPIO number between 2 and 27.",
       "hint": "BCM number of the pin an active buzzer is wired to, beeping on every passing. Empty: no buzzer."
     },
+    "BUZZER_STATUS": {
+      "label": "Buzzer status sounds",
+      "message": "on or off.",
+      "hint": "on: the buzzer also tells you when the gate is ready, loses the server, has no synced clock, raises its emergency Wi-Fi or shuts down. off: only passings and the power-on tone. Default on."
+    },
     "BEAM_EDGE": {
       "label": "Light barrier trigger edge",
       "message": "rising or falling.",

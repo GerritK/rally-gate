@@ -18,6 +18,7 @@ struct Settings {
   String wifiPass;
   String hotspotPass;
   String serverHost;  // default rally-server.local, mDNS like a Pi gate
+  bool buzzerStatus = true;  // status sounds; power-on and the tap beep ignore it
 };
 
 struct RecentTap {

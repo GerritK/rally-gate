@@ -2,6 +2,7 @@ import { ChildProcess, spawn } from 'child_process';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { createInterface } from 'readline';
+import { EXIT_DECODER_FAILED } from '../exit-codes';
 import { DecoderAdapter, DetectionCallback } from './decoder-adapter';
 
 export interface OpenStintAdapterOptions {
@@ -88,7 +89,7 @@ export class OpenStintAdapter implements DecoderAdapter {
     this.child.on('exit', (code) => {
       if (this.child) {
         console.error(`[openstint] openstint_rtlsdr exited with code ${code}`);
-        process.exit(1);
+        process.exit(EXIT_DECODER_FAILED);
       }
     });
     console.log(`[openstint] starting decoder, gain ${this.options.gain}dB`);

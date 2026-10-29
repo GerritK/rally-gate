@@ -58,6 +58,8 @@
   .field input:focus + label, .field input:not(:placeholder-shown) + label { top: -10px; font-size: .75rem; background: var(--surface); }
   .field input:focus + label { color: var(--primary); }
   .field .hint { padding: 6px 16px 0; font-size: .75rem; line-height: 1.25; color: var(--muted); }
+  .field.check label { position: static; display: flex; align-items: center; gap: 12px; padding: 0; color: inherit; pointer-events: auto; cursor: pointer; }
+  .field.check input { width: 20px; height: 20px; padding: 0; accent-color: var(--primary); }
   .field.invalid input { border-color: var(--error); box-shadow: inset 0 0 0 1px var(--error); }
   .field.invalid label, .field.invalid .hint { color: var(--error); }
 
@@ -191,6 +193,10 @@
         <label for="hotspotPass">Emergency Wi-Fi password</label>
         <div class="hint">For the rally-gate-‹name› network this gate raises when it can reach no Wi-Fi. Leave empty to keep it.</div>
       </div>
+      <div class="field check">
+        <label><input type="checkbox" id="buzzerStatus" name="buzzerStatus" value="on">Status sounds</label>
+        <div class="hint">Ready, connection and clock warnings, emergency Wi-Fi. The tap beep and the power-on tone always sound.</div>
+      </div>
     </div>
     <div class="card-actions">
       <button type="submit" class="primary end">Save and restart</button>
@@ -289,6 +295,7 @@ async function refresh() {
     saved = s;
     $('gateIdInput').value = s.gateId;
     $('serverHost').value = s.serverHost;
+    $('buzzerStatus').checked = s.buzzerStatus;
     $('ssid').value = s.wifiSsid;
   }
 }

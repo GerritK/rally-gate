@@ -188,6 +188,15 @@ describe('fieldDescriptors', () => {
     expect(Object.keys(fieldDescriptors())).toEqual(Object.keys(FIELDS));
   });
 
+  it('sends yes/no settings as toggles, validated as on/off', () => {
+    const descriptors = fieldDescriptors();
+    expect(descriptors.BUZZER_STATUS.toggle).toBe('on');
+    expect(descriptors.FORWARD_BEAM_ONLY.toggle).toBe('off');
+    for (const d of Object.values(descriptors).filter((d) => d.toggle)) {
+      expect(d.oneOf).toEqual(['on', 'off']);
+    }
+  });
+
   it('survives JSON, which is how it reaches the browser', () => {
     const descriptors = fieldDescriptors();
     expect(JSON.parse(JSON.stringify(descriptors)).GATE_ID.pattern).toBe(

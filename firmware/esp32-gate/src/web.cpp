@@ -41,6 +41,7 @@ static void handleStatus() {
   json += ",\"serverConnected\":" + String(uplinkConnected() ? "true" : "false");
   json += ",\"clockSynced\":" + String(clockFresh() ? "true" : "false");
   json += ",\"clockOffsetMs\":" + String(clockOffsetMs(), 3);
+  json += ",\"buzzerStatus\":" + String(settings.buzzerStatus ? "true" : "false");
   json += ",\"readerFound\":" + String(readerFound ? "true" : "false");
   json += ",\"buffered\":" + String(bufferedCount());
   json += ",\"recent\":[";
@@ -67,6 +68,7 @@ static void handleSettings() {
   if (server.hasArg("gateId")) s.gateId = server.arg("gateId");
   if (server.hasArg("serverHost")) s.serverHost = server.arg("serverHost");
   if (server.hasArg("hotspotPass")) s.hotspotPass = server.arg("hotspotPass");
+  s.buzzerStatus = server.hasArg("buzzerStatus");  // an unchecked box is not sent
   s.gateId.trim();
   s.serverHost.trim();
 

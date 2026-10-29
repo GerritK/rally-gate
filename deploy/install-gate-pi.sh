@@ -470,6 +470,18 @@ echo 'address=/#/10.42.0.1' | sudo tee /etc/NetworkManager/dnsmasq-shared.d/rall
 # the SSID and password. See the header of deploy/rally-gate-net.
 sudo install -m 0755 "$INSTALL_DIR/deploy/rally-gate-net" /usr/local/sbin/rally-gate-net
 
+# Status sounds from outside the agent: the hotspot watchdog (root) and the
+# settings page's power-off. runuser drops root first, since the code it runs
+# sits in a directory $USER can write to.
+sudo tee /usr/local/bin/rally-gate-beep >/dev/null <<EOF
+#!/bin/sh
+if [ "\$(id -u)" = 0 ]; then
+  exec runuser -u $USER -- /usr/bin/node $INSTALL_DIR/apps/gate-agent/dist/beep-cli.js "\$@"
+fi
+exec /usr/bin/node $INSTALL_DIR/apps/gate-agent/dist/beep-cli.js "\$@"
+EOF
+sudo chmod 0755 /usr/local/bin/rally-gate-beep
+
 # Exact commands rather than a blanket rule: this service is reachable by
 # anyone on the rally network and has no authentication, so what it can do as
 # root is the boundary.
