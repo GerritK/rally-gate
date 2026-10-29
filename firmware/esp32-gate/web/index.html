@@ -332,6 +332,8 @@ $('settingsForm').onsubmit = (e) => { e.preventDefault(); post('/api/settings', 
 // Changing the gate ID is not a rename on the server: it keys the gate, its
 // assignment and every detection, so this comes back as a new, unassigned gate.
 $('gateIdInput').oninput = () => {
+  // Capitals only (validGateId), so a typed small letter becomes one.
+  $('gateIdInput').value = $('gateIdInput').value.toUpperCase();
   const changed = saved && $('gateIdInput').value !== saved.gateId;
   if (changed) alert($('gateIdChanged'), 'warning', 'Changing the Gate ID makes this a different gate to the server. Its assignment and recorded taps stay with the old ID.', true);
   $('gateIdChanged').hidden = !changed;

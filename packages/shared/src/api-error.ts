@@ -20,6 +20,7 @@ export enum ApiErrorCode {
   OTHER_STAGE_ACTIVE = 'otherStageActive',
   START_ORDER_FROZEN = 'startOrderFrozen',
   COMBINED_GATE_CLASH = 'combinedGateClash',
+  INVALID_GATE_ID = 'invalidGateId',
   GATE_IN_STARTED_STAGE = 'gateInStartedStage',
   /** `params.assignmentCount`: deleting with `force` removes them too. */
   GATE_HAS_ASSIGNMENTS = 'gateHasAssignments',

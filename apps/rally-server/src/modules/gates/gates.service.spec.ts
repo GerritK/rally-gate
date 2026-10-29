@@ -53,6 +53,12 @@ describe('GatesService.recordHeartbeat', () => {
     expect(gate).toMatchObject({ id: 'GATE1', name: 'GATE1' });
   });
 
+  it('never registers a gate whose id breaks the gate id rule', async () => {
+    const { service } = makeService({});
+
+    expect(await service.recordHeartbeat('start_wp1')).toBeNull();
+  });
+
   it('ignores an unknown gate when auto-discovery is disabled', async () => {
     const { service } = makeService({ autoDiscoverGates: false });
 

@@ -260,8 +260,8 @@ inline int detectionJson(const Tap &tap, int64_t timeUs, bool timeUnknown,
                   timeUnknown ? ",\"metadata\":{\"timeUnknown\":true}" : "");
 }
 
-// Gate ids are matched verbatim by the server and used in MQTT topics, so the
-// same alphabet as the Pi installer's (CLUB_START_WP1): A-Z, 0-9, underscore.
+// GATE_ID_PATTERN in packages/shared, by hand: the server ignores heartbeats
+// from any other id, and the Pi gates use the same rule.
 inline bool validGateId(const char *id) {
   size_t len = strlen(id);
   if (len == 0 || len > 32) return false;

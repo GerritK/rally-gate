@@ -200,6 +200,13 @@ function rulesFor(name: string, spec: FieldSpec): Rule[] {
   ];
 }
 
+// Gate ids are capitals only (GATE_ID_PATTERN), so a typed small letter is
+// turned into one instead of being refused.
+function onTextInput(name: string, value: string) {
+  if (name === 'GATE_ID') values.value[name] = value.toUpperCase();
+  clearServerError(name);
+}
+
 // A server-side error refers to the value that was submitted, so it stops being
 // true the moment the field is edited. Left in place it would sit under a field
 // the marshal has already corrected.
@@ -646,7 +653,7 @@ onUnmounted(() => {
                   :error-messages="serverError(name)"
                   persistent-hint
                   class="mb-4"
-                  @update:model-value="clearServerError(name)"
+                  @update:model-value="onTextInput(name, $event)"
                 />
               </template>
 

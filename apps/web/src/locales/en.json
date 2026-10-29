@@ -566,6 +566,7 @@
     "otherStageActive": "Another stage is active on a shared gate.",
     "startOrderFrozen": "{stage} has started; its start order stays frozen.",
     "combinedGateClash": "{stage} already has a start or finish gate; a combined start/finish gate replaces both.",
+    "invalidGateId": "A gate name is A–Z, 0–9 and _ only, at most 32 characters.",
     "gateInStartedStage": "Gate {gate} is used on stages that have started ({stages}) and can't be deleted.",
     "gateHasAssignments": "Gate {gate} is still assigned to stages.",
     "closeStageBeforePowerOff": "A stage is active. Close it before shutting down the gates.",

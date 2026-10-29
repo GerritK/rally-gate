@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import {
@@ -7,6 +7,7 @@ import {
   CLOCK_CORRECTION_THRESHOLD_KEY,
   DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS,
   DETECTION_TOPIC_PREFIX,
+  GATE_ID_PATTERN,
   gateConfigUrl,
   GateHeartbeat,
   GatePowerOffResult,
@@ -87,6 +88,8 @@ const HEARTBEAT_TOPIC_REGEX = new RegExp(
 
 @Injectable()
 export class GatesService {
+  private readonly logger = new Logger(GatesService.name);
+
   constructor(
     @InjectRepository(Gate)
     private readonly gates: Repository<Gate>,
@@ -200,6 +203,12 @@ export class GatesService {
     arrivedAt: Date = new Date(),
     address?: string,
   ): Promise<Gate | null> {
+    // Never registered, so it never shows on the Hardware page and the
+    // organiser notices before the start. Its detections are still stored.
+    if (!GATE_ID_PATTERN.test(gateId)) {
+      this.logger.warn(`Ignoring heartbeat from invalid gate id ${gateId}`);
+      return null;
+    }
     let gate = await this.gates.findOneBy({ id: gateId });
     if (!gate) {
       const autoDiscover = await this.settingsService.getBoolean(

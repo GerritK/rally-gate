@@ -140,7 +140,7 @@ describe('server-owned fields are not settable through the API', () => {
     [
       'GateAssignment.active',
       CreateGateAssignmentDto,
-      { gateId: 'g1', stageId: 'WP1', role: 'stage_start', active: true },
+      { gateId: 'G1', stageId: 'WP1', role: 'stage_start', active: true },
       'active',
     ],
     // Classes are assigned by id only; a nested object would bypass the
@@ -244,7 +244,7 @@ describe('malformed values are rejected at the boundary', () => {
 
   it('rejects an unknown gate role', async () => {
     const messages = await rejectionMessages(CreateGateAssignmentDto, {
-      gateId: 'g1',
+      gateId: 'G1',
       stageId: 'WP1',
       role: 'teleporter',
     });

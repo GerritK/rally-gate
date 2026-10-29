@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto';
 import { readFileSync, renameSync, unlinkSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
+import { GATE_ID_PATTERN } from '@rally-gate/shared';
 import type { FieldDescriptor, FieldError } from './api-types';
 
 export const CONFIG_PATH =
@@ -35,9 +36,7 @@ const toggle = (initial: 'on' | 'off') =>
 
 export const FIELDS = {
   GATE_ID: {
-    // Matches what the server accepts as a Gate primary key, and stays within
-    // what a host name can be derived from (see install-gate-pi.sh).
-    pattern: /^[A-Za-z0-9_-]{1,64}$/,
+    pattern: GATE_ID_PATTERN,
   },
   MQTT_HOST: {
     // Host name or IP. Deliberately not a strict hostname grammar: `.local`

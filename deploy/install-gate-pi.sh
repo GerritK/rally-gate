@@ -210,8 +210,14 @@ fi
 title "1. Name this gate"
 note "Every gate needs its own name. Start it with your club's short code so"
 note "it stays unique when gates are shared between clubs, e.g. CLUB_START_WP1."
-ask GATE_ID "Gate name" "${CUR_GATE_ID:-$(hostname | tr '[:lower:]-' '[:upper:]_')}"
-while [ -z "$GATE_ID" ]; do ask GATE_ID "A gate name is required"; done
+ask GATE_ID "Gate name" "${CUR_GATE_ID:-$(hostname | tr '[:lower:]-' '[:upper:]_' | tr -cd 'A-Z0-9_' | cut -c1-32)}"
+# GATE_ID_PATTERN in packages/shared: capitals only, so typed small letters become them.
+GATE_ID="$(printf '%s' "$GATE_ID" | tr '[:lower:]' '[:upper:]')"
+until [[ "$GATE_ID" =~ ^[A-Z0-9_]{1,32}$ ]]; do
+  GATE_ID=""
+  ask GATE_ID "Use A-Z, 0-9 and _ only, at most 32 characters"
+  GATE_ID="$(printf '%s' "$GATE_ID" | tr '[:lower:]' '[:upper:]')"
+done
 
 # Derived rather than reused: a host name may contain only letters, digits and
 # hyphens (RFC 1123), while GATE_ID is deliberately underscore-separated

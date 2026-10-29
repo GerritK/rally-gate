@@ -1,10 +1,11 @@
-import { GateRole } from '@rally-gate/shared';
+import { GATE_ID_PATTERN, GateRole } from '@rally-gate/shared';
 import {
   IsEnum,
   IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   Min,
 } from 'class-validator';
 
@@ -27,8 +28,7 @@ export class UpsertGateDto {
  * while bypassing the cross-stage conflict check entirely.
  */
 export class CreateGateAssignmentDto {
-  @IsString()
-  @IsNotEmpty()
+  @Matches(GATE_ID_PATTERN)
   gateId: string;
 
   @IsString()

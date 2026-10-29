@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,6 +9,8 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
+import { ApiErrorCode, GATE_ID_PATTERN } from '@rally-gate/shared';
+import { apiError } from '../../common/api-error';
 import { UpsertGateDto } from './dto';
 import { GatesService } from './gates.service';
 
@@ -33,6 +36,11 @@ export class GatesController {
 
   @Put(':id')
   upsert(@Param('id') id: string, @Body() gate: UpsertGateDto) {
+    if (!GATE_ID_PATTERN.test(id)) {
+      throw new BadRequestException(
+        apiError(ApiErrorCode.INVALID_GATE_ID, `Invalid gate id ${id}`),
+      );
+    }
     return this.gatesService.upsert({ ...gate, id });
   }
 
