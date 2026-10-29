@@ -131,6 +131,15 @@ inlines the fonts and gzips it into the image, about 95 KB. Vuetify itself
 stays out: Node in the firmware build and a few hundred KB more over the
 emergency Wi-Fi, for one page.
 
+**The page and the reader share one firmware**, where a Pi keeps gate-config
+in a process of its own so that it survives an agent stuck in a crash loop
+(`gate-config-ui.md`). A microcontroller has no second process to put it in.
+What keeps that from biting: every setting is checked before it is saved
+(`web.cpp`, the same rules as on a Pi), so the page can't store a value the
+firmware would trip over, and the network and server it fails to reach only
+bring the emergency Wi-Fi up. A gate that crashes before its page is up anyway
+is reflashed over USB.
+
 Emergency Wi-Fi as on a Pi: `rally-gate-<name>` with password `rally-gate`,
 raised when no network is configured or after 60s without one, with a
 captive portal on 80 redirecting to 57439. It goes down once the gate joins
