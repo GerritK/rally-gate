@@ -30,7 +30,6 @@ async function bootstrap() {
   // REST resource and a dashboard page. The prefix is what keeps a new
   // endpoint from silently shadowing a page.
   app.setGlobalPrefix('api');
-  app.enableCors({ origin: '*' });
   app.useGlobalPipes(
     new ValidationPipe({
       // Rejecting rather than silently stripping: both close the hole (no

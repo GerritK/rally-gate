@@ -2,17 +2,11 @@ import type { ApiErrorBody } from '@rally-gate/shared';
 import { t } from '@rally-gate/ui';
 
 /**
- * Empty in a built app: rally-server serves these files itself, so the API
- * is same-origin and a relative `/api/...` needs no host. That also removes
- * the old failure where a copied `dist/` pointed every browser at its own
- * localhost.
- *
- * In `npm run dev:web` Vite serves on 57440 while the API stays on 57430, so
- * the origin has to be spelled out. `VITE_API_URL` still overrides both.
+ * Always same-origin: rally-server serves the built app itself, and in
+ * `npm run dev:web` Vite proxies `/api` to it. The API sends no CORS headers
+ * and the login cookie is `SameSite=Strict`, so another origin can't work.
  */
-export const API_BASE: string =
-  import.meta.env.VITE_API_URL ??
-  (import.meta.env.DEV ? 'http://localhost:57430/api' : '/api');
+export const API_BASE = '/api';
 
 export class ApiError extends Error {
   // Declared and assigned explicitly rather than as constructor parameter

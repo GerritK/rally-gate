@@ -23,6 +23,7 @@ export default defineConfig({
   },
   server: {
     port: 57440,
+    proxy: { '/api': 'http://localhost:57430' },
   },
   // @rally-gate/shared ships a CommonJS build and is a symlinked workspace
   // package, so Vite's dev server skips it during dependency pre-bundling
