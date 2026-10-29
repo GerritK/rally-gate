@@ -38,7 +38,7 @@ const KEY = /'([a-z][a-zA-Z]*(?:\.[a-zA-Z]+)+)'|keypath="([^"]+)"/g;
 
 for (const app of [
   join(root, 'apps', 'web', 'src'),
-  join(root, 'apps', 'gate-config', 'web', 'src'),
+  join(root, 'apps', 'gate', 'web', 'src'),
 ]) {
   const en = new Set([...load(app, 'en'), ...load(ui, 'en')]);
   const de = new Set([...load(app, 'de'), ...load(ui, 'de')]);

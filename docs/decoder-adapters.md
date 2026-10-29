@@ -1,6 +1,6 @@
 # Decoder Adapters
 
-`apps/gate-agent` gets its detections from a `DecoderAdapter`:
+gate-agent (`apps/gate/src/agent`) gets its detections from a `DecoderAdapter`:
 
 ```ts
 interface DecoderAdapter {

@@ -1,29 +1,29 @@
 {
-  "name": "@rally-gate/gate-config",
+  "name": "@rally-gate/gate",
   "version": "0.0.1",
   "private": true,
   "license": "MIT",
-  "main": "dist/main.js",
   "scripts": {
     "build": "tsc -p tsconfig.json && vue-tsc -p tsconfig.web.json --noEmit && vite build",
     "build:deploy": "tsc -p tsconfig.json && vite build",
-    "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
-    "dev:web": "vite",
-    "start": "node dist/main.js",
-    "test": "jest"
+    "dev:agent": "ts-node-dev --respawn --transpile-only src/agent/main.ts",
+    "dev:config": "ts-node-dev --respawn --transpile-only src/gate-config/main.ts",
+    "dev:config-web": "vite",
+    "simulate": "ts-node --transpile-only src/agent/simulate-cli.ts",
+    "test": "node --require ts-node/register/transpile-only --test \"src/**/*.spec.ts\""
   },
   "dependencies": {
     "@rally-gate/shared": "0.0.1",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "mqtt": "^5.10.1",
+    "ulid": "^3.0.2"
   },
   "devDependencies": {
     "@rally-gate/ui": "0.0.1",
     "@types/express": "^5.0.0",
-    "@types/jest": "^30.0.0",
     "@types/node": "^24.19.2",
     "@vitejs/plugin-vue": "^6.0.7",
-    "jest": "^30.5.2",
-    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "~6.0.3",
     "vite": "^8.1.1",

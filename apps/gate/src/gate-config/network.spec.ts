@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   parseDeviceStatus,
   parseWifiList,
@@ -7,7 +9,7 @@ import {
 
 describe('splitTerse', () => {
   it('splits on unescaped colons', () => {
-    expect(splitTerse('wlan0:wifi:connected:Rally')).toEqual([
+    assert.deepEqual(splitTerse('wlan0:wifi:connected:Rally'), [
       'wlan0',
       'wifi',
       'connected',
@@ -18,7 +20,7 @@ describe('splitTerse', () => {
   it('keeps an escaped colon inside a field', () => {
     // An SSID may contain a colon; a plain split() drops such a network from
     // the list entirely, which is the bug this exists to prevent.
-    expect(splitTerse('Rally\\:Net:72:WPA2')).toEqual([
+    assert.deepEqual(splitTerse('Rally\\:Net:72:WPA2'), [
       'Rally:Net',
       '72',
       'WPA2',
@@ -26,7 +28,7 @@ describe('splitTerse', () => {
   });
 
   it('keeps an escaped backslash', () => {
-    expect(splitTerse('a\\\\b:1')).toEqual(['a\\b', '1']);
+    assert.deepEqual(splitTerse('a\\\\b:1'), ['a\\b', '1']);
   });
 });
 
@@ -35,14 +37,14 @@ describe('parseDeviceStatus', () => {
     const rows = parseDeviceStatus(
       'wlan0:wifi:connected:Clubhaus\neth0:ethernet:unavailable:\n',
     );
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toEqual({
+    assert.equal(rows.length, 2);
+    assert.deepEqual(rows[0], {
       device: 'wlan0',
       type: 'wifi',
       state: 'connected',
       connection: 'Clubhaus',
     });
-    expect(rows[1].connection).toBe('');
+    assert.equal(rows[1].connection, '');
   });
 });
 
@@ -51,68 +53,76 @@ describe('parseWifiList', () => {
     const networks = parseWifiList(
       ':Weak:20:WPA2\n:OpenNet:55:--\n:Strong:88:WPA2\n',
     );
-    expect(networks.map((n) => n.ssid)).toEqual(['Strong', 'OpenNet', 'Weak']);
-    expect(networks[1].secured).toBe(false);
-    expect(networks[0].secured).toBe(true);
+    assert.deepEqual(
+      networks.map((n) => n.ssid),
+      ['Strong', 'OpenNet', 'Weak'],
+    );
+    assert.equal(networks[1].secured, false);
+    assert.equal(networks[0].secured, true);
   });
 
   it('keeps only the strongest reading of a repeated SSID', () => {
     const networks = parseWifiList(
       ':Mesh:31:WPA2\n*:Mesh:12:WPA2\n:Mesh:77:WPA2\n',
     );
-    expect(networks).toEqual([
+    assert.deepEqual(networks, [
       { ssid: 'Mesh', signal: 77, secured: true, inUse: true },
     ]);
   });
 
   it('drops hidden networks, which have no name to click', () => {
-    expect(parseWifiList('::44:WPA2\n:Named:10:WPA2\n')).toHaveLength(1);
+    assert.equal(parseWifiList('::44:WPA2\n:Named:10:WPA2\n').length, 1);
   });
 });
 
 describe('validateWifi', () => {
   it('accepts a secured network', () => {
-    expect(validateWifi({ ssid: 'Clubhaus', password: 'hunter22' })).toEqual(
+    assert.deepEqual(
+      validateWifi({ ssid: 'Clubhaus', password: 'hunter22' }),
       {},
     );
   });
 
   it('accepts an open network with no password', () => {
-    expect(validateWifi({ ssid: 'Clubhaus', password: '' })).toEqual({});
+    assert.deepEqual(validateWifi({ ssid: 'Clubhaus', password: '' }), {});
   });
 
   it('rejects an SSID nmcli would read as one of its own options', () => {
-    expect(
+    assert.notEqual(
       validateWifi({ ssid: '-x', password: 'hunter22' }).ssid,
-    ).toBeDefined();
+      undefined,
+    );
   });
 
   it('rejects a line break in the SSID', () => {
-    expect(
+    assert.notEqual(
       validateWifi({ ssid: 'a\nb', password: 'hunter22' }).ssid,
-    ).toBeDefined();
+      undefined,
+    );
   });
 
   it('rejects an SSID over 32 bytes, counting bytes not characters', () => {
     // 17 two-byte characters fit in 32 *characters* but not in 32 bytes, which
     // is the limit an access point actually has.
-    expect(validateWifi({ ssid: 'ü'.repeat(17) }).ssid).toBeDefined();
-    expect(validateWifi({ ssid: 'ü'.repeat(16) }).ssid).toBeUndefined();
+    assert.notEqual(validateWifi({ ssid: 'ü'.repeat(17) }).ssid, undefined);
+    assert.equal(validateWifi({ ssid: 'ü'.repeat(16) }).ssid, undefined);
   });
 
   it('rejects a password shorter than WPA2 allows', () => {
-    expect(
+    assert.notEqual(
       validateWifi({ ssid: 'Clubhaus', password: 'short' }).password,
-    ).toBeDefined();
+      undefined,
+    );
   });
 
   it('rejects a password longer than WPA2 allows', () => {
-    expect(
+    assert.notEqual(
       validateWifi({ ssid: 'Clubhaus', password: 'x'.repeat(64) }).password,
-    ).toBeDefined();
+      undefined,
+    );
   });
 
   it('requires an SSID', () => {
-    expect(validateWifi({}).ssid).toBeDefined();
+    assert.notEqual(validateWifi({}).ssid, undefined);
   });
 });

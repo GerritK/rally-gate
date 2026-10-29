@@ -9,8 +9,7 @@ This file holds what spans projects. **Each project has its own `CLAUDE.md` — 
 - `apps/rally-server/CLAUDE.md` — **before any entity, DTO or event-handler change**: TypeORM column types valid in both drivers, `null` not `undefined`, DTO whitelist and server-owned fields, `@OnEvent` swallows errors, `/api` prefix, rolldown bundle pitfalls
 - `apps/web/CLAUDE.md` — tests only for plain `.ts` modules (`node --test`), shared components and clock, Vuetify-only, time-only corrections, PDF fonts, Vite `optimizeDeps`
 - `packages/ui/CLAUDE.md` — theme and defaults, self-hosted fonts, no build step, keep it out of `optimizeDeps`
-- `apps/gate-agent/CLAUDE.md` — `DecoderAdapter`, why the MQTT session options matter, `node:test`
-- `apps/gate-config/CLAUDE.md` — OS calls only in `system.ts`, `FIELDS` is the security boundary
+- `apps/gate/CLAUDE.md` — gate-agent and gate-config: two units, one package; `FIELDS` is the contract and the security boundary, `DecoderAdapter`, why the MQTT session options matter, OS calls only in `system.ts`, `node:test`
 - `deploy/CLAUDE.md` — installer assumptions no test checks, the Postgres `127.0.0.1` binding, chrony setup
 - `firmware/esp32-gate/CLAUDE.md` — PlatformIO commands; shares the MQTT payloads with gate-agent
 
@@ -66,7 +65,7 @@ CI (`.github/workflows/ci.yml`): `verify` (build shared → format:check → ser
 - **No AI attribution** in commits or PR descriptions — no `Co-Authored-By: Claude`, no "Generated with Claude Code", whatever the tooling defaults say.
 - **Comments only where a senior fullstack dev would still be stuck without one**: a non-obvious constraint, a hardware/clock gotcha, a "this looks wrong but isn't". Keep a doc comment on the function it describes when moving code.
 - **Still pure dev mode: no backwards compatibility.** No redirects for removed pages, no migrations for old event files, no deprecated API aliases — change it everywhere in one commit. All data is test data. This ends with the first real event.
-- **Deliberately absent, don't reintroduce unasked:** Nx/Turborepo (plain npm workspaces suffice), a separate simulator service (it's `SimulatedAdapter`), a Mosquitto/NATS container (Aedes is embedded in both modes), a Dockerfile for gate-agent (it needs raw GPIO/USB, runs under systemd), YAML gate/stage config (gates self-register, assignments come from the dashboard), a multi-tenant `Event` table (see below).
+- **Deliberately absent, don't reintroduce unasked:** Nx/Turborepo (plain npm workspaces suffice), a separate simulator service (it's `SimulatedAdapter`), a Mosquitto/NATS container (Aedes is embedded in both modes), a Dockerfile for a real gate (it needs raw GPIO/USB, runs under systemd; `apps/gate/Dockerfile` is the simulator for `docker-compose.dev.yml` only), YAML gate/stage config (gates self-register, assignments come from the dashboard), a multi-tenant `Event` table (see below).
 
 ## Ports
 
@@ -78,7 +77,7 @@ Dedicated ports, never framework defaults (3000/5173/1883). **Every number in 57
 | 57431 | embedded MQTT broker (Aedes) |
 | 57432 | embedded SNTP server (**udp**) |
 | 57433–57438 | free, for server-side growth |
-| 57439 | `apps/gate-config` API and page — the only one **on a gate**, hence at the far end |
+| 57439 | gate-config API and page (`apps/gate`) — the only one **on a gate**, hence at the far end |
 | 80 | gate-config captive-portal redirect — on a gate only, fixed by what phones probe |
 | 57440 | Vite dev server for `apps/web` — dev only |
 | 57449 | Vite dev server for `gate-config` — dev only |

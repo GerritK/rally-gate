@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Interactive installer for gate-agent on a stock Raspberry Pi OS Lite image.
 # Runs bare-metal (not Docker) so it has direct access to the RTL-SDR/USB
-# decoder and any GPIO sensors — see apps/gate-agent/Dockerfile for why.
+# decoder and any GPIO sensors — see apps/gate/Dockerfile for why.
 #
 # Usage: curl -fsSL https://github.com/GerritK/rally-gate/releases/latest/download/install-gate-pi.sh | bash
 # Prompts can be skipped by pre-setting the env vars, e.g.:
@@ -376,11 +376,10 @@ cd "$INSTALL_DIR"
 # Only the gate's workspaces: the rest of the monorepo (rally-server's Nest,
 # TypeORM and native better-sqlite3, the dashboard) is about half the install
 # and never runs here. A new workspace the gate imports must be added here too.
-run "Installing dependencies" npm ci --workspace=@rally-gate/shared --workspace=@rally-gate/gate-agent --workspace=@rally-gate/gate-config
+run "Installing dependencies" npm ci --workspace=@rally-gate/shared --workspace=@rally-gate/gate
 run "Building shared code" npm run build --workspace=@rally-gate/shared
-run "Building the gate service" npm run build --workspace=@rally-gate/gate-agent
 # build:deploy skips vue-tsc: it OOMs a Pi on the Vuetify types, and CI already typechecks.
-run "Building the settings page (the slowest part)" npm run build:deploy --workspace=@rally-gate/gate-config
+run "Building the gate service and its settings page" npm run build:deploy --workspace=@rally-gate/gate
 
 step "Saving gate settings"
 # Config lives in a file, not in the unit: the gate config UI rewrites it at
@@ -393,7 +392,7 @@ sudo mkdir -p /etc/rally-gate
   if [ -f "$GATE_ENV" ]; then
     grep -vE '^(GATE_ID|MQTT_HOST|MQTT_PORT|HOTSPOT_PASSWORD)=' "$GATE_ENV" || true
   else
-    echo "# Written by deploy/install-gate-pi.sh, then owned by @rally-gate/gate-config."
+    echo "# Written by deploy/install-gate-pi.sh, then owned by gate-config."
   fi
   printf '%s\n' "GATE_ID=$GATE_ID" "MQTT_HOST=$MQTT_HOST" "MQTT_PORT=$MQTT_PORT" "HOTSPOT_PASSWORD=$HOTSPOT_PASSWORD"
 } >/tmp/rally-gate.env
@@ -412,12 +411,16 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=$INSTALL_DIR
-ExecStart=/usr/bin/node apps/gate-agent/dist/main.js
+ExecStart=/usr/bin/node apps/gate/dist/agent/main.js
 EnvironmentFile=/etc/rally-gate/gate.env
 Restart=always
 # Without a delay, five failed starts in 10s make systemd give up for good — a
 # gate whose sensor or SDR was unplugged at boot would never come back.
 RestartSec=5
+# EXIT_CONFIG_INVALID (apps/gate/src/agent/exit-codes.ts): a setting in gate.env
+# breaks its rule. Restarting can't fix that, so the unit stays failed until
+# gate-config saves and starts it again; it also marks the field.
+RestartPreventExitStatus=3
 User=$USER
 # Lets the openstint adapter run its decoder SCHED_FIFO (chrt) without root.
 LimitRTPRIO=70
@@ -440,8 +443,8 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=$INSTALL_DIR/apps/gate-config
-ExecStart=/usr/bin/node dist/main.js
+WorkingDirectory=$INSTALL_DIR/apps/gate
+ExecStart=/usr/bin/node dist/gate-config/main.js
 Restart=always
 User=$USER
 # Port 80 only redirects to 57439 — it is what phones probe to detect a captive
@@ -482,9 +485,9 @@ sudo install -m 0755 "$INSTALL_DIR/deploy/rally-gate-net" /usr/local/sbin/rally-
 sudo tee /usr/local/bin/rally-gate-beep >/dev/null <<EOF
 #!/bin/sh
 if [ "\$(id -u)" = 0 ]; then
-  exec runuser -u $USER -- /usr/bin/node $INSTALL_DIR/apps/gate-agent/dist/beep-cli.js "\$@"
+  exec runuser -u $USER -- /usr/bin/node $INSTALL_DIR/apps/gate/dist/agent/beep-cli.js "\$@"
 fi
-exec /usr/bin/node $INSTALL_DIR/apps/gate-agent/dist/beep-cli.js "\$@"
+exec /usr/bin/node $INSTALL_DIR/apps/gate/dist/agent/beep-cli.js "\$@"
 EOF
 sudo chmod 0755 /usr/local/bin/rally-gate-beep
 

@@ -1,16 +1,21 @@
+import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, readdirSync } from 'fs';
+import { describe, it } from 'node:test';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import {
   FIELDS,
   FieldName,
   fieldDescriptors,
+  readSettings,
+  validate,
+} from './fields';
+import {
   parseEnvFile,
   readConfig,
   serializeEnvFile,
-  validate,
   writeConfig,
-} from './config-file';
+} from './gate-config/config-file';
 
 function scratchFile(): string {
   return join(mkdtempSync(join(tmpdir(), 'gate-config-')), 'gate.env');
@@ -18,32 +23,35 @@ function scratchFile(): string {
 
 describe('parseEnvFile', () => {
   it('reads keys, ignoring comments and blank lines', () => {
-    expect(
+    assert.deepEqual(
       parseEnvFile('# a comment\n\nGATE_ID=CLUB_START_WP1\nMQTT_PORT=57431\n'),
-    ).toEqual({ GATE_ID: 'CLUB_START_WP1', MQTT_PORT: '57431' });
+      { GATE_ID: 'CLUB_START_WP1', MQTT_PORT: '57431' },
+    );
   });
 
   it('drops keys that are not settable, so a hand-edited file cannot smuggle them back', () => {
-    expect(parseEnvFile('GATE_ID=G1\nLD_PRELOAD=/tmp/evil.so\n')).toEqual({
+    assert.deepEqual(parseEnvFile('GATE_ID=G1\nLD_PRELOAD=/tmp/evil.so\n'), {
       GATE_ID: 'G1',
     });
   });
 
   it('round-trips through serialize', () => {
     const config = { GATE_ID: 'G1', MQTT_HOST: 'rally-server.local' };
-    expect(parseEnvFile(serializeEnvFile(config))).toEqual(config);
+    assert.deepEqual(parseEnvFile(serializeEnvFile(config)), config);
   });
 
   it('omits empty values rather than writing a blank assignment', () => {
-    expect(serializeEnvFile({ GATE_ID: 'G1', TRANSPONDERS: '' })).not.toContain(
-      'TRANSPONDERS',
+    assert.ok(
+      !serializeEnvFile({ GATE_ID: 'G1', TRANSPONDERS: '' }).includes(
+        'TRANSPONDERS',
+      ),
     );
   });
 });
 
 describe('validate', () => {
   it('accepts a realistic configuration', () => {
-    expect(
+    assert.deepEqual(
       validate({
         GATE_ID: 'CLUB_START_WP1',
         MQTT_HOST: 'rally-server.local',
@@ -52,36 +60,39 @@ describe('validate', () => {
         TRANSPONDERS: '1234567,7654321',
         HEARTBEAT_INTERVAL_MS: '15000',
       }),
-    ).toEqual({});
+      {},
+    );
   });
 
   it('rejects an unknown key instead of ignoring it', () => {
-    expect(validate({ NODE_OPTIONS: '--require /tmp/x.js' })).toHaveProperty(
-      'NODE_OPTIONS',
+    assert.ok(
+      'NODE_OPTIONS' in validate({ NODE_OPTIONS: '--require /tmp/x.js' }),
     );
   });
 
   // The one that matters most: a line break would append a second KEY=value
   // line to the file systemd reads as EnvironmentFile, which makes every
   // per-field rule below it bypassable and runs code as the gate-agent user.
-  it.each([
+  for (const [label, value] of [
     ['a line feed', 'G1\nLD_PRELOAD=/tmp/evil.so'],
     ['a carriage return', 'G1\rLD_PRELOAD=/tmp/evil.so'],
     // Built rather than written as a '\u0000' escape: prettier rewrites that
     // into a raw NUL byte in the source, which is invisible in a diff and
     // does not survive every editor.
     ['a null byte', 'G1' + String.fromCharCode(0) + 'x'],
-  ])('rejects %s in a value', (_label, value) => {
-    expect(validate({ GATE_ID: value })).toHaveProperty('GATE_ID');
-  });
+  ]) {
+    it(`rejects ${label} in a value`, () => {
+      assert.ok('GATE_ID' in validate({ GATE_ID: value }));
+    });
+  }
 
   it('reports only the offending field when a value carries an injection', () => {
-    expect(Object.keys(validate({ GATE_ID: 'G1\nADAPTER=evil' }))).toEqual([
+    assert.deepEqual(Object.keys(validate({ GATE_ID: 'G1\nADAPTER=evil' })), [
       'GATE_ID',
     ]);
   });
 
-  it.each([
+  for (const [label, key, value] of [
     ['a port above range', 'MQTT_PORT', '70000'],
     ['a non-numeric port', 'MQTT_PORT', 'abc'],
     ['an unknown adapter', 'ADAPTER', 'mylaps'],
@@ -97,13 +108,50 @@ describe('validate', () => {
       '1',
     ],
     ['transponders with a letter', 'TRANSPONDERS', '123,abc'],
-  ])('rejects %s', (_label, key, value) => {
-    expect(validate({ [key]: value })).toHaveProperty(key);
-  });
+  ]) {
+    it(`rejects ${label}`, () => {
+      assert.ok(key in validate({ [key]: value }));
+    });
+  }
 
   it('treats an absent or empty field as "leave unset", not invalid', () => {
-    expect(validate({ SIMULATE_INTERVAL_MS: '' })).toEqual({});
-    expect(validate({})).toEqual({});
+    assert.deepEqual(validate({ SIMULATE_INTERVAL_MS: '' }), {});
+    assert.deepEqual(validate({}), {});
+  });
+});
+
+describe('readSettings', () => {
+  it('fills every unset field with its default', () => {
+    const { settings, invalid } = readSettings({ GATE_ID: 'CLUB_START_WP1' });
+    assert.deepEqual(invalid, []);
+    assert.equal(settings.GATE_ID, 'CLUB_START_WP1');
+    assert.equal(settings.BEAM_LOCKOUT_MS, '500');
+    assert.equal(settings.BUZZER_STATUS, 'on');
+    assert.equal(settings.BUZZER_GPIO, undefined);
+  });
+
+  // Hand-edited gate.env never passed through the page's validation.
+  it('names a field that breaks its rule and never hands its value on', () => {
+    const { settings, invalid } = readSettings({
+      BEAM_LOCKOUT_MS: '5OO',
+      ADAPTER: 'mylaps',
+    });
+    assert.deepEqual(invalid.sort(), ['ADAPTER', 'BEAM_LOCKOUT_MS']);
+    assert.equal(settings.BEAM_LOCKOUT_MS, '500');
+    assert.equal(settings.ADAPTER, 'simulated');
+  });
+
+  it('ignores the rest of the environment', () => {
+    assert.deepEqual(readSettings({ PATH: '/usr/bin' }).invalid, []);
+  });
+
+  it('has defaults that pass their own rules', () => {
+    const defaults = Object.fromEntries(
+      Object.entries(FIELDS).flatMap(([name, spec]) =>
+        'default' in spec ? [[name, spec.default]] : [],
+      ),
+    );
+    assert.deepEqual(validate(defaults), {});
   });
 });
 
@@ -111,7 +159,7 @@ describe('writeConfig', () => {
   it('writes a file readConfig can read back', () => {
     const path = scratchFile();
     writeConfig({ GATE_ID: 'G1', MQTT_HOST: 'rally-server.local' }, path);
-    expect(readConfig(path)).toEqual({
+    assert.deepEqual(readConfig(path), {
       GATE_ID: 'G1',
       MQTT_HOST: 'rally-server.local',
     });
@@ -122,21 +170,22 @@ describe('writeConfig', () => {
     writeConfig({ GATE_ID: 'OLD', MQTT_PORT: '57431' }, path);
     writeConfig({ GATE_ID: 'NEW' }, path);
     const text = readFileSync(path, 'utf8');
-    expect(text).toContain('GATE_ID=NEW');
-    expect(text).not.toContain('OLD');
-    expect(text).not.toContain('MQTT_PORT');
+    assert.ok(text.includes('GATE_ID=NEW'));
+    assert.ok(!text.includes('OLD'));
+    assert.ok(!text.includes('MQTT_PORT'));
   });
 
   it('leaves no temporary file behind', () => {
     const path = scratchFile();
     writeConfig({ GATE_ID: 'G1' }, path);
-    expect(readdirSync(join(path, '..'))).toEqual(['gate.env']);
+    assert.deepEqual(readdirSync(join(path, '..')), ['gate.env']);
   });
 
   it('reports a missing file as empty config, not a crash', () => {
-    expect(
+    assert.deepEqual(
       readConfig(join(mkdtempSync(join(tmpdir(), 'gc-')), 'absent.env')),
-    ).toEqual({});
+      {},
+    );
   });
 
   it('keeps the old file and cleans up when the write cannot land', () => {
@@ -144,11 +193,12 @@ describe('writeConfig', () => {
     const directory = join(path, '..');
     writeConfig({ GATE_ID: 'GOOD' }, path);
     // A path under a non-existent directory makes the temp write fail.
-    expect(() =>
+    assert.throws(() =>
       writeConfig({ GATE_ID: 'NEW' }, join(directory, 'missing', 'gate.env')),
-    ).toThrow();
-    expect(readConfig(path)).toEqual({ GATE_ID: 'GOOD' });
-    expect(readdirSync(directory).filter((f) => f.endsWith('.tmp'))).toEqual(
+    );
+    assert.deepEqual(readConfig(path), { GATE_ID: 'GOOD' });
+    assert.deepEqual(
+      readdirSync(directory).filter((f) => f.endsWith('.tmp')),
       [],
     );
   });
@@ -185,38 +235,40 @@ function clientSideRejects(field: FieldName, value: string): boolean {
 
 describe('fieldDescriptors', () => {
   it('describes every settable field', () => {
-    expect(Object.keys(fieldDescriptors())).toEqual(Object.keys(FIELDS));
+    assert.deepEqual(Object.keys(fieldDescriptors()), Object.keys(FIELDS));
   });
 
   it('sends yes/no settings as toggles, validated as on/off', () => {
     const descriptors = fieldDescriptors();
-    expect(descriptors.BUZZER_STATUS.toggle).toBe('on');
-    expect(descriptors.FORWARD_BEAM_ONLY.toggle).toBe('off');
+    assert.equal(descriptors.BUZZER_STATUS.default, 'on');
+    assert.equal(descriptors.FORWARD_BEAM_ONLY.default, 'off');
     for (const d of Object.values(descriptors).filter((d) => d.toggle)) {
-      expect(d.oneOf).toEqual(['on', 'off']);
+      assert.deepEqual(d.oneOf, ['on', 'off']);
     }
   });
 
   it('survives JSON, which is how it reaches the browser', () => {
     const descriptors = fieldDescriptors();
-    expect(JSON.parse(JSON.stringify(descriptors)).GATE_ID.pattern).toBe(
+    assert.equal(
+      JSON.parse(JSON.stringify(descriptors)).GATE_ID.pattern,
       descriptors.GATE_ID.pattern,
     );
   });
 
   it('carries a rule for each field, so none silently validates client-side as anything', () => {
     for (const [name, spec] of Object.entries(fieldDescriptors())) {
-      expect({
-        name,
-        hasRule: !!(spec.pattern || spec.oneOf || spec.range),
-      }).toEqual({ name, hasRule: true });
+      assert.deepEqual(
+        { name, hasRule: !!(spec.pattern || spec.oneOf || spec.range) },
+        { name, hasRule: true },
+      );
     }
   });
 
-  it.each([
+  for (const [field, value, shouldPass] of [
     ['GATE_ID', 'CLUB_START_WP1', true],
     ['GATE_ID', 'CLUB START', false],
-    ['GATE_ID', 'a'.repeat(65), false],
+    ['GATE_ID', 'club_start_wp1', false],
+    ['GATE_ID', 'A'.repeat(33), false],
     ['MQTT_HOST', 'rally-server.local', true],
     ['MQTT_HOST', '192.168.1.10', true],
     ['MQTT_HOST', 'fe80::1', true],
@@ -237,19 +289,18 @@ describe('fieldDescriptors', () => {
     ['SIMULATE_INTERVAL_MS', '1', false],
     ['HEARTBEAT_INTERVAL_MS', '15000', true],
     ['HEARTBEAT_INTERVAL_MS', '60000', false],
-  ] as [FieldName, string, boolean][])(
-    'agrees between server and client for %s = %s',
-    (field, value, shouldPass) => {
+  ] as [FieldName, string, boolean][]) {
+    it(`agrees between server and client for ${field} = ${value}`, () => {
       const serverAccepts = validate({ [field]: value })[field] === undefined;
-      expect({
-        server: serverAccepts,
-        client: !clientSideRejects(field, value),
-      }).toEqual({ server: shouldPass, client: shouldPass });
-    },
-  );
+      assert.deepEqual(
+        { server: serverAccepts, client: !clientSideRejects(field, value) },
+        { server: shouldPass, client: shouldPass },
+      );
+    });
+  }
 
   it("reports a broken rule as 'invalid', which the page words as the field's message", () => {
-    expect(validate({ MQTT_PORT: '70000' }).MQTT_PORT).toBe('invalid');
+    assert.equal(validate({ MQTT_PORT: '70000' }).MQTT_PORT, 'invalid');
   });
 });
 
@@ -263,7 +314,7 @@ describe('field groups', () => {
     const stranded = Object.entries(fieldDescriptors())
       .filter(([, descriptor]) => !RENDERED_GROUPS.includes(descriptor.group))
       .map(([name]) => name);
-    expect(stranded).toEqual([]);
+    assert.deepEqual(stranded, []);
   });
 
   it('ties decoder settings only to decoders that exist', () => {
@@ -274,26 +325,25 @@ describe('field groups', () => {
         d.adapters?.some((a) => !descriptors.ADAPTER.oneOf!.includes(a)),
       )
       .map(([name]) => name);
-    expect(orphaned).toEqual([]);
-    expect(descriptors.BEAM_GPIO.adapters).toContain('beam');
-    expect(descriptors.TRANSPONDERS.adapters).toEqual(['simulated']);
+    assert.deepEqual(orphaned, []);
+    assert.ok(descriptors.BEAM_GPIO.adapters?.includes('beam'));
+    assert.deepEqual(descriptors.TRANSPONDERS.adapters, ['simulated']);
   });
 
   it('keeps the simulator settings with the decoder', () => {
     const descriptors = fieldDescriptors();
-    expect(descriptors.ADAPTER.group).toBe('decoder');
-    expect(descriptors.TRANSPONDERS.group).toBe('decoder');
-    expect(descriptors.SIMULATE_INTERVAL_MS.group).toBe('decoder');
-    expect(descriptors.GATE_ID.group).toBe('general');
+    assert.equal(descriptors.ADAPTER.group, 'decoder');
+    assert.equal(descriptors.TRANSPONDERS.group, 'decoder');
+    assert.equal(descriptors.SIMULATE_INTERVAL_MS.group, 'decoder');
+    assert.equal(descriptors.GATE_ID.group, 'general');
   });
 });
 
 // The server sends rules only, so a new field without its words on the page
 // would show its raw key as label.
 describe('field texts', () => {
-  it.each(['en', 'de'])(
-    'has a label, hint and message for every field in %s',
-    (locale) => {
+  for (const locale of ['en', 'de']) {
+    it(`has a label, hint and message for every field in ${locale}`, () => {
       const messages = JSON.parse(
         readFileSync(
           join(__dirname, '..', 'web', 'src', 'locales', `${locale}.json`),
@@ -305,7 +355,7 @@ describe('field texts', () => {
           .filter((part) => typeof messages.fields?.[name]?.[part] !== 'string')
           .map((part) => `${name}.${part}`),
       );
-      expect(missing).toEqual([]);
-    },
-  );
+      assert.deepEqual(missing, []);
+    });
+  }
 });

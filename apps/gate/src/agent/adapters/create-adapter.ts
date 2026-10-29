@@ -5,8 +5,7 @@ import { DecoderAdapter } from './decoder-adapter';
 import { OpenStintAdapter } from './openstint.adapter';
 import { SimulatedAdapter } from './simulated.adapter';
 
-/** Null for an unknown ADAPTER — see main.ts for why that exits. */
-export function createAdapter(): DecoderAdapter | null {
+export function createAdapter(): DecoderAdapter {
   switch (config.adapter) {
     case 'simulated':
       return new SimulatedAdapter(config.simulated);
@@ -21,7 +20,5 @@ export function createAdapter(): DecoderAdapter | null {
         windowMs: config.pairWindowMs,
         forwardBeamOnly: config.forwardBeamOnly,
       });
-    default:
-      return null;
   }
 }

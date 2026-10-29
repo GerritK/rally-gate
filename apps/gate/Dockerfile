@@ -10,15 +10,17 @@ WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/ui/package.json packages/ui/
-COPY apps/gate-agent/package.json apps/gate-agent/
+COPY apps/gate/package.json apps/gate/
 COPY apps/rally-server/package.json apps/rally-server/
 COPY apps/web/package.json apps/web/
 RUN npm ci
 
 COPY packages/shared packages/shared
-COPY apps/gate-agent apps/gate-agent
+COPY apps/gate apps/gate
 RUN npm run build --workspace=@rally-gate/shared
-RUN npm run build --workspace=@rally-gate/gate-agent
+# The Node code only: the settings page needs packages/ui and Vite, and a
+# simulated agent has no use for it.
+RUN npx --workspace=@rally-gate/gate tsc -p tsconfig.json
 
 RUN npm prune --omit=dev
 
@@ -28,6 +30,6 @@ ENV NODE_ENV=production
 
 COPY --from=build /repo/node_modules node_modules
 COPY --from=build /repo/packages/shared packages/shared
-COPY --from=build /repo/apps/gate-agent apps/gate-agent
+COPY --from=build /repo/apps/gate apps/gate
 
-CMD ["node", "apps/gate-agent/dist/main.js"]
+CMD ["node", "apps/gate/dist/agent/main.js"]

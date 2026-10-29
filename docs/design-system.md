@@ -1,6 +1,6 @@
 # Design System
 
-Every Rally Gate web interface (`apps/web`, `apps/gate-config`) uses the
+Every Rally Gate web interface (`apps/web`, gate-config in `apps/gate`) uses the
 Vuetify setup in `packages/ui`: `createRallyVuetify()` (`vuetify.ts`), the
 `rallyGateDark` theme (`theme.ts`, colour values only), self-hosted fonts
 (`fonts.ts`) and shared CSS (`utilities.css`). Change things there, never
@@ -299,7 +299,7 @@ status on the right.
 `packages/ui/src/logo.svg`, exported as `logoUrl`, sits left of the title in
 both apps' app bar. It isn't an action, so its orange doesn't compete with a
 page's main button. The favicons (`apps/web/public/favicon.svg`,
-`apps/gate-config/web/public/favicon.svg`) are the same paths on a square
+`apps/gate/web/public/favicon.svg`) are the same paths on a square
 `#0B0D10` tile; change all three together. Printed PDFs carry it small beside
 "Rally Gate" at the foot, in two greys (`LOGO_GREYS` in
 `apps/web/src/pdf.ts`), drawn from the same file.

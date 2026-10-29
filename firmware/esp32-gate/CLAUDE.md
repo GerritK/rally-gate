@@ -7,4 +7,4 @@ pio test -e native        # core tests on the host (lib/gate_core)
 pio run -e xiao_esp32s3   # firmware build
 ```
 
-It speaks the same MQTT topics and `DetectionEvent`/heartbeat payloads as `apps/gate-agent` (`packages/shared`), so a change to those shapes has to land here too — nothing type-checks across the boundary.
+It speaks the same MQTT topics and `DetectionEvent`/heartbeat payloads as gate-agent in `apps/gate` (`packages/shared`), so a change to those shapes has to land here too — nothing type-checks across the boundary.

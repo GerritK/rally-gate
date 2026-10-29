@@ -1,9 +1,6 @@
 import { readFileSync, statSync } from 'fs';
+import { DECODER_STATUS_FILE as STATUS_FILE } from '../paths';
 import type { DecoderStatus } from './api-types';
-
-/** Written by gate-agent's OpenStint adapter into its systemd RuntimeDirectory. */
-const STATUS_FILE =
-  process.env.OPENSTINT_STATUS_FILE ?? '/run/rally-gate-agent/openstint-status';
 
 /**
  * OpenStint's `S <timestamp> <noise_power> <dc_offset> <frames_received>

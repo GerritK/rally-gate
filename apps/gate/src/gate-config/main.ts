@@ -3,14 +3,8 @@ import express from 'express';
 import { existsSync } from 'fs';
 import { createServer } from 'http';
 import { join } from 'path';
-import {
-  fieldDescriptors,
-  GateConfig,
-  isFieldName,
-  readConfig,
-  validate,
-  writeConfig,
-} from './config-file';
+import { fieldDescriptors, GateConfig, isFieldName, validate } from '../fields';
+import { readConfig, writeConfig } from './config-file';
 import { readDecoderStatus } from './decoder-status';
 import { parseDeviceStatus, parseWifiList, validateWifi } from './network';
 import {
@@ -40,8 +34,11 @@ app.get('/api/fields', (_req, res) => {
   res.json(fieldDescriptors());
 });
 
+// With the file's own errors: a value typed in by hand that breaks its rule
+// keeps the agent stopped, and the page marks that field.
 app.get('/api/config', (_req, res) => {
-  res.json(readConfig());
+  const values = readConfig();
+  res.json({ values, errors: validate(values) });
 });
 
 app.put('/api/config', async (req, res) => {
@@ -155,7 +152,7 @@ app.post('/api/power-off', async (_req, res) => {
 // Serves the built Vue app when it exists. Absent in the dev loop, where Vite
 // serves it instead and proxies /api here — same arrangement as rally-server
 // and apps/web (see the static-serving note in CLAUDE.md).
-const webDist = join(__dirname, '..', 'web', 'dist');
+const webDist = join(__dirname, '..', '..', 'web', 'dist');
 if (existsSync(webDist)) {
   app.use(express.static(webDist));
   app.get(/.*/, (_req, res) => res.sendFile(join(webDist, 'index.html')));

@@ -23,7 +23,7 @@ import type {
   FieldError,
   WifiError,
   WifiNetwork,
-} from '../../src/api-types';
+} from '../../src/gate-config/api-types';
 
 interface NetworkState {
   available: boolean;
@@ -117,7 +117,7 @@ watchEffect(() => {
     : t('gateConfig.title');
 });
 
-// Which card a setting belongs in is decided in config-file.ts, not here, so a
+// Which card a setting belongs in is decided in src/fields.ts, not here, so a
 // new field cannot end up in the wrong one — or in none at all, which is what
 // a hand-maintained list in this component would eventually do.
 // A decoder's own settings show only while it is selected. Hidden ones keep
@@ -170,7 +170,7 @@ type Rule = (value: unknown) => true | string;
 /**
  * Immediate feedback only. Every rule here is derived from the descriptor the
  * server sent, and the server re-checks all of it on save — see `validate` in
- * config-file.ts. An empty value passes: absent means "leave unset", and which
+ * src/fields.ts. An empty value passes: absent means "leave unset", and which
  * fields are required is not a grammar question.
  */
 function rulesFor(name: string, spec: FieldSpec): Rule[] {
@@ -216,13 +216,16 @@ function clearServerError(name: string) {
 
 async function load() {
   fields.value = await (await fetch('/api/fields')).json();
-  const config = await (await fetch('/api/config')).json();
+  const { values: config, errors: fileErrors } = await (
+    await fetch('/api/config')
+  ).json();
   values.value = Object.fromEntries(
     Object.entries(fields.value).map(([key, spec]) => [
       key,
-      config[key] ?? spec.toggle ?? '',
+      config[key] ?? (spec.toggle ? spec.default : '') ?? '',
     ]),
   );
+  errors.value = fileErrors;
   originalGateId.value = config.GATE_ID ?? '';
 }
 
@@ -649,6 +652,8 @@ onUnmounted(() => {
                   v-model="values[name]"
                   :label="fieldText(name, 'label')"
                   :hint="fieldText(name, 'hint')"
+                  :placeholder="spec.default"
+                  :persistent-placeholder="!!spec.default"
                   :rules="rulesFor(name, spec)"
                   :error-messages="serverError(name)"
                   persistent-hint
@@ -690,6 +695,8 @@ onUnmounted(() => {
                   v-else-if="spec.oneOf"
                   v-model="values[name]"
                   :items="spec.oneOf"
+                  :placeholder="spec.default"
+                  :persistent-placeholder="!!spec.default"
                   :label="fieldText(name, 'label')"
                   :hint="fieldText(name, 'hint')"
                   :rules="rulesFor(name, spec)"
@@ -703,6 +710,8 @@ onUnmounted(() => {
                   v-model="values[name]"
                   :label="fieldText(name, 'label')"
                   :hint="fieldText(name, 'hint')"
+                  :placeholder="spec.default"
+                  :persistent-placeholder="!!spec.default"
                   :rules="rulesFor(name, spec)"
                   :error-messages="serverError(name)"
                   persistent-hint

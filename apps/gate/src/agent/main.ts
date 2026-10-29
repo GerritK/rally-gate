@@ -1,19 +1,20 @@
 import { createAdapter } from './adapters/create-adapter';
 import { Buzzer } from './buzzer';
-import { config } from './config';
-import { EXIT_DECODER_FAILED } from './exit-codes';
+import { config, invalidSettings } from './config';
+import { EXIT_CONFIG_INVALID, EXIT_DECODER_FAILED } from './exit-codes';
 import { log } from './log';
 import { ClockState, StatusSignals } from './status-signals';
 import { readChrony, refreshTimeSource } from './time-sync';
 import { Uplink } from './uplink';
 
-const adapter = createAdapter();
-if (!adapter) {
-  // Exit rather than fall back to the simulator: a typo would otherwise run a
-  // gate at an event that times nothing real.
-  log.error(`unknown ADAPTER "${config.adapter}"`);
-  process.exit(1);
+if (invalidSettings.length > 0) {
+  // Exit rather than run on defaults: a typo in ADAPTER would otherwise run
+  // the simulator at an event, timing nothing real.
+  log.error(`invalid setting(s) in gate.env: ${invalidSettings.join(', ')}`);
+  process.exit(EXIT_CONFIG_INVALID);
 }
+
+const adapter = createAdapter();
 
 const buzzer = config.buzzerLine
   ? new Buzzer(config.buzzerLine, config.buzzerStatus)
@@ -68,7 +69,7 @@ void Promise.resolve(
 async function shutdown() {
   clearInterval(heartbeatTimer);
   clearInterval(statusTimer);
-  await adapter?.stop();
+  await adapter.stop();
   uplink.end();
   process.exit(0);
 }

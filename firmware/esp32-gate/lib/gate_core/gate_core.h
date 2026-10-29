@@ -199,7 +199,7 @@ inline TapTime resolveTapTime(const Tap &tap, uint32_t bootId, bool synced,
 enum class Status { None, ConnectionLost, ClockUnsynced, Ready };
 
 // Which status sound a marshal should hear next, polled with the current state.
-// The same rules as StatusSignals in apps/gate-agent/src/status-signals.ts;
+// The same rules as StatusSignals in apps/gate/src/agent/status-signals.ts;
 // `ready` means connected, reader found and clock synced.
 struct StatusTracker {
   static const uint32_t LOST_AFTER_MS = 15000;

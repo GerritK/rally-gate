@@ -13,8 +13,10 @@ export interface FieldDescriptor {
   /** Shown only while ADAPTER is one of these. */
   adapters?: string[];
   oneOf?: string[];
-  /** A yes/no setting, rendered as a switch; this is its position while unset. */
-  toggle?: 'on' | 'off';
+  /** A yes/no setting, rendered as a switch. */
+  toggle?: boolean;
+  /** What the agent runs with while the key is unset. */
+  default?: string;
   pattern?: string;
   range?: [number, number];
 }

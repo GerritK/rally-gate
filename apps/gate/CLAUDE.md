@@ -1,0 +1,18 @@
+# apps/gate
+
+Everything that runs on a Pi gate, as one package with two systemd units:
+
+- **`src/agent/`** (`rally-gate-agent`): reads a decoder, publishes detections and heartbeats over MQTT. It knows its `GATE_ID` and nothing else (root `CLAUDE.md`, "Gates are dumb"). `beep-cli.ts` is a third entry point (`rally-gate-beep`) for the hotspot watchdog and power-off.
+- **`src/gate-config/`** + **`web/`** (`rally-gate-config`): the on-gate config service and its page (port 57439, captive-portal redirect on 80). Design: `docs/gate-config-ui.md` — read its "Wi-Fi goes through a wrapper" section before touching anything that shells out to `nmcli`.
+- **`src/fields.ts`** and **`src/paths.ts`** are the contract between the two: every setting with its rule and default, and the files both sides touch.
+
+Two units, not one process, on purpose: the agent restarts forever, so a config page hosted inside it would die with the thing it exists to repair.
+
+- Tests run on **`node:test`**: `npm test -w apps/gate`, for the plain modules only (no Vue).
+- **`FIELDS` in `src/fields.ts` is the security boundary.** `gate.env` becomes the agent's environment and gate-config has no authentication, so an arbitrary key would allow `NODE_OPTIONS`/`LD_PRELOAD`. Never widen it to "whatever the form posted". The page derives its input rules and placeholders from these specs (`/api/fields`) rather than restating them. **No text on the server:** a field's label, hint and message live in `web/src/locales/*.json` under `fields.<NAME>` (`fields.spec.ts` fails if one is missing), and every refusal goes out as a code (`FieldError`, `WifiError` in `src/gate-config/api-types.ts`) the page words.
+- **The agent reads its settings through `readSettings` (`src/agent/config.ts`), never `process.env` directly.** A field that breaks its rule (hand-edited `gate.env`) makes it exit with `EXIT_CONFIG_INVALID`; the unit's `RestartPreventExitStatus=` keeps it stopped, and the page marks the field. A new setting is a `FIELDS` entry with a default, or it can't be set on a gate; `deploy/install-gate-pi.sh` writes `GATE_ID`/`MQTT_HOST`/`MQTT_PORT`/`HOTSPOT_PASSWORD`, so renaming one means changing it there too.
+- **`DecoderAdapter`** (`src/agent/adapters/decoder-adapter.ts`, `start()`/`stop()`) isolates hardware. `SimulatedAdapter`, `BeamAdapter` (light barrier via `gpiomon`), `OpenStintAdapter` (transponder loop, spawns `openstint_rtlsdr` and reads its stdout) and `BeamOpenStintAdapter` (both, paired by `PassingMatcher`) exist, picked by `ADAPTER` in `create-adapter.ts`. Everything past this app only sees a `DetectionEvent`, so new hardware never touches `rally-server`. A beam detection has no `transponderId`; the server holds it for a marshal. Hardware notes: `docs/decoder-adapters.md`.
+- **`clientId`/`clean: false`/`queueQoSZero: false` in `src/agent/uplink.ts` are load-bearing**: detections are QoS 1 over a persistent session so a reconnect replays them; heartbeats are QoS 0 and never queued, since a stale `sentAt` would be measured as clock offset. The comments there explain each.
+- **Every OS call of gate-config lives in `src/gate-config/system.ts`** (systemd, chrony, journalctl, nmcli) and reports failure instead of throwing. Off a Pi the service still runs and every status row reads as unavailable. Changes there are only verifiable on real hardware.
+- Dev: point `GATE_CONFIG_FILE` and `CHRONY_SOURCE_DIR` at a scratch directory so nothing needs `/etc`. Run with `npm run dev:gate-agent`, `npm run dev:gate-config` and `npm run dev:gate-config-web` from the root.
+- `npm run build` typechecks the page with vue-tsc; `build:deploy` (the installer's) skips that, since it runs a Pi out of memory.

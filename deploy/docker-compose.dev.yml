@@ -7,7 +7,7 @@ services:
   gate-agent-start:
     build:
       context: ..
-      dockerfile: apps/gate-agent/Dockerfile
+      dockerfile: apps/gate/Dockerfile
     depends_on:
       - rally-server
     # rally-server runs on the host network, so its service name no longer
@@ -26,7 +26,7 @@ services:
   gate-agent-finish:
     build:
       context: ..
-      dockerfile: apps/gate-agent/Dockerfile
+      dockerfile: apps/gate/Dockerfile
     depends_on:
       - rally-server
     extra_hosts:

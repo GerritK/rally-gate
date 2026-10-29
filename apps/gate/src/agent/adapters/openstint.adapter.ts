@@ -1,6 +1,6 @@
 import { ChildProcess, spawn } from 'child_process';
 import { writeFileSync } from 'fs';
-import { join } from 'path';
+import { DECODER_STATUS_FILE } from '../../paths';
 import { createInterface } from 'readline';
 import { EXIT_DECODER_FAILED } from '../exit-codes';
 import { DecoderAdapter, DetectionCallback } from './decoder-adapter';
@@ -104,17 +104,13 @@ export class OpenStintAdapter implements DecoderAdapter {
 
 /**
  * The latest status line (`S`, once a second), for gate-config's status page
- * to read. A file in systemd's RuntimeDirectory= (tmpfs) rather than the
- * journal, which it would bury; unset off a Pi, where nothing reads it.
+ * to read. A file on tmpfs rather than the journal, which would bury it; only
+ * under systemd, which is what gives the agent its runtime directory.
  */
-const STATUS_FILE =
-  process.env.RUNTIME_DIRECTORY &&
-  join(process.env.RUNTIME_DIRECTORY, 'openstint-status');
-
 function writeStatus(line: string): void {
-  if (!STATUS_FILE) return;
+  if (!process.env.RUNTIME_DIRECTORY) return;
   try {
-    writeFileSync(STATUS_FILE, line);
+    writeFileSync(DECODER_STATUS_FILE, line);
   } catch {
     // A status page losing its numbers must never take timing down with it.
   }

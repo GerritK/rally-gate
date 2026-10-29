@@ -22,7 +22,7 @@ test('no two signals sound alike', () => {
 // The firmware cannot import shared, so it carries a copy; this is what keeps it honest.
 test('the ESP32 firmware has the same signals', () => {
   const header = readFileSync(
-    join(__dirname, '../../../firmware/esp32-gate/src/buzzer_signals.h'),
+    join(__dirname, '../../../../firmware/esp32-gate/src/buzzer_signals.h'),
     'utf8',
   );
   const copy = Object.fromEntries(

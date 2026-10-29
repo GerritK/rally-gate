@@ -1,26 +1,36 @@
 # Gate Config UI
 
-`apps/gate-config`: a page on each gate Pi, at
+gate-config (`apps/gate`, `src/gate-config/` and `web/`): a page on each gate Pi, at
 `http://<gate-hostname>.local:57439`, so a marshal can check and reconfigure a
 gate without SSH or re-running the installer — or from the link next to an
 online gate on the dashboard's Hardware page.
 
-**Separate from `gate-agent` on purpose.** gate-agent runs under
-`Restart=always`, so a config that makes it exit becomes a crash loop — and a UI
-living inside it would die with the thing it exists to repair.
+**A separate process from `gate-agent` on purpose**, though the same package.
+gate-agent runs under `Restart=always`, so a config that makes it exit becomes
+a crash loop — and a UI living inside it would die with the thing it exists to
+repair. The ESP32 gate has no second process and accepts the opposite; see
+`esp32-gate.md`.
 
 ## Configuration
 
 The systemd unit is written once by the installer and reads
-`EnvironmentFile=/etc/rally-gate/gate.env`; gate-config owns that file. gate-agent
-needed no change, since it already reads exactly these env vars. The file is
-written atomically (temp + rename), because gates lose power for real.
+`EnvironmentFile=/etc/rally-gate/gate.env`; gate-config owns that file. The file
+is written atomically (temp + rename), because gates lose power for real.
 
-Settable keys are a **whitelist** (`FIELDS` in `config-file.ts`): the file is
+Settable keys are a **whitelist** (`FIELDS` in `src/fields.ts`): the file is
 gate-agent's environment, and an arbitrary key would let anyone on the network
 set `LD_PRELOAD`. Each field's `group` decides which card it appears in, and
-`config-file.spec.ts` fails if a group has no card — such a field would be
-unreachable with no error.
+`fields.spec.ts` fails if a group has no card — such a field would be
+unreachable with no error. Each field's `default` is what the agent runs with
+while it is unset, shown as the field's placeholder.
+
+**Both sides check the file.** gate-agent reads its settings through the same
+`FIELDS` (`readSettings`), because `gate.env` can also be edited over SSH. A
+value that breaks its rule stops the agent with `EXIT_CONFIG_INVALID` (3), which
+`RestartPreventExitStatus=` keeps from looping; `GET /api/config` returns the
+file's own errors with its values, so the page marks that field, and saving
+starts the agent again. Running on a default instead would time a rally with a
+setting nobody chose.
 
 - **`GATE_ID` is an identity.** The server keys gates, assignments and
   detections on it, so changing it mid-event orphans the old rows. The page warns
@@ -134,8 +144,8 @@ password draws the boundary around the gate's own AP, and is readable through
 Vue + Vuetify through `packages/ui`, like `apps/web`. Built on the gate by the
 installer; `vue-tsc` is skipped there for speed.
 
-Everything touching the OS is in `src/system.ts`, which reports failures instead
+Everything touching the OS is in `src/gate-config/system.ts`, which reports failures instead
 of throwing — off a Pi every status row reads unavailable and the page still
-works. `config-file.ts` and `network.ts` are unit-tested, including injection
+works. `fields.ts`, `config-file.ts` and `network.ts` are unit-tested, including injection
 cases; `rally-gate-net` was checked against a stub `nmcli` on `PATH`. On a real
 Pi everything above is verified except the captive portal redirect.

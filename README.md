@@ -188,8 +188,7 @@ npm workspaces monorepo, TypeScript throughout:
 |---|---|
 | `apps/rally-server` | NestJS: REST API, embedded MQTT broker, time server, mDNS, SQLite or PostgreSQL |
 | `apps/web` | Vue 3 + Vuetify dashboard |
-| `apps/gate-agent` | runs on a gate; turns sensor readings into detections over MQTT |
-| `apps/gate-config` | runs on a gate; its config page |
+| `apps/gate` | runs on a gate: gate-agent turns sensor readings into detections over MQTT, gate-config is its settings page |
 | `packages/shared` | types shared by all apps |
 | `packages/ui` | the shared Vuetify theme and styles |
 
