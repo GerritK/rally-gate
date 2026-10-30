@@ -18,6 +18,7 @@ import {
   fetchGatePairing,
   fetchGates,
   openGatePairing,
+  gateConfigureUrl,
   powerOffAllGates,
   rejectWaitingGate,
   upsertGate,
@@ -32,7 +33,6 @@ import { fetchStages, type Stage } from '../api/stages';
 import {
   ApiErrorCode,
   DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS,
-  gateConfigUrl,
   StageStatus,
   type GatePairingState,
   type GatePowerOffResult,
@@ -422,7 +422,7 @@ onUnmounted(() => {
                     "
                     :href="
                       gate.address && isOnline(gate, serverNow)
-                        ? gateConfigUrl(gate.address)
+                        ? gateConfigureUrl(gate.id)
                         : undefined
                     "
                     target="_blank"

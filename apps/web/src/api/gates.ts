@@ -1,5 +1,11 @@
 import type { GatePairingState, GatePowerOffResult } from '@rally-gate/shared';
-import { apiFetch, deleteRequest, postRequest, putJson } from './client';
+import {
+  API_BASE,
+  apiFetch,
+  deleteRequest,
+  postRequest,
+  putJson,
+} from './client';
 
 export interface Gate {
   id: string;
@@ -58,4 +64,9 @@ export function acceptWaitingGate(gateId: string): Promise<GatePairingState> {
 
 export function rejectWaitingGate(gateId: string): Promise<void> {
   return deleteRequest(`/gate-pairing/${gateId}`);
+}
+
+/** A link, not a fetch: the server answers with a redirect to the gate's page and a pass (`docs/auth.md` "gate-config"). */
+export function gateConfigureUrl(gateId: string): string {
+  return `${API_BASE}/gates/${encodeURIComponent(gateId)}/configure`;
 }

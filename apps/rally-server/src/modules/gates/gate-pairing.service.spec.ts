@@ -81,6 +81,14 @@ describe('GatePairingService', () => {
     ).toBe(GateLogin.ACCEPTED);
   });
 
+  it('signs the config pass the gates check, for the shared test vector', () => {
+    const service = paired();
+    expect(service.configPass('G1', NOW)).toBe(
+      '1800000060000.cec4c7c97d5c4899e5ebc6b33e679d2bbb5e6a4eb34632478ad54024ecedd02b',
+    );
+    expect(service.configPass('UNKNOWN', NOW)).toBeNull();
+  });
+
   it('keeps the keys across a restart', () => {
     paired();
     expect(make().login('G1', token(KEY, 'G1', NOW + 60_000), null, NOW)).toBe(

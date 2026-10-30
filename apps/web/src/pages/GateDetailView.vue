@@ -7,7 +7,12 @@ import {
   fetchGateAssignments,
   type GateAssignment,
 } from '../api/gate-assignments';
-import { fetchGate, upsertGate, type Gate } from '../api/gates';
+import {
+  fetchGate,
+  gateConfigureUrl,
+  upsertGate,
+  type Gate,
+} from '../api/gates';
 import { closeLiveStream, openLiveStream, upsert } from '../api/live';
 import { fetchClockCorrectionThresholdMs } from '../api/settings';
 import { fetchStages, type Stage } from '../api/stages';
@@ -26,10 +31,7 @@ import {
   STAGE_STATUS_DISPLAY,
   entryName,
 } from '../format';
-import {
-  DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS,
-  gateConfigUrl,
-} from '@rally-gate/shared';
+import { DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS } from '@rally-gate/shared';
 import { useRouter } from 'vue-router';
 
 const props = defineProps<{ gateId: string }>();
@@ -239,7 +241,7 @@ onUnmounted(() => {
                 <span class="rg-timing">{{ gate.address }}</span>
                 <v-btn
                   v-if="online && can('setup')"
-                  :href="gateConfigUrl(gate.address)"
+                  :href="gateConfigureUrl(gate.id)"
                   target="_blank"
                   size="small"
                   variant="text"

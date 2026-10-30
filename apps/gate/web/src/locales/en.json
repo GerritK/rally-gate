@@ -38,6 +38,7 @@
     "wifiPassword": "Wi-Fi password",
     "wifiPasswordHint": "Stored by NetworkManager, not in the gate's config file.",
     "onHotspot": "You are connected to this gate's own hotspot. Joining a network takes the hotspot down, so this page will go unreachable — that is expected. If the gate cannot join, it raises the hotspot again within a minute.",
+    "locked": "Read only. To change this gate, open it from the dashboard's Hardware page (Open gate config), or join the gate's own hotspot. For 3 minutes after switching on, until it reaches the server, it is open as well.",
     "resetWifi": "Reset Wi-Fi",
     "rescan": "Scan",
     "join": "Join",

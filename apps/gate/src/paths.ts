@@ -5,15 +5,22 @@ export const CONFIG_PATH =
   process.env.GATE_CONFIG_FILE ?? '/etc/rally-gate/gate.env';
 
 /**
- * OpenStint's latest status line, written by the agent into its systemd
- * `RuntimeDirectory=` and read by gate-config. Unset off a Pi, where systemd
- * gives the agent no runtime directory and nothing reads it.
+ * The agent's systemd `RuntimeDirectory=`, which gate-config reads. Off a Pi
+ * systemd gives the agent none, so the agent writes nothing there.
  */
+const AGENT_RUNTIME_DIR =
+  process.env.RUNTIME_DIRECTORY ?? '/run/rally-gate-agent';
+
+/** OpenStint's latest status line. */
 export const DECODER_STATUS_FILE =
   process.env.OPENSTINT_STATUS_FILE ??
-  (process.env.RUNTIME_DIRECTORY
-    ? join(process.env.RUNTIME_DIRECTORY, 'openstint-status')
-    : '/run/rally-gate-agent/openstint-status');
+  join(AGENT_RUNTIME_DIR, 'openstint-status');
+
+/**
+ * Created once the broker accepted the agent's login; it ends gate-config's
+ * power-on window (`docs/auth.md` "gate-config").
+ */
+export const SERVER_REACHED_FILE = join(AGENT_RUNTIME_DIR, 'server-reached');
 
 /**
  * The gate's own key, created by the agent on its first start

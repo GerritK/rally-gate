@@ -8,9 +8,11 @@ import {
   Post,
   Put,
   Query,
+  Redirect,
 } from '@nestjs/common';
 import { ApiErrorCode, GATE_ID_PATTERN } from '@rally-gate/shared';
 import { apiError } from '../../common/api-error';
+import { Private } from '../auth/auth.guard';
 import { UpsertGateDto } from './dto';
 import { GatesService } from './gates.service';
 
@@ -27,6 +29,14 @@ export class GatesController {
   @Post('power-off')
   powerOffAll() {
     return this.gatesService.powerOffAll();
+  }
+
+  /** A link, so the browser opens the gate in a new tab without a popup blocker in the way. */
+  @Get(':id/configure')
+  @Private()
+  @Redirect()
+  async configure(@Param('id') id: string) {
+    return { url: await this.gatesService.configureUrl(id) };
   }
 
   @Get(':id')

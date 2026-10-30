@@ -54,6 +54,19 @@ export function gateConfigUrl(address: string): string {
 }
 
 /**
+ * The pass that opens a gate's config page on the rally Wi-Fi
+ * (`docs/auth.md` "gate-config"): `<expiryMs>.<hex HMAC-SHA256(key, this)>`,
+ * as `?t=`. `config.` keeps it from passing as a broker token, which signs
+ * `gateId.expiry`. The ESP32 firmware builds the same string.
+ */
+export function gateConfigPassMessage(gateId: string, expiry: number): string {
+  return `config.${gateId}.${expiry}`;
+}
+
+/** The link sits in the browser history, so it is short; the session it opens lasts an hour. */
+export const GATE_CONFIG_PASS_LIFETIME_MS = 60_000;
+
+/**
  * One gate's answer to "shut down". `unreachable`: no reply from its
  * gate-config; `refused`: it replied but the shutdown didn't start, with the
  * command's own output as `detail`.

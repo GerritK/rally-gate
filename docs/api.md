@@ -43,7 +43,8 @@ the public page reads: `/auth/session`, `/version`, `/time`, GET
 | `/time` | GET | `{ now }`, the server clock; the dashboard shows it instead of the device's, since gates sync to the server |
 | `/gates` | GET, `/:id` GET/PUT/DELETE | hardware identity only (PUT sets the name). Created by a paired gate's first heartbeat (`auth.md` "Gates") or by hand |
 | `/gate-pairing` | GET, POST, `/:gateId` POST/DELETE | `GatePairingState`: `{ open, closesAt, waiting }`, `closesAt` null while no gate is paired yet. POST opens pairing for 10 minutes; `/:gateId` POST accepts a waiting gate, DELETE rejects it for the rest of the window, 404 `gateNotWaiting`. Organiser only for changes |
-| `/gates/power-off` | POST | shuts down every online gate through its gate-config; one `{ gateId, ok, error?, detail? }` per gate (`unreachable`, or `refused` with the command output). 409 while a stage is active |
+| `/gates/power-off` | POST | shuts down every online gate through its gate-config, with a pass per gate (`auth.md` "gate-config"); one `{ gateId, ok, error?, detail? }` per gate (`unreachable`, or `refused` with the command output). 409 while a stage is active |
+| `/gates/:id/configure` | GET | organiser only: 302 to the gate's config page with a pass, `http://<address>:57439/?t=<pass>`. A link, not a fetch. 404 `gateNotConfigurable` without an address or key |
 | `/gate-assignments` | GET, POST, `/:id` DELETE | the (gate, stage, role, splitIndex) plan. `active` is not settable — activation is per stage |
 | `/entries` | GET, POST, `/:id` GET/PATCH | `startNumber` is unique, POST/PATCH 409 on a clash. Classes are written as `classIds` (replaces the list, 400 on an unknown id) and read back as `classes` |
 | `/entries/:id/changes` | GET | `ChangeView[]`, newest first: each hand-made change to the entry's results with the value before and after and the device (`auth.md`) |
@@ -100,4 +101,6 @@ only: passings, transponders and gates are internal.
 
 A gate's own configuration is not here: gate-config (`apps/gate`) serves it on the gate
 itself, port 57439 (`/api/config`, `/api/status`, `/api/decoder`, `/api/network`,
-`/api/network/reset`) — see `gate-config-ui.md`.
+`/api/network/reset`, `/api/power-off`) — see `gate-config-ui.md`. On the rally Wi-Fi every
+change there needs a session opened with `?t=<pass>`, else 403 `{ error: "locked" }`
+(`auth.md` "gate-config").

@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import {
@@ -16,6 +21,7 @@ import { Repository } from 'typeorm';
 import { apiError } from '../../common/api-error';
 import { SettingsService } from '../settings/settings.service';
 import { GateAssignmentsService } from './gate-assignments.service';
+import { GatePairingService } from './gate-pairing.service';
 import { Gate } from './gate.entity';
 
 /**
@@ -61,9 +67,11 @@ export function measureClockOffsetMs(
 async function powerOffGate(
   gateId: string,
   address: string,
+  pass: string | null,
 ): Promise<GatePowerOffResult> {
+  const query = pass ? `?t=${pass}` : '';
   try {
-    const res = await fetch(`${gateConfigUrl(address)}api/power-off`, {
+    const res = await fetch(`${gateConfigUrl(address)}api/power-off${query}`, {
       method: 'POST',
       signal: AbortSignal.timeout(5000),
     });
@@ -95,6 +103,7 @@ export class GatesService {
     private readonly settingsService: SettingsService,
     private readonly emitter: EventEmitter2,
     private readonly gateAssignmentsService: GateAssignmentsService,
+    private readonly pairing: GatePairingService,
   ) {}
 
   findAll(): Promise<Gate[]> {
@@ -143,7 +152,26 @@ export class GatesService {
         g.lastHeartbeatAt &&
         now - g.lastHeartbeatAt.getTime() < HEARTBEAT_ONLINE_THRESHOLD_MS,
     );
-    return Promise.all(online.map((g) => powerOffGate(g.id, g.address!)));
+    return Promise.all(
+      online.map((g) =>
+        powerOffGate(g.id, g.address!, this.pairing.configPass(g.id, now)),
+      ),
+    );
+  }
+
+  /** "Configure" on Hardware: the gate's config page with a pass (`docs/auth.md` "gate-config"). */
+  async configureUrl(id: string, now = Date.now()): Promise<string> {
+    const address = (await this.findOne(id))?.address;
+    const pass = this.pairing.configPass(id, now);
+    if (!address || !pass) {
+      throw new NotFoundException(
+        apiError(
+          ApiErrorCode.GATE_NOT_CONFIGURABLE,
+          `Gate ${id} has no address or key on this server`,
+        ),
+      );
+    }
+    return `${gateConfigUrl(address)}?t=${pass}`;
   }
 
   @OnEvent('mqtt.message')

@@ -2,7 +2,8 @@
 
 Designed 2026-10-30. Built so far: roles, invitations, devices, the
 organiser login and the public page (step 1 in `development-roadmap.md` "Next"),
-and the broker login with gate pairing (step 2); gate-config is still open.
+the broker login with gate pairing (step 2), and gate-config's pass (step 3)
+on the Pi; the ESP32's settings page is still open.
 
 ## What it protects against
 
@@ -203,18 +204,41 @@ for both):
 
 - **On its own hotspot:** open, as today. The WPA2 password on the sticker is
   the boundary, and the hotspot only comes up when the gate is on no Wi-Fi.
-- **On the rally Wi-Fi:** status is readable, every action needs a pass. The
-  organiser clicks "Configure" on the Hardware page; the server signs
-  `gateId + expiry` with that gate's key (HMAC-SHA256, `gate_core.h` on the ESP32)
-  and the browser opens `http://<gate>:57439/?t=<pass>`. The gate checks it
-  locally, with no call back to the server, and sets a cookie. The link is
-  valid 60 s (it sits in the browser history), the session 1 h. The server
-  signs its own pass for "Shut down all gates" the same way, so the
-  "No server → gate commands" rule (`architecture.md`) is untouched.
+- **On the rally Wi-Fi:** status is readable, every change needs a session,
+  else 403 `locked`; the page shows read-only and leaves the hotspot password
+  out of the settings, or anyone here could join the hotspot later. The
+  organiser opens the gate config from the Hardware page (organiser only):
+  `GET /api/gates/:id/configure` redirects to
+  `http://<gate>:57439/?t=<pass>`, a link and not a fetch, so no popup
+  blocker gets in the way. The pass is `<expiryMs>.<hex HMAC-SHA256(key,
+  "config." + gateId + "." + expiry)>` (`gateConfigPassMessage` in
+  `packages/shared`): the `config.` keeps a sniffed broker token from opening
+  the page, and a pass from passing as a token. The gate checks it locally,
+  with no call back to the server, 10 s of clock slack as for the token, sets
+  the session cookie and redirects to `/`, out of the address bar. The link
+  is valid 60 s (it sits in the browser history), the session 1 h.
+- **The session** is `<expiryMs>.<HMAC(key, "session." + expiry)>`, httpOnly,
+  `SameSite=Strict`, stateless: nothing to store on the gate, and it outlasts
+  a restart of gate-config. No logout. Neither pass nor session is single
+  use: a sniffed cookie is as good as a sniffed link, and the operating rule
+  covers both.
+- The server signs its own pass for "Shut down all gates" the same way
+  (`POST /api/power-off?t=`), so the "No server → gate commands" rule
+  (`architecture.md`) is untouched.
+- **Open without a pass:** the gate's own hotspot (a Pi tells by the address
+  the request came in on, `10.42.0.1`; the ESP32 by its AP address) and
+  loopback (SSH, and the Vite proxy in the dev loop). These get a session
+  cookie too, so its hour outlasts the hotspot.
 - **Server unreachable:** physical access is trust. From power-on, gate-config
-  is open until the gate reaches the server or 3 minutes pass, whichever comes
-  first; the buzzer says so. A session opened in that window lasts its normal
-  hour. With a server present the window closes within seconds.
+  is open until the broker accepts the gate's login or 3 minutes pass,
+  whichever comes first. Refused counts as not reached: an unpaired gate can
+  get no pass, so it stays open for those minutes to be fixed. A session
+  opened in that window lasts its normal hour. No sound of its own: the page
+  says it is locked. On a Pi gate-agent creates `server-reached` in its
+  runtime directory, and gate-config latches the closed window, since that
+  directory goes when the agent restarts.
+- Without its key (the agent never ran) a gate opens no session: only its
+  hotspot and the window.
 
 ## Comes with it
 

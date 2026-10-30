@@ -41,7 +41,10 @@ const status = ref<{
   sync: ChronyState | null;
   log: CommandResult;
   version: string;
+  /** False on the rally Wi-Fi without a session: everything reads, nothing changes. */
+  unlocked: boolean;
 } | null>(null);
+const locked = computed(() => status.value?.unlocked === false);
 
 const saving = ref(false);
 // null until Vuetify has validated; only an explicit false means "known bad",
@@ -470,6 +473,14 @@ onUnmounted(() => {
 
     <v-main>
       <v-container class="py-6" style="max-width: 720px">
+        <v-alert
+          v-if="locked"
+          type="info"
+          variant="tonal"
+          density="comfortable"
+          :text="t('gateConfig.locked')"
+          class="mb-6"
+        />
         <!-- Status first: in the field a gate's page is opened to check it or
              to fix its Wi-Fi; settings are set once. Same order as the ESP32
              gate's page (firmware/esp32-gate/web/index.html). -->
@@ -538,7 +549,7 @@ onUnmounted(() => {
               status?.log.output || t('gateConfig.unavailable')
             }}</pre>
           </v-card-text>
-          <v-card-actions>
+          <v-card-actions v-if="!locked">
             <v-btn variant="text" prepend-icon="mdi-power" @click="powerOff">
               {{ t('gateConfig.shutDown') }}
             </v-btn>
@@ -620,7 +631,7 @@ onUnmounted(() => {
               />
             </template>
           </v-card-text>
-          <v-card-actions v-if="network?.available">
+          <v-card-actions v-if="network?.available && !locked">
             <v-btn
               variant="text"
               prepend-icon="mdi-wifi-remove"
@@ -643,7 +654,7 @@ onUnmounted(() => {
 
         <!-- One form across both cards: they are two halves of the same PUT, so
              the save button sits after them rather than in either one. -->
-        <v-form v-model="formValid">
+        <v-form v-model="formValid" :disabled="locked">
           <v-card class="mb-6">
             <v-card-title>{{ t('gateConfig.settings') }}</v-card-title>
             <v-card-text>
@@ -762,7 +773,7 @@ onUnmounted(() => {
             </v-card-text>
           </v-card>
 
-          <div class="d-flex justify-end mb-6">
+          <div v-if="!locked" class="d-flex justify-end mb-6">
             <v-btn
               :loading="saving"
               :disabled="formValid === false"

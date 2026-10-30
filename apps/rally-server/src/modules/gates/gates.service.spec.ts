@@ -36,6 +36,9 @@ function makeService(opts: {
       settingsService as never,
       emitter as never,
       gateAssignmentsService as never,
+      {
+        configPass: (id: string) => (id === 'NOKEY' ? null : `pass-${id}`),
+      } as never,
     ),
     gates,
     gateAssignmentsService,
@@ -250,7 +253,7 @@ describe('GatesService.powerOffAll', () => {
     const results = await service.powerOffAll(now);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://10.0.0.5:57439/api/power-off',
+      'http://10.0.0.5:57439/api/power-off?t=pass-ONLINE',
       expect.objectContaining({ method: 'POST' }),
     );
     expect(results).toEqual([
@@ -262,5 +265,18 @@ describe('GatesService.powerOffAll', () => {
         detail: 'sudo: not allowed',
       },
     ]);
+  });
+});
+
+describe('GatesService.configureUrl', () => {
+  it('links to the gate with a pass, and refuses a gate without a key', async () => {
+    const { service } = makeService({
+      existingGate: { id: 'G1', address: '10.0.0.5' },
+    });
+
+    await expect(service.configureUrl('G1')).resolves.toBe(
+      'http://10.0.0.5:57439/?t=pass-G1',
+    );
+    await expect(service.configureUrl('NOKEY')).rejects.toThrow('no address');
   });
 });

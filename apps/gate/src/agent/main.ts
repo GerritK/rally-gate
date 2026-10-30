@@ -1,3 +1,5 @@
+import { writeFileSync } from 'fs';
+import { SERVER_REACHED_FILE } from '../paths';
 import { createAdapter } from './adapters/create-adapter';
 import { Buzzer } from './buzzer';
 import { config, invalidSettings } from './config';
@@ -45,6 +47,13 @@ uplink.onConnect(() => {
   state.connected = true;
   sendHeartbeat();
   refreshTimeSource();
+  if (process.env.RUNTIME_DIRECTORY) {
+    try {
+      writeFileSync(SERVER_REACHED_FILE, '');
+    } catch {
+      // Only keeps gate-config open up to its 3 minutes; never worth a crash.
+    }
+  }
 });
 uplink.onDisconnect(() => (state.connected = false));
 const heartbeatTimer = setInterval(sendHeartbeat, config.heartbeatIntervalMs);

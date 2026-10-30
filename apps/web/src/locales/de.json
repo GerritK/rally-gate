@@ -577,6 +577,7 @@
     "combinedGateClash": "{stage} hat schon ein Start- oder Ziel-Gate; ein kombiniertes Start/Ziel-Gate ersetzt beide.",
     "invalidGateId": "Ein Gate-Name besteht nur aus A–Z, 0–9 und _, höchstens 32 Zeichen.",
     "gateNotWaiting": "Dieses Gate wartet nicht mehr auf Freigabe.",
+    "gateNotConfigurable": "Dieses Gate war noch nicht an diesem Server angemeldet, seine Einstellungen gehen nur direkt am Gate.",
     "gateInStartedStage": "Gate {gate} wird auf begonnenen WPs verwendet ({stages}) und kann nicht gelöscht werden.",
     "gateHasAssignments": "Gate {gate} ist noch WPs zugeordnet.",
     "closeStageBeforePowerOff": "Eine WP ist aktiv. Schließe sie, bevor du die Gates herunterfährst.",

@@ -55,8 +55,9 @@ second, only while OpenStint is the selected decoder.
 ## Applying a change
 
 Saving restarts `rally-gate-agent` and updates chrony's source. Privilege comes
-from exact sudoers commands, not root, because this service is unauthenticated
-and what it can do as root *is* the boundary:
+from exact sudoers commands, not root, because a session opened in the
+power-on window or on the hotspot needs no login, and what this service can do
+as root *is* the boundary:
 
 ```
 <user> ALL=(root) NOPASSWD: /usr/bin/systemctl restart rally-gate-agent
@@ -67,8 +68,8 @@ and what it can do as root *is* the boundary:
 ```
 
 **Shut down** (confirmed on the page) exists because pulling power mid-write
-can corrupt the SD card. Anyone on the rally network can press it — same
-boundary as Wi-Fi reset, until auth lands. A lost connection afterwards is
+can corrupt the SD card. Like every change it needs a session ("Access").
+A lost connection afterwards is
 reported as expected.
 
 The installer runs `visudo -c` and removes an invalid drop-in, since a broken one
@@ -134,9 +135,13 @@ network that is still associating.
 
 ## Access
 
-No authentication; the closed rally network is the boundary. The hotspot's WPA2
-password draws the boundary around the gate's own AP, and is readable through
-`GET /api/config` like any field. The Wi-Fi client password never touches
+`docs/auth.md` "gate-config": on the rally Wi-Fi the page is read-only until it
+is opened from the dashboard's Hardware page, which carries a pass signed with
+the gate's key; open on the gate's own hotspot, over loopback and in the
+3 minutes after power-on until the agent reaches the server. One Express
+middleware in `src/gate-config/main.ts` decides it, the signing is in
+`access.ts`. The hotspot's WPA2 password draws the boundary around the gate's
+own AP; `GET /api/config` leaves it out without a session. The Wi-Fi client password never touches
 `gate.env` — NetworkManager stores it, and gate-config can't read it back.
 
 ## Build and testing

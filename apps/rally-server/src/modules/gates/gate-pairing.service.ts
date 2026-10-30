@@ -1,7 +1,9 @@
 import {
   ApiErrorCode,
+  GATE_CONFIG_PASS_LIFETIME_MS,
   GATE_ID_PATTERN,
   GATE_KEY_PASSWORD_PREFIX,
+  gateConfigPassMessage,
   GatePairingState,
   WaitingGate,
 } from '@rally-gate/shared';
@@ -145,6 +147,19 @@ export class GatePairingService implements OnModuleInit {
       known ? 'wrong or expired token' : 'unknown gate',
       now,
     );
+  }
+
+  /** The `?t=` that opens the gate's config page, null without its key. */
+  configPass(gateId: string, now = Date.now()): string | null {
+    const key = this.keys[gateId];
+    if (!key) {
+      return null;
+    }
+    const expiry = now + GATE_CONFIG_PASS_LIFETIME_MS;
+    const mac = createHmac('sha256', Buffer.from(key, 'hex'))
+      .update(gateConfigPassMessage(gateId, expiry))
+      .digest('hex');
+    return `${expiry}.${mac}`;
   }
 
   state(now = Date.now()): GatePairingState {

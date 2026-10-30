@@ -27,6 +27,8 @@ export enum ApiErrorCode {
   CLOSE_STAGE_BEFORE_POWER_OFF = 'closeStageBeforePowerOff',
   /** Accepted or rejected meanwhile, or the server restarted. */
   GATE_NOT_WAITING = 'gateNotWaiting',
+  /** No address or no key yet: the gate never logged in to this server. */
+  GATE_NOT_CONFIGURABLE = 'gateNotConfigurable',
   STAGE_RUN_NOT_FOUND = 'stageRunNotFound',
   FINISH_NOT_AFTER_START = 'finishNotAfterStart',
   INVALID_TIME = 'invalidTime',

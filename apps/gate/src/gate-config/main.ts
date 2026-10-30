@@ -1,9 +1,19 @@
 import { GATE_CONFIG_PORT, parseTracking, VERSION } from '@rally-gate/shared';
 import express from 'express';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { createServer } from 'http';
+import { uptime } from 'os';
 import { join } from 'path';
 import { fieldDescriptors, GateConfig, isFieldName, validate } from '../fields';
+import { GATE_KEY_PATH, SERVER_REACHED_FILE } from '../paths';
+import {
+  newSession,
+  POWER_ON_WINDOW_MS,
+  SESSION_COOKIE,
+  SESSION_LIFETIME_MS,
+  validPass,
+  validSession,
+} from './access';
 import { readConfig, writeConfig } from './config-file';
 import { readDecoderStatus } from './decoder-status';
 import { parseDeviceStatus, parseWifiList, validateWifi } from './network';
@@ -23,7 +33,79 @@ import {
 
 const PORT = Number(process.env.GATE_CONFIG_PORT ?? GATE_CONFIG_PORT);
 
+// NetworkManager's address for a shared connection, the gate's own hotspot
+// (install-gate-pi.sh).
+const HOTSPOT_ADDRESS = '10.42.0.1';
+const LOOPBACK = new Set(['127.0.0.1', '::1']);
+
+let gateKey: string | null = null;
+/** The agent creates it on its first start; until then nothing can open a session. */
+function readGateKey(): string | null {
+  try {
+    gateKey ??= readFileSync(GATE_KEY_PATH, 'utf8').trim();
+  } catch {
+    // Not created yet.
+  }
+  return gateKey;
+}
+
+let powerOnWindowClosed = false;
+/** Latched: the agent's runtime directory, and the marker with it, goes when the agent restarts. */
+function powerOnWindowOpen(): boolean {
+  powerOnWindowClosed ||=
+    uptime() * 1000 > POWER_ON_WINDOW_MS || existsSync(SERVER_REACHED_FILE);
+  return !powerOnWindowClosed;
+}
+
+function cookieValue(req: express.Request, name: string): string {
+  for (const part of (req.headers.cookie ?? '').split(';')) {
+    const [key, ...value] = part.trim().split('=');
+    if (key === name) return value.join('=');
+  }
+  return '';
+}
+
 const app = express();
+
+/**
+ * Who may change anything (`docs/auth.md` "gate-config"): the gate's own
+ * hotspot, the gate itself, anyone in the power-on window, and on the rally
+ * Wi-Fi a session opened with the server's pass (`?t=`). Everyone else reads
+ * the status and gets 403 for every change.
+ */
+app.use((req, res, next) => {
+  const key = readGateKey();
+  const pass = typeof req.query.t === 'string' ? req.query.t : '';
+  const local = (req.socket.localAddress ?? '').replace(/^::ffff:/, '');
+  const remote = (req.socket.remoteAddress ?? '').replace(/^::ffff:/, '');
+  const session = !!key && validSession(key, cookieValue(req, SESSION_COOKIE));
+  const unlocked =
+    session ||
+    local === HOTSPOT_ADDRESS ||
+    LOOPBACK.has(remote) ||
+    powerOnWindowOpen() ||
+    (!!key && validPass(key, readConfig().GATE_ID ?? '', pass));
+  // Also in the window and on the hotspot, so the hour outlasts both.
+  if (unlocked && key && !session) {
+    res.cookie(SESSION_COOKIE, newSession(key), {
+      maxAge: SESSION_LIFETIME_MS,
+      httpOnly: true,
+      sameSite: 'strict',
+    });
+  }
+  // The pass sits in the address bar otherwise.
+  if (pass && req.method === 'GET' && !req.path.startsWith('/api/')) {
+    res.redirect(req.path);
+    return;
+  }
+  if (!unlocked && req.method !== 'GET') {
+    res.status(403).json({ error: 'locked' });
+    return;
+  }
+  res.locals.unlocked = unlocked;
+  next();
+});
+
 app.use(express.json({ limit: '16kb' }));
 
 // Field rules travel to the browser so they have exactly one definition; the
@@ -36,9 +118,13 @@ app.get('/api/fields', (_req, res) => {
 
 // With the file's own errors: a value typed in by hand that breaks its rule
 // keeps the agent stopped, and the page marks that field.
+// Locked, without the hotspot password: anyone on the rally Wi-Fi could
+// otherwise join the hotspot once the gate falls back to it.
 app.get('/api/config', (_req, res) => {
   const values = readConfig();
-  res.json({ values, errors: validate(values) });
+  const errors = validate(values);
+  if (!res.locals.unlocked) delete values.HOTSPOT_PASSWORD;
+  res.json({ values, errors });
 });
 
 app.put('/api/config', async (req, res) => {
@@ -84,7 +170,14 @@ app.get('/api/status', async (_req, res) => {
     recentLog(),
   ]);
   const sync = clockCsv.ok ? (parseTracking(clockCsv.output) ?? null) : null;
-  res.json({ agent, clock, sync, log, version: VERSION });
+  res.json({
+    agent,
+    clock,
+    sync,
+    log,
+    version: VERSION,
+    unlocked: res.locals.unlocked as boolean,
+  });
 });
 
 // Apart from /api/status because the page polls it every second while
