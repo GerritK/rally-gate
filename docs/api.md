@@ -41,7 +41,8 @@ the public page reads: `/auth/session`, `/version`, `/time`, GET
 | `/auth/devices` | GET, `/:id` PATCH | redeemed devices and password logins (`invitationId` null), PATCH `{ blocked }`. Organiser only, GET too |
 | `/version` | GET | `{ version }`, the server's build — see "Gate discovery & heartbeat" in `architecture.md` |
 | `/time` | GET | `{ now }`, the server clock; the dashboard shows it instead of the device's, since gates sync to the server |
-| `/gates` | GET, `/:id` GET/PUT/DELETE | hardware identity only (PUT sets the name). Auto-created from a first heartbeat unless `autoDiscoverGates` is off |
+| `/gates` | GET, `/:id` GET/PUT/DELETE | hardware identity only (PUT sets the name). Created by a paired gate's first heartbeat (`auth.md` "Gates") or by hand |
+| `/gate-pairing` | GET, POST, `/:gateId` POST/DELETE | `GatePairingState`: `{ open, closesAt, waiting }`, `closesAt` null while no gate is paired yet. POST opens pairing for 10 minutes; `/:gateId` POST accepts a waiting gate, DELETE rejects it for the rest of the window, 404 `gateNotWaiting`. Organiser only for changes |
 | `/gates/power-off` | POST | shuts down every online gate through its gate-config; one `{ gateId, ok, error?, detail? }` per gate (`unreachable`, or `refused` with the command output). 409 while a stage is active |
 | `/gate-assignments` | GET, POST, `/:id` DELETE | the (gate, stage, role, splitIndex) plan. `active` is not settable — activation is per stage |
 | `/entries` | GET, POST, `/:id` GET/PATCH | `startNumber` is unique, POST/PATCH 409 on a clash. Classes are written as `classIds` (replaces the list, 400 on an unknown id) and read back as `classes` |
@@ -74,7 +75,7 @@ the public page reads: `/auth/session`, `/version`, `/time`, GET
 | `/rally-info/start`, `/close`, `/reopen` | POST | `SETUP` → `RUNNING` → `CLOSED`, reopen back to `RUNNING`; 409 `rallyStatusInvalid` from any other status. Close 409s `carsOnStage` with `params.count`, else closes the running stages |
 | `/event` | GET, POST `{ name, date }`, `/open` POST `{ file }` | the open event file and the others in the folder, `switchable: false` when fixed by config. POST creates/opens by restarting the server (202, then poll GET); 409 while a stage is `ACTIVE` — see `deployment-modes.md` |
 | `/event/known-gates` | GET, `/:id` DELETE | gates this computer remembers across events (standalone only); DELETE forgets one, the open event keeps it |
-| `/settings/:key` | GET, PUT | `autoDiscoverGates`, `clockCorrectionThresholdMs`, `notionalPenaltyMs`, `startOrderGrouping`/`startOrderKey`/`startOrderDirection` (enums in `packages/shared/src/start-order.ts`; an unknown value reads as the default) |
+| `/settings/:key` | GET, PUT | `clockCorrectionThresholdMs`, `notionalPenaltyMs`, `startOrderGrouping`/`startOrderKey`/`startOrderDirection` (enums in `packages/shared/src/start-order.ts`; an unknown value reads as the default) |
 
 Every mutating endpoint binds a DTO class, and unknown fields are a 400 — see
 `apps/rally-server/CLAUDE.md` for which fields are deliberately absent.
@@ -88,6 +89,7 @@ reconnect.
 
 - `detection`, `stage-run`, `stage-run-split` — the record as it changes
 - `gate` — a `Gate` on each heartbeat
+- `gate-pairing` — `GatePairingState` on every change, a waiting gate's retry too
 - `pending-detections` — `{ pending }`, `awaiting-detections` — `{ awaiting }`:
   the whole list on every change, not a delta
 - `rally` — `RallyInfo` on every change, status included; every stream

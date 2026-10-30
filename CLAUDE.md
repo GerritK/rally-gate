@@ -42,7 +42,7 @@ npm test --workspaces --if-present
 
 Dev loop, no hardware needed:
 ```bash
-npm run dev:server           # rally-server: API :57430, MQTT :57431, SNTP :57432/udp
+npm run dev:server           # rally-server: API :57430, MQTT :57431, SNTP :57432/udp; GATES_AUTO_ACCEPT=1 (dev.env)
 npm run seed-demo-data       # a stage, gate assignments and one entry via the REST API
 npm run simulate -- --gate START_WP1 --transponder 1234567   # one detection (--beam: without transponder)
 npm run dev:gate-agent       # continuous simulated detections
@@ -99,9 +99,9 @@ Gate hardware (or SimulatedAdapter)
 
 **Server-side behaviour is event-driven through `EventEmitter2`**, not method chains: `EventsService` emits, `LiveController` and listeners react. A new cross-cutting reaction is an emitted event with independent listeners, not a service calling three others inline.
 
-**Gates are dumb.** A gate knows only its `GATE_ID` and publishes to `rally/gates/<gateId>/detections` and `/heartbeat`. All meaning is assigned on the server.
+**Gates are dumb.** A gate knows only its `GATE_ID` and its own key (to log in, `docs/auth.md`) and publishes to `rally/gates/<gateId>/detections` and `/heartbeat`. All meaning is assigned on the server.
 
-**`Gate` is identity, `GateAssignment` is the plan.** A `Gate` (id, name, heartbeat, capabilities) auto-creates from its first heartbeat. A `GateAssignment` is (gate, stage, role, splitIndex, active): a gate may be planned on many stages, but exactly one assignment per gate is active, and that one decides what a detection means. `StageRun`/`StageSplit` snapshot `stageId`, so reassigning a gate never rewrites history.
+**`Gate` is identity, `GateAssignment` is the plan.** A `Gate` (id, name, heartbeat, capabilities) auto-creates from its first heartbeat, once the gate is paired (`docs/auth.md` "Gates"). A `GateAssignment` is (gate, stage, role, splitIndex, active): a gate may be planned on many stages, but exactly one assignment per gate is active, and that one decides what a detection means. `StageRun`/`StageSplit` snapshot `stageId`, so reassigning a gate never rewrites history.
 
 **One database = one event.** No `Event` entity: the SQLite file (or Postgres database) is the event, and saving or transferring one is copying it. Switching events in the standalone package restarts the process (`deploy/standalone/start.js`). **Deployment is a config switch, not a fork**: `DB_TYPE=sqlite` (default, standalone) or `postgres` (headless), picked in `apps/rally-server/src/config/database.config.ts`.
 

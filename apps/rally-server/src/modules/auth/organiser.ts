@@ -15,11 +15,12 @@ import { eventsDir } from '../event-files/event-files';
  * Postgres has no events folder, hence `CONFIG_DIR` (a volume in
  * `deploy/docker-compose.yml`).
  */
+export function configDir(): string {
+  return process.env.CONFIG_DIR || eventsDir() || process.cwd();
+}
+
 export function organiserFile(): string {
-  return join(
-    process.env.CONFIG_DIR || eventsDir() || process.cwd(),
-    'organiser.json',
-  );
+  return join(configDir(), 'organiser.json');
 }
 
 interface OrganiserFile {

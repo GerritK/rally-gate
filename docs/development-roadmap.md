@@ -31,7 +31,7 @@ One line each; the linked doc has the detail. History is in git.
   (`decoder-adapters.md`). Verified on a Pi with a real car through a loop.
 - **Beam + OpenStint** at one gate: the beam's time, the transponder's car
   (`decoder-adapters.md`). Not yet tried on hardware.
-- **Stages and gates:** auto-discovery by heartbeat, assignments as a plan
+- **Stages and gates:** gates paired once with their own key, then created by their first heartbeat, assignments as a plan
   with per-stage activation, expected stage time (`architecture.md`).
 - **Clocks:** chrony against rally-server's SNTP, measured offset with a
   correction deadband (`architecture.md` "Clock offset").
@@ -100,12 +100,14 @@ One line each; the linked doc has the detail. History is in git.
      `/auth/login`, and the operating rule "participants never on the timing
      Wi-Fi" on the login page and in the README, and the public page with
      every internal read behind the login. Done.
-  2. Broker and gates: self-generated gate key, pairing and approval,
-     detections of waiting gates held, `autoDiscoverGates` removed,
-     `GATES_AUTO_ACCEPT` for dev. The key never as the MQTT password, a
-     short-lived HMAC token instead. Decide how a gate tells the real server
-     from one answering as `rally-server.local` before it releases detections.
-     Check how mqtt.js backs off on a refused connect.
+  2. Broker and gates. Built: Pi gates create their own key and log in
+     with a single-use HMAC token, the key goes out only on a server's
+     CONNACK 4 while pairing is open, Pair gates on Hardware with accept and
+     reject, waiting gates refused so their detections stay on the gate,
+     each gate publishing only on its own topics, `autoDiscoverGates`
+     removed, `GATES_AUTO_ACCEPT` for dev. No server proof and no TLS: the
+     operating rule covers a fake server (`auth.md` "Gates"). Left: the
+     same login on the ESP32 (key in NVS).
   3. gate-config and ESP32: signed pass, the 3-minute power-on window, the
      same on `web.cpp`. Check whether browser flashing erases NVS.
 

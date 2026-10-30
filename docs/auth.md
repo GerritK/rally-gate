@@ -1,8 +1,8 @@
 # Access and authentication
 
 Designed 2026-10-30. Built so far: roles, invitations, devices, the
-organiser login and the public page (step 1 in `development-roadmap.md` "Next"); gates, the
-broker and gate-config are still open.
+organiser login and the public page (step 1 in `development-roadmap.md` "Next"),
+and the broker login with gate pairing (step 2); gate-config is still open.
 
 ## What it protects against
 
@@ -25,8 +25,8 @@ here is plain HTTP and MQTT. What such a person gets:
 | Sniff a marshal's or organiser's request | the device cookie: that login, until blocked | built, open |
 | Sniff `POST /auth/login` | the organiser password | built, open |
 | Sniff `/join/:code` | the invitation code (shows up as an extra device under it) | built, open |
-| Sniff a gate's MQTT CONNECT | the gate key, if it is sent as the password: impersonate the gate | planned, avoided below |
-| Answer as `rally-server.local` (mDNS spoof, ARP) | invitation codes from phones scanning the `.local` QR; gates connect, and the gate drops each detection on the fake broker's PUBACK — drivers with no time | open, step 2 decides |
+| Sniff a gate's MQTT CONNECT | a token, valid once and for a minute; the key only while a pairing window is open | built, limited |
+| Answer as `rally-server.local` (mDNS spoof, ARP) | invitation codes from phones scanning the `.local` QR; gates connect, and the gate drops each detection on the fake broker's PUBACK — drivers with no time. A fake answering CONNACK 4 gets the gate's key | open, operating rule |
 | Brute-force `/auth/login` | the organiser password, if weak — 5 wrong per address and minute, then 429 | built, limited |
 | Brute-force an invitation code | 8 of 31 characters, ~10¹² — not feasible over Wi-Fi | fine |
 | Flood the airtime, rogue DHCP | gates drop offline; QoS 1 delivers late, the dashboard shows them offline | operating rule |
@@ -43,8 +43,8 @@ Consequences:
 - **WPA3 where the hardware allows:** with SAE, knowing the password no longer
   decrypts others' traffic. Pi and ESP32-S3 support it; older phones
   partly. It doesn't help against a spoofed server.
-- **A gate's key never goes on the wire**, so neither sniffing nor a fake
-  server learns it (step 2, see "Gates").
+- **A gate's key goes on the wire only while pairing**, so sniffing outside
+  a pairing window learns nothing that lasts (see "Gates").
 - **`/auth/login` has a rate limit**: 5 wrong passwords per client address,
   then refused until a minute after the first; a right one clears it. In
   memory, so a restart forgets it.
@@ -137,48 +137,64 @@ A login is a **device with a role**, not a person with a password.
 
 Nothing is typed on a gate (`development-roadmap.md` "Zero-config gates").
 
-- At install the gate generates its own random key: Pi in
-  `/etc/rally-gate/gate.key` (its own file — the installer rewrites
-  `gate.env` on every update, and creates the key only when missing), ESP32 in
-  NVS (`esp_random()`). It logs in to the broker with its gate id as username
-  and, as password, **not the key** but `expiry + HMAC(key, gateId + expiry)`
-  with an expiry a minute ahead: MQTT 3.1.1 has nothing but username and
-  password, and a key sent as one would go to anyone who sniffs the Wi-Fi or
-  answers as `rally-server.local` (see "Participants on the timing Wi-Fi").
-  A sniffed token can be replayed only until it expires. Gates follow the
-  server's clock, so the expiry check holds; allow a few seconds of slack for
-  a gate whose clock isn't synced yet. Pairing sends the key once (it has to
-  reach the server somehow) — the reason pairing is a short, deliberate
-  window.
-- **Open, step 2:** a fake broker that acks detections makes the gate drop
-  them. Candidate fix: the server proves it knows the key once per connection
-  (signs a nonce the gate sends on its own topic) before the gate releases
-  anything from its buffer. Decide when building step 2; until then the
-  operating rule above is the protection.
+- On its first start the gate generates its own random key: Pi gate-agent
+  in `gate.key` next to `gate.env` (`/etc/rally-gate/`; its own file, since
+  the installer rewrites `gate.env` on every update, and nothing but the
+  agent writes it), ESP32 in NVS (`esp_random()`). It logs in to the broker
+  with its gate id as username and client id and, as password, **not the
+  key** but `<expiry>.<HMAC-SHA256(key, gateId + "." + expiry)>` (hex, expiry
+  in ms a minute ahead; `GATE_KEY_PASSWORD_PREFIX` in `packages/shared`):
+  MQTT 3.1.1 has nothing but username and password. The server allows 10 s
+  past the expiry for a gate whose clock hasn't synced yet, and takes each
+  token once: a gate's expiry must grow, so a sniffed token can't push the
+  real gate off and then stay connected.
+- **The key goes out only when a server asks**: CONNACK 4 (bad username or
+  password), which the broker answers an unknown or changed key while
+  pairing is open; the gate sends `key:<hex>` on its next attempt. Otherwise
+  the answer is CONNACK 5 and the gate keeps trying with tokens every 5 s
+  (mqtt.js retries a refused login only with `reconnectOnConnackError`). A
+  gate lent to another club pairs with that club's server like a new one,
+  and logs in at home again with no step.
+- **A fake server is left to the operating rule.** One answering as
+  `rally-server.local` can answer CONNACK 4 and get the key, and ack
+  detections the gate then drops. Having the server prove it knows the key
+  before a gate releases detections (a signed nonce) was weighed and left
+  out: without TLS it doesn't stop a server that relays, and with
+  participants off the timing Wi-Fi nobody is there to run the fake.
+- **No TLS for MQTT either.** Offline there is no CA, so a gate would pin the
+  server's self-signed certificate at pairing, with the same window as the
+  key and the same problem for lent gates, while browser traffic stays plain
+  anyway. The token scheme works unchanged under TLS should that change.
 - **Updates keep the key**: re-running the installer, USB flashing and OTA
   leave it alone. A new SD card or erasing the ESP32's flash is a new
   identity. There is deliberately no "new identity" button — one pressed
   mid-rally un-approves a gate.
-- **Pairing**, like Bluetooth: normally an unknown gate, or a known gate id
+- **Pairing**, like Bluetooth: normally an unknown gate, or a paired gate id
   with a different key, is refused at MQTT connect and shows up only in the
-  server log. "Add gates" on the Hardware page opens pairing for 10 minutes;
-  while no gate is known at all, pairing is open. During pairing, unknown gates
-  appear as **waiting for approval** (at most 20, the rest refused), and the
-  organiser accepts each with a click. The server stores the key with the
-  gate in the cross-event file next to `known-gates`. A changed key on a known
-  gate id shows as "key changed, accept?"; the old key stays valid until then.
-- Pairing state is in memory only: a server restart (an event switch too)
-  closes it.
-- Detections of a gate that is waiting are **stored but not timed**, and
-  processed on approval — a dropped passing is a driver with no time, and the
-  pipeline is idempotent. Rejecting the gate deletes them. A refused gate keeps
-  retrying, so a replacement gate added mid-rally shows up as soon as pairing
-  opens: the ESP32 keeps its taps in flash, a Pi in mqtt.js's in-memory queue
-  (lost if gate-agent restarts before approval).
-- This replaces the `autoDiscoverGates` setting, which goes entirely.
-- Dev only: `GATES_AUTO_ACCEPT=1` on the server skips pairing and approval for
-  `npm run simulate`, the simulated agents in `docker-compose.dev.yml`,
-  `seed-demo-data` and `npm run screenshots`. No dashboard switch for it.
+  server log (once per gate and 10 minutes). "Pair gates" on the Hardware
+  page opens pairing for 10 minutes; while no gate is paired at all, it is
+  open. During pairing a gate that sent its key appears as **waiting for
+  approval** (at most 20, the rest refused), and the organiser accepts or
+  rejects each with a click; a rejected one stays refused until pairing is
+  opened again. The server keeps the keys in `gate-keys.json` next to
+  `organiser.json` (headless: `CONFIG_DIR`), across events. A changed key on
+  a paired gate id shows as "key changed"; the old key stays valid until it
+  is accepted. A gate added by hand is a roster entry only: the real one
+  behind it still pairs.
+- Pairing and the waiting gates are in memory only: a server restart (an
+  event switch too) closes pairing, and a waiting gate sends its key again
+  once it reopens.
+- **A waiting gate stays refused**, so its detections stay on the gate and
+  arrive once it is approved: the ESP32 keeps its taps in flash, a Pi in
+  mqtt.js's in-memory queue (lost if gate-agent restarts before approval).
+- The broker lets a gate publish only under `rally/gates/<its id>/` and
+  subscribe to nothing, and ignores a detection whose `gateId` isn't its
+  topic's.
+- This replaced the `autoDiscoverGates` setting.
+- Dev only: `GATES_AUTO_ACCEPT=1` on the server keeps pairing open, approves
+  every key at once and lets clients without a login publish for any gate
+  (`npm run simulate`, `npm run screenshots`). `npm run dev:server` (its
+  `dev.env`) and `docker-compose.dev.yml` set it. No dashboard switch.
 
 ## gate-config: a signed pass from the server
 

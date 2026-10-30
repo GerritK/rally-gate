@@ -64,3 +64,20 @@ export interface GatePowerOffResult {
   error?: 'unreachable' | 'refused';
   detail?: string;
 }
+
+/** A gate that sent its key while pairing was open and waits for the organiser. */
+export interface WaitingGate {
+  gateId: string;
+  /** The gate id already has an approved key: a new SD card, or another device using its id. */
+  keyChanged: boolean;
+  since: string;
+  lastAttemptAt: string;
+  address: string | null;
+}
+
+/** `GET /api/gate-pairing`. Open with `closesAt` null: no gate is known yet. */
+export interface GatePairingState {
+  open: boolean;
+  closesAt: string | null;
+  waiting: WaitingGate[];
+}

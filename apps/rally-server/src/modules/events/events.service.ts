@@ -385,6 +385,13 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     const detection = parseDetection(parsed);
+    // The broker checks the topic against the gate's login, not the payload.
+    if (detection && detection.gateId !== match[1]) {
+      this.logger.warn(
+        `Ignoring detection for gate ${detection.gateId} published on ${topic}`,
+      );
+      return;
+    }
     if (!detection) {
       this.logger.warn(
         `Ignoring detection on ${topic} with missing or invalid fields — expected non-empty eventId and gateId, a usable transponderId if any, a known transponderKind if any, and a parseable timestampGate`,

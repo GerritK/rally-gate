@@ -2,9 +2,6 @@
 // server applies while one is unset — the web shows the same default until
 // the stored value loads. Display and start-order keys sit beside their enums.
 
-/** "false" ignores heartbeats from gates not added by hand. */
-export const AUTO_DISCOVER_GATES_KEY = 'autoDiscoverGates';
-
 export const CLOCK_CORRECTION_THRESHOLD_KEY = 'clockCorrectionThresholdMs';
 
 /**

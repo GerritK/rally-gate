@@ -4,6 +4,11 @@
 # Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 
 services:
+  # Dev only: the simulated agents are approved without a click.
+  rally-server:
+    environment:
+      GATES_AUTO_ACCEPT: "1"
+
   gate-agent-start:
     build:
       context: ..

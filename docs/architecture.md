@@ -10,9 +10,10 @@ mode has nothing external to install.
 - `gate-agent` publishes a heartbeat every `HEARTBEAT_INTERVAL_MS` (15s) with
   `sentAt`, `capabilities` (the adapter it runs), `version`, and its NTP state
   (`ntpSynced`, `ntpOffsetMs`: the RMS offset from `chronyc -c tracking`, or
-  the same figure from the ESP32 firmware; absent when it can't be read, which the dashboard shows as unknown, not unsynced). A heartbeat from an unknown
-  `gateId` auto-creates a `Gate` row, unless the `autoDiscoverGates` setting is
-  off. Gates can also be added by hand on the Hardware page.
+  the same figure from the ESP32 firmware; absent when it can't be read, which the dashboard shows as unknown, not unsynced). Only a paired gate gets past
+  the broker's login (`auth.md` "Gates"), and its first heartbeat creates the
+  `Gate` row. Gates can also be added by hand on the Hardware page; the real
+  gate behind one still needs pairing.
 - Online/offline is `now - lastHeartbeatAt > 30s`
   (`HEARTBEAT_ONLINE_THRESHOLD_MS`). *Ready* is online and chrony not reported
   unsynced; Live Timing shows each gate of the selected stage on a line in

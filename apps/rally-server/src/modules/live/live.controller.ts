@@ -11,6 +11,7 @@ const LIVE_EVENTS: Record<LiveEventType, string> = {
   'stage-run': 'stage-run.updated',
   'stage-run-split': 'stage-run.split',
   gate: 'gate.heartbeat',
+  'gate-pairing': 'gate.pairing-changed',
   // Whole lists rather than deltas, so a client that reconnects is correct
   // again on the next change without replay.
   'pending-detections': 'detection.pending-changed',

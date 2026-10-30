@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import {
   ApiErrorCode,
-  AUTO_DISCOVER_GATES_KEY,
   CLOCK_CORRECTION_THRESHOLD_KEY,
   DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS,
   DETECTION_TOPIC_PREFIX,
@@ -20,7 +19,7 @@ import { GateAssignmentsService } from './gate-assignments.service';
 import { Gate } from './gate.entity';
 
 /**
- * `capabilities` is self-reported by the gate over an unauthenticated broker
+ * `capabilities` is self-reported by the gate
  * and stored verbatim, so it needs a bound — the ValidationPipe guards HTTP
  * only. Generous next to the real values ("simulated", "openstint").
  */
@@ -192,10 +191,8 @@ export class GatesService {
   }
 
   /**
-   * Ignores heartbeats from gates that were never manually added when
-   * auto-discovery is off, rather than silently registering them — that's
-   * the point of the setting (keep the roster to gates the marshal expects
-   * at this event).
+   * Creates the gate on its first heartbeat: only a gate the organiser
+   * approved gets past the broker's login (`GatePairingService`).
    */
   async recordHeartbeat(
     gateId: string,
@@ -209,17 +206,9 @@ export class GatesService {
       this.logger.warn(`Ignoring heartbeat from invalid gate id ${gateId}`);
       return null;
     }
-    let gate = await this.gates.findOneBy({ id: gateId });
-    if (!gate) {
-      const autoDiscover = await this.settingsService.getBoolean(
-        AUTO_DISCOVER_GATES_KEY,
-        true,
-      );
-      if (!autoDiscover) {
-        return null;
-      }
-      gate = this.gates.create({ id: gateId, name: gateId });
-    }
+    const gate =
+      (await this.gates.findOneBy({ id: gateId })) ??
+      this.gates.create({ id: gateId, name: gateId });
     gate.lastHeartbeatAt = arrivedAt;
     if (typeof heartbeat.capabilities === 'string' && heartbeat.capabilities) {
       gate.capabilities = heartbeat.capabilities.slice(

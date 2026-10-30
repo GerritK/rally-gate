@@ -13,9 +13,13 @@ import {
   type GateAssignment,
 } from '../api/gate-assignments';
 import {
+  acceptWaitingGate,
   deleteGate,
+  fetchGatePairing,
   fetchGates,
+  openGatePairing,
   powerOffAllGates,
+  rejectWaitingGate,
   upsertGate,
   type Gate,
 } from '../api/gates';
@@ -23,18 +27,14 @@ import { fetchEntries, type Entry } from '../api/entries';
 import { fetchRecentEvents, type DetectionEventRecord } from '../api/events';
 import { closeLiveStream, openLiveStream, upsert } from '../api/live';
 import { serverNow } from '../api/time';
-import {
-  fetchClockCorrectionThresholdMs,
-  fetchSetting,
-  saveSetting,
-} from '../api/settings';
+import { fetchClockCorrectionThresholdMs } from '../api/settings';
 import { fetchStages, type Stage } from '../api/stages';
 import {
   ApiErrorCode,
-  AUTO_DISCOVER_GATES_KEY,
   DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS,
   gateConfigUrl,
   StageStatus,
+  type GatePairingState,
   type GatePowerOffResult,
 } from '@rally-gate/shared';
 import {
@@ -57,7 +57,7 @@ let gatesSource: EventSource;
 const gates = ref<Gate[]>([]);
 const gateAssignments = ref<GateAssignment[]>([]);
 const stages = ref<Stage[]>([]);
-const autoDiscover = ref(true);
+const pairing = ref<GatePairingState | null>(null);
 const clockCorrectionThresholdMs = ref(DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS);
 const gateDialogOpen = ref(false);
 const gateDraft = ref({ id: '', name: '' });
@@ -208,30 +208,41 @@ async function onForgetKnownGate(id: string) {
   knownGates.value = knownGates.value?.filter((g) => g.id !== id) ?? null;
 }
 
-async function onToggleAutoDiscover(value: boolean | null) {
-  autoDiscover.value = value ?? true;
-  await saveSetting(AUTO_DISCOVER_GATES_KEY, String(autoDiscover.value));
+async function onOpenPairing() {
+  pairing.value = await openGatePairing();
+}
+
+async function onAcceptGate(gateId: string) {
+  pairing.value = await acceptWaitingGate(gateId);
+  notify(t('hardware.accepted', { id: gateId }));
+}
+
+async function onRejectGate(gateId: string) {
+  await rejectWaitingGate(gateId);
+  pairing.value = await fetchGatePairing();
 }
 
 onMounted(async () => {
-  const [, eventInfo, autoDiscoverSetting, thresholdMs] = await Promise.all([
+  const [, eventInfo, thresholdMs] = await Promise.all([
     refreshGates(),
     fetchEventInfo(),
-    fetchSetting(AUTO_DISCOVER_GATES_KEY),
     fetchClockCorrectionThresholdMs(),
   ]);
   if (eventInfo.switchable) {
     knownGates.value = await fetchKnownGates();
   }
-  autoDiscover.value = autoDiscoverSetting !== 'false';
   clockCorrectionThresholdMs.value = thresholdMs;
   gatesSource = openLiveStream(
     {
       gate: (gate) => upsert(gates.value, gate, 'id'),
+      'gate-pairing': (state) => (pairing.value = state),
       detection: noteRead,
     },
     async () => {
-      gates.value = await fetchGates();
+      [gates.value, pairing.value] = await Promise.all([
+        fetchGates(),
+        fetchGatePairing(),
+      ]);
       await refreshReads();
     },
   );
@@ -250,6 +261,15 @@ onUnmounted(() => {
       <v-btn
         v-if="can('setup')"
         variant="tonal"
+        prepend-icon="mdi-link-variant"
+        class="mr-2"
+        @click="onOpenPairing"
+      >
+        {{ $t('hardware.pairGates') }}
+      </v-btn>
+      <v-btn
+        v-if="can('setup')"
+        variant="tonal"
         prepend-icon="mdi-plus"
         @click="openGateDialog"
       >
@@ -257,16 +277,64 @@ onUnmounted(() => {
       </v-btn>
     </v-card-title>
     <v-card-text>
-      <v-switch
-        :model-value="autoDiscover"
-        :readonly="!can('setup')"
-        :label="$t('hardware.autoDiscover')"
-        color="primary"
+      <v-alert v-if="pairing?.open" type="info" variant="tonal" class="mb-4">
+        {{
+          pairing.closesAt
+            ? $t('hardware.pairingOpen', {
+                time: formatClockTime(pairing.closesAt),
+              })
+            : $t('hardware.pairingFirst')
+        }}
+      </v-alert>
+      <p v-else-if="can('setup')" class="text-medium-emphasis mb-4">
+        {{ $t('hardware.pairingHint') }}
+      </p>
+      <v-table
+        v-if="pairing?.waiting.length"
         density="comfortable"
-        hide-details
         class="mb-4"
-        @update:model-value="onToggleAutoDiscover"
-      />
+      >
+        <tbody>
+          <tr v-for="waiting in pairing.waiting" :key="waiting.gateId">
+            <td class="text-no-wrap">
+              {{ waiting.gateId }}
+              <v-chip
+                v-if="waiting.keyChanged"
+                v-tooltip:top="$t('hardware.keyChangedHint')"
+                size="small"
+                color="warning"
+                class="ml-2"
+              >
+                {{ $t('hardware.keyChanged') }}
+              </v-chip>
+            </td>
+            <td class="text-medium-emphasis">
+              {{
+                $t('hardware.waitingSince', {
+                  time: formatClockTime(waiting.since),
+                  address: waiting.address ?? '-',
+                })
+              }}
+            </td>
+            <td v-if="can('setup')" class="text-no-wrap text-right">
+              <v-btn
+                variant="tonal"
+                color="primary"
+                class="mr-2"
+                @click="onAcceptGate(waiting.gateId)"
+              >
+                {{ $t('hardware.accept') }}
+              </v-btn>
+              <v-btn variant="text" @click="onRejectGate(waiting.gateId)">
+                {{ $t('hardware.reject') }}
+              </v-btn>
+            </td>
+          </tr>
+        </tbody>
+      </v-table>
+      <p v-else-if="pairing?.open" class="text-medium-emphasis mb-4">
+        {{ $t('hardware.noneWaiting') }}
+      </p>
       <v-table density="comfortable">
         <thead>
           <tr>
@@ -383,9 +451,6 @@ onUnmounted(() => {
           </tr>
         </tbody>
       </v-table>
-      <v-alert v-if="!autoDiscover" type="warning" variant="tonal" class="mt-4">
-        {{ $t('hardware.autoDiscoverOff', { action: $t('hardware.addGate') }) }}
-      </v-alert>
     </v-card-text>
     <v-card-actions v-if="can('setup')">
       <v-btn

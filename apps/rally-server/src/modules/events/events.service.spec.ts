@@ -108,6 +108,15 @@ function detection(overrides: Record<string, unknown> = {}) {
 }
 
 describe('EventsService detection failures', () => {
+  it('ignores a detection for another gate than its topic', async () => {
+    // The broker lets a gate publish under its own topic only.
+    const { service, saved } = makeService({});
+
+    await service.handleMqttMessage(detection({ gateId: 'G2' }));
+
+    expect(saved).toHaveLength(0);
+  });
+
   it('keeps the raw detection when rule application fails', async () => {
     // The detection is the only evidence the car came past at all.
     const { service, saved } = makeService({

@@ -25,6 +25,8 @@ export enum ApiErrorCode {
   /** `params.assignmentCount`: deleting with `force` removes them too. */
   GATE_HAS_ASSIGNMENTS = 'gateHasAssignments',
   CLOSE_STAGE_BEFORE_POWER_OFF = 'closeStageBeforePowerOff',
+  /** Accepted or rejected meanwhile, or the server restarted. */
+  GATE_NOT_WAITING = 'gateNotWaiting',
   STAGE_RUN_NOT_FOUND = 'stageRunNotFound',
   FINISH_NOT_AFTER_START = 'finishNotAfterStart',
   INVALID_TIME = 'invalidTime',

@@ -4,6 +4,7 @@ dist-standalone/
 *.sqlite
 *.sqlite-journal
 organiser.json
+gate-keys.json
 .env
 .env.local
 

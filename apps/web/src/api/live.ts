@@ -1,4 +1,8 @@
-import type { LiveEventType, RallyStatus } from '@rally-gate/shared';
+import type {
+  GatePairingState,
+  LiveEventType,
+  RallyStatus,
+} from '@rally-gate/shared';
 import { ref } from 'vue';
 import { API_BASE } from './client';
 import type { DetectionEventRecord } from './events';
@@ -11,6 +15,7 @@ interface LivePayloads {
   'stage-run': StageRun;
   'stage-run-split': StageSplit;
   gate: Gate;
+  'gate-pairing': GatePairingState;
   'pending-detections': { pending: DetectionEventRecord[] };
   'awaiting-detections': { awaiting: DetectionEventRecord[] };
   rally: RallyInfo & { status: RallyStatus };

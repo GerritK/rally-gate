@@ -6,9 +6,11 @@ import {
   GateHeartbeat,
   VERSION,
 } from '@rally-gate/shared';
-import mqtt, { MqttClient } from 'mqtt';
+import mqtt, { ErrorWithReasonCode, MqttClient } from 'mqtt';
 import { ulid } from 'ulid';
+import { GATE_KEY_PATH } from '../paths';
 import { config } from './config';
+import { gatePassword, loadGateKey } from './gate-key';
 import { log } from './log';
 
 /** The gate's MQTT link to rally-server: heartbeats and detections out. */
@@ -32,12 +34,42 @@ export class Uplink {
    * the server measures the outage as clock offset and corrects detections by it.
    */
   constructor() {
+    const key = loadGateKey(GATE_KEY_PATH);
+    let sendKey = false;
     this.client = mqtt.connect(`mqtt://${config.mqttHost}:${config.mqttPort}`, {
       clientId: config.gateId,
       clean: false,
       queueQoSZero: false,
+      username: config.gateId,
+      password: gatePassword(key, config.gateId, false),
+      // Without it mqtt.js gives up for good on a refused login, and a gate
+      // waiting for approval must keep trying.
+      reconnectOnConnackError: true,
+    });
+    // A token is valid for a minute and only once: a fresh one every attempt.
+    this.client.on('reconnect', () => {
+      this.client.options.password = gatePassword(key, config.gateId, sendKey);
+    });
+    this.client.on('connect', () => {
+      sendKey = false;
+      this.client.options.reconnectPeriod = 1000;
     });
     this.client.on('error', (err) => {
+      // 4: pairing is open and the server doesn't know this key yet.
+      if (err instanceof ErrorWithReasonCode) {
+        sendKey = err.code === 4;
+        // Refused retries every 5 s, not every second: nothing changes faster
+        // than the organiser clicks.
+        this.client.options.reconnectPeriod = 5000;
+        if (sendKey) {
+          log.info("pairing is open on the server, sending this gate's key");
+        } else {
+          log.warn(
+            `server refused this gate (${GATE_KEY_PATH}): waiting for the organiser to approve it under Hardware → Pair gates`,
+          );
+        }
+        return;
+      }
       // Message only: this repeats every reconnect, and the stack is always the same DNS/socket frames.
       // A failed dual-stack connect is an AggregateError with an empty message; its code is the useful part.
       const code = (err as NodeJS.ErrnoException).code;

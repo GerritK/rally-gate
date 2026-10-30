@@ -172,8 +172,8 @@ Values live in `theme.ts`. The rules:
   opens on its detail page: an empty "new" page whose lists can't be filled
   before the first save is a dead end.
 - **Nothing saves on the fly.** A form saves on its Save button. The
-  exception is a lone switch that is itself the setting (auto-discover
-  gates): it applies at once, since one click puts it back.
+  exception is a lone switch that is itself the setting: it applies at
+  once, since one click puts it back.
 - **Unsaved changes are never lost silently.** Leaving a page with a dirty
   form asks first (own dialog via the router guard). Closing or reloading
   the tab uses `beforeunload`, the one place the browser's own dialog is

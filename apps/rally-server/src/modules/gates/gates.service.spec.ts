@@ -3,7 +3,6 @@ import { GatesService, measureClockOffsetMs } from './gates.service';
 
 function makeService(opts: {
   existingGate?: unknown;
-  autoDiscoverGates?: boolean;
   clockCorrectionThresholdMs?: number;
   removeAllForGate?: () => Promise<void>;
   allGates?: unknown[];
@@ -17,7 +16,6 @@ function makeService(opts: {
     find: jest.fn().mockResolvedValue(opts.allGates ?? []),
   };
   const settingsService = {
-    getBoolean: jest.fn().mockResolvedValue(opts.autoDiscoverGates ?? true),
     getNumber: jest
       .fn()
       .mockResolvedValue(
@@ -45,7 +43,7 @@ function makeService(opts: {
 }
 
 describe('GatesService.recordHeartbeat', () => {
-  it('auto-registers an unknown gate when auto-discovery is enabled (default)', async () => {
+  it('registers an unknown gate on its first heartbeat', async () => {
     const { service } = makeService({});
 
     const gate = await service.recordHeartbeat('GATE1');
@@ -57,27 +55,6 @@ describe('GatesService.recordHeartbeat', () => {
     const { service } = makeService({});
 
     expect(await service.recordHeartbeat('start_wp1')).toBeNull();
-  });
-
-  it('ignores an unknown gate when auto-discovery is disabled', async () => {
-    const { service } = makeService({ autoDiscoverGates: false });
-
-    const gate = await service.recordHeartbeat('GATE1');
-
-    expect(gate).toBeNull();
-  });
-
-  it('still updates a previously known gate when auto-discovery is disabled', async () => {
-    const { service } = makeService({
-      existingGate: { id: 'GATE1', name: 'GATE1' },
-      autoDiscoverGates: false,
-    });
-
-    const gate = await service.recordHeartbeat('GATE1', {
-      capabilities: 'simulated',
-    });
-
-    expect(gate).toMatchObject({ id: 'GATE1', capabilities: 'simulated' });
   });
 
   it('records the clock offset from the heartbeat sentAt', async () => {

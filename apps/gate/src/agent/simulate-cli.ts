@@ -21,7 +21,12 @@ const transponderKind = arg('kind') as TransponderKind | undefined;
 const host = process.env.MQTT_HOST ?? 'localhost';
 const port = process.env.MQTT_PORT ?? '57431';
 
+// Without a login, which only a server with GATES_AUTO_ACCEPT=1 allows.
 const client = mqtt.connect(`mqtt://${host}:${port}`);
+client.on('error', (err) => {
+  console.error(`${err.message} — start the server with GATES_AUTO_ACCEPT=1`);
+  process.exit(1);
+});
 
 client.on('connect', () => {
   const event: DetectionEvent = {

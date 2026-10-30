@@ -6,7 +6,13 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { createServer, Server, Socket } from 'net';
-import { Aedes } from 'aedes';
+import { Aedes, type AuthenticateError, type Client } from 'aedes';
+import { DETECTION_TOPIC_PREFIX } from '@rally-gate/shared';
+import { GateLogin, GatePairingService } from '../gates/gate-pairing.service';
+
+function remoteAddress(client: Client): string | null {
+  return (client.conn as Socket).remoteAddress?.replace(/^::ffff:/, '') ?? null;
+}
 
 @Injectable()
 export class BrokerService implements OnModuleInit, OnModuleDestroy {
@@ -14,11 +20,49 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
   private aedes: Aedes;
   private server: Server;
 
-  constructor(private readonly events: EventEmitter2) {}
+  constructor(
+    private readonly events: EventEmitter2,
+    private readonly pairing: GatePairingService,
+  ) {}
 
   async onModuleInit() {
     const port = Number(process.env.MQTT_PORT ?? 57431);
-    this.aedes = await Aedes.createBroker();
+    // Gates logged in with a key; under GATES_AUTO_ACCEPT the rest are dev
+    // tools (simulate, screenshots) publishing for any gate.
+    const gates = new WeakSet<Client>();
+    this.aedes = await Aedes.createBroker({
+      authenticate: (client, username, password, done) => {
+        if (!username && this.pairing.allowsAnonymous) {
+          return done(null, true);
+        }
+        const result =
+          username && client.id === username
+            ? this.pairing.login(
+                username,
+                password?.toString() ?? '',
+                remoteAddress(client),
+              )
+            : GateLogin.REFUSED;
+        if (result === GateLogin.ACCEPTED) {
+          gates.add(client);
+          return done(null, true);
+        }
+        const error = new Error(result) as AuthenticateError;
+        error.returnCode = result === GateLogin.SEND_KEY ? 4 : 5;
+        done(error, false);
+      },
+      // A gate speaks for itself only, and listens to nothing.
+      authorizePublish: (client, packet, callback) =>
+        callback(
+          !client ||
+            !gates.has(client) ||
+            packet.topic.startsWith(`${DETECTION_TOPIC_PREFIX}/${client.id}/`)
+            ? null
+            : new Error(`${client.id} may not publish to ${packet.topic}`),
+        ),
+      authorizeSubscribe: (client, subscription, callback) =>
+        callback(null, gates.has(client) ? null : subscription),
+    });
     this.server = createServer(this.aedes.handle);
 
     this.aedes.on('publish', (packet, client) => {
@@ -30,7 +74,7 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
       this.events.emit('mqtt.message', {
         topic: packet.topic,
         payload: packet.payload,
-        address: (client.conn as Socket).remoteAddress,
+        address: remoteAddress(client),
       });
     });
 

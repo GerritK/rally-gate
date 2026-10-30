@@ -4,6 +4,7 @@ export type LiveEventType =
   | 'stage-run'
   | 'stage-run-split'
   | 'gate'
+  | 'gate-pairing'
   | 'pending-detections'
   | 'awaiting-detections'
   | 'rally';

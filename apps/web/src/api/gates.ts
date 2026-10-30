@@ -1,4 +1,4 @@
-import type { GatePowerOffResult } from '@rally-gate/shared';
+import type { GatePairingState, GatePowerOffResult } from '@rally-gate/shared';
 import { apiFetch, deleteRequest, postRequest, putJson } from './client';
 
 export interface Gate {
@@ -41,4 +41,21 @@ export function deleteGate(id: string, force = false): Promise<void> {
 /** 409 while a stage is active. */
 export function powerOffAllGates(): Promise<GatePowerOffResult[]> {
   return postRequest('/gates/power-off');
+}
+
+export function fetchGatePairing(): Promise<GatePairingState> {
+  return apiFetch('/gate-pairing');
+}
+
+/** Open for 10 minutes from now. */
+export function openGatePairing(): Promise<GatePairingState> {
+  return postRequest('/gate-pairing');
+}
+
+export function acceptWaitingGate(gateId: string): Promise<GatePairingState> {
+  return postRequest(`/gate-pairing/${gateId}`);
+}
+
+export function rejectWaitingGate(gateId: string): Promise<void> {
+  return deleteRequest(`/gate-pairing/${gateId}`);
 }

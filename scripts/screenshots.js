@@ -334,6 +334,7 @@ async function main() {
       DB_PATH: dbPath,
       MQTT_PORT: String(MQTT_PORT),
       MDNS_DISABLE: '1',
+      GATES_AUTO_ACCEPT: '1',
       LOG_LEVEL: 'warn',
     },
     stdio: 'inherit',
