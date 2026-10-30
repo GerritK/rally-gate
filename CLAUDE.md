@@ -25,6 +25,7 @@ The "why" lives in `docs/` — read the relevant one first:
 - `design-system.md` — colour, type, layout, status, confirmation and print rules for every web UI
 - `gate-config-ui.md` — the on-gate config service, Wi-Fi and hotspot
 - `esp32-gate.md` — the ESP32 NFC check-in gate
+- `openwrt-guest-access.md` — the public page from an OpenWRT guest network: firewall, NAT, `rally.lan` via mDNS
 - `development-roadmap.md` — standing rules, built, next, deliberately deferred (check before starting new work)
 
 ## Commands

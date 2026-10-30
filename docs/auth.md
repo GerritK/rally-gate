@@ -40,7 +40,8 @@ Consequences:
   design below assumes it, and the README and the login page say so.
   Open: a guest network's client isolation usually blocks the public page
   too, so participants get it through online mode, a printout, or a router
-  that forwards only `57430` from the guest network.
+  that forwards only `57430` from the guest network (OpenWRT:
+  `openwrt-guest-access.md`).
 - **WPA3 where the hardware allows:** with SAE, knowing the password no longer
   decrypts others' traffic. Pi and ESP32-S3 support it; older phones
   partly. It doesn't help against a spoofed server.
