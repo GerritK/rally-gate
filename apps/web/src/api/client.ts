@@ -44,6 +44,14 @@ export async function apiFetch<T>(
   });
   const body = await res.json().catch(() => null);
   if (!res.ok) {
+    // Blocked, or logged out elsewhere: show what this browser may do now.
+    // Imported late, since auth.ts builds on this module.
+    if (
+      (res.status === 401 || res.status === 403) &&
+      path !== '/auth/session'
+    ) {
+      void import('./auth').then((auth) => auth.fetchSession());
+    }
     throw new ApiError(
       res.status,
       (body ?? {}) as Partial<ApiErrorBody>,

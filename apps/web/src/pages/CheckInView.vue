@@ -14,6 +14,7 @@ import { ENTRY_STATUS_DISPLAY } from '../format';
 import TransponderFields from '../components/TransponderFields.vue';
 import TransponderList from '../components/TransponderList.vue';
 import { toTransponderDrafts, toTransponderInput } from '../entry-status';
+import { can } from '../api/auth';
 
 /**
  * Two stations, one job each: the desk checks crews in, the scrutineers pass
@@ -331,6 +332,7 @@ onMounted(refresh);
           @saved="onSaved"
         >
           <v-btn
+            v-if="can('editEntry')"
             variant="tonal"
             prepend-icon="mdi-pencil"
             @click="dialogOpen = true"

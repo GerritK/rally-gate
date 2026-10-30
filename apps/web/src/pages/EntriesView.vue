@@ -12,6 +12,7 @@ import EntryDialog from '../components/EntryDialog.vue';
 import EntryStatusActions from '../components/EntryStatusActions.vue';
 import { ENTRY_STATUS_DISPLAY } from '../format';
 import { transponderLabels } from '../entry-status';
+import { can } from '../api/auth';
 
 const router = useRouter();
 const entries = ref<Entry[]>([]);
@@ -39,6 +40,7 @@ onMounted(refresh);
       <v-spacer />
       <div class="d-flex flex-wrap justify-end ga-2">
         <v-btn
+          v-if="can('editEntry')"
           variant="tonal"
           prepend-icon="mdi-clipboard-check-outline"
           to="/entries/check-in"
@@ -46,6 +48,7 @@ onMounted(refresh);
           {{ $t('checkIn.title') }}
         </v-btn>
         <v-btn
+          v-if="can('editEntry')"
           color="primary"
           prepend-icon="mdi-plus"
           @click="dialogOpen = true"

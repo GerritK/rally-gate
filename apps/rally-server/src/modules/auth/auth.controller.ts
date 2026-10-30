@@ -23,7 +23,7 @@ import {
   SetPasswordDto,
   SetupDto,
 } from './dto';
-import { setPassword, setupTokenMatches } from './organiser';
+import { serverUrls, setPassword, setupTokenMatches } from './organiser';
 
 /**
  * No expiry: a marshal logged out mid-stage is worse than the remaining
@@ -98,6 +98,13 @@ export class AuthController {
   @HttpCode(204)
   password(@Body() body: SetPasswordDto) {
     setPassword(body.password);
+  }
+
+  /** What an invitation's QR code links to: the LAN address, never localhost. */
+  @Private()
+  @Get('server-urls')
+  serverUrls() {
+    return serverUrls();
   }
 
   @Private()

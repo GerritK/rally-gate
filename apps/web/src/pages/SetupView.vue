@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { can } from '../api/auth';
 import { RallyStatus, StageStatus } from '@rally-gate/shared';
 import { onMounted, ref } from 'vue';
 import {
@@ -169,7 +170,7 @@ onMounted(async () => {
         <v-icon icon="mdi-file-outline" size="small" />
         {{ eventInfo.file }}
       </v-card-subtitle>
-      <template v-if="eventInfo?.switchable" #append>
+      <template v-if="eventInfo?.switchable && can('setup')" #append>
         <v-btn variant="text" prepend-icon="mdi-plus" @click="openNew">
           {{ $t('setup.newEvent') }}
         </v-btn>
@@ -183,7 +184,11 @@ onMounted(async () => {
       </template>
     </v-card-item>
     <v-card-text>
-      <form class="d-flex flex-wrap align-center ga-3" @submit.prevent="onSave">
+      <v-form
+        :readonly="!can('setup')"
+        class="d-flex flex-wrap align-center ga-3"
+        @submit.prevent="onSave"
+      >
         <v-text-field
           v-model="rallyInfo.name"
           :label="$t('setup.rallyName')"
@@ -206,6 +211,7 @@ onMounted(async () => {
           style="min-width: 220px"
         />
         <v-btn
+          v-if="can('setup')"
           type="submit"
           color="primary"
           :loading="saving"
@@ -213,7 +219,7 @@ onMounted(async () => {
         >
           {{ $t('common.save') }}
         </v-btn>
-      </form>
+      </v-form>
     </v-card-text>
   </v-card>
 
@@ -222,7 +228,7 @@ onMounted(async () => {
       <v-card-title>{{ $t('rally.title') }}</v-card-title>
       <template #append>
         <StatusChip :display="RALLY_STATUS_DISPLAY[rallyStatus]" />
-        <v-menu v-if="rallyStatus === RallyStatus.CLOSED">
+        <v-menu v-if="rallyStatus === RallyStatus.CLOSED && can('setup')">
           <template #activator="{ props: menu }">
             <v-btn
               v-bind="menu"
@@ -246,7 +252,7 @@ onMounted(async () => {
     <v-card-text class="d-flex flex-wrap align-center ga-4">
       <span class="flex-1-1">{{ $t(`rally.hint.${rallyStatus}`) }}</span>
       <v-btn
-        v-if="rallyStatus === RallyStatus.SETUP"
+        v-if="rallyStatus === RallyStatus.SETUP && can('setup')"
         color="success"
         variant="outlined"
         prepend-icon="mdi-play"
@@ -255,7 +261,7 @@ onMounted(async () => {
         {{ $t('rally.start') }}
       </v-btn>
       <v-btn
-        v-else-if="rallyStatus === RallyStatus.RUNNING"
+        v-else-if="rallyStatus === RallyStatus.RUNNING && can('setup')"
         color="error"
         variant="outlined"
         prepend-icon="mdi-flag-checkered"
@@ -360,6 +366,12 @@ onMounted(async () => {
       >
         <v-card-title>{{ $t('displaySetup.title') }}</v-card-title>
         <v-card-text>{{ $t('setup.displayHint') }}</v-card-text>
+      </v-card>
+    </v-col>
+    <v-col v-if="can('setup')" cols="12" sm="4">
+      <v-card class="h-100" to="/setup/access" prepend-icon="mdi-key-chain">
+        <v-card-title>{{ $t('access.title') }}</v-card-title>
+        <v-card-text>{{ $t('access.hint') }}</v-card-text>
       </v-card>
     </v-col>
   </v-row>

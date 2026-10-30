@@ -10,8 +10,8 @@ import {
 } from '@nestjs/common';
 import { CreatePenaltyDto, PenaltyTypeDto } from './dto';
 import { PenaltiesService } from './penalties.service';
-import { AccessRole, RallyStatus } from '@rally-gate/shared';
-import { Roles } from '../auth/auth.guard';
+import { RallyStatus } from '@rally-gate/shared';
+import { Requires } from '../auth/auth.guard';
 import { LockedWhen } from '../rally-info/rally-lock';
 
 @Controller('penalty-types')
@@ -43,7 +43,7 @@ export class PenaltyTypesController {
 }
 
 @Controller('penalties')
-@Roles(AccessRole.TIMING)
+@Requires('penalties')
 export class PenaltiesController {
   constructor(private readonly penaltiesService: PenaltiesService) {}
 

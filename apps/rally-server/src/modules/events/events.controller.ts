@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { AssignEntryDto, RecentEventsQueryDto } from './dto';
 import { EventsService } from './events.service';
-import { AccessRole, RallyStatus } from '@rally-gate/shared';
-import { CurrentPrincipal, Roles } from '../auth/auth.guard';
-import { assertMayChangeStage, type Principal } from '../auth/auth.service';
+import { RallyStatus } from '@rally-gate/shared';
+import { CurrentPrincipal, Requires } from '../auth/auth.guard';
+import { assertMay, type Principal } from '../auth/auth.service';
 import { LockedWhen } from '../rally-info/rally-lock';
 
 @Controller('events')
@@ -26,7 +26,7 @@ export class EventsController {
   }
 
   /** Retry now rather than waiting for the periodic sweep. */
-  @Roles(AccessRole.TIMING)
+  @Requires('retryPending')
   @Post('pending/retry')
   async retryPending() {
     return { recovered: await this.eventsService.reprocessPending() };
@@ -39,28 +39,30 @@ export class EventsController {
   }
 
   @LockedWhen(RallyStatus.CLOSED)
-  @Roles(AccessRole.TIMING, AccessRole.STAGE_MARSHAL)
+  @Requires('assignPassing')
   @Post(':eventId/assign')
   async assign(
     @Param('eventId') eventId: string,
     @Body() body: AssignEntryDto,
     @CurrentPrincipal() principal: Principal,
   ) {
-    assertMayChangeStage(
+    assertMay(
       principal,
+      'assignPassing',
       await this.eventsService.stageIdOfAwaiting(eventId),
     );
     return this.eventsService.assignEntry(eventId, body.entryId);
   }
 
-  @Roles(AccessRole.TIMING, AccessRole.STAGE_MARSHAL)
+  @Requires('assignPassing')
   @Post(':eventId/dismiss')
   async dismiss(
     @Param('eventId') eventId: string,
     @CurrentPrincipal() principal: Principal,
   ) {
-    assertMayChangeStage(
+    assertMay(
       principal,
+      'assignPassing',
       await this.eventsService.stageIdOfAwaiting(eventId),
     );
     return this.eventsService.dismissAwaiting(eventId);

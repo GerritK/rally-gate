@@ -9,8 +9,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import {
   AccessRole,
   ApiErrorCode,
+  mayDo,
   type AuthDevice,
   type AuthSession,
+  type Permission,
 } from '@rally-gate/shared';
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { IsNull, Repository } from 'typeorm';
@@ -211,20 +213,32 @@ export class AuthService implements OnApplicationBootstrap {
 }
 
 /**
- * For routes a stage marshal may use: 403 unless the stage is on its
- * invitation. Every other role passes; `@Roles` already decided those.
- * Null `stageId` (a passing at a gate with no active stage) is no marshal's.
+ * The handler's own check where the guard can't decide: a stage marshal's
+ * stage, or what an entry's status change needs. Null `stageId` (a passing
+ * at a gate with no active stage) is no marshal's.
  */
-export function assertMayChangeStage(
+export function assertMay(
   principal: Principal,
-  stageId: string | null,
+  permission: Permission,
+  stageId?: string | null,
 ): void {
-  if (principal.role !== AccessRole.STAGE_MARSHAL) return;
-  if (stageId && principal.invitation?.stageIds.includes(stageId)) return;
+  const login = {
+    role: principal.role,
+    stageIds: principal.invitation?.stageIds ?? [],
+  };
+  if (mayDo(login, permission, stageId)) return;
+  const stageOnly =
+    principal.role === AccessRole.STAGE_MARSHAL &&
+    mayDo({ ...login, stageIds: [stageId ?? ''] }, permission, stageId);
   throw new ForbiddenException(
-    apiError(
-      ApiErrorCode.STAGE_NOT_YOURS,
-      'This login may only change the stages on its invitation',
-    ),
+    stageOnly
+      ? apiError(
+          ApiErrorCode.STAGE_NOT_YOURS,
+          'This login may only change the stages on its invitation',
+        )
+      : apiError(
+          ApiErrorCode.ROLE_NOT_ALLOWED,
+          `${principal.role} may not do this`,
+        ),
   );
 }

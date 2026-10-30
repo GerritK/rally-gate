@@ -46,6 +46,17 @@ export const router = createRouter({
       component: () => import('./pages/SetupScoringView.vue'),
     },
     {
+      path: '/setup/access',
+      component: () => import('./pages/SetupAccessView.vue'),
+    },
+    { path: '/login', component: () => import('./pages/LoginView.vue') },
+    // What an invitation's QR code opens.
+    {
+      path: '/join/:code',
+      component: () => import('./pages/LoginView.vue'),
+      props: true,
+    },
+    {
       path: '/setup/display',
       component: () => import('./pages/SetupDisplayView.vue'),
     },

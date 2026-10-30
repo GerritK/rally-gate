@@ -35,6 +35,7 @@ import TransponderList from '../components/TransponderList.vue';
 import EntryDialog from '../components/EntryDialog.vue';
 import EntryStatusActions from '../components/EntryStatusActions.vue';
 import PenaltyDialog from '../components/PenaltyDialog.vue';
+import { can } from '../api/auth';
 import { flagName, flagUrl } from '../crew';
 import {
   formatDuration,
@@ -252,6 +253,7 @@ onMounted(refresh);
         <CrewName :crew="entry" class="rg-head-crew" />
         <template #append>
           <v-btn
+            v-if="can('editEntry')"
             variant="tonal"
             prepend-icon="mdi-pencil"
             @click="dialogOpen = true"
@@ -467,6 +469,7 @@ onMounted(refresh);
         <v-card-title>{{ $t('penalties.penalties') }}</v-card-title>
         <template #append>
           <v-btn
+            v-if="can('penalties')"
             variant="tonal"
             prepend-icon="mdi-plus"
             @click="penaltyDialog?.add(entry.id, null)"
@@ -513,7 +516,7 @@ onMounted(refresh);
               >
             </td>
             <td>
-              <v-menu>
+              <v-menu v-if="can('penalties')">
                 <template #activator="{ props: menu }">
                   <v-btn
                     v-bind="menu"

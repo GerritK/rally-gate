@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { can } from '../api/auth';
 import {
   START_ORDER_DIRECTION_KEY,
   START_ORDER_GROUPING_KEY,
@@ -97,7 +98,11 @@ onMounted(async () => {
           </template>
         </i18n-t>
       </v-alert>
-      <form class="d-flex flex-column ga-4" @submit.prevent="onSave">
+      <v-form
+        :readonly="!can('setup')"
+        class="d-flex flex-column ga-4"
+        @submit.prevent="onSave"
+      >
         <v-select
           v-model="grouping"
           :items="groupingOptions"
@@ -131,6 +136,7 @@ onMounted(async () => {
         />
         <div class="d-flex align-center ga-3">
           <v-btn
+            v-if="can('setup')"
             type="submit"
             color="primary"
             :loading="saving"
@@ -140,7 +146,7 @@ onMounted(async () => {
             {{ $t('common.save') }}
           </v-btn>
         </div>
-      </form>
+      </v-form>
     </v-card-text>
   </v-card>
 </template>

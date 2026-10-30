@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { can } from '../api/auth';
 import { computed, onMounted, ref, watch } from 'vue';
 import {
   createGateAssignment,
@@ -182,7 +183,11 @@ onMounted(load);
           })
         }}
       </v-alert>
-      <form class="rg-stage-form" @submit.prevent="onSaveStage">
+      <v-form
+        :readonly="!can('setup')"
+        class="rg-stage-form"
+        @submit.prevent="onSaveStage"
+      >
         <div class="rg-stage-sections">
           <div class="rg-stage-fields">
             <div class="rg-section-title">{{ $t('stage.general') }}</div>
@@ -243,6 +248,7 @@ onMounted(load);
         </div>
         <div>
           <v-btn
+            v-if="can('setup')"
             type="submit"
             color="primary"
             :loading="savingStage"
@@ -252,7 +258,7 @@ onMounted(load);
             {{ $t('common.save') }}
           </v-btn>
         </div>
-      </form>
+      </v-form>
     </v-card-text>
   </v-card>
 
@@ -261,7 +267,7 @@ onMounted(load);
       {{ $t('stage.assignments') }}
       <v-spacer />
       <v-btn
-        v-if="stageEditable"
+        v-if="stageEditable && can('setup')"
         variant="tonal"
         prepend-icon="mdi-plus"
         @click="openAssignmentDialog"
@@ -308,7 +314,7 @@ onMounted(load);
               </v-chip>
             </td>
             <td class="text-no-wrap">
-              <v-menu v-if="stageEditable">
+              <v-menu v-if="stageEditable && can('setup')">
                 <template #activator="{ props: menu }">
                   <v-btn
                     v-bind="menu"

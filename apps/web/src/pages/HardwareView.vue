@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { can } from '../api/auth';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { ApiError } from '../api/client';
 import {
@@ -246,13 +247,19 @@ onUnmounted(() => {
     <v-card-title class="d-flex align-center">
       {{ $t('hardware.gates') }}
       <v-spacer />
-      <v-btn variant="tonal" prepend-icon="mdi-plus" @click="openGateDialog">
+      <v-btn
+        v-if="can('setup')"
+        variant="tonal"
+        prepend-icon="mdi-plus"
+        @click="openGateDialog"
+      >
         {{ $t('hardware.addGate') }}
       </v-btn>
     </v-card-title>
     <v-card-text>
       <v-switch
         :model-value="autoDiscover"
+        :readonly="!can('setup')"
         :label="$t('hardware.autoDiscover')"
         color="primary"
         density="comfortable"
@@ -325,7 +332,7 @@ onUnmounted(() => {
             <td>{{ gate.capabilities ?? '-' }}</td>
             <td><GateVersion :gate="gate" /></td>
             <td class="text-no-wrap">
-              <v-menu>
+              <v-menu v-if="can('setup')">
                 <template #activator="{ props: menu }">
                   <v-btn
                     v-bind="menu"
@@ -380,7 +387,7 @@ onUnmounted(() => {
         {{ $t('hardware.autoDiscoverOff', { action: $t('hardware.addGate') }) }}
       </v-alert>
     </v-card-text>
-    <v-card-actions>
+    <v-card-actions v-if="can('setup')">
       <v-btn
         variant="text"
         color="error"
@@ -402,14 +409,14 @@ onUnmounted(() => {
         <tr>
           <th>{{ $t('stages.id') }}</th>
           <th>{{ $t('stages.name') }}</th>
-          <th width="1%"></th>
+          <th v-if="can('setup')" width="1%"></th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="gate in knownGates" :key="gate.id">
           <td>{{ gate.id }}</td>
           <td>{{ gate.name }}</td>
-          <td class="text-no-wrap text-right">
+          <td v-if="can('setup')" class="text-no-wrap text-right">
             <v-chip v-if="gateIds.has(gate.id)" size="small" class="mr-2">
               {{ $t('hardware.inThisEvent') }}
             </v-chip>

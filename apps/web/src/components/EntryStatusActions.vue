@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { EntryStatus } from '@rally-gate/shared';
+import { EntryStatus, entryStatusPermission } from '@rally-gate/shared';
+import { can } from '../api/auth';
 import { notifyError } from '@rally-gate/ui';
 import type { Entry, EntryPatch } from '../api/entries';
 import { isForward, statusActions, useEntryStatus } from '../entry-status';
@@ -22,7 +23,13 @@ const emit = defineEmits<{ saved: [entry: Entry] }>();
 
 const setStatus = useEntryStatus();
 const actions = computed(() => {
-  const { next, others } = statusActions(props.entry.status);
+  const { next: step, others: all } = statusActions(props.entry.status);
+  // Only the steps this login may take: Timing withdraws, only the
+  // organiser disqualifies.
+  const allowed = (a: { to: EntryStatus }) =>
+    can(entryStatusPermission(props.entry.status, a.to));
+  const next = step && allowed(step) ? step : null;
+  const others = all.filter(allowed);
   const shown = (to: EntryStatus) =>
     props.large && props.alsoShow?.includes(to);
   return {

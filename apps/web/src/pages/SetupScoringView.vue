@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { can } from '../api/auth';
 import {
   DEFAULT_NOTIONAL_PENALTY_MS,
   NOTIONAL_PENALTY_MS_KEY,
@@ -173,7 +174,8 @@ onMounted(async () => {
           </template>
         </i18n-t>
       </v-alert>
-      <form
+      <v-form
+        :readonly="!can('setup')"
         class="d-flex flex-wrap align-center ga-3"
         @submit.prevent="onSavePenalty"
       >
@@ -187,6 +189,7 @@ onMounted(async () => {
           style="max-width: 260px"
         />
         <v-btn
+          v-if="can('setup')"
           type="submit"
           color="primary"
           :loading="savingPenalty"
@@ -195,7 +198,7 @@ onMounted(async () => {
         >
           {{ $t('common.save') }}
         </v-btn>
-      </form>
+      </v-form>
     </v-card-text>
   </v-card>
 
@@ -203,7 +206,12 @@ onMounted(async () => {
     <v-card-title class="d-flex align-center">
       {{ $t('penalties.catalogue') }}
       <v-spacer />
-      <v-btn variant="tonal" prepend-icon="mdi-plus" @click="openDialog(null)">
+      <v-btn
+        v-if="can('setup')"
+        variant="tonal"
+        prepend-icon="mdi-plus"
+        @click="openDialog(null)"
+      >
         {{ $t('penalties.addType') }}
       </v-btn>
     </v-card-title>
@@ -232,6 +240,7 @@ onMounted(async () => {
             </td>
             <td class="text-no-wrap">
               <v-btn
+                v-if="can('setup')"
                 size="small"
                 variant="text"
                 prepend-icon="mdi-pencil"
@@ -240,7 +249,7 @@ onMounted(async () => {
               >
                 {{ $t('common.edit') }}
               </v-btn>
-              <v-menu>
+              <v-menu v-if="can('setup')">
                 <template #activator="{ props: menu }">
                   <v-btn
                     v-bind="menu"

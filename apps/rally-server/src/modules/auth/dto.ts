@@ -27,7 +27,7 @@ export class SetPasswordDto {
   password: string;
 }
 
-/** `token` is the `?t=` of the setup link the server logs. */
+/** `token` is the `?setup=` of the setup link the server logs. */
 export class SetupDto extends SetPasswordDto {
   @IsString()
   @IsNotEmpty()

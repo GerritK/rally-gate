@@ -9,6 +9,7 @@ import {
   SUPPORT_URL,
   t,
 } from '@rally-gate/ui';
+import { fetchSession, session, sessionName } from './api/auth';
 import { fetchEventInfo } from './api/event';
 import { fetchRallyInfo, rallyName, rallyStatus } from './api/rally-info';
 import { liveStatus } from './api/live';
@@ -51,13 +52,17 @@ const LIVE_DISPLAY = {
 // up here, on the next navigation.
 watch(
   () => route.path,
-  () => fetchRallyInfo().catch(() => undefined),
+  () => {
+    fetchRallyInfo().catch(() => undefined);
+    fetchSession().catch(() => undefined);
+  },
 );
 
 onMounted(async () => {
   void fetchServerVersion();
   syncServerClock().catch(() => undefined);
   void loadDisplaySettings();
+  void fetchSession();
   await fetchRallyInfo();
   fileName.value = eventName((await fetchEventInfo()).file);
 });
@@ -152,6 +157,11 @@ onMounted(async () => {
       <template #append>
         <v-list nav density="compact">
           <v-list-item
+            to="/login"
+            :prepend-icon="session?.role ? 'mdi-account-check' : 'mdi-login'"
+            :title="session?.role ? sessionName(session) : t('login.title')"
+          />
+          <v-list-item
             :href="REPO_URL"
             target="_blank"
             prepend-icon="mdi-github"
@@ -171,6 +181,21 @@ onMounted(async () => {
     </v-navigation-drawer>
     <v-main>
       <v-container fluid class="py-6">
+        <v-alert
+          v-if="session && !session.role && route.path !== '/login'"
+          type="info"
+          variant="tonal"
+          density="compact"
+          icon="mdi-eye-outline"
+          class="mb-4"
+        >
+          {{ t('login.notLoggedIn') }}
+          <template #append>
+            <v-btn variant="text" size="small" to="/login">
+              {{ t('login.title') }}
+            </v-btn>
+          </template>
+        </v-alert>
         <router-view />
       </v-container>
     </v-main>

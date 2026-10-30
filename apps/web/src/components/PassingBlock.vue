@@ -12,6 +12,8 @@ defineProps<{
   /** Later passings at this card's gates, shown after this one is handled:
    *  passings are assigned in time order, and the suggestion is too. */
   queued: DetectionEventRecord[];
+  /** Shown, but this login may not assign it. */
+  readonly?: boolean;
 }>();
 defineEmits<{
   pick: [entryId: string];
@@ -53,7 +55,7 @@ defineEmits<{
       <!-- Wraps as one group, never button by button, and the select is sized
          by the layout, not its content: picking a driver must not shift the
          buttons under the marshal's pointer. -->
-      <div class="rg-passing-actions">
+      <div v-if="!readonly" class="rg-passing-actions">
         <v-select
           :model-value="entryId"
           :items="entryOptions"
@@ -110,6 +112,7 @@ defineEmits<{
       </span>
       <v-spacer />
       <v-btn
+        v-if="!readonly"
         size="small"
         variant="text"
         prepend-icon="mdi-close"

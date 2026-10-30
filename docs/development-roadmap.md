@@ -92,13 +92,12 @@ One line each; the linked doc has the detail. History is in git.
 
 - **Access and authentication** (`auth.md`), before the first real event, in
   three steps, each shippable:
-  1. API and dashboard. Built: the server side (roles on every change,
-     invitations and devices, organiser by localhost or password with a setup
-     QR, `reset-admin`). Next, each its own commit: the dashboard for it
-     (redeem page with camera, invitations with printable QR codes, devices,
-     password login and `/setup` page; until then only the server machine
-     can change anything), the device id on every correction, penalty and
-     assignment, then the public page with internal reads behind the login.
+  1. API and dashboard. Built: roles on every change, invitations with
+     printable QR codes and devices (Setup → Access), organiser by localhost
+     or password with a setup QR, `reset-admin`, `/login` and `/join/:code`,
+     the dashboard showing only what the role may do. Next, each its own
+     commit: the device id on every correction, penalty and assignment, then
+     the public page with internal reads behind the login.
   2. Broker and gates: self-generated gate key, pairing and approval,
      detections of waiting gates held, `autoDiscoverGates` removed,
      `GATES_AUTO_ACCEPT` for dev. Check how mqtt.js backs off on a refused

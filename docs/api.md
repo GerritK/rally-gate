@@ -18,12 +18,12 @@ Every request except GET needs a login (`auth.md`): the server machine itself
 cookie. None is 401 `loginRequired`, a role the route doesn't allow 403
 `roleNotAllowed`, a stage marshal outside its stages 403 `stageNotYours`, and
 a browser change whose `Origin` isn't this server 403 `foreignOrigin`.
-Changes are the organiser's unless `@Roles` on the route says otherwise:
-Timing may assign and dismiss passings, retry pending, add and delete
-penalties, activate and close stages and change stage runs; a stage marshal
-may assign and dismiss passings and create, correct and finish runs on its
-stages; Check-in may create and edit entries. GETs stay open until the public
-page lands, except the invitation and device lists.
+Changes are the organiser's unless `@Requires` on the route names a
+`PERMISSIONS` entry (`packages/shared/src/permissions.ts`, the table in
+`auth.md`). `PATCH /entries/:id` checks the change itself: other fields need
+`editEntry`, a status change what that step needs (`entryStatusPermission`).
+GETs stay open until the public page lands, except the invitation and device
+lists.
 
 | Endpoint | Methods | Notes |
 |---|---|---|

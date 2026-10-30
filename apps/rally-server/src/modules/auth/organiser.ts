@@ -7,7 +7,7 @@ import {
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { toString as qrToString } from 'qrcode';
-import { lanAddresses } from '../discovery/discovery.service';
+import { lanAddresses, mdnsHost } from '../discovery/discovery.service';
 import { eventsDir } from '../event-files/event-files';
 
 /**
@@ -25,7 +25,7 @@ export function organiserFile(): string {
 interface OrganiserFile {
   /** `salt:hash`, scrypt, both hex. */
   passwordHash?: string;
-  /** For the `/setup?t=` link while no password is set. */
+  /** For the `/login?setup=` link while no password is set. */
   setupToken?: string;
 }
 
@@ -84,15 +84,30 @@ export function ensureSetupToken(reset = false): string {
 }
 
 /**
- * The LAN IP, not `rally-server.local`: Android resolves `.local`
- * unreliably. One link per address, since which one a phone reaches is
- * unknown here.
+ * One link per LAN IP, since which one a phone reaches is unknown here.
+ * Right now only: the IP changes with the network.
  */
-export async function setupInstructions(token: string): Promise<string> {
+function lanUrls(): string[] {
   const port = process.env.PORT ?? 57430;
-  const urls = (lanAddresses().length ? lanAddresses() : ['localhost']).map(
-    (ip) => `http://${ip}:${port}/setup?t=${token}`,
+  return (lanAddresses().length ? lanAddresses() : ['localhost']).map(
+    (ip) => `http://${ip}:${port}`,
   );
+}
+
+/**
+ * For printed invitations: the mDNS name first, since sheets are often
+ * printed at home and the IP there is not the one at the rally. The IPs
+ * follow for phones that can't resolve `.local` (older Android).
+ */
+export function serverUrls(): string[] {
+  const host = mdnsHost();
+  const port = process.env.PORT ?? 57430;
+  return [...(host ? [`http://${host}:${port}`] : []), ...lanUrls()];
+}
+
+/** Scanned off the live log, so the current IP is the safe choice. */
+export async function setupInstructions(token: string): Promise<string> {
+  const urls = lanUrls().map((url) => `${url}/login?setup=${token}`);
   const qr = await qrToString(urls[0], { type: 'terminal', small: true });
   return [
     'No organiser password yet. Scan this QR code with a phone on the rally network to set it:',

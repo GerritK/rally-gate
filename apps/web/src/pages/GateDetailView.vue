@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { can } from '../api/auth';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { formatClockTime, formatRelativeTime } from '@rally-gate/ui';
 import { fetchRecentEvents, type DetectionEventRecord } from '../api/events';
@@ -189,6 +190,7 @@ onUnmounted(() => {
           <v-card-subtitle class="rg-timing">{{ gate.id }}</v-card-subtitle>
           <template #append>
             <v-btn
+              v-if="can('setup')"
               variant="tonal"
               prepend-icon="mdi-pencil"
               @click="openRename"
@@ -236,7 +238,7 @@ onUnmounted(() => {
               <template v-if="gate.address">
                 <span class="rg-timing">{{ gate.address }}</span>
                 <v-btn
-                  v-if="online"
+                  v-if="online && can('setup')"
                   :href="gateConfigUrl(gate.address)"
                   target="_blank"
                   size="small"

@@ -20,6 +20,13 @@ import { networkInterfaces, NetworkInterfaceInfo } from 'os';
  */
 const DEFAULT_MDNS_HOST = 'rally-server.local';
 
+/** The advertised name, null when advertising is off. */
+export function mdnsHost(): string | null {
+  return process.env.MDNS_DISABLE === '1'
+    ? null
+    : (process.env.MDNS_HOST ?? DEFAULT_MDNS_HOST);
+}
+
 // ponytail: adapter-name heuristic, not per-interface answers; a real
 // responder (avahi) answers each query with the address of the interface it
 // arrived on, which bonjour-service can't do.
@@ -53,12 +60,12 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
   private service?: Service;
 
   onModuleInit() {
-    if (process.env.MDNS_DISABLE === '1') {
+    const host = mdnsHost();
+    if (!host) {
       this.logger.log('mDNS advertisement disabled (MDNS_DISABLE=1)');
       return;
     }
 
-    const host = process.env.MDNS_HOST ?? DEFAULT_MDNS_HOST;
     const mqttPort = Number(process.env.MQTT_PORT ?? 57431);
 
     try {

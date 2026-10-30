@@ -17,7 +17,8 @@ import {
   TIMING_MARKS,
   ENTRY_STATUS_DISPLAY,
 } from './format';
-import type { Crew, Starter } from '@rally-gate/shared';
+import type { Crew, Invitation, Starter } from '@rally-gate/shared';
+import { formatCode, joinUrl } from './api/auth';
 import { logoUrl, notifyError, t } from '@rally-gate/ui';
 import barlowBoldUrl from './assets/fonts/Barlow-Bold.ttf?url';
 import barlowRegularUrl from './assets/fonts/Barlow-Regular.ttf?url';
@@ -472,7 +473,6 @@ async function openPdf(
   await addFonts(doc);
   const logo = await greyLogo();
   const width = doc.internal.pageSize.getWidth();
-  const height = doc.internal.pageSize.getHeight();
   const usable = width - MARGIN.left - MARGIN.right;
   const page = () => doc.getCurrentPageInfo().pageNumber;
   const printedAt = formatStamp(serverNow.value);
@@ -612,31 +612,14 @@ async function openPdf(
       // Footer, bottom line: where it comes from on the left, when
       // (published, printed) on the right. Above it the legend, wrapped
       // upward.
-      const bottom = height - 9;
-      const above = bottom - 4.5;
-      const logoHeight = 3;
-      const logoWidth = logoHeight * LOGO_ASPECT;
-      doc.addImage(
+      const bottom = drawFooter(
+        doc,
         logo,
-        'PNG',
-        MARGIN.left,
-        bottom - logoHeight + 0.4,
-        logoWidth,
-        logoHeight,
-        'logo',
-      );
-      doc.setFontSize(8).setTextColor(90).setFont(FONT, 'bold');
-      doc.text('Rally Gate', MARGIN.left + logoWidth + 1.5, bottom);
-      doc.setFont(FONT, 'normal');
-      doc.text(
         [sec.note, t('pdf.printed', { at: printedAt })]
           .filter(Boolean)
           .join(' · '),
-        width - MARGIN.right,
-        bottom,
-        { align: 'right' },
       );
-      doc.setTextColor(0);
+      const above = bottom - 4.5;
       const legendLines = sec.legend
         ? (doc.splitTextToSize(sec.legend, usable) as string[])
         : [];
@@ -647,10 +630,113 @@ async function openPdf(
     });
   }
 
+  showPdf(doc, fileName, tab);
+}
+
+function showPdf(doc: jsPDF, fileName: string, tab: Window | null) {
   doc.setProperties({ title: fileName });
   if (tab) {
     tab.location.href = String(doc.output('bloburl'));
   } else {
     doc.save(`${fileName}.pdf`);
+  }
+}
+
+/** The foot's bottom line: logo and "Rally Gate" left, `right` right.
+ *  Returns its baseline. */
+function drawFooter(doc: jsPDF, logo: string, right: string): number {
+  const width = doc.internal.pageSize.getWidth();
+  const bottom = doc.internal.pageSize.getHeight() - 9;
+  const logoHeight = 3;
+  const logoWidth = logoHeight * LOGO_ASPECT;
+  doc.addImage(
+    logo,
+    'PNG',
+    MARGIN.left,
+    bottom - logoHeight + 0.4,
+    logoWidth,
+    logoHeight,
+    'logo',
+  );
+  doc.setFontSize(8).setTextColor(90).setFont(FONT, 'bold');
+  doc.text('Rally Gate', MARGIN.left + logoWidth + 1.5, bottom);
+  doc.setFont(FONT, 'normal');
+  doc.text(right, width - MARGIN.right, bottom, { align: 'right' });
+  doc.setTextColor(0);
+  return bottom;
+}
+
+/**
+ * One sheet per invitation, to hand out or pin up at the stage: the QR code
+ * a phone's camera opens, and the code to type in when the camera fails.
+ * `base` is the server's LAN address, never localhost. Same tab rule as
+ * `printPdf`: call it straight from the click.
+ */
+export async function printInvitations(
+  invitations: Invitation[],
+  base: string,
+): Promise<void> {
+  const tab = window.open('', '_blank');
+  try {
+    const [{ jsPDF }, { toDataURL }] = await Promise.all([
+      import('jspdf'),
+      import('qrcode'),
+    ]);
+    const doc = new jsPDF({ format: 'a4' });
+    await addFonts(doc);
+    const logo = await greyLogo();
+    const width = doc.internal.pageSize.getWidth();
+    const usable = width - MARGIN.left - MARGIN.right;
+    const center = width / 2;
+    const printedAt = t('pdf.printed', { at: formatStamp(serverNow.value) });
+    const qrSize = 100;
+
+    for (const [i, invitation] of invitations.entries()) {
+      if (i > 0) doc.addPage();
+      const url = joinUrl(base, invitation.code);
+      doc.setFont(FONT, 'normal').setFontSize(11);
+      doc.text(fitLine(doc, rallyName.value, usable), center, 20, {
+        align: 'center',
+      });
+      doc.setFont(FONT, 'bold').setFontSize(24);
+      doc.text(fitLine(doc, invitation.label, usable), center, 34, {
+        align: 'center',
+      });
+      doc.setFont(FONT, 'normal').setFontSize(13);
+      const role = [
+        t(`access.roles.${invitation.role}`),
+        invitation.stageIds.join(', '),
+      ];
+      doc.text(
+        fitLine(doc, role.filter(Boolean).join(' · '), usable),
+        center,
+        43,
+        {
+          align: 'center',
+        },
+      );
+      doc.addImage(
+        await toDataURL(url, { margin: 0, width: 800 }),
+        'PNG',
+        center - qrSize / 2,
+        52,
+        qrSize,
+        qrSize,
+      );
+      doc.setFont(MONO, 'normal').setFontSize(10);
+      doc.text(url, center, 52 + qrSize + 8, { align: 'center' });
+      doc.setFont(FONT, 'normal').setFontSize(11);
+      doc.text(t('access.pdfScan'), center, 178, { align: 'center' });
+      doc.text(t('access.pdfManual', { url: `${base}/login` }), center, 185, {
+        align: 'center',
+      });
+      doc.setFont(MONO, 'bold').setFontSize(28);
+      doc.text(formatCode(invitation.code), center, 202, { align: 'center' });
+      drawFooter(doc, logo, printedAt);
+    }
+    showPdf(doc, t('access.pdfFile'), tab);
+  } catch (err) {
+    tab?.close();
+    notifyError(err);
   }
 }

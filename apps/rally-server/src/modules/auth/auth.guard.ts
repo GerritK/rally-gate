@@ -8,7 +8,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { AccessRole, ApiErrorCode } from '@rally-gate/shared';
+import {
+  AccessRole,
+  ApiErrorCode,
+  PERMISSIONS,
+  type Permission,
+} from '@rally-gate/shared';
 import type { Request } from 'express';
 import { apiError } from '../../common/api-error';
 import { AuthService, type Principal } from './auth.service';
@@ -20,10 +25,15 @@ const PUBLIC = 'public';
 const PRIVATE = 'private';
 
 /**
- * Who besides the organiser may call a changing route. A changing route
- * without it is the organiser's only, so a new endpoint is closed by default.
+ * Which `PERMISSIONS` entry a changing route needs. A changing route without
+ * it is the organiser's only, so a new endpoint is closed by default. A stage
+ * marshal's stage is checked in the handler (`assertMay`), which knows it.
  */
-export const Roles = (...roles: AccessRole[]) => SetMetadata(ROLES, roles);
+export const Requires = (...permissions: Permission[]) =>
+  SetMetadata(
+    ROLES,
+    permissions.flatMap((p): AccessRole[] => PERMISSIONS[p]),
+  );
 
 /** Changing routes anyone may call: logging in. */
 export const Public = () => SetMetadata(PUBLIC, true);

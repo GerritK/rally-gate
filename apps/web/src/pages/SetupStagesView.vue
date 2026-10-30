@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { can } from '../api/auth';
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { StageScoring, StageStatus } from '@rally-gate/shared';
@@ -71,7 +72,12 @@ onMounted(refresh);
     <v-card-title class="d-flex align-center">
       {{ $t('stages.title') }}
       <v-spacer />
-      <v-btn color="primary" prepend-icon="mdi-plus" @click="openCreate">
+      <v-btn
+        v-if="can('setup')"
+        color="primary"
+        prepend-icon="mdi-plus"
+        @click="openCreate"
+      >
         {{ $t('stages.add') }}
       </v-btn>
     </v-card-title>
@@ -108,7 +114,9 @@ onMounted(refresh);
               <StatusChip :display="STAGE_STATUS_DISPLAY[stage.status]" />
             </td>
             <td class="text-no-wrap">
-              <v-menu v-if="stage.status === StageStatus.NOT_STARTED">
+              <v-menu
+                v-if="stage.status === StageStatus.NOT_STARTED && can('setup')"
+              >
                 <template #activator="{ props: menu }">
                   <v-btn
                     v-bind="menu"

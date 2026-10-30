@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { can } from '../api/auth';
 import { RallyStatus } from '@rally-gate/shared';
 import { computed, onMounted, ref } from 'vue';
 import {
@@ -95,6 +96,7 @@ onMounted(refresh);
       {{ $t('classes.classes') }}
       <v-spacer />
       <v-btn
+        v-if="can('setup')"
         variant="tonal"
         prepend-icon="mdi-plus"
         :disabled="addLocked"
@@ -120,7 +122,7 @@ onMounted(refresh);
             <th>{{ $t('stages.name') }}</th>
             <th>{{ $t('transponder.kind') }}</th>
             <th>{{ $t('nav.entries') }}</th>
-            <th width="1%"></th>
+            <th v-if="can('setup')" width="1%"></th>
           </tr>
         </thead>
         <tbody>
@@ -140,7 +142,7 @@ onMounted(refresh);
               </v-chip>
             </td>
             <td>{{ countOf(entryClass) }}</td>
-            <td class="text-no-wrap">
+            <td v-if="can('setup')" class="text-no-wrap">
               <v-btn
                 size="small"
                 variant="text"

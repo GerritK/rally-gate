@@ -242,6 +242,10 @@ Values live in `theme.ts`. The rules:
   with no entry picked, a Setup page locked by the rally status under its
   `RallyLockAlert`, a stage's Save under "This stage is ACTIVE…", a
   menu item with the reason as its subtitle.
+- **What a role may never do isn't shown at all**: no greyed button, no
+  caption, a ⋮ menu without entries goes too, a form turns read-only and
+  loses its Save. Ask `can()` (`api/auth.ts`). The rule above is for
+  passing reasons only (the rally status, an active stage).
 - **Ask when data is lost that can't be retyped from the screen or from
   memory:** delete a run or a passing, close a stage, unfreeze a published
   start list, anything that takes other records with it. Say what will be
@@ -341,6 +345,9 @@ meant for paper has a button.
   then down, so they hang as a grid.
 - Start list: Pos, #, Crew, Car, Class when not grouped; main classes as
   full-width header rows.
+- Invitations (Setup → Access) are no table: one portrait sheet each, the
+  label large, role and stages, the QR code with its link under it, the code
+  to type in large monospace, grouped `ABCD-EFGH`. Same foot.
 - Portrait unless a table needs the width. Layout mechanics (column fitting,
   even splits, slack) are documented in `pdf.ts`.
 

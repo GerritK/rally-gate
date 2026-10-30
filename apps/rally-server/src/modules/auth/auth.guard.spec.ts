@@ -1,16 +1,16 @@
 import { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { AccessRole } from '@rally-gate/shared';
-import { AuthGuard, Private, Public, Roles } from './auth.guard';
 import {
-  assertMayChangeStage,
-  AuthService,
-  type Principal,
-} from './auth.service';
+  AccessRole,
+  entryStatusPermission,
+  EntryStatus,
+} from '@rally-gate/shared';
+import { AuthGuard, Private, Public, Requires } from './auth.guard';
+import { assertMay, AuthService, type Principal } from './auth.service';
 import { Invitation } from './invitation.entity';
 
 class Routes {
-  @Roles(AccessRole.TIMING)
+  @Requires('activateStage')
   timing() {}
   organiserOnly() {}
   @Public()
@@ -105,15 +105,36 @@ describe('AuthGuard', () => {
   });
 });
 
-describe('assertMayChangeStage', () => {
+describe('assertMay', () => {
   it('limits a stage marshal to its stages', () => {
-    expect(() => assertMayChangeStage(marshal, 'ss2')).not.toThrow();
-    expect(() => assertMayChangeStage(marshal, 'ss1')).toThrow();
-    expect(() => assertMayChangeStage(marshal, null)).toThrow();
+    expect(() => assertMay(marshal, 'correctRun', 'ss2')).not.toThrow();
+    expect(() => assertMay(marshal, 'correctRun', 'ss1')).toThrow(
+      'stages on its invitation',
+    );
+    expect(() => assertMay(marshal, 'correctRun', null)).toThrow();
+    expect(() => assertMay(marshal, 'voidRun', 'ss2')).toThrow('may not');
   });
 
-  it('leaves every other role alone', () => {
+  it('leaves the stage alone for every other role', () => {
     const timing = { ...marshal, role: AccessRole.TIMING };
-    expect(() => assertMayChangeStage(timing, 'ss1')).not.toThrow();
+    expect(() => assertMay(timing, 'correctRun', 'ss1')).not.toThrow();
+  });
+
+  it('keeps disqualifying for the organiser', () => {
+    const checkIn = { ...marshal, role: AccessRole.CHECK_IN };
+    const timing = { ...marshal, role: AccessRole.TIMING };
+    const need = (from: EntryStatus, to: EntryStatus) =>
+      entryStatusPermission(from, to);
+    const { REGISTERED, CHECKED_IN, WITHDRAWN, DISQUALIFIED } = EntryStatus;
+    expect(() =>
+      assertMay(checkIn, need(REGISTERED, CHECKED_IN)),
+    ).not.toThrow();
+    expect(() =>
+      assertMay(checkIn, need(CHECKED_IN, REGISTERED)),
+    ).not.toThrow();
+    expect(() => assertMay(timing, need(CHECKED_IN, WITHDRAWN))).not.toThrow();
+    expect(() => assertMay(timing, need(CHECKED_IN, REGISTERED))).toThrow();
+    expect(() => assertMay(checkIn, need(CHECKED_IN, DISQUALIFIED))).toThrow();
+    expect(() => assertMay(timing, need(DISQUALIFIED, CHECKED_IN))).toThrow();
   });
 });

@@ -8,8 +8,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
-import { AccessRole } from '@rally-gate/shared';
-import { Roles } from '../auth/auth.guard';
+import { Requires } from '../auth/auth.guard';
 import { CreateStageDto, UpdateStageDto } from './dto';
 import { StagesService } from './stages.service';
 
@@ -44,7 +43,7 @@ export class StagesController {
     return this.stagesService.remove(id);
   }
 
-  @Roles(AccessRole.TIMING)
+  @Requires('activateStage')
   @Post(':id/close')
   close(@Param('id') id: string) {
     return this.stagesService.close(id);
@@ -57,7 +56,7 @@ export class StagesController {
    * (plain message, no `conflictingStageIds`) if the stage is already
    * closed — closing is terminal.
    */
-  @Roles(AccessRole.TIMING)
+  @Requires('activateStage')
   @Post(':id/activate')
   activate(@Param('id') id: string, @Query('force') force?: string) {
     return this.stagesService.activate(id, force === 'true');

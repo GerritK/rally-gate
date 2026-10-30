@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { can } from '../api/auth';
 import {
   FLAGS_SHOWN_KEY,
   NAME_FORMAT_KEY,
@@ -70,7 +71,11 @@ onMounted(async () => {
   <v-card>
     <v-card-title>{{ $t('displaySetup.title') }}</v-card-title>
     <v-card-text>
-      <form class="rg-display-form" @submit.prevent="onSave">
+      <v-form
+        :readonly="!can('setup')"
+        class="rg-display-form"
+        @submit.prevent="onSave"
+      >
         <div class="rg-section-title">{{ $t('table.crew') }}</div>
         <div class="rg-display-crew">
           <div class="rg-display-fields">
@@ -110,6 +115,7 @@ onMounted(async () => {
         />
         <div>
           <v-btn
+            v-if="can('setup')"
             type="submit"
             color="primary"
             :loading="saving"
@@ -118,7 +124,7 @@ onMounted(async () => {
             {{ $t('common.save') }}
           </v-btn>
         </div>
-      </form>
+      </v-form>
     </v-card-text>
   </v-card>
 </template>

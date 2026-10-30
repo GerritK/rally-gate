@@ -12,6 +12,7 @@ import {
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { ApiError } from '../api/client';
+import { can, session } from '../api/auth';
 import {
   assignEntryToEvent,
   dismissEvent,
@@ -793,12 +794,19 @@ async function loadStage() {
 
 watch(() => props.stageId, loadStage);
 
-/** The stage a marshal most likely wants: running, else next up. */
+/**
+ * The stage a marshal most likely wants: running, else next up. A stage
+ * marshal's own stages only, while it has any.
+ */
 function defaultStage(): Stage | undefined {
+  const own = stages.value.filter((s) =>
+    session.value?.stageIds.includes(s.id),
+  );
+  const pool = own.length > 0 ? own : stages.value;
   return (
-    stages.value.find((s) => s.status === StageStatus.ACTIVE) ??
-    stages.value.find((s) => s.status === StageStatus.NOT_STARTED) ??
-    stages.value.at(-1)
+    pool.find((s) => s.status === StageStatus.ACTIVE) ??
+    pool.find((s) => s.status === StageStatus.NOT_STARTED) ??
+    pool.at(-1)
   );
 }
 
@@ -882,6 +890,7 @@ onUnmounted(() => {
       </div>
       <v-spacer />
       <v-btn
+        v-if="can('retryPending')"
         :loading="retryingPending"
         variant="outlined"
         prepend-icon="mdi-refresh"
@@ -924,7 +933,9 @@ onUnmounted(() => {
         <div class="d-flex flex-wrap justify-end ga-2">
           <v-btn
             v-if="
-              stage.status === StageStatus.NOT_STARTED && !startOrder?.frozen
+              stage.status === StageStatus.NOT_STARTED &&
+              !startOrder?.frozen &&
+              can('setup')
             "
             color="primary"
             prepend-icon="mdi-lock"
@@ -934,7 +945,9 @@ onUnmounted(() => {
           </v-btn>
           <v-btn
             v-if="
-              stage.status === StageStatus.NOT_STARTED && startOrder?.frozen
+              stage.status === StageStatus.NOT_STARTED &&
+              startOrder?.frozen &&
+              can('setup')
             "
             variant="text"
             prepend-icon="mdi-lock-open-variant"
@@ -951,7 +964,9 @@ onUnmounted(() => {
             {{ $t('live.printStartList') }}
           </v-btn>
           <v-btn
-            v-if="stage.status === StageStatus.NOT_STARTED"
+            v-if="
+              stage.status === StageStatus.NOT_STARTED && can('activateStage')
+            "
             :loading="activatingStage"
             color="success"
             variant="outlined"
@@ -961,7 +976,7 @@ onUnmounted(() => {
             {{ $t('live.activateStage') }}
           </v-btn>
           <v-btn
-            v-if="stage.status === StageStatus.ACTIVE"
+            v-if="stage.status === StageStatus.ACTIVE && can('activateStage')"
             :loading="closingStage"
             color="error"
             variant="outlined"
@@ -1063,7 +1078,9 @@ onUnmounted(() => {
             />
           </div>
           <v-btn
-            v-if="stage.status === StageStatus.ACTIVE"
+            v-if="
+              stage.status === StageStatus.ACTIVE && can('timeRun', stage.id)
+            "
             color="primary"
             size="large"
             block
@@ -1132,6 +1149,7 @@ onUnmounted(() => {
             :gate-name="gateName(event.gateId)"
             :entry-id="entryFor(event)"
             :entry-options="entryOptionsFor(event)"
+            :readonly="!can('assignPassing', stage.id)"
             @pick="(id) => (pickedEntryIds[event.eventId] = id)"
             @assign="onAssign(event)"
             @dismiss="onDismiss(event)"
@@ -1194,6 +1212,7 @@ onUnmounted(() => {
               </td>
               <td class="text-right" style="width: 1%">
                 <v-btn
+                  v-if="can('timeRun', stage.id)"
                   size="small"
                   variant="tonal"
                   prepend-icon="mdi-flag-checkered"
@@ -1311,7 +1330,7 @@ onUnmounted(() => {
             </td>
             <td class="text-no-wrap text-right">
               <v-btn
-                v-if="row.run"
+                v-if="row.run && can('correctRun', stage.id)"
                 size="small"
                 variant="text"
                 prepend-icon="mdi-pencil"
@@ -1320,7 +1339,9 @@ onUnmounted(() => {
                 {{ $t('live.correct') }}
               </v-btn>
               <v-btn
-                v-else-if="canStart(row)"
+                v-else-if="
+                  !row.run && canStart(row) && can('timeRun', stage.id)
+                "
                 size="small"
                 variant="text"
                 prepend-icon="mdi-play"
@@ -1330,7 +1351,11 @@ onUnmounted(() => {
                 {{ $t('live.startNow') }}
               </v-btn>
               <v-menu
-                v-if="!row.run && stage.status !== StageStatus.NOT_STARTED"
+                v-if="
+                  !row.run &&
+                  stage.status !== StageStatus.NOT_STARTED &&
+                  (can('timeRun', stage.id) || can('penalties'))
+                "
               >
                 <template #activator="{ props: menu }">
                   <v-btn
@@ -1343,18 +1368,20 @@ onUnmounted(() => {
                 </template>
                 <v-list density="compact">
                   <v-list-item
+                    v-if="can('timeRun', stage.id)"
                     prepend-icon="mdi-timer-edit-outline"
                     :title="$t('live.enterTime')"
                     @click="correctionDialog?.enter(row.starter.entryId)"
                   />
                   <v-list-item
+                    v-if="can('penalties')"
                     prepend-icon="mdi-flag-variant-outline"
                     :title="$t('penalties.add')"
                     @click="penaltyDialog?.add(row.starter.entryId, stage.id)"
                   />
                 </v-list>
               </v-menu>
-              <v-menu v-if="row.run">
+              <v-menu v-if="row.run && (can('penalties') || can('voidRun'))">
                 <template #activator="{ props: menu }">
                   <v-btn
                     v-bind="menu"
@@ -1366,16 +1393,19 @@ onUnmounted(() => {
                 </template>
                 <v-list density="compact">
                   <v-list-item
+                    v-if="can('penalties')"
                     prepend-icon="mdi-flag-variant-outline"
                     :title="$t('penalties.add')"
                     @click="penaltyDialog?.add(row.run!.entryId, stage.id)"
                   />
                   <v-list-item
+                    v-if="can('voidRun')"
                     prepend-icon="mdi-cancel"
                     :title="$t('live.voidAttempt')"
                     @click="onVoidRun(row.run!)"
                   />
                   <v-list-item
+                    v-if="can('voidRun')"
                     prepend-icon="mdi-delete"
                     :title="$t('live.deleteRun')"
                     base-color="error"
@@ -1419,6 +1449,7 @@ onUnmounted(() => {
             </td>
             <td class="text-no-wrap text-right">
               <v-btn
+                v-if="can('voidRun')"
                 size="small"
                 variant="text"
                 prepend-icon="mdi-restore"
@@ -1426,7 +1457,7 @@ onUnmounted(() => {
               >
                 {{ $t('live.restore') }}
               </v-btn>
-              <v-menu>
+              <v-menu v-if="can('voidRun')">
                 <template #activator="{ props: menu }">
                   <v-btn
                     v-bind="menu"

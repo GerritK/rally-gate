@@ -25,10 +25,20 @@ Roles decide what a login may **change**:
 
 | Role | May change |
 |---|---|
-| Organiser | everything, plus invitations and gate approval |
-| Timing | every stage: corrections, penalties, assigning passings, activate/close |
+| Organiser | everything, plus invitations and gate approval; alone disqualifies and reinstates (a jury decision) |
+| Timing | every stage: corrections, voiding, penalties, assigning passings, activate/close; withdraws entries |
 | Stage marshal | only the stages on its invitation: assigning passings, manual start/finish, corrections |
-| Check-in | entries and transponders |
+| Check-in | entries and transponders, check-in and scrutineering steps, withdrawing |
+
+The table is `PERMISSIONS` in `packages/shared/src/permissions.ts`, read by
+both sides: rally-server's `@Requires` and the dashboard's `can()`. The
+dashboard **hides** what a role may never do (button, menu entry, Save; a
+form turns read-only) instead of letting the server answer 403, and keeps
+every page visible, since reading is any login's. Not logged in, it shows
+the pages read-only with a "Log in" strip until the public page replaces
+them. It reloads the session on every navigation and after any 401/403, so a
+blocked device falls back at once. A stage marshal's Live Timing opens on
+its own stage.
 
 ## People: invitations, not accounts
 
@@ -37,9 +47,11 @@ A login is a **device with a role**, not a person with a password.
 - The organiser creates an invitation per role on the dashboard ("Anna – Start
   SS2", role Stage marshal, stages SS2). It shows as a QR code plus a short
   code to type in when the camera fails, meant to be printed.
-- The QR holds the server's **LAN IP**, not `rally-server.local`: Android
-  resolves `.local` unreliably. `DiscoveryService` already knows the reachable
-  addresses.
+- The QR holds **`rally-server.local`** by default (`MDNS_HOST`), since sheets
+  are often printed at home, where the server's IP is not the rally's. Older
+  Android resolves `.local` unreliably, so the page also offers the current
+  LAN IPs for printing on site. The setup QR in the server log uses the IP:
+  it is scanned right then.
 - Scanning it makes the device a login: an httpOnly cookie, `SameSite=Strict`
   (`EventSource` on `/api/live` can't send headers, so a cookie it is). No
   expiry: a marshal logged out mid-stage is worse than the remaining risk.
@@ -49,8 +61,9 @@ A login is a **device with a role**, not a person with a password.
 - Invitations and devices live in the **event database**: opening another
   event logs every device out, and no old access survives into the next rally.
   Closing and reopening the same event keeps them. A cookie belongs to the
-  address it was set on, so preparing tablets at home only works if the server
-  has the same IP at the rally — the documented way is printing the QR codes.
+  address it was set on, so a tablet logged in at home through
+  `rally-server.local` stays logged in at the rally; through an IP only if the
+  server gets the same one there.
 - Invitations and devices are never deleted, only blocked: every correction,
   penalty and passing assignment stores the **device id**, and the correction
   history shows "Anna – Start SS2 · device 2". That's what a protest needs.

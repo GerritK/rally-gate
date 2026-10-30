@@ -2,7 +2,7 @@
 
 `apps/web`: a `vue-router` app behind a `v-navigation-drawer`, one `.vue` file
 per route in `src/pages/`, API calls in `src/api/` (one module per entity,
-sharing `client.ts`). Audience is marshals and organisers only.
+sharing `client.ts`). Audience is marshals and organisers only; who may change what is `auth.md`.
 
 | Route | Nav | Contents |
 |---|---|---|
@@ -22,6 +22,9 @@ sharing `client.ts`). Audience is marshals and organisers only.
 | `/setup/start-order` | Setup | start order rules: grouping, key, direction. Later planned start times |
 | `/setup/scoring` | Setup | notional time penalty; the penalty catalogue: types with their tiers and how they count (per stage or per rally), add/edit/delete (deleting takes its penalties) |
 | `/setup/display` | Setup | Crew: name format and flags, with an example crew drawn with the unsaved settings; Results: podium. Switches, on screen only (printouts are plain PDFs) |
+| `/setup/access` | Setup | invitations (role, stages, code, devices; Print one or all as a PDF sheet with the QR code, Block in ⋮), the devices that logged in (Block), the organiser password. Organiser only (`auth.md`) |
+| `/login` | — | who this browser is, Log out; an invitation code to type; the organiser password. `?setup=` from the server log sets the first one. The drawer's foot links here |
+| `/join/:code` | — | what an invitation's QR code opens: logs the device in, then Live Timing |
 
 ## Decisions
 
