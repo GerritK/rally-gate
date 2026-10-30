@@ -1,5 +1,6 @@
 import {
   BUZZER_GAP_MS,
+  BUZZER_SIGNAL_GAP_MS,
   BUZZER_SIGNALS,
   BuzzerSignal,
 } from '@rally-gate/shared';
@@ -121,7 +122,13 @@ export class Buzzer {
   }
 
   private async drain(): Promise<void> {
+    let previous: Item | undefined;
     for (let item = this.queue.shift(); item; item = this.queue.shift()) {
+      // Passings follow each other at the tone gap; a signal stands apart.
+      if (previous && !(previous.passing && item.passing)) {
+        await sleep(BUZZER_SIGNAL_GAP_MS - BUZZER_GAP_MS);
+      }
+      previous = item;
       for (const ms of item.tones) {
         try {
           for (const [command, args] of this.tone!(ms)) {

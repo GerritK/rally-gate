@@ -83,7 +83,11 @@ Passings during a beep queue up (at most 3) and beep after it, 100ms apart.
 **Status sounds** tell whoever stands at the gate what it is doing. A passing is
 always the single 120ms beep; every status sound holds a long tone (400ms,
 short is 80ms), which a queue of passings can't sound like. The ESP32 gate plays
-the same ones (its extra `3×80ms` means a tap was *not* stored).
+the same ones (its extra `3×80ms` means a tap was *not* stored). Tones within
+a sound are 100ms apart, and a second of silence separates a sound from
+whatever sounds next, so power on followed by the hotspot is long, pause, long
+short, not one sound. Only sounds queued in one process keep that apart: the hotspot and
+power-off come from `rally-gate-beep`, a process of their own.
 
 | Sound | Means |
 |---|---|

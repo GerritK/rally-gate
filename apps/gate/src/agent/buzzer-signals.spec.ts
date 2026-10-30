@@ -1,6 +1,7 @@
 import {
   BUZZER_GAP_MS,
   BUZZER_LONG_MS,
+  BUZZER_SIGNAL_GAP_MS,
   BUZZER_SIGNALS,
 } from '@rally-gate/shared';
 import assert from 'node:assert/strict';
@@ -32,5 +33,9 @@ test('the ESP32 firmware has the same signals', () => {
     ]),
   );
   assert.deepEqual(copy, BUZZER_SIGNALS);
-  assert.match(header, new RegExp(`BUZZER_GAP_MS = ${BUZZER_GAP_MS};`));
+  assert.match(header, new RegExp(` BUZZER_GAP_MS = ${BUZZER_GAP_MS};`));
+  assert.match(
+    header,
+    new RegExp(`BUZZER_SIGNAL_GAP_MS = ${BUZZER_SIGNAL_GAP_MS};`),
+  );
 });

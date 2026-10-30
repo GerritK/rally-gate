@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 constexpr uint16_t BUZZER_GAP_MS = 100;
+constexpr uint16_t BUZZER_SIGNAL_GAP_MS = 1000;
 
 // A namespace: lwIP already has a shutdown().
 namespace buzzer_signals {

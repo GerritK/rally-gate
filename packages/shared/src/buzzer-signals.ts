@@ -2,6 +2,8 @@ export const BUZZER_SHORT_MS = 80;
 export const BUZZER_LONG_MS = 400;
 /** Silence after every tone, so repeated tones stay apart. */
 export const BUZZER_GAP_MS = 100;
+/** Silence between a signal and whatever sounds next, so two signals never run into one. */
+export const BUZZER_SIGNAL_GAP_MS = 1000;
 
 /**
  * Tone lengths in ms. A passing is a single 120ms beep and never one of these:

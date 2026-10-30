@@ -113,6 +113,7 @@ static void soundTick() {
   toneOn = false;
   toneUntilMs = millis() + BUZZER_GAP_MS;
   if (++toneIndex == q.count) {
+    toneUntilMs = millis() + BUZZER_SIGNAL_GAP_MS;  // two signals never run into one
     toneIndex = 0;
     memmove(soundQueue, soundQueue + 1, --queued * sizeof soundQueue[0]);
   }
