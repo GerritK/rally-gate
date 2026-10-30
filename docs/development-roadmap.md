@@ -97,11 +97,16 @@ One line each; the linked doc has the detail. History is in git.
      or password with a setup QR, `reset-admin`, `/login` and `/join/:code`,
      the dashboard showing only what the role may do. Next, each its own
      commit: the device id on every correction, penalty and assignment, then
-     the public page with internal reads behind the login.
+     the public page with internal reads behind the login, a rate limit on
+     `/auth/login`, and the operating rule "participants never on the timing
+     Wi-Fi" on the login page and in the setup docs (`auth.md`
+     "Participants on the timing Wi-Fi").
   2. Broker and gates: self-generated gate key, pairing and approval,
      detections of waiting gates held, `autoDiscoverGates` removed,
-     `GATES_AUTO_ACCEPT` for dev. Check how mqtt.js backs off on a refused
-     connect.
+     `GATES_AUTO_ACCEPT` for dev. The key never as the MQTT password, a
+     short-lived HMAC token instead. Decide how a gate tells the real server
+     from one answering as `rally-server.local` before it releases detections.
+     Check how mqtt.js backs off on a refused connect.
   3. gate-config and ESP32: signed pass, the 3-minute power-on window, the
      same on `web.cpp`. Check whether browser flashing erases NVS.
 

@@ -1,16 +1,51 @@
 # Access and authentication
 
-Designed 2026-10-30, not built yet; the build order is in
-`development-roadmap.md` "Next". Until it lands, the closed rally network is
-the only boundary.
+Designed 2026-10-30. Built so far: roles, invitations, devices and the
+organiser login (step 1 in `development-roadmap.md` "Next"); gates, the
+broker and gate-config are still open.
 
 ## What it protects against
 
 Curious people on the rally Wi-Fi (spectators, drivers who know its password)
 clicking around, and marshals changing things outside their job (the SS2 start
 marshal correcting SS1). Plus: no device can inject or impersonate detections.
-Not a goal: an attacker sniffing the LAN. No TLS — certificates on an offline
-laptop are not something a club can run.
+No TLS — certificates on an offline laptop are not something a club can run —
+so an attacker *on the same Wi-Fi* is handled by keeping participants off it
+(next section), not by the protocol.
+
+## Participants on the timing Wi-Fi
+
+A competitor with a motive and Wireshark is in the paddock. With WPA2, anyone
+who knows the Wi-Fi password can decrypt the other devices' traffic (the key
+derives from the password plus a handshake they can capture), and everything
+here is plain HTTP and MQTT. What such a person gets:
+
+| Attack | Gets | Status |
+|---|---|---|
+| Sniff a marshal's or organiser's request | the device cookie: that login, until blocked | built, open |
+| Sniff `POST /auth/login` | the organiser password | built, open |
+| Sniff `/join/:code` | the invitation code (shows up as an extra device under it) | built, open |
+| Sniff a gate's MQTT CONNECT | the gate key, if it is sent as the password: impersonate the gate | planned, avoided below |
+| Answer as `rally-server.local` (mDNS spoof, ARP) | invitation codes from phones scanning the `.local` QR; gates connect, and the gate drops each detection on the fake broker's PUBACK — drivers with no time | open, step 2 decides |
+| Brute-force `/auth/login` | the organiser password, if weak — no rate limit yet | built, open |
+| Brute-force an invitation code | 8 of 31 characters, ~10¹² — not feasible over Wi-Fi | fine |
+| Flood the airtime, rogue DHCP | gates drop offline; QoS 1 delivers late, the dashboard shows them offline | operating rule |
+
+Consequences:
+
+- **Operating rule: participants never join the timing Wi-Fi.** One closed
+  network for server, gates and staff devices; a guest network for
+  everyone else. Most routers have one. This is the actual boundary — the
+  design below assumes it, and the setup docs and the login page say so.
+  Open: a guest network's client isolation usually blocks the public page
+  too, so participants get it through online mode, a printout, or a router
+  that forwards only `57430` from the guest network.
+- **WPA3 where the hardware allows:** with SAE, knowing the password no longer
+  decrypts others' traffic. Pi and ESP32-S3 support it; older phones
+  partly. It doesn't help against a spoofed server.
+- **A gate's key never goes on the wire**, so neither sniffing nor a fake
+  server learns it (step 2, see "Gates").
+- **`/auth/login` gets a rate limit** (a few attempts per minute per address).
 
 ## Who sees what
 
@@ -94,7 +129,20 @@ Nothing is typed on a gate (`development-roadmap.md` "Zero-config gates").
   `/etc/rally-gate/gate.key` (its own file — the installer rewrites
   `gate.env` on every update, and creates the key only when missing), ESP32 in
   NVS (`esp_random()`). It logs in to the broker with its gate id as username
-  and the key as password.
+  and, as password, **not the key** but `expiry + HMAC(key, gateId + expiry)`
+  with an expiry a minute ahead: MQTT 3.1.1 has nothing but username and
+  password, and a key sent as one would go to anyone who sniffs the Wi-Fi or
+  answers as `rally-server.local` (see "Participants on the timing Wi-Fi").
+  A sniffed token can be replayed only until it expires. Gates follow the
+  server's clock, so the expiry check holds; allow a few seconds of slack for
+  a gate whose clock isn't synced yet. Pairing sends the key once (it has to
+  reach the server somehow) — the reason pairing is a short, deliberate
+  window.
+- **Open, step 2:** a fake broker that acks detections makes the gate drop
+  them. Candidate fix: the server proves it knows the key once per connection
+  (signs a nonce the gate sends on its own topic) before the gate releases
+  anything from its buffer. Decide when building step 2; until then the
+  operating rule above is the protection.
 - **Updates keep the key**: re-running the installer, USB flashing and OTA
   leave it alone. A new SD card or erasing the ESP32's flash is a new
   identity. There is deliberately no "new identity" button — one pressed
