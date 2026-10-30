@@ -1,4 +1,5 @@
-import { StageRunStatus, StageStatus } from '@rally-gate/shared';
+import { withFakeTransaction } from '../../common/fake-transaction';
+import { ChangeAction, StageRunStatus, StageStatus } from '@rally-gate/shared';
 import type { StageRun } from './stage-run.entity';
 import {
   deriveStageRunStatus,
@@ -97,11 +98,11 @@ function makeService(
   run: Record<string, unknown> | null,
   stage: { status: StageStatus } = { status: StageStatus.NOT_STARTED },
 ) {
-  const stageRuns = {
+  const stageRuns = withFakeTransaction({
     findOneBy: jest.fn().mockResolvedValue(run),
     save: jest.fn().mockImplementation((r) => Promise.resolve(r)),
     delete: jest.fn().mockResolvedValue({ affected: run ? 1 : 0 }),
-  };
+  });
   const stageSplits = {};
   const stagesService = { findOne: jest.fn().mockResolvedValue(stage) };
   const emitter = { emit: jest.fn() };
@@ -135,9 +136,9 @@ describe('StageRunsService.findSplitsForStageAtIndex', () => {
       voided: true,
       finishTime: new Date(),
     };
-    const stageRuns = {
+    const stageRuns = withFakeTransaction({
       find: jest.fn().mockResolvedValue([voided, surviving]),
-    };
+    });
     const stageSplits = {
       find: jest.fn().mockResolvedValue([
         { id: 's-voided', stageRunId: 'r1', splitIndex: 1, elapsedMs: 1_000 },
@@ -172,25 +173,67 @@ describe('StageRunsService.correctRun', () => {
   it('recomputes durationMs from the corrected finish time', async () => {
     const { service, emitter } = makeService({ ...baseRun });
 
-    const corrected = await service.correctRun('r1', {
-      finishTime: '2026-01-01T00:01:30.000Z',
-    });
+    const corrected = await service.correctRun(
+      'r1',
+      {
+        finishTime: '2026-01-01T00:01:30.000Z',
+      },
+      null,
+    );
 
     expect(corrected.durationMs).toBe(90_000);
     expect(corrected.status).toBe(StageRunStatus.FINISHED);
     expect(emitter.emit).toHaveBeenCalledWith('stage-run.updated', corrected);
   });
 
+  it('records the old and new times and the device that changed them', async () => {
+    const { service, stageRuns } = makeService({ ...baseRun });
+
+    await service.correctRun(
+      'r1',
+      { finishTime: '2026-01-01T00:01:30.000Z' },
+      'device-2',
+    );
+
+    expect(stageRuns.inserted).toHaveLength(1);
+    expect(stageRuns.inserted[0]).toMatchObject({
+      action: ChangeAction.RUN_CORRECTED,
+      deviceId: 'device-2',
+      entryId: 'v1',
+      stageId: 's1',
+      subjectId: 'r1',
+      before: { finishTime: '2026-01-01T00:01:00.000Z' },
+      after: { finishTime: '2026-01-01T00:01:30.000Z' },
+    });
+  });
+
+  it('records nothing when the correction is refused', async () => {
+    const { service, stageRuns } = makeService({ ...baseRun });
+
+    await expect(
+      service.correctRun(
+        'r1',
+        { finishTime: '2025-12-31T23:59:00.000Z' },
+        'device-2',
+      ),
+    ).rejects.toThrow();
+    expect(stageRuns.inserted).toEqual([]);
+  });
+
   it('marks only the corrected end as hand-set, and a cleared finish as not', async () => {
     const { service } = makeService({ ...baseRun });
 
-    const corrected = await service.correctRun('r1', {
-      startTime: '2026-01-01T00:00:05.000Z',
-    });
+    const corrected = await service.correctRun(
+      'r1',
+      {
+        startTime: '2026-01-01T00:00:05.000Z',
+      },
+      null,
+    );
     expect(corrected.startManual).toBe(true);
     expect(corrected.finishManual).toBeFalsy();
 
-    const cleared = await service.correctRun('r1', { finishTime: null });
+    const cleared = await service.correctRun('r1', { finishTime: null }, null);
     expect(cleared.finishManual).toBe(false);
   });
 
@@ -200,7 +243,11 @@ describe('StageRunsService.correctRun', () => {
       { status: StageStatus.NOT_STARTED },
     );
 
-    const corrected = await service.correctRun('r1', { finishTime: null });
+    const corrected = await service.correctRun(
+      'r1',
+      { finishTime: null },
+      null,
+    );
 
     // Must be null, not undefined: TypeORM's save() silently skips
     // undefined properties (leaves the DB column untouched), so only null
@@ -216,14 +263,18 @@ describe('StageRunsService.correctRun', () => {
       { status: StageStatus.CLOSED },
     );
 
-    const corrected = await service.correctRun('r1', { finishTime: null });
+    const corrected = await service.correctRun(
+      'r1',
+      { finishTime: null },
+      null,
+    );
 
     expect(corrected.status).toBe(StageRunStatus.CANCELLED);
   });
 
   it('throws NotFoundException for a missing run', async () => {
     const { service } = makeService(null);
-    await expect(service.correctRun('missing', {})).rejects.toThrow(
+    await expect(service.correctRun('missing', {}, null)).rejects.toThrow(
       'StageRun missing not found',
     );
   });
@@ -232,7 +283,11 @@ describe('StageRunsService.correctRun', () => {
     const { service, stageRuns } = makeService({ ...baseRun });
 
     await expect(
-      service.correctRun('r1', { finishTime: '2025-12-31T23:59:00.000Z' }),
+      service.correctRun(
+        'r1',
+        { finishTime: '2025-12-31T23:59:00.000Z' },
+        null,
+      ),
     ).rejects.toThrow('must be after startTime');
     expect(stageRuns.save).not.toHaveBeenCalled();
   });
@@ -243,7 +298,7 @@ describe('StageRunsService.correctRun', () => {
     const { service } = makeService({ ...baseRun });
 
     await expect(
-      service.correctRun('r1', { startTime: '2026-01-01T00:02:00.000Z' }),
+      service.correctRun('r1', { startTime: '2026-01-01T00:02:00.000Z' }, null),
     ).rejects.toThrow('must be after startTime');
   });
 
@@ -251,7 +306,7 @@ describe('StageRunsService.correctRun', () => {
     const { service, stageRuns } = makeService({ ...baseRun });
 
     await expect(
-      service.correctRun('r1', { finishTime: 'yesterday-ish' }),
+      service.correctRun('r1', { finishTime: 'yesterday-ish' }, null),
     ).rejects.toThrow('finishTime is not a valid date/time');
     expect(stageRuns.save).not.toHaveBeenCalled();
   });
@@ -269,13 +324,13 @@ describe('StageRunsService.unvoidRun', () => {
   };
 
   function makeUnvoidService(siblings: Record<string, unknown>[]) {
-    const stageRuns = {
+    const stageRuns = withFakeTransaction({
       findOneBy: jest.fn().mockResolvedValue({ ...voidedRun }),
       // The service filters itself out, so return it alongside the siblings
       // exactly as the repository would.
       find: jest.fn().mockResolvedValue(siblings),
       save: jest.fn().mockImplementation((r) => Promise.resolve(r)),
-    };
+    });
     const stagesService = {
       findOne: jest.fn().mockResolvedValue({ status: StageStatus.NOT_STARTED }),
     };
@@ -293,7 +348,7 @@ describe('StageRunsService.unvoidRun', () => {
   it('restores a void when nothing else survives on that stage', async () => {
     const { service } = makeUnvoidService([]);
 
-    const restored = await service.unvoidRun('r1');
+    const restored = await service.unvoidRun('r1', null);
 
     expect(restored.voided).toBe(false);
     expect(restored.status).toBe(StageRunStatus.FINISHED);
@@ -309,7 +364,7 @@ describe('StageRunsService.unvoidRun', () => {
       { ...survivor, voided: false, finishTime: new Date() },
     ]);
 
-    await expect(service.unvoidRun('r1')).rejects.toThrow(
+    await expect(service.unvoidRun('r1', null)).rejects.toThrow(
       `Attempt ${survivor.attempt} already counts`,
     );
     expect(stageRuns.save).not.toHaveBeenCalled();
@@ -320,18 +375,18 @@ describe('StageRunsService.unvoidRun', () => {
       { id: 'r2', attempt: 2, voided: false, finishTime: new Date() },
     ]);
 
-    await expect(service.unvoidRun('r1')).rejects.toThrow();
+    await expect(service.unvoidRun('r1', null)).rejects.toThrow();
     expect(stageRuns.save).not.toHaveBeenCalled();
   });
 });
 
 describe('StageRunsService.createManual', () => {
   it('throws ConflictException when the entry already has an unfinished run', async () => {
-    const stageRuns = {
+    const stageRuns = withFakeTransaction({
       findOne: jest.fn().mockResolvedValue(null), // nextAttempt lookup
       create: jest.fn().mockImplementation((r: unknown) => r),
       save: jest.fn().mockRejectedValue(uniqueViolation()),
-    };
+    });
     const stagesService = { findOne: jest.fn() };
     const emitter = { emit: jest.fn() };
     const service = new StageRunsService(
@@ -342,20 +397,23 @@ describe('StageRunsService.createManual', () => {
     );
 
     await expect(
-      service.createManual({
-        entryId: 'v1',
-        stageId: 's1',
-        startTime: '2026-01-01T00:00:00.000Z',
-      }),
+      service.createManual(
+        {
+          entryId: 'v1',
+          stageId: 's1',
+          startTime: '2026-01-01T00:00:00.000Z',
+        },
+        null,
+      ),
     ).rejects.toThrow('already has an attempt on stage s1 that counts');
   });
 
   it('stamps a run without a start time with the server clock', async () => {
-    const stageRuns = {
+    const stageRuns = withFakeTransaction({
       findOne: jest.fn().mockResolvedValue(null),
       create: jest.fn((r: { startTime: Date }) => r),
       save: jest.fn((r: unknown) => Promise.resolve(r)),
-    };
+    });
     const service = new StageRunsService(
       stageRuns as never,
       {} as never,
@@ -364,7 +422,7 @@ describe('StageRunsService.createManual', () => {
     );
     const before = Date.now();
 
-    await service.createManual({ entryId: 'v1', stageId: 's1' });
+    await service.createManual({ entryId: 'v1', stageId: 's1' }, null);
 
     const { startTime } = stageRuns.create.mock.calls[0][0];
     expect(startTime.getTime()).toBeGreaterThanOrEqual(before);
@@ -375,12 +433,15 @@ describe('StageRunsService.createManual', () => {
     const { service, stageRuns } = makeService(null);
 
     await expect(
-      service.createManual({
-        entryId: 'v1',
-        stageId: 's1',
-        startTime: '2026-01-01T00:01:00.000Z',
-        finishTime: '2026-01-01T00:00:00.000Z',
-      }),
+      service.createManual(
+        {
+          entryId: 'v1',
+          stageId: 's1',
+          startTime: '2026-01-01T00:01:00.000Z',
+          finishTime: '2026-01-01T00:00:00.000Z',
+        },
+        null,
+      ),
     ).rejects.toThrow('must be after startTime');
     expect(stageRuns.save).not.toHaveBeenCalled();
   });
@@ -388,11 +449,11 @@ describe('StageRunsService.createManual', () => {
 
 describe('StageRunsService.finishNow', () => {
   function makeFinishNowService(run: Record<string, unknown>) {
-    const stageRuns = {
+    const stageRuns = withFakeTransaction({
       findOneBy: jest.fn().mockResolvedValue(run),
       findOne: jest.fn().mockResolvedValue(run),
       save: jest.fn((r: unknown) => Promise.resolve(r)),
-    };
+    });
     const stagesService = {
       findOne: jest.fn().mockResolvedValue({ status: 'ACTIVE' }),
     };
@@ -416,7 +477,7 @@ describe('StageRunsService.finishNow', () => {
       voided: false,
     });
 
-    const finished = await service.finishNow('r1');
+    const finished = await service.finishNow('r1', null);
 
     expect(finished.durationMs).toBeGreaterThanOrEqual(60_000);
     expect(finished.finishManual).toBe(true);
@@ -431,7 +492,9 @@ describe('StageRunsService.finishNow', () => {
       voided: false,
     });
 
-    await expect(service.finishNow('r1')).rejects.toThrow('already finished');
+    await expect(service.finishNow('r1', null)).rejects.toThrow(
+      'already finished',
+    );
     expect(stageRuns.save).not.toHaveBeenCalled();
   });
 });
@@ -543,7 +606,7 @@ describe('StageRunsService.startRun', () => {
       startTime: new Date('2026-01-01T00:00:00.000Z'),
       finishTime: undefined,
     };
-    const stageRuns = {
+    const stageRuns = withFakeTransaction({
       findOneBy: jest
         .fn()
         .mockResolvedValueOnce(null) // findActive pre-check
@@ -551,7 +614,7 @@ describe('StageRunsService.startRun', () => {
       findOne: jest.fn().mockResolvedValue(null), // findFinished pre-check
       create: jest.fn().mockImplementation((r: unknown) => r),
       save: jest.fn().mockRejectedValue(uniqueViolation()),
-    };
+    });
     const stagesService = {
       findOne: jest.fn().mockResolvedValue({ status: StageStatus.NOT_STARTED }),
     };

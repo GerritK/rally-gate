@@ -716,5 +716,29 @@
     "setupTitle": "Organisator-Passwort setzen",
     "setupExplain": "Damit meldet sich der Organisator auf jedem Gerät außer dem Server an.",
     "joining": "Anmeldung läuft…"
+  },
+  "changes": {
+    "title": "Verlauf",
+    "hint": "Jede Änderung von Hand an den Ergebnissen dieses Autos, neueste zuerst.",
+    "when": "Wann",
+    "what": "Änderung",
+    "before": "Vorher",
+    "after": "Nachher",
+    "by": "Von",
+    "empty": "Noch nichts von Hand geändert.",
+    "serverMachine": "Server-Rechner",
+    "actions": {
+      "RUN_CREATED": "Lauf gestartet oder eingetragen",
+      "RUN_FINISHED": "Ziel jetzt",
+      "RUN_CORRECTED": "Lauf korrigiert",
+      "RUN_VOIDED": "Versuch annulliert",
+      "RUN_RESTORED": "Versuch wiederhergestellt",
+      "RUN_DELETED": "Lauf gelöscht",
+      "PENALTY_ADDED": "Strafe hinzugefügt",
+      "PENALTY_DELETED": "Strafe gelöscht",
+      "PASSING_ASSIGNED": "Durchfahrt zugeordnet",
+      "PASSING_DISMISSED": "Durchfahrt verworfen",
+      "ENTRY_STATUS": "Status geändert"
+    }
   }
 }

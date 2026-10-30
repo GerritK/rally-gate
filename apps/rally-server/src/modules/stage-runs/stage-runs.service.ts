@@ -7,10 +7,17 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ApiErrorCode, StageRunStatus, StageStatus } from '@rally-gate/shared';
+import {
+  ApiErrorCode,
+  ChangeAction,
+  StageRunStatus,
+  StageStatus,
+  type RunSnapshot,
+} from '@rally-gate/shared';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { apiError } from '../../common/api-error';
 import { isUniqueViolation } from '../../common/db-errors';
+import { recordChange, runSnapshot } from '../changes/record-change';
 import { StagesService } from '../stages/stages.service';
 import { StageRun } from './stage-run.entity';
 import { StageSplit } from './stage-split.entity';
@@ -387,8 +394,10 @@ export class StageRunsService {
   async correctRun(
     id: string,
     patch: StageRunCorrection,
+    by: string | null,
   ): Promise<StageRunWithStatus> {
     const run = await this.findOneOrFail(id);
+    const before = runSnapshot(run);
     if (patch.startTime !== undefined) {
       run.startTime = parseTime(patch.startTime, 'startTime');
       run.startManual = true;
@@ -405,14 +414,22 @@ export class StageRunsService {
       assertValidRunDuration(run.startTime, run.finishTime);
     }
     run.durationMs = durationMs(run.startTime, run.finishTime);
-    const saved = await this.stageRuns.save(run);
+    const saved = await this.saveRecorded(
+      run,
+      by,
+      ChangeAction.RUN_CORRECTED,
+      before,
+    );
     const withStatus = await this.withStatus(saved);
     this.emitter.emit('stage-run.updated', withStatus);
     return withStatus;
   }
 
   /** Admin override: record a run whose start (and maybe finish) detection never arrived. */
-  async createManual(input: ManualStageRunInput): Promise<StageRunWithStatus> {
+  async createManual(
+    input: ManualStageRunInput,
+    by: string | null,
+  ): Promise<StageRunWithStatus> {
     const startTime = input.startTime
       ? parseTime(input.startTime, 'startTime')
       : new Date();
@@ -434,7 +451,7 @@ export class StageRunsService {
     });
     let saved: StageRun;
     try {
-      saved = await this.stageRuns.save(run);
+      saved = await this.saveRecorded(run, by, ChangeAction.RUN_CREATED, null);
     } catch (err) {
       if (isUniqueViolation(err)) {
         // An entry has at most one non-voided attempt per stage. Recording
@@ -459,7 +476,7 @@ export class StageRunsService {
    * fallback when the finish gate misses a car. Unlike a gate finish it
    * refuses instead of ignoring, so a double click can't move a time.
    */
-  async finishNow(id: string): Promise<StageRunWithStatus> {
+  async finishNow(id: string, by: string | null): Promise<StageRunWithStatus> {
     const run = await this.findOneOrFail(id);
     if (
       run.voided ||
@@ -473,13 +490,8 @@ export class StageRunsService {
         ),
       );
     }
-    const finished = await this.finishRun(
-      run.entryId,
-      run.stageId,
-      new Date(),
-      true,
-    );
-    if (!finished) {
+    const finishTime = new Date();
+    if (!isValidRunDuration(run.startTime, finishTime)) {
       throw new ConflictException(
         apiError(
           ApiErrorCode.RUN_STARTS_IN_FUTURE,
@@ -487,6 +499,13 @@ export class StageRunsService {
         ),
       );
     }
+    const before = runSnapshot(run);
+    run.finishTime = finishTime;
+    run.finishManual = true;
+    run.durationMs = durationMs(run.startTime, finishTime);
+    const finished = await this.withStatus(
+      await this.saveRecorded(run, by, ChangeAction.RUN_FINISHED, before),
+    );
     this.emitter.emit('stage-run.updated', finished);
     return finished;
   }
@@ -501,10 +520,12 @@ export class StageRunsService {
    * pass. That is the point of doing it this way rather than hand-entering a
    * replacement run: both ends of the re-run stay gate-timed.
    */
-  async voidRun(id: string): Promise<StageRunWithStatus> {
+  async voidRun(id: string, by: string | null): Promise<StageRunWithStatus> {
     const run = await this.findOneOrFail(id);
     run.voided = true;
-    const withStatus = await this.withStatus(await this.stageRuns.save(run));
+    const withStatus = await this.withStatus(
+      await this.saveRecorded(run, by, ChangeAction.RUN_VOIDED, null),
+    );
     this.emitter.emit('stage-run.updated', withStatus);
     return withStatus;
   }
@@ -515,7 +536,7 @@ export class StageRunsService {
    * cascading: striking out a run the car actually drove is the marshal's
    * call to make explicitly, not a side effect of "restore".
    */
-  async unvoidRun(id: string): Promise<StageRunWithStatus> {
+  async unvoidRun(id: string, by: string | null): Promise<StageRunWithStatus> {
     const run = await this.findOneOrFail(id);
     const survivor = (
       await this.stageRuns.find({
@@ -538,22 +559,48 @@ export class StageRunsService {
     }
 
     run.voided = false;
-    const withStatus = await this.withStatus(await this.stageRuns.save(run));
+    const withStatus = await this.withStatus(
+      await this.saveRecorded(run, by, ChangeAction.RUN_RESTORED, null),
+    );
     this.emitter.emit('stage-run.updated', withStatus);
     return withStatus;
   }
 
-  async remove(id: string): Promise<void> {
-    // No foreign keys, so splits don't cascade and have to go first. Safe
-    // without a transaction: if the run doesn't exist, the split delete
-    // matched nothing anyway.
-    await this.stageSplits.delete({ stageRunId: id });
-    const result = await this.stageRuns.delete(id);
-    if (result.affected === 0) {
-      throw new NotFoundException(
-        apiError(ApiErrorCode.STAGE_RUN_NOT_FOUND, `StageRun ${id} not found`),
-      );
-    }
+  async remove(id: string, by: string | null): Promise<void> {
+    const run = await this.findOneOrFail(id);
+    await this.stageRuns.manager.transaction(async (manager) => {
+      // No foreign keys, so splits don't cascade and have to go first.
+      await manager.delete(StageSplit, { stageRunId: id });
+      await manager.delete(StageRun, id);
+      await recordChange(manager, by, {
+        action: ChangeAction.RUN_DELETED,
+        entryId: run.entryId,
+        stageId: run.stageId,
+        subjectId: run.id,
+        before: runSnapshot(run),
+      });
+    });
+  }
+
+  /** A hand-made change and its `ChangeRecord`, in one transaction. */
+  private saveRecorded(
+    run: StageRun,
+    by: string | null,
+    action: ChangeAction,
+    before: RunSnapshot | null,
+  ): Promise<StageRun> {
+    return this.stageRuns.manager.transaction(async (manager) => {
+      const saved = await manager.save(StageRun, run);
+      await recordChange(manager, by, {
+        action,
+        entryId: saved.entryId,
+        stageId: saved.stageId,
+        subjectId: saved.id,
+        before,
+        after: runSnapshot(saved),
+      });
+      return saved;
+    });
   }
 
   async findSplitsForStage(stageId: string): Promise<StageSplit[]> {

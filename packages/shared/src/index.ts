@@ -18,3 +18,4 @@ export * from './api-error';
 export * from './rally';
 export * from './auth';
 export * from './permissions';
+export * from './change';

@@ -21,6 +21,7 @@ import { Penalty } from '../modules/penalties/penalty.entity';
 import { PenaltyType } from '../modules/penalties/penalty-type.entity';
 import { Invitation } from '../modules/auth/invitation.entity';
 import { Device } from '../modules/auth/device.entity';
+import { ChangeRecord } from '../modules/changes/change-record.entity';
 
 const ENTITIES = [
   DetectionEventRecord,
@@ -38,6 +39,7 @@ const ENTITIES = [
   PenaltyType,
   Invitation,
   Device,
+  ChangeRecord,
 ];
 
 /**

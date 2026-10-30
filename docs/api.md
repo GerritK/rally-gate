@@ -41,6 +41,7 @@ lists.
 | `/gates/power-off` | POST | shuts down every online gate through its gate-config; one `{ gateId, ok, error?, detail? }` per gate (`unreachable`, or `refused` with the command output). 409 while a stage is active |
 | `/gate-assignments` | GET, POST, `/:id` DELETE | the (gate, stage, role, splitIndex) plan. `active` is not settable — activation is per stage |
 | `/entries` | GET, POST, `/:id` GET/PATCH | `startNumber` is unique, POST/PATCH 409 on a clash. Classes are written as `classIds` (replaces the list, 400 on an unknown id) and read back as `classes` |
+| `/entries/:id/changes` | GET | `ChangeView[]`, newest first: each hand-made change to the entry's results with the value before and after and the device (`auth.md`) |
 | `/entry-classes` | GET, POST, `/:id` PUT/DELETE | `{ name, main? }`, name unique (409), main classes listed first. DELETE takes the class off its entries |
 | `/penalty-types` | GET, POST, `/:id` PUT/DELETE | `{ name, scope, tiers: [{ fromCount, seconds }] }`, tiers from 1 ascending (400), name unique (409). PUT reprices given penalties, DELETE deletes them |
 | `/penalties` | GET `?entryId=`, POST, `/:id` DELETE | `{ entryId, stageId?, typeId?, count?, seconds?, note? }`: a type, or free text with `seconds` and `note` (400). 409 on a stage not started. Read back with its computed `penaltyMs` (`event-model.md` "Penalties") |

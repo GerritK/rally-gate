@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { buildDatabaseConfig } from './config/database.config';
 import { AuthModule } from './modules/auth/auth.module';
+import { ChangesModule } from './modules/changes/changes.module';
 import { BrokerModule } from './modules/broker/broker.module';
 import { ClassificationModule } from './modules/classification/classification.module';
 import { DiscoveryModule } from './modules/discovery/discovery.module';
@@ -41,6 +42,7 @@ import { EntriesModule } from './modules/entries/entries.module';
     ClassificationModule,
     StartOrderModule,
     EventFilesModule,
+    ChangesModule,
   ],
   controllers: [AppController],
 })

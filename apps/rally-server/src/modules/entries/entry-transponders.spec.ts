@@ -44,9 +44,13 @@ describe('entry transponders through sqlite', () => {
       ],
     });
 
-    const updated = await service.update(entry.id, {
-      transponders: [{ kind: TransponderKind.NFC, identifier: '111' }],
-    });
+    const updated = await service.update(
+      entry.id,
+      {
+        transponders: [{ kind: TransponderKind.NFC, identifier: '111' }],
+      },
+      null,
+    );
 
     expect(updated.transponders).toEqual([
       expect.objectContaining({ kind: TransponderKind.NFC, identifier: '111' }),
@@ -61,7 +65,7 @@ describe('entry transponders through sqlite', () => {
       transponders: [{ kind: TransponderKind.RC, identifier: '333' }],
     });
 
-    await service.update(entry.id, { driverFirstName: 'Bea' });
+    await service.update(entry.id, { driverFirstName: 'Bea' }, null);
 
     expect((await service.findOne(entry.id))?.transponders).toHaveLength(1);
   });

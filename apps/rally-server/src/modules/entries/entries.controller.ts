@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { entryStatusPermission } from '@rally-gate/shared';
 import { CurrentPrincipal, Requires } from '../auth/auth.guard';
-import { assertMay, type Principal } from '../auth/auth.service';
+import { assertMay, deviceOf, type Principal } from '../auth/auth.service';
 import { RallyStatusService } from '../rally-info/rally-status.service';
 import { CreateEntryDto, UpdateEntryDto } from './dto';
 import { EntriesService } from './entries.service';
@@ -52,6 +52,6 @@ export class EntriesController {
     if (entry) {
       await this.rallyStatusService.assertEntryChangeAllowed(entry, body);
     }
-    return this.entriesService.update(id, body);
+    return this.entriesService.update(id, body, deviceOf(principal));
   }
 }

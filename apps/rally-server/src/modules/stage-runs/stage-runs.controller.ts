@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiErrorCode, isOutOfEvent, RallyStatus } from '@rally-gate/shared';
 import { CurrentPrincipal, Requires } from '../auth/auth.guard';
-import { assertMay, type Principal } from '../auth/auth.service';
+import { assertMay, deviceOf, type Principal } from '../auth/auth.service';
 import { apiError } from '../../common/api-error';
 import { EntriesService } from '../entries/entries.service';
 import { CorrectStageRunDto, CreateStageRunDto } from './dto';
@@ -66,7 +66,7 @@ export class StageRunsController {
         ),
       );
     }
-    return this.stageRunsService.createManual(body);
+    return this.stageRunsService.createManual(body, deviceOf(principal));
   }
 
   @LockedWhen(RallyStatus.CLOSED)
@@ -82,7 +82,7 @@ export class StageRunsController {
       'correctRun',
       await this.stageRunsService.stageIdOf(id),
     );
-    return this.stageRunsService.correctRun(id, body);
+    return this.stageRunsService.correctRun(id, body, deviceOf(principal));
   }
 
   /** Hand-timed finish, server-stamped. 409 if finished, voided or closed. */
@@ -94,7 +94,7 @@ export class StageRunsController {
     @CurrentPrincipal() principal: Principal,
   ) {
     assertMay(principal, 'timeRun', await this.stageRunsService.stageIdOf(id));
-    return this.stageRunsService.finishNow(id);
+    return this.stageRunsService.finishNow(id, deviceOf(principal));
   }
 
   /**
@@ -105,8 +105,8 @@ export class StageRunsController {
   @LockedWhen(RallyStatus.CLOSED)
   @Requires('voidRun')
   @Post(':id/void')
-  void(@Param('id') id: string) {
-    return this.stageRunsService.voidRun(id);
+  void(@Param('id') id: string, @CurrentPrincipal() principal: Principal) {
+    return this.stageRunsService.voidRun(id, deviceOf(principal));
   }
 
   /**
@@ -117,14 +117,14 @@ export class StageRunsController {
   @LockedWhen(RallyStatus.CLOSED)
   @Requires('voidRun')
   @Post(':id/unvoid')
-  unvoid(@Param('id') id: string) {
-    return this.stageRunsService.unvoidRun(id);
+  unvoid(@Param('id') id: string, @CurrentPrincipal() principal: Principal) {
+    return this.stageRunsService.unvoidRun(id, deviceOf(principal));
   }
 
   @LockedWhen(RallyStatus.CLOSED)
   @Requires('voidRun')
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.stageRunsService.remove(id);
+  remove(@Param('id') id: string, @CurrentPrincipal() principal: Principal) {
+    return this.stageRunsService.remove(id, deviceOf(principal));
   }
 }

@@ -99,9 +99,18 @@ A login is a **device with a role**, not a person with a password.
   address it was set on, so a tablet logged in at home through
   `rally-server.local` stays logged in at the rally; through an IP only if the
   server gets the same one there.
-- Invitations and devices are never deleted, only blocked: every correction,
-  penalty and passing assignment stores the **device id**, and the correction
-  history shows "Anna – Start SS2 · device 2". That's what a protest needs.
+- Invitations and devices are never deleted, only blocked: every hand-made
+  change to a result is a `ChangeRecord` with the **device id** (null: the
+  server machine) and the value before and after, and the entry page's
+  History names it "Anna – Start SS2 · device 2". Recorded: Start now, Finish
+  now, typed and corrected times, void/restore/delete, penalties added and
+  deleted, passings assigned and dismissed, entry status changes. Not
+  recorded: setup edits, gate-timed passings (those are `DetectionEventRecord`
+  already). Append-only, written in the change's own transaction. What it
+  is for: undoing a correction on the wrong car (the old value is there) and
+  settling "my time was different a minute ago". A device is a login, not a
+  person: a sniffed cookie is the same device ("Participants on the timing
+  Wi-Fi"). Dismissed passings have no entry and show nowhere yet.
 
 ### The organiser
 

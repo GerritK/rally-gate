@@ -5,10 +5,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ApiErrorCode, StageStatus } from '@rally-gate/shared';
+import {
+  ApiErrorCode,
+  ChangeAction,
+  StageStatus,
+  type PenaltySnapshot,
+} from '@rally-gate/shared';
 import { DataSource, Repository } from 'typeorm';
 import { apiError } from '../../common/api-error';
 import { isUniqueViolation } from '../../common/db-errors';
+import { recordChange } from '../changes/record-change';
 import { EntriesService } from '../entries/entries.service';
 import { Stage } from '../stages/stage.entity';
 import { countsInOverall, StagesService } from '../stages/stages.service';
@@ -18,6 +24,13 @@ import { PenaltyType } from './penalty-type.entity';
 import { Penalty } from './penalty.entity';
 
 export type PricedPenalty = Penalty & { penaltyMs: number };
+
+const penaltySnapshot = (penalty: Penalty): PenaltySnapshot => ({
+  typeId: penalty.typeId,
+  count: penalty.count,
+  seconds: penalty.seconds,
+  note: penalty.note,
+});
 
 @Injectable()
 export class PenaltiesService {
@@ -81,7 +94,10 @@ export class PenaltiesService {
       .map((penalty) => ({ ...penalty, penaltyMs: prices.get(penalty.id)! }));
   }
 
-  async create(dto: CreatePenaltyDto): Promise<PricedPenalty> {
+  async create(
+    dto: CreatePenaltyDto,
+    by: string | null,
+  ): Promise<PricedPenalty> {
     if (!(await this.entriesService.findOne(dto.entryId))) {
       throw new NotFoundException(
         apiError(
@@ -129,27 +145,47 @@ export class PenaltiesService {
         ),
       );
     }
-    const { id } = await this.penalties.save(
-      this.penalties.create({
-        entryId: dto.entryId,
-        stageId: dto.stageId ?? null,
-        typeId: dto.typeId ?? null,
-        count: dto.count ?? 1,
-        seconds: dto.seconds ?? null,
-        note: dto.note?.trim() || null,
-        createdAt: new Date(),
-      }),
-    );
+    const { id } = await this.dataSource.transaction(async (manager) => {
+      const saved = await manager.save(
+        manager.create(Penalty, {
+          entryId: dto.entryId,
+          stageId: dto.stageId ?? null,
+          typeId: dto.typeId ?? null,
+          count: dto.count ?? 1,
+          seconds: dto.seconds ?? null,
+          note: dto.note?.trim() || null,
+          createdAt: new Date(),
+        }),
+      );
+      await recordChange(manager, by, {
+        action: ChangeAction.PENALTY_ADDED,
+        entryId: saved.entryId,
+        stageId: saved.stageId,
+        subjectId: saved.id,
+        after: penaltySnapshot(saved),
+      });
+      return saved;
+    });
     return (await this.findAll(dto.entryId)).find((p) => p.id === id)!;
   }
 
-  async remove(id: string): Promise<void> {
-    const { affected } = await this.penalties.delete(id);
-    if (!affected) {
+  async remove(id: string, by: string | null): Promise<void> {
+    const penalty = await this.penalties.findOneBy({ id });
+    if (!penalty) {
       throw new NotFoundException(
         apiError(ApiErrorCode.PENALTY_NOT_FOUND, `Penalty ${id} not found`),
       );
     }
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(Penalty, id);
+      await recordChange(manager, by, {
+        action: ChangeAction.PENALTY_DELETED,
+        entryId: penalty.entryId,
+        stageId: penalty.stageId,
+        subjectId: penalty.id,
+        before: penaltySnapshot(penalty),
+      });
+    });
   }
 
   /**

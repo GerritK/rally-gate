@@ -11,7 +11,8 @@ import {
 import { CreatePenaltyDto, PenaltyTypeDto } from './dto';
 import { PenaltiesService } from './penalties.service';
 import { RallyStatus } from '@rally-gate/shared';
-import { Requires } from '../auth/auth.guard';
+import { CurrentPrincipal, Requires } from '../auth/auth.guard';
+import { deviceOf, type Principal } from '../auth/auth.service';
 import { LockedWhen } from '../rally-info/rally-lock';
 
 @Controller('penalty-types')
@@ -54,13 +55,16 @@ export class PenaltiesController {
 
   @LockedWhen(RallyStatus.CLOSED)
   @Post()
-  create(@Body() body: CreatePenaltyDto) {
-    return this.penaltiesService.create(body);
+  create(
+    @Body() body: CreatePenaltyDto,
+    @CurrentPrincipal() principal: Principal,
+  ) {
+    return this.penaltiesService.create(body, deviceOf(principal));
   }
 
   @LockedWhen(RallyStatus.CLOSED)
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.penaltiesService.remove(id);
+  remove(@Param('id') id: string, @CurrentPrincipal() principal: Principal) {
+    return this.penaltiesService.remove(id, deviceOf(principal));
   }
 }

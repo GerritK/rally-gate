@@ -7,6 +7,7 @@ import { StagesService } from '../stages/stages.service';
 import { EntriesService } from '../entries/entries.service';
 import { DetectionEventRecord } from './detection-event.entity';
 import { EventsService } from './events.service';
+import { withFakeTransaction } from '../../common/fake-transaction';
 
 const GATE = { id: 'G1', name: 'G1', clockOffsetMs: null };
 const ENTRY = { id: 'v1', transponderId: '1234567' };
@@ -29,7 +30,7 @@ function makeService(opts: {
     saved.push({ ...r });
     return Promise.resolve(r);
   };
-  const events = {
+  const events = withFakeTransaction({
     create: jest
       .fn()
       .mockImplementation((r: DetectionEventRecord) => ({ ...r })),
@@ -38,7 +39,7 @@ function makeService(opts: {
     existsBy: jest.fn().mockResolvedValue(opts.alreadyStored ?? false),
     find: jest.fn().mockResolvedValue(opts.pending ?? []),
     findOneBy: jest.fn().mockResolvedValue(opts.stored ?? null),
-  };
+  });
   const gatesService = {
     findOne: jest.fn().mockResolvedValue('gate' in opts ? opts.gate : GATE),
     clockCorrectionMsFor: jest.fn().mockResolvedValue(0),
@@ -445,7 +446,7 @@ describe('EventsService unidentified passings', () => {
       stored: { ...awaiting },
     });
 
-    await service.assignEntry('e1', 'v1');
+    await service.assignEntry('e1', 'v1', null);
 
     expect(startRun).toHaveBeenCalledWith(
       'v1',
@@ -469,7 +470,7 @@ describe('EventsService unidentified passings', () => {
       }),
     });
 
-    await expect(service.assignEntry('e1', 'v1')).rejects.toThrow(
+    await expect(service.assignEntry('e1', 'v1', null)).rejects.toThrow(
       ConflictException,
     );
     expect(saved).toHaveLength(0);
@@ -480,7 +481,7 @@ describe('EventsService unidentified passings', () => {
       stored: { ...awaiting },
     });
 
-    await service.dismissAwaiting('e1');
+    await service.dismissAwaiting('e1', null);
 
     expect(startRun).not.toHaveBeenCalled();
     expect(saved.at(-1)).toMatchObject({

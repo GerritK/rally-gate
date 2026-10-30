@@ -95,9 +95,9 @@ One line each; the linked doc has the detail. History is in git.
   1. API and dashboard. Built: roles on every change, invitations with
      printable QR codes and devices (Setup → Access), organiser by localhost
      or password with a setup QR, `reset-admin`, `/login` and `/join/:code`,
-     the dashboard showing only what the role may do. Next, each its own
-     commit: the device id on every correction, penalty and assignment, then
-     the public page with internal reads behind the login, a rate limit on
+     the dashboard showing only what the role may do, the History of every
+     hand-made change with its device on the entry page. Next, each its own
+     commit: the public page with internal reads behind the login, a rate limit on
      `/auth/login`, and the operating rule "participants never on the timing
      Wi-Fi" on the login page and in the setup docs (`auth.md`
      "Participants on the timing Wi-Fi").

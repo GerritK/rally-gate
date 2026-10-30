@@ -1,5 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
-import { EntryStatus } from '@rally-gate/shared';
+import { ChangeAction, EntryStatus } from '@rally-gate/shared';
+import { withFakeTransaction } from '../../common/fake-transaction';
 import { EntriesService } from './entries.service';
 
 /**
@@ -70,10 +71,10 @@ function makeServiceForUpdate(
   existingEntry: unknown,
   saveImpl: (v: unknown) => Promise<unknown> = (v) => Promise.resolve(v),
 ) {
-  const entries = {
+  const entries = withFakeTransaction({
     findOneBy: jest.fn().mockResolvedValue(existingEntry),
     save: jest.fn().mockImplementation(saveImpl),
-  };
+  });
   return new EntriesService(entries as never, {} as never);
 }
 
@@ -82,7 +83,7 @@ describe('EntriesService.update', () => {
     const service = makeServiceForUpdate(null);
 
     await expect(
-      service.update('missing', { status: EntryStatus.CHECKED_IN }),
+      service.update('missing', { status: EntryStatus.CHECKED_IN }, null),
     ).rejects.toThrow(NotFoundException);
   });
 
@@ -94,10 +95,14 @@ describe('EntriesService.update', () => {
       status: EntryStatus.REGISTERED,
     });
 
-    const updated = await service.update('v1', {
-      status: EntryStatus.CHECKED_IN,
-      coDriverFirstName: 'Co Driver',
-    });
+    const updated = await service.update(
+      'v1',
+      {
+        status: EntryStatus.CHECKED_IN,
+        coDriverFirstName: 'Co Driver',
+      },
+      null,
+    );
 
     expect(updated).toMatchObject({
       startNumber: 12,
@@ -105,6 +110,30 @@ describe('EntriesService.update', () => {
       status: EntryStatus.CHECKED_IN,
       coDriverFirstName: 'Co Driver',
     });
+  });
+
+  it('records a status change, but not an edit of the crew', async () => {
+    const entries = withFakeTransaction({
+      findOneBy: jest.fn().mockResolvedValue({
+        id: 'v1',
+        status: EntryStatus.CHECKED_IN,
+      }),
+      save: jest.fn().mockImplementation((v: unknown) => Promise.resolve(v)),
+    });
+    const service = new EntriesService(entries as never, {} as never);
+
+    await service.update('v1', { driverFirstName: 'Bea' }, 'device-1');
+    expect(entries.inserted).toEqual([]);
+
+    await service.update('v1', { status: EntryStatus.WITHDRAWN }, 'device-1');
+    expect(entries.inserted).toEqual([
+      expect.objectContaining({
+        action: ChangeAction.ENTRY_STATUS,
+        deviceId: 'device-1',
+        before: { status: EntryStatus.CHECKED_IN },
+        after: { status: EntryStatus.WITHDRAWN },
+      }),
+    ]);
   });
 
   it('keeps fields the patch carries as undefined, as a validated DTO does', async () => {
@@ -115,12 +144,16 @@ describe('EntriesService.update', () => {
       coDriverFirstName: 'Co',
     });
 
-    const updated = await service.update('v1', {
-      startNumber: undefined,
-      driverFirstName: undefined,
-      coDriverFirstName: null,
-      status: EntryStatus.CHECKED_IN,
-    });
+    const updated = await service.update(
+      'v1',
+      {
+        startNumber: undefined,
+        driverFirstName: undefined,
+        coDriverFirstName: null,
+        status: EntryStatus.CHECKED_IN,
+      },
+      null,
+    );
 
     expect(updated).toMatchObject({
       startNumber: 12,
@@ -136,8 +169,8 @@ describe('EntriesService.update', () => {
       () => Promise.reject(uniqueViolation()),
     );
 
-    await expect(service.update('v1', { startNumber: 99 })).rejects.toThrow(
-      'Start number 99 is already in use',
-    );
+    await expect(
+      service.update('v1', { startNumber: 99 }, null),
+    ).rejects.toThrow('Start number 99 is already in use');
   });
 });

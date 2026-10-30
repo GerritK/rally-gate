@@ -716,5 +716,29 @@
     "setupTitle": "Set the organiser password",
     "setupExplain": "With it the organiser logs in on any device other than the server.",
     "joining": "Logging in…"
+  },
+  "changes": {
+    "title": "History",
+    "hint": "Every hand-made change to this car's results, newest first.",
+    "when": "When",
+    "what": "Change",
+    "before": "Before",
+    "after": "After",
+    "by": "By",
+    "empty": "Nothing changed by hand yet.",
+    "serverMachine": "Server computer",
+    "actions": {
+      "RUN_CREATED": "Run started or entered",
+      "RUN_FINISHED": "Finish now",
+      "RUN_CORRECTED": "Run corrected",
+      "RUN_VOIDED": "Attempt voided",
+      "RUN_RESTORED": "Attempt restored",
+      "RUN_DELETED": "Run deleted",
+      "PENALTY_ADDED": "Penalty added",
+      "PENALTY_DELETED": "Penalty deleted",
+      "PASSING_ASSIGNED": "Passing assigned",
+      "PASSING_DISMISSED": "Passing dismissed",
+      "ENTRY_STATUS": "Status changed"
+    }
   }
 }

@@ -3,7 +3,7 @@ import { AssignEntryDto, RecentEventsQueryDto } from './dto';
 import { EventsService } from './events.service';
 import { RallyStatus } from '@rally-gate/shared';
 import { CurrentPrincipal, Requires } from '../auth/auth.guard';
-import { assertMay, type Principal } from '../auth/auth.service';
+import { assertMay, deviceOf, type Principal } from '../auth/auth.service';
 import { LockedWhen } from '../rally-info/rally-lock';
 
 @Controller('events')
@@ -51,7 +51,11 @@ export class EventsController {
       'assignPassing',
       await this.eventsService.stageIdOfAwaiting(eventId),
     );
-    return this.eventsService.assignEntry(eventId, body.entryId);
+    return this.eventsService.assignEntry(
+      eventId,
+      body.entryId,
+      deviceOf(principal),
+    );
   }
 
   @Requires('assignPassing')
@@ -65,6 +69,6 @@ export class EventsController {
       'assignPassing',
       await this.eventsService.stageIdOfAwaiting(eventId),
     );
-    return this.eventsService.dismissAwaiting(eventId);
+    return this.eventsService.dismissAwaiting(eventId, deviceOf(principal));
   }
 }

@@ -28,6 +28,9 @@ import {
   verifyPassword,
 } from './organiser';
 
+/** Stored on every `ChangeRecord`; null is the server machine. */
+export const deviceOf = (principal: Principal) => principal.device?.id ?? null;
+
 /** Who sent a request; attached by `AuthGuard`. */
 export interface Principal {
   role: AccessRole;

@@ -5,8 +5,17 @@ import {
   StageScoring,
   StageStatus,
   EntryStatus,
+  type ChangeSnapshot,
+  type ChangeView,
 } from '@rally-gate/shared';
-import { t, useConfirm } from '@rally-gate/ui';
+import {
+  formatClockTime,
+  formatStageDuration,
+  t,
+  useConfirm,
+} from '@rally-gate/ui';
+import { useDisplay } from 'vuetify';
+import { fetchChanges } from '../api/changes';
 import {
   fetchOverallClassification,
   fetchStageClassification,
@@ -45,6 +54,7 @@ import {
   TIMING_MARKS,
   type TimingMark,
   ENTRY_STATUS_DISPLAY,
+  formatStamp,
 } from '../format';
 
 const props = defineProps<{ entryId: string }>();
@@ -58,6 +68,10 @@ const stageRanks = ref(new Map<string, Placing[]>());
 const overall = ref<OverallPlacing[]>([]);
 const penalties = ref<Penalty[]>([]);
 const penaltyTypes = ref<PenaltyType[]>([]);
+const changes = ref<ChangeView[]>([]);
+/** The change whose before and after are open in the dialog. */
+const shownChange = ref<ChangeView | null>(null);
+const { smAndDown } = useDisplay();
 const loaded = ref(false);
 const dialogOpen = ref(false);
 const penaltyDialog = ref<InstanceType<typeof PenaltyDialog> | null>(null);
@@ -193,6 +207,70 @@ const legendMarks = computed<TimingMark[]>(() => [
   ...(stageRows.value.some((r) => r.notional) ? (['notional'] as const) : []),
 ]);
 
+/** "Anna – Start SS2 · Device 2", as the invitation names it. */
+function changedBy(change: ChangeView): string {
+  if (!change.by) return t('changes.serverMachine');
+  const who = change.by.label ?? t(`access.roles.${change.by.role}`);
+  return `${who} · ${t('access.device', { n: change.by.number })}`;
+}
+
+/** A snapshot as label/value lines, the same labels for before and after. */
+function snapshotFields(snapshot: ChangeSnapshot): [string, string][] {
+  if ('startTime' in snapshot) {
+    const { startTime, finishTime } = snapshot;
+    return [
+      [t('gateRole.start'), formatClockTime(startTime)],
+      [t('gateRole.finish'), finishTime ? formatClockTime(finishTime) : '–'],
+      // Clock times stop at the second; the time driven shows a tenths fix.
+      [
+        t('table.time'),
+        finishTime
+          ? formatStageDuration(Date.parse(finishTime) - Date.parse(startTime))
+          : '–',
+      ],
+    ];
+  }
+  if ('status' in snapshot) {
+    return [
+      [
+        t('table.status'),
+        ENTRY_STATUS_DISPLAY[snapshot.status as EntryStatus].label,
+      ],
+    ];
+  }
+  if ('gateId' in snapshot) {
+    return [
+      [t('stage.gate'), snapshot.gateId],
+      [t('table.time'), formatClockTime(snapshot.time)],
+    ];
+  }
+  const type = penaltyTypes.value.find((p) => p.id === snapshot.typeId);
+  return [
+    [t('penalties.type'), type?.name ?? snapshot.note ?? ''],
+    [t('penalties.count'), String(snapshot.count)],
+    ...(type && snapshot.note
+      ? [[t('penalties.note'), snapshot.note] as [string, string]]
+      : []),
+  ];
+}
+
+/** One row per value, before beside after, so a change reads across. */
+const comparison = computed(() => {
+  const change = shownChange.value;
+  if (!change) return [];
+  const before = new Map(change.before ? snapshotFields(change.before) : []);
+  const after = new Map(change.after ? snapshotFields(change.after) : []);
+  return [...new Set([...before.keys(), ...after.keys()])].map((label) => ({
+    label,
+    before: before.get(label) ?? '',
+    after: after.get(label) ?? '',
+    changed:
+      !!change.before &&
+      !!change.after &&
+      before.get(label) !== after.get(label),
+  }));
+});
+
 async function refresh() {
   [
     entries.value,
@@ -202,6 +280,7 @@ async function refresh() {
     overall.value,
     penalties.value,
     penaltyTypes.value,
+    changes.value,
   ] = await Promise.all([
     fetchEntries(),
     fetchEntryClasses(),
@@ -210,6 +289,7 @@ async function refresh() {
     fetchOverallClassification(),
     fetchPenalties(props.entryId),
     fetchPenaltyTypes(),
+    fetchChanges(props.entryId),
   ]);
   const started = stages.value.filter(
     (s) => s.status !== StageStatus.NOT_STARTED,
@@ -543,6 +623,98 @@ onMounted(refresh);
         </tbody>
       </v-table>
     </v-card>
+
+    <v-card class="mt-4">
+      <v-card-item>
+        <v-card-title>{{ $t('changes.title') }}</v-card-title>
+        <v-card-subtitle>{{ $t('changes.hint') }}</v-card-subtitle>
+      </v-card-item>
+      <!-- Before and after only in the dialog: two runs' times side by
+           side in every row was unreadable. -->
+      <v-table density="comfortable" hover>
+        <thead>
+          <tr>
+            <th>{{ $t('changes.when') }}</th>
+            <th>{{ $t('changes.what') }}</th>
+            <th>{{ $t('entryDetail.stage') }}</th>
+            <th>{{ $t('changes.by') }}</th>
+            <th width="1%"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="change in changes"
+            :key="change.id"
+            class="cursor-pointer"
+            @click="shownChange = change"
+          >
+            <td class="rg-timing text-no-wrap">{{ formatStamp(change.at) }}</td>
+            <td>{{ $t(`changes.actions.${change.action}`) }}</td>
+            <td>{{ change.stageId ?? '' }}</td>
+            <td>{{ changedBy(change) }}</td>
+            <td><v-icon icon="mdi-chevron-right" size="small" /></td>
+          </tr>
+          <tr v-if="changes.length === 0">
+            <td colspan="5" class="rg-empty">{{ $t('changes.empty') }}</td>
+          </tr>
+        </tbody>
+      </v-table>
+    </v-card>
+
+    <v-dialog
+      :model-value="!!shownChange"
+      max-width="520"
+      :fullscreen="smAndDown"
+      @update:model-value="shownChange = null"
+    >
+      <v-card
+        v-if="shownChange"
+        :title="$t(`changes.actions.${shownChange.action}`)"
+      >
+        <v-card-text>
+          <dl class="rg-change">
+            <dt>{{ $t('changes.when') }}</dt>
+            <dd class="rg-timing">{{ formatStamp(shownChange.at) }}</dd>
+            <template v-if="shownChange.stageId">
+              <dt>{{ $t('entryDetail.stage') }}</dt>
+              <dd>{{ shownChange.stageId }}</dd>
+            </template>
+            <dt>{{ $t('changes.by') }}</dt>
+            <dd>{{ changedBy(shownChange) }}</dd>
+          </dl>
+          <v-table density="compact" class="mt-4">
+            <thead>
+              <tr>
+                <th></th>
+                <th v-if="shownChange.before">{{ $t('changes.before') }}</th>
+                <th v-if="shownChange.after">{{ $t('changes.after') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in comparison" :key="row.label">
+                <td class="text-medium-emphasis">{{ row.label }}</td>
+                <td v-if="shownChange.before" class="rg-timing">
+                  {{ row.before }}
+                </td>
+                <td
+                  v-if="shownChange.after"
+                  class="rg-timing"
+                  :class="{ 'font-weight-bold': row.changed }"
+                >
+                  {{ row.after }}
+                </td>
+              </tr>
+            </tbody>
+          </v-table>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="shownChange = null">
+            {{ $t('common.close') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </template>
 
   <PenaltyDialog
@@ -600,6 +772,18 @@ onMounted(refresh);
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px;
+}
+.rg-change {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 24px;
+  margin: 0;
+}
+.rg-change dt {
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+.rg-change dd {
+  margin: 0;
 }
 .rg-flag {
   height: 0.9em;

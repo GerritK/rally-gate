@@ -5,7 +5,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ApiErrorCode, Crew, TransponderKind } from '@rally-gate/shared';
+import {
+  ApiErrorCode,
+  ChangeAction,
+  Crew,
+  TransponderKind,
+} from '@rally-gate/shared';
+import { recordChange } from '../changes/record-change';
 import { In, Repository } from 'typeorm';
 import { apiError } from '../../common/api-error';
 import { isUniqueViolation } from '../../common/db-errors';
@@ -80,13 +86,18 @@ export class EntriesService {
     }
   }
 
-  async update(id: string, { classIds, ...patch }: EntryInput): Promise<Entry> {
+  async update(
+    id: string,
+    { classIds, ...patch }: EntryInput,
+    by: string | null,
+  ): Promise<Entry> {
     const entry = await this.findOne(id);
     if (!entry) {
       throw new NotFoundException(
         apiError(ApiErrorCode.ENTRY_NOT_FOUND, `Entry ${id} not found`),
       );
     }
+    const statusBefore = entry.status;
     // The validated DTO carries every declared field as an own property, unset
     // ones as `undefined` (ES2022+ class fields). Copied over, they'd blank the
     // returned entry even though save() skips them — `null` still clears.
@@ -101,7 +112,22 @@ export class EntriesService {
       entry.classes = classes;
     }
     try {
-      return await this.entries.save(entry);
+      return await this.entries.manager.transaction(async (manager) => {
+        const saved = await manager.save(Entry, entry);
+        // Only the status: it moves results (withdrawn, disqualified); the
+        // crew's name or a transponder is not what a protest is about.
+        if (saved.status !== statusBefore) {
+          await recordChange(manager, by, {
+            action: ChangeAction.ENTRY_STATUS,
+            entryId: saved.id,
+            stageId: null,
+            subjectId: saved.id,
+            before: { status: statusBefore },
+            after: { status: saved.status },
+          });
+        }
+        return saved;
+      });
     } catch (err) {
       if (isUniqueViolation(err)) {
         throw new ConflictException(

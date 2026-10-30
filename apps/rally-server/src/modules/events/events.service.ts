@@ -11,6 +11,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   ApiErrorCode,
+  ChangeAction,
   DEFAULT_MIN_STAGE_DURATION_MS,
   DETECTION_TOPIC_PREFIX,
   DetectionEvent,
@@ -21,6 +22,7 @@ import {
 } from '@rally-gate/shared';
 import { In, Repository } from 'typeorm';
 import { apiError } from '../../common/api-error';
+import { recordChange } from '../changes/record-change';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { Gate } from '../gates/gate.entity';
 import { GatesService } from '../gates/gates.service';
@@ -172,8 +174,10 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
   async assignEntry(
     eventId: string,
     entryId: string,
+    by: string | null,
   ): Promise<DetectionEventRecord> {
     const record = await this.findAwaitingOrThrow(eventId);
+    const stageId = await this.stageIdOfAwaiting(eventId);
     if (!(await this.entriesService.findOne(entryId))) {
       throw new NotFoundException(
         apiError(ApiErrorCode.ENTRY_NOT_FOUND, `Entry ${entryId} not found`),
@@ -193,7 +197,18 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     record.entryId = entryId;
     record.awaitingEntry = false;
     record.processed = true;
-    await this.events.save(record);
+    // The run the rules just wrote is the consequence; this records the
+    // decision behind it.
+    await this.events.manager.transaction(async (manager) => {
+      await manager.save(DetectionEventRecord, record);
+      await recordChange(manager, by, {
+        action: ChangeAction.PASSING_ASSIGNED,
+        entryId,
+        stageId,
+        subjectId: record.eventId,
+        after: passingSnapshot(record),
+      });
+    });
     await this.emitAwaitingChanged();
     return record;
   }
@@ -226,10 +241,23 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** For a passing that was no car at all: a marshal, a dog, a double trigger. */
-  async dismissAwaiting(eventId: string): Promise<DetectionEventRecord> {
+  async dismissAwaiting(
+    eventId: string,
+    by: string | null,
+  ): Promise<DetectionEventRecord> {
     const record = await this.findAwaitingOrThrow(eventId);
+    const stageId = await this.stageIdOfAwaiting(eventId);
     record.awaitingEntry = false;
-    await this.events.save(record);
+    await this.events.manager.transaction(async (manager) => {
+      await manager.save(DetectionEventRecord, record);
+      await recordChange(manager, by, {
+        action: ChangeAction.PASSING_DISMISSED,
+        entryId: null,
+        stageId,
+        subjectId: record.eventId,
+        before: passingSnapshot(record),
+      });
+    });
     await this.emitAwaitingChanged();
     return record;
   }
@@ -597,6 +625,11 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     return false;
   }
 }
+
+const passingSnapshot = (record: DetectionEventRecord) => ({
+  gateId: record.gateId,
+  time: effectiveTime(record).toISOString(),
+});
 
 function effectiveTime(record: DetectionEventRecord): Date {
   return new Date(record.timestampGate.getTime() + record.clockCorrectionMs);
