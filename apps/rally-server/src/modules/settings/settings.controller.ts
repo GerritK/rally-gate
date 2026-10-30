@@ -9,6 +9,7 @@ import {
 import { RallyInfoService } from '../rally-info/rally-info.service';
 import { SetSettingDto } from './dto';
 import { SettingsService } from './settings.service';
+import { Public } from '../auth/auth.guard';
 
 /** Per key, as one route stores them all: the start-order rules reorder
  *  stage start lists, the notional penalty moves every DNF/DNS's total. */
@@ -26,6 +27,7 @@ export class SettingsController {
     private readonly rallyInfo: RallyInfoService,
   ) {}
 
+  @Public()
   @Get(':key')
   async get(@Param('key') key: string) {
     const value = await this.settingsService.get(key);

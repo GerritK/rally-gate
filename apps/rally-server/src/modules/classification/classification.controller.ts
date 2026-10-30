@@ -1,11 +1,13 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ClassificationService } from './classification.service';
+import { Public } from '../auth/auth.guard';
 
 /** `?classId=a&classId=b` arrives as an array, a single one as a string. */
 function toClassIds(classId?: string | string[]): string[] {
   return [classId ?? []].flat();
 }
 
+@Public()
 @Controller('classification')
 export class ClassificationController {
   constructor(private readonly classificationService: ClassificationService) {}

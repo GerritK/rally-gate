@@ -703,7 +703,7 @@
   "login": {
     "title": "Anmelden",
     "current": "Angemeldet als",
-    "notLoggedIn": "Nicht angemeldet: Du kannst alles ansehen, aber nichts ändern.",
+    "notLoggedIn": "Nicht angemeldet: Du siehst nur die öffentlichen Startlisten und Ergebnisse.",
     "thisComputer": "Organisator (dieser Rechner)",
     "codeTitle": "Einladungscode",
     "code": "Code",

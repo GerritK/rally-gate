@@ -58,6 +58,7 @@ const onPassword = () =>
 async function onLogout() {
   await logout();
   notify(t('login.loggedOut'));
+  if (!session.value?.role) await router.replace('/public');
 }
 
 onMounted(() => {

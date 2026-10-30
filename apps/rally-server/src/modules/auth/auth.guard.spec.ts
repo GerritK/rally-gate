@@ -60,9 +60,26 @@ const withCookie = (principal: Principal) => ({
 });
 
 describe('AuthGuard', () => {
-  it('lets anyone read, but not a @Private read', async () => {
-    await expect(run('timing', 'GET', {})).resolves.toBe(true);
+  it('lets anyone read only a @Public route', async () => {
+    await expect(run('login', 'GET', {})).resolves.toBe(true);
+    await expect(run('timing', 'GET', {})).rejects.toThrow('Log in');
     await expect(run('invitations', 'GET', {})).rejects.toThrow('Log in');
+  });
+
+  it('lets any login read, but a @Private read needs the role', async () => {
+    const checkIn = withCookie({
+      role: AccessRole.CHECK_IN,
+      device: null,
+      invitation: null,
+    });
+    await expect(run('organiserOnly', 'GET', checkIn)).resolves.toBe(true);
+    await expect(run('invitations', 'GET', checkIn)).rejects.toThrow('may not');
+  });
+
+  it('leaves a read from another web page to the login', async () => {
+    await expect(
+      run('login', 'GET', { origin: 'http://evil.example', host: 'x:57430' }),
+    ).resolves.toBe(true);
   });
 
   it('refuses a change without a login', async () => {

@@ -11,11 +11,13 @@ import { EntryClassDto } from './dto';
 import { EntriesService } from './entries.service';
 import { RallyStatus } from '@rally-gate/shared';
 import { LockedWhen } from '../rally-info/rally-lock';
+import { Public } from '../auth/auth.guard';
 
 @Controller('entry-classes')
 export class EntryClassesController {
   constructor(private readonly entriesService: EntriesService) {}
 
+  @Public()
   @Get()
   findAll() {
     return this.entriesService.findAllClasses();

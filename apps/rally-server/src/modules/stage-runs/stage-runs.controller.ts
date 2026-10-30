@@ -11,7 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiErrorCode, isOutOfEvent, RallyStatus } from '@rally-gate/shared';
-import { CurrentPrincipal, Requires } from '../auth/auth.guard';
+import { CurrentPrincipal, Requires, Public } from '../auth/auth.guard';
 import { assertMay, deviceOf, type Principal } from '../auth/auth.service';
 import { apiError } from '../../common/api-error';
 import { EntriesService } from '../entries/entries.service';
@@ -27,12 +27,14 @@ export class StageRunsController {
   ) {}
 
   /** Every attempt, voided ones included; `?stageId=` narrows to one stage. */
+  @Public()
   @Get()
   findAll(@Query('stageId') stageId?: string) {
     return this.stageRunsService.findAll(stageId);
   }
 
   /** All splits of every attempt on a stage, so a page needs one request. */
+  @Public()
   @Get('splits')
   findSplitsForStage(@Query('stageId') stageId: string) {
     return this.stageRunsService.findSplitsForStage(stageId);

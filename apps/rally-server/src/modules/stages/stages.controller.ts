@@ -8,7 +8,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
-import { Requires } from '../auth/auth.guard';
+import { Requires, Public } from '../auth/auth.guard';
 import { CreateStageDto, UpdateStageDto } from './dto';
 import { StagesService } from './stages.service';
 
@@ -16,11 +16,13 @@ import { StagesService } from './stages.service';
 export class StagesController {
   constructor(private readonly stagesService: StagesService) {}
 
+  @Public()
   @Get()
   findAll() {
     return this.stagesService.findAll();
   }
 
+  @Public()
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.stagesService.findOne(id);

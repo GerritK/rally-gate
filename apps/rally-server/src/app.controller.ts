@@ -1,6 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
 import { VERSION } from '@rally-gate/shared';
+import { Public } from './modules/auth/auth.guard';
 
+@Public()
 @Controller()
 export class AppController {
   @Get('version')

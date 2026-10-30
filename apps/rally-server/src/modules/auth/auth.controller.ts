@@ -43,6 +43,7 @@ function setDeviceCookie(res: Response, token: string): void {
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
+  @Public()
   @Get('session')
   session(@CurrentPrincipal() principal: Principal | null) {
     return this.auth.session(principal);

@@ -35,10 +35,10 @@ export const Requires = (...permissions: Permission[]) =>
     permissions.flatMap((p): AccessRole[] => PERMISSIONS[p]),
   );
 
-/** Changing routes anyone may call: logging in. */
+/** Routes anyone may call, logged in or not: logging in, and what the public page reads. */
 export const Public = () => SetMetadata(PUBLIC, true);
 
-/** A read that needs the role check too: invitation codes, devices. */
+/** A read that needs the role check too, not just any login: invitation codes, devices. */
 export const Private = () => SetMetadata(PRIVATE, true);
 
 type AuthedRequest = Request & { principal?: Principal | null };
@@ -61,9 +61,9 @@ export function cookieValue(req: Request, name: string): string | null {
 }
 
 /**
- * Global (`APP_GUARD`). Reads stay open until the public page lands
- * (`docs/auth.md`) unless `@Private`; every other method needs a login whose role the route
- * allows.
+ * Global (`APP_GUARD`). Every route needs a login unless `@Public`: any login
+ * for a read, one whose role the route allows for a change or a `@Private`
+ * read (`docs/auth.md` "Who sees what").
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -78,14 +78,11 @@ export class AuthGuard implements CanActivate {
 
     const targets = [context.getHandler(), context.getClass()];
     const read = req.method === 'GET' || req.method === 'HEAD';
-    if (read && !this.reflector.getAllAndOverride<boolean>(PRIVATE, targets)) {
-      return true;
-    }
     // Without CORS a foreign page still gets a plain form POST through, and
     // on the server machine that would be the organiser. Browsers always
     // send Origin on a POST; curl and the seed script send none.
     const origin = req.headers.origin;
-    if (origin && new URL(origin).host !== req.headers.host) {
+    if (!read && origin && new URL(origin).host !== req.headers.host) {
       throw new ForbiddenException(
         apiError(ApiErrorCode.FOREIGN_ORIGIN, `Refused request from ${origin}`),
       );
@@ -97,6 +94,9 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException(
         apiError(ApiErrorCode.LOGIN_REQUIRED, 'Log in first'),
       );
+    }
+    if (read && !this.reflector.getAllAndOverride<boolean>(PRIVATE, targets)) {
+      return true;
     }
     const roles =
       this.reflector.getAllAndOverride<AccessRole[]>(ROLES, targets) ?? [];

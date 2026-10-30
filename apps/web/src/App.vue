@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch, watchEffect } from 'vue';
+import { computed, onMounted, ref, watch, watchEffect } from 'vue';
 import {
   currentLocale,
   LocaleMenu,
@@ -9,7 +9,7 @@ import {
   SUPPORT_URL,
   t,
 } from '@rally-gate/ui';
-import { fetchSession, session, sessionName } from './api/auth';
+import { session, sessionName } from './api/auth';
 import { fetchEventInfo } from './api/event';
 import { fetchRallyInfo, rallyName, rallyStatus } from './api/rally-info';
 import { liveStatus } from './api/live';
@@ -17,11 +17,13 @@ import { serverNow, syncServerClock } from './api/time';
 import { fetchServerVersion, serverVersion } from './api/version';
 import { loadDisplaySettings } from './crew';
 import { eventName, RALLY_STATUS_DISPLAY } from './format';
-import { useRoute } from 'vue-router';
-import { NAV_ITEMS } from './router';
+import { useRoute, useRouter } from 'vue-router';
+import { isPublicPath, NAV_ITEMS } from './router';
 
 const drawer = ref(true);
 const route = useRoute();
+const router = useRouter();
+const loggedIn = computed(() => !!session.value?.role);
 /** By first path segment: sub-pages (/setup/stages, /hardware/gates/…,
  *  /results/stages/…) aren't nested routes, so the link's own active state
  *  misses them. */
@@ -49,22 +51,38 @@ const LIVE_DISPLAY = {
 } as const;
 
 // Pages with a live stream get a status change pushed; the others pick it
-// up here, on the next navigation.
+// up here, on the next navigation (the first one too: nothing matches before
+// it). The session is the router's.
 watch(
   () => route.path,
   () => {
-    fetchRallyInfo().catch(() => undefined);
-    fetchSession().catch(() => undefined);
+    if (route.matched.length > 0 && !route.meta.live) {
+      fetchRallyInfo().catch(() => undefined);
+    }
   },
+  { immediate: true },
 );
 
-onMounted(async () => {
+// A 401/403 reloads the session; a device blocked mid-page lands here.
+watch(loggedIn, (now) => {
+  if (!now && session.value && !isPublicPath(route.path)) {
+    void router.replace('/public');
+  }
+});
+
+// The file name is internal (`/event`), so only for a login.
+watch(
+  loggedIn,
+  async (now) => {
+    if (now) fileName.value = eventName((await fetchEventInfo()).file);
+  },
+  { immediate: true },
+);
+
+onMounted(() => {
   void fetchServerVersion();
   syncServerClock().catch(() => undefined);
   void loadDisplaySettings();
-  void fetchSession();
-  await fetchRallyInfo();
-  fileName.value = eventName((await fetchEventInfo()).file);
 });
 </script>
 
@@ -75,7 +93,7 @@ onMounted(async () => {
          just the open event. -->
     <v-app-bar>
       <template #prepend>
-        <v-app-bar-nav-icon @click="drawer = !drawer" />
+        <v-app-bar-nav-icon v-if="loggedIn" @click="drawer = !drawer" />
       </template>
       <v-app-bar-title>
         <div class="d-flex align-center ga-3">
@@ -89,7 +107,7 @@ onMounted(async () => {
         <!-- Links to where it is changed; the change itself never sits in
              the app bar, where a stray tap on a tablet would end a rally. -->
         <v-chip
-          to="/setup"
+          :to="loggedIn ? '/setup' : undefined"
           :color="RALLY_STATUS_DISPLAY[rallyStatus].color"
           :prepend-icon="RALLY_STATUS_DISPLAY[rallyStatus].icon"
           size="small"
@@ -135,15 +153,24 @@ onMounted(async () => {
         <!-- No active state: the drawer already marks Setup, and a lit cog
              in the app bar reads as a pressed button. -->
         <v-btn
+          v-if="loggedIn"
           to="/setup"
           :active="false"
           icon="mdi-cog-outline"
           v-tooltip:bottom="t('nav.setup')"
           :aria-label="t('nav.setup')"
         />
+        <v-btn
+          v-else-if="route.path !== '/login'"
+          to="/login"
+          variant="text"
+          prepend-icon="mdi-login"
+        >
+          {{ t('login.title') }}
+        </v-btn>
       </template>
     </v-app-bar>
-    <v-navigation-drawer v-model="drawer">
+    <v-navigation-drawer v-if="loggedIn" v-model="drawer">
       <v-list nav density="comfortable">
         <v-list-item
           v-for="item in NAV_ITEMS"
@@ -181,21 +208,6 @@ onMounted(async () => {
     </v-navigation-drawer>
     <v-main>
       <v-container fluid class="py-6">
-        <v-alert
-          v-if="session && !session.role && route.path !== '/login'"
-          type="info"
-          variant="tonal"
-          density="compact"
-          icon="mdi-eye-outline"
-          class="mb-4"
-        >
-          {{ t('login.notLoggedIn') }}
-          <template #append>
-            <v-btn variant="text" size="small" to="/login">
-              {{ t('login.title') }}
-            </v-btn>
-          </template>
-        </v-alert>
         <router-view />
       </v-container>
     </v-main>

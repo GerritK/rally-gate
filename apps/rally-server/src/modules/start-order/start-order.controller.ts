@@ -1,10 +1,12 @@
 import { Controller, Get, Param, Post } from '@nestjs/common';
 import { StartOrderService } from './start-order.service';
+import { Public } from '../auth/auth.guard';
 
 @Controller('stages/:id/start-order')
 export class StartOrderController {
   constructor(private readonly startOrderService: StartOrderService) {}
 
+  @Public()
   @Get()
   get(@Param('id') id: string) {
     return this.startOrderService.getStartOrder(id);

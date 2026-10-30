@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post, Put } from '@nestjs/common';
 import { UpsertRallyInfoDto } from './dto';
 import { RallyInfoService } from './rally-info.service';
 import { RallyStatusService } from './rally-status.service';
+import { Public } from '../auth/auth.guard';
 
 @Controller('rally-info')
 export class RallyInfoController {
@@ -10,6 +11,7 @@ export class RallyInfoController {
     private readonly rallyStatusService: RallyStatusService,
   ) {}
 
+  @Public()
   @Get()
   get() {
     return this.rallyInfoService.get();

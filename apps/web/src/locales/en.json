@@ -703,7 +703,7 @@
   "login": {
     "title": "Log in",
     "current": "Logged in as",
-    "notLoggedIn": "Not logged in: you can look, but not change anything.",
+    "notLoggedIn": "Not logged in: you see the public start lists and results only.",
     "thisComputer": "Organiser (this computer)",
     "codeTitle": "Invitation code",
     "code": "Code",

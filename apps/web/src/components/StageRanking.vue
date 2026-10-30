@@ -20,6 +20,8 @@ import {
 const props = defineProps<{
   stage: Stage | undefined;
   results: StageResults;
+  /** On the public page: no entry links, stage links stay on it. */
+  publicView?: boolean;
 }>();
 
 const router = useRouter();
@@ -86,8 +88,8 @@ const legendMarks = computed<TimingMark[]>(() =>
         <tr
           v-for="placing in results.classification"
           :key="placing.entryId"
-          class="cursor-pointer"
-          @click="router.push(`/entries/${placing.entryId}`)"
+          :class="{ 'cursor-pointer': !publicView }"
+          @click="publicView || router.push(`/entries/${placing.entryId}`)"
         >
           <td>{{ placing.position }}</td>
           <td><StartNumber :number="placing.startNumber" /></td>
@@ -158,8 +160,8 @@ const legendMarks = computed<TimingMark[]>(() =>
         <tr
           v-for="row in results.nonFinishers"
           :key="row.entryId"
-          class="cursor-pointer"
-          @click="router.push(`/entries/${row.entryId}`)"
+          :class="{ 'cursor-pointer': !publicView }"
+          @click="publicView || router.push(`/entries/${row.entryId}`)"
         >
           <td><StartNumber :number="row.startNumber" /></td>
           <td><CrewName :crew="row" /></td>

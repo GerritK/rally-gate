@@ -2,7 +2,8 @@
 
 `apps/web`: a `vue-router` app behind a `v-navigation-drawer`, one `.vue` file
 per route in `src/pages/`, API calls in `src/api/` (one module per entity,
-sharing `client.ts`). Audience is marshals and organisers only; who may change what is `auth.md`.
+sharing `client.ts`). Audience is marshals and organisers; anyone without a login gets `/public`
+only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
 
 | Route | Nav | Contents |
 |---|---|---|
@@ -23,6 +24,7 @@ sharing `client.ts`). Audience is marshals and organisers only; who may change w
 | `/setup/scoring` | Setup | notional time penalty; the penalty catalogue: types with their tiers and how they count (per stage or per rally), add/edit/delete (deleting takes its penalties) |
 | `/setup/display` | Setup | Crew: name format and flags, with an example crew drawn with the unsaved settings; Results: podium. Switches, on screen only (printouts are plain PDFs) |
 | `/setup/access` | Setup | invitations (role, stages, code, devices; Print one or all as a PDF sheet with the QR code, Block in ⋮), the devices that logged in (Block), the organiser password. Organiser only (`auth.md`) |
+| `/public/:stageId?` | — | what anyone without a login sees, without the drawer: the stage track ending in Overall, the class filter; a stage's start list with each car's state and time (running ones ticking), then its results; or the overall, penalties as a sum. No print, no links to entries. No stage picks the active one. Every other page sends a browser without a login here |
 | `/login` | — | who this browser is, Log out; an invitation code to type; the organiser password. `?setup=` from the server log sets the first one. The drawer's foot links here |
 | `/join/:code` | — | what an invitation's QR code opens: logs the device in, then Live Timing |
 

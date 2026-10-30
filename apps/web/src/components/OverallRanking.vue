@@ -33,6 +33,8 @@ const props = defineProps<{
   classIds: string[];
   stages: Stage[];
   entries: Entry[];
+  /** On the public page: no entry links, stage links stay on it. */
+  publicView?: boolean;
 }>();
 
 const route = useRoute();
@@ -115,7 +117,9 @@ const runningStages = computed(() =>
           <th v-for="stage in countedStages" :key="stage.id" class="rg-time">
             <router-link
               :to="{
-                path: `/results/stages/${stage.id}`,
+                path: publicView
+                  ? `/public/${stage.id}`
+                  : `/results/stages/${stage.id}`,
                 query: route.query,
               }"
               class="rg-link"
@@ -135,8 +139,8 @@ const runningStages = computed(() =>
         <tr
           v-for="placing in placings"
           :key="placing.entryId"
-          class="cursor-pointer"
-          @click="router.push(`/entries/${placing.entryId}`)"
+          :class="{ 'cursor-pointer': !publicView }"
+          @click="publicView || router.push(`/entries/${placing.entryId}`)"
         >
           <td>{{ placing.position }}</td>
           <td><StartNumber :number="placing.startNumber" /></td>

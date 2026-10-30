@@ -13,7 +13,7 @@ which the dashboard translates as `errors.<code>` with `params` filled in;
 A change the rally status locks (`event-model.md` "Rally status") is a 409
 `lockedWhileRunning` or `lockedWhileClosed`.
 
-Every request except GET needs a login (`auth.md`): the server machine itself
+Every request needs a login unless the route is `@Public` (`auth.md`): the server machine itself
 (loopback socket) is the organiser, anyone else sends the `rally_gate_device`
 cookie. None is 401 `loginRequired`, a role the route doesn't allow 403
 `roleNotAllowed`, a stage marshal outside its stages 403 `stageNotYours`, and
@@ -22,8 +22,12 @@ Changes are the organiser's unless `@Requires` on the route names a
 `PERMISSIONS` entry (`packages/shared/src/permissions.ts`, the table in
 `auth.md`). `PATCH /entries/:id` checks the change itself: other fields need
 `editEntry`, a status change what that step needs (`entryStatusPermission`).
-GETs stay open until the public page lands, except the invitation and device
-lists.
+Any login may read, except the invitation and device lists and
+`/auth/server-urls` (organiser only, `@Private`). Without a login, only what
+the public page reads: `/auth/session`, `/version`, `/time`, GET
+`/rally-info`, `/stages`, `/stages/:id`, `/stages/:id/start-order`,
+`/stage-runs`, `/stage-runs/splits`, `/classification/*`, `/entry-classes`,
+`/settings/:key`, `/live`, plus the login routes.
 
 | Endpoint | Methods | Notes |
 |---|---|---|
@@ -88,6 +92,9 @@ reconnect.
   the whole list on every change, not a delta
 - `rally` — `RallyInfo` on every change, status included; every stream
   carries it, so the app bar follows on any page with one
+
+Without a login the stream carries `stage-run`, `stage-run-split` and `rally`
+only: passings, transponders and gates are internal.
 
 A gate's own configuration is not here: gate-config (`apps/gate`) serves it on the gate
 itself, port 57439 (`/api/config`, `/api/status`, `/api/decoder`, `/api/network`,

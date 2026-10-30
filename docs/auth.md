@@ -1,7 +1,7 @@
 # Access and authentication
 
-Designed 2026-10-30. Built so far: roles, invitations, devices and the
-organiser login (step 1 in `development-roadmap.md` "Next"); gates, the
+Designed 2026-10-30. Built so far: roles, invitations, devices, the
+organiser login and the public page (step 1 in `development-roadmap.md` "Next"); gates, the
 broker and gate-config are still open.
 
 ## What it protects against
@@ -71,9 +71,10 @@ The table is `PERMISSIONS` in `packages/shared/src/permissions.ts`, read by
 both sides: rally-server's `@Requires` and the dashboard's `can()`. The
 dashboard **hides** what a role may never do (button, menu entry, Save; a
 form turns read-only) instead of letting the server answer 403, and keeps
-every page visible, since reading is any login's. Not logged in, it shows
-the pages read-only with a "Log in" strip until the public page replaces
-them. It reloads the session on every navigation and after any 401/403, so a
+every page visible, since reading is any login's. Not logged in, every page
+but `/public`, `/login` and `/join` sends the browser to `/public`, which
+has no drawer and a Log in button in the app bar; the server refuses those
+reads too (`api.md`). It reloads the session on every navigation and after any 401/403, so a
 blocked device falls back at once. A stage marshal's Live Timing opens on
 its own stage.
 
