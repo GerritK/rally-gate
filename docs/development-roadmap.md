@@ -100,14 +100,14 @@ One line each; the linked doc has the detail. History is in git.
      `/auth/login`, and the operating rule "participants never on the timing
      Wi-Fi" on the login page and in the README, and the public page with
      every internal read behind the login. Done.
-  2. Broker and gates. Built: Pi gates create their own key and log in
+  2. Broker and gates. Built: gates create their own key and log in
      with a single-use HMAC token, the key goes out only on a server's
      CONNACK 4 while pairing is open, Pair gates on Hardware with accept and
      reject, waiting gates refused so their detections stay on the gate,
      each gate publishing only on its own topics, `autoDiscoverGates`
      removed, `GATES_AUTO_ACCEPT` for dev. No server proof and no TLS: the
-     operating rule covers a fake server (`auth.md` "Gates"). Left: the
-     same login on the ESP32 (key in NVS).
+     operating rule covers a fake server (`auth.md` "Gates"). The ESP32
+     keeps its key in NVS and logs in the same way. Done.
   3. gate-config and ESP32: signed pass, the 3-minute power-on window, the
      same on `web.cpp`. Check whether browser flashing erases NVS.
 

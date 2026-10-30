@@ -29,6 +29,7 @@ struct RecentTap {
 // main.cpp
 extern Settings settings;
 extern uint32_t bootId;
+extern uint8_t gateKey[32];  // broker login, docs/auth.md "Gates"
 extern IPAddress serverIp;
 extern bool readerFound;
 extern bool hotspotUp;

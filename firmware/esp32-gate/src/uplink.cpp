@@ -22,6 +22,11 @@ struct InFlight {
 };
 
 static esp_mqtt_client_handle_t client = nullptr;
+static esp_mqtt_client_config_t mqttCfg = {};
+static char password[86];
+static volatile bool sendKey = false;
+static volatile int refusedCode = 0;  // CONNACK code of the last refused login
+static int loggedRefusal = 0;
 static String currentUri;
 static volatile bool connected = false;
 static bool wasConnected = false;
@@ -33,9 +38,25 @@ static uint32_t tapSeq = 0;
 static int buffered = 0;
 
 // Runs on esp-mqtt's own task, so it only hands over; loop() does the work.
+// The password is the exception: it has to be set before this CONNECT goes out.
 static void onMqttEvent(void *, esp_event_base_t, int32_t id, void *data) {
   auto *event = (esp_mqtt_event_handle_t)data;
-  if (id == MQTT_EVENT_CONNECTED) connected = true;
+  if (id == MQTT_EVENT_BEFORE_CONNECT) {
+    // A token is valid for a minute and only once: a fresh one every attempt.
+    gate::gatePassword(gateKey, settings.gateId.c_str(), wallUs() / 1000 + 60000, sendKey, password);
+    mqttCfg.password = password;
+    esp_mqtt_set_config(event->client, &mqttCfg);
+  }
+  if (id == MQTT_EVENT_ERROR && event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED) {
+    refusedCode = event->error_handle->connect_return_code;
+    // 4: pairing is open and the server doesn't know this key yet.
+    sendKey = refusedCode == MQTT_CONNECTION_REFUSE_BAD_USERNAME;
+  }
+  if (id == MQTT_EVENT_CONNECTED) {
+    connected = true;
+    sendKey = false;
+    refusedCode = 0;
+  }
   if (id == MQTT_EVENT_DISCONNECTED) connected = false;
   if (id == MQTT_EVENT_PUBLISHED) xQueueSend(acks, &event->msg_id, 0);
 }
@@ -161,15 +182,28 @@ static void heartbeat() {
   esp_mqtt_client_publish(client, topic, json, 0, 0, 0);
 }
 
+static void logRefusal() {
+  int code = refusedCode;
+  if (code == loggedRefusal) return;
+  loggedRefusal = code;
+  if (code == MQTT_CONNECTION_REFUSE_BAD_USERNAME)
+    Serial.println("[uplink] pairing is open on the server, sending this gate's key");
+  else if (code)
+    Serial.printf("[uplink] server refused this gate (%d): waiting for the organiser to approve it under Hardware -> Pair gates\n", code);
+}
+
 void uplinkTick(IPAddress server) {
-  if (server == IPAddress()) return;
+  // The login token carries an expiry in server time, so not before the first sync.
+  if (server == IPAddress() || !clockSet()) return;
   String uri = "mqtt://" + server.toString() + ":" + MQTT_PORT;
   if (!client) {
-    esp_mqtt_client_config_t cfg = {};
-    cfg.uri = uri.c_str();
-    cfg.client_id = settings.gateId.c_str();
-    cfg.keepalive = 15;
-    client = esp_mqtt_client_init(&cfg);
+    mqttCfg.uri = uri.c_str();
+    mqttCfg.client_id = settings.gateId.c_str();
+    mqttCfg.username = settings.gateId.c_str();
+    mqttCfg.keepalive = 15;
+    client = esp_mqtt_client_init(&mqttCfg);
+    // Kept for the per-attempt password, without re-parsing the URI each time.
+    mqttCfg.uri = nullptr;
     esp_mqtt_client_register_event(client, MQTT_EVENT_ANY, onMqttEvent, nullptr);
     esp_mqtt_client_start(client);
     currentUri = uri;
@@ -189,6 +223,7 @@ void uplinkTick(IPAddress server) {
     for (auto &s : inFlight) s.msgId = 0;
   wasConnected = isConnected;
 
+  logRefusal();
   handleAcks();
   if (!isConnected) return;
   if ((int32_t)(millis() - nextHeartbeatMs) >= 0) {

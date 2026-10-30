@@ -205,7 +205,7 @@ for both):
   the boundary, and the hotspot only comes up when the gate is on no Wi-Fi.
 - **On the rally Wi-Fi:** status is readable, every action needs a pass. The
   organiser clicks "Configure" on the Hardware page; the server signs
-  `gateId + expiry` with that gate's key (HMAC-SHA256, mbedtls on the ESP32)
+  `gateId + expiry` with that gate's key (HMAC-SHA256, `gate_core.h` on the ESP32)
   and the browser opens `http://<gate>:57439/?t=<pass>`. The gate checks it
   locally, with no call back to the server, and sets a cookie. The link is
   valid 60 s (it sits in the browser history), the session 1 h. The server

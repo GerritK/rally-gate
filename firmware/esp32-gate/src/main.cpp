@@ -28,6 +28,7 @@ static const uint32_t READER_CHECK_MS = 5000;
 
 Settings settings;
 uint32_t bootId = 0;
+uint8_t gateKey[32];
 IPAddress serverIp;
 bool readerFound = false;
 bool hotspotUp = false;
@@ -307,6 +308,11 @@ void setup() {
   bootId = prefs.getUInt("bootId", 0) + 1;
   prefs.putUInt("bootId", bootId);
   loadSettings();
+  // Made once and kept through every settings change: a new key means pairing again.
+  if (prefs.getBytes("gateKey", gateKey, sizeof gateKey) != sizeof gateKey) {
+    esp_fill_random(gateKey, sizeof gateKey);
+    prefs.putBytes("gateKey", gateKey, sizeof gateKey);
+  }
   play(buzzer_signals::powerOn, true);
   Serial.printf("[gate] %s %s boot %lu\n", settings.gateId.c_str(), FIRMWARE_VERSION, (unsigned long)bootId);
 

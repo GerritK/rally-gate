@@ -114,6 +114,7 @@ workspaces with its own CI build. What each part of the Pi stack becomes:
 | `gate-config` on 57439 + hotspot fallback | SoftAP captive portal for Wi-Fi, and a small status page on **57439**, so the dashboard's gate link (`gateConfigUrl`) works unchanged |
 | `POST /api/power-off` | deep sleep, so "Shut down all gates" works for every gate. There is no SD card to protect, so it only saves the battery. The PN532 shares the 3V3 rail, so it gets its own `PowerDown` command first, with chip select held high through the sleep (floating, it wakes the reader). The reader board's power LED keeps drawing a few mA; only switching the reader's supply (a MOSFET on a GPIO) removes that |
 | `ntpSynced` / `ntpOffsetMs` | the RMS of the last 8 measured offsets, the figure chrony reports as "RMS offset" on a Pi |
+| `gate.key` and the broker login | key in NVS from `esp_random()`, kept through every settings change; the token is HMAC-SHA256 in `gate_core.h`, so the native tests check it against gate-agent's vector. It connects only once its clock is set, since the token carries an expiry in server time (`auth.md` "Gates") |
 | `eventId` | random UUIDv4 from `esp_random()` |
 | `source` / `capabilities` | `nfc` |
 

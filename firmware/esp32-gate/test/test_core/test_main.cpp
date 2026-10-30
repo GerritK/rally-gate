@@ -195,6 +195,28 @@ void test_status_reader_missing_withholds_ready() {
   TEST_ASSERT_EQUAL(Status::Ready, s.next(1000, true, true, true));
 }
 
+void test_sha256() {
+  uint8_t out[32];
+  char hex[65];
+  Sha256 h;
+  h.update((const uint8_t *)"abc", 3);
+  h.finish(out);
+  hexLower(out, 32, hex);
+  TEST_ASSERT_EQUAL_STRING("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", hex);
+}
+
+// The vector gate-key.spec.ts and gate-pairing.service.spec.ts share.
+void test_gate_password() {
+  uint8_t key[32];
+  memset(key, 0xaa, sizeof key);
+  char out[86];
+  gatePassword(key, "G1", 1800000060000LL, false, out);
+  TEST_ASSERT_EQUAL_STRING(
+      "1800000060000.4231b15975d7e3739ed595c7308c5cb7aee07c44536aa735be18c701e45de59a", out);
+  gatePassword(key, "G1", 1800000060000LL, true, out);
+  TEST_ASSERT_EQUAL_STRING("key:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", out);
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_ntp_timestamp_roundtrip);
@@ -217,5 +239,7 @@ int main() {
   RUN_TEST(test_status_never_connected_is_silent);
   RUN_TEST(test_status_clock_withholds_ready_and_warns_once);
   RUN_TEST(test_status_reader_missing_withholds_ready);
+  RUN_TEST(test_sha256);
+  RUN_TEST(test_gate_password);
   return UNITY_END();
 }
