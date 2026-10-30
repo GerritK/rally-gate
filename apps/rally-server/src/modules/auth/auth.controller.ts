@@ -7,11 +7,12 @@ import {
   Patch,
   Post,
   Put,
+  Req,
   Res,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiErrorCode } from '@rally-gate/shared';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { apiError } from '../../common/api-error';
 import { CurrentPrincipal, DEVICE_COOKIE, Private, Public } from './auth.guard';
 import { AuthService, type Principal } from './auth.service';
@@ -65,9 +66,13 @@ export class AuthController {
   @HttpCode(200)
   async login(
     @Body() body: LoginDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { token, principal } = await this.auth.login(body.password);
+    const { token, principal } = await this.auth.login(
+      body.password,
+      req.socket.remoteAddress ?? '',
+    );
     setDeviceCookie(res, token);
     return this.auth.session(principal);
   }

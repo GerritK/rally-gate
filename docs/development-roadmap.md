@@ -96,11 +96,10 @@ One line each; the linked doc has the detail. History is in git.
      printable QR codes and devices (Setup → Access), organiser by localhost
      or password with a setup QR, `reset-admin`, `/login` and `/join/:code`,
      the dashboard showing only what the role may do, the History of every
-     hand-made change with its device on the entry page. Next, each its own
-     commit: the public page with internal reads behind the login, a rate limit on
+     hand-made change with its device on the entry page, a rate limit on
      `/auth/login`, and the operating rule "participants never on the timing
-     Wi-Fi" on the login page and in the setup docs (`auth.md`
-     "Participants on the timing Wi-Fi").
+     Wi-Fi" on the login page and in the README. Next: the public page with
+     internal reads behind the login.
   2. Broker and gates: self-generated gate key, pairing and approval,
      detections of waiting gates held, `autoDiscoverGates` removed,
      `GATES_AUTO_ACCEPT` for dev. The key never as the MQTT password, a

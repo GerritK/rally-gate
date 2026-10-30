@@ -21,6 +21,7 @@ import { eventsDir } from '../event-files/event-files';
 import { Device } from './device.entity';
 import { CreateInvitationDto } from './dto';
 import { Invitation } from './invitation.entity';
+import { LoginLimit } from './login-limit';
 import {
   ensureSetupToken,
   passwordSet,
@@ -52,6 +53,8 @@ export const normaliseCode = (code: string) =>
 
 @Injectable()
 export class AuthService implements OnApplicationBootstrap {
+  private readonly loginLimit = new LoginLimit();
+
   constructor(
     @InjectRepository(Invitation)
     private readonly invitations: Repository<Invitation>,
@@ -118,14 +121,19 @@ export class AuthService implements OnApplicationBootstrap {
     return { token, principal: { role: invitation.role, device, invitation } };
   }
 
+  /** `address`: the socket's, never a header (see `AuthGuard`). */
   async login(
     password: string,
+    address: string,
   ): Promise<{ token: string; principal: Principal }> {
+    this.loginLimit.check(address);
     if (!verifyPassword(password)) {
+      this.loginLimit.failed(address);
       throw new UnauthorizedException(
         apiError(ApiErrorCode.PASSWORD_WRONG, 'Wrong password'),
       );
     }
+    this.loginLimit.succeeded(address);
     const { token, device } = await this.createDevice(null);
     return {
       token,

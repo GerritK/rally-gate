@@ -142,6 +142,7 @@ onMounted(() => {
         </v-card-title>
         <v-card-text>
           <p v-if="setupToken" class="mb-4">{{ $t('login.setupExplain') }}</p>
+          <p class="mb-4 text-medium-emphasis">{{ $t('login.wifiRule') }}</p>
           <v-form @submit.prevent="onPassword">
             <v-alert
               v-if="error?.form === 'password'"

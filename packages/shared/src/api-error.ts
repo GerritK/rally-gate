@@ -59,6 +59,8 @@ export enum ApiErrorCode {
   STAGE_NOT_YOURS = 'stageNotYours',
   INVITATION_INVALID = 'invitationInvalid',
   PASSWORD_WRONG = 'passwordWrong',
+  /** `params.seconds`: until the address may try again. */
+  TOO_MANY_ATTEMPTS = 'tooManyAttempts',
   SETUP_LINK_INVALID = 'setupLinkInvalid',
   INVITATION_NOT_FOUND = 'invitationNotFound',
   DEVICE_NOT_FOUND = 'deviceNotFound',

@@ -29,7 +29,7 @@ lists.
 |---|---|---|
 | `/auth/session` | GET | `AuthSession`: role (null when not logged in), device, label, marshal stages, `passwordSet` |
 | `/auth/redeem` | POST `{ code }` | an invitation's code (case, spaces and dashes ignored) sets the device cookie; 401 `invitationInvalid` if unknown or blocked. The same browser again keeps its device |
-| `/auth/login` | POST `{ password }` | organiser password, makes a device too; 401 `passwordWrong` |
+| `/auth/login` | POST `{ password }` | organiser password, makes a device too; 401 `passwordWrong`, 429 `tooManyAttempts` (`params.seconds`) after 5 wrong per address and minute |
 | `/auth/logout` | POST | clears the cookie; the device stays listed |
 | `/auth/setup` | POST `{ token, password }` | the first password, with the token from the setup link the server logs; 401 `setupLinkInvalid` |
 | `/auth/password` | PUT `{ password }` | the organiser sets a new one, at least 8 characters |

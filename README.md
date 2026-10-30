@@ -104,7 +104,10 @@ What comes when: [docs/development-roadmap.md](docs/development-roadmap.md).
   [docs/decoder-adapters.md](docs/decoder-adapters.md). A DS3231 RTC module is
   optional and keeps the clock across power cuts.
 - **A Wi-Fi network** that the server and all gates join. It does not need
-  internet access.
+  internet access. Keep it closed: only the server, the gates and staff
+  devices on it, participants and spectators on a guest network. Anyone with
+  its password can read the timing traffic (see
+  [docs/auth.md](docs/auth.md#participants-on-the-timing-wi-fi)).
 
 ## Installation
 

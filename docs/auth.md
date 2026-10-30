@@ -27,7 +27,7 @@ here is plain HTTP and MQTT. What such a person gets:
 | Sniff `/join/:code` | the invitation code (shows up as an extra device under it) | built, open |
 | Sniff a gate's MQTT CONNECT | the gate key, if it is sent as the password: impersonate the gate | planned, avoided below |
 | Answer as `rally-server.local` (mDNS spoof, ARP) | invitation codes from phones scanning the `.local` QR; gates connect, and the gate drops each detection on the fake broker's PUBACK — drivers with no time | open, step 2 decides |
-| Brute-force `/auth/login` | the organiser password, if weak — no rate limit yet | built, open |
+| Brute-force `/auth/login` | the organiser password, if weak — 5 wrong per address and minute, then 429 | built, limited |
 | Brute-force an invitation code | 8 of 31 characters, ~10¹² — not feasible over Wi-Fi | fine |
 | Flood the airtime, rogue DHCP | gates drop offline; QoS 1 delivers late, the dashboard shows them offline | operating rule |
 
@@ -36,7 +36,7 @@ Consequences:
 - **Operating rule: participants never join the timing Wi-Fi.** One closed
   network for server, gates and staff devices; a guest network for
   everyone else. Most routers have one. This is the actual boundary — the
-  design below assumes it, and the setup docs and the login page say so.
+  design below assumes it, and the README and the login page say so.
   Open: a guest network's client isolation usually blocks the public page
   too, so participants get it through online mode, a printout, or a router
   that forwards only `57430` from the guest network.
@@ -45,7 +45,9 @@ Consequences:
   partly. It doesn't help against a spoofed server.
 - **A gate's key never goes on the wire**, so neither sniffing nor a fake
   server learns it (step 2, see "Gates").
-- **`/auth/login` gets a rate limit** (a few attempts per minute per address).
+- **`/auth/login` has a rate limit**: 5 wrong passwords per client address,
+  then refused until a minute after the first; a right one clears it. In
+  memory, so a restart forgets it.
 
 ## Who sees what
 
