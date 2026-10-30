@@ -9,6 +9,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
 import { RESTART_EXIT_CODE } from './modules/event-files/event-files';
+import { portClashHint } from './port-owner';
 import { ensureWindowsFirewall } from './windows-firewall';
 
 /**
@@ -19,6 +20,9 @@ import { ensureWindowsFirewall } from './windows-firewall';
 const WEB_DIST = join(__dirname, '..', '..', 'web', 'dist');
 
 async function bootstrap() {
+  // Before any port is bound: the reservation it makes is refused for a port
+  // in use. Waits on the UAC prompt only on the first start, never fails.
+  await ensureWindowsFirewall();
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     // Open SSE streams would otherwise hold app.close() open forever.
     forceCloseConnections: true,
@@ -60,8 +64,13 @@ async function bootstrap() {
     });
   }
 
-  const port = process.env.PORT ?? 57430;
-  await app.listen(port);
+  const port = Number(process.env.PORT ?? 57430);
+  await app.listen(port).catch(async (err: NodeJS.ErrnoException) => {
+    console.error(
+      `Dashboard cannot listen on port ${port}: ${err.message}${await portClashHint(port, 'tcp', err)}.`,
+    );
+    process.exit(1);
+  });
   const url = `http://localhost:${port}`;
   // Not through the logger: the standalone console runs at LOG_LEVEL=warn,
   // and this is the one line a marshal needs from it.
@@ -78,8 +87,6 @@ async function bootstrap() {
   if (process.env.OPEN_BROWSER === '1') {
     openBrowser(url);
   }
-  // Not awaited: the UAC prompt must not hold up a server that works locally.
-  void ensureWindowsFirewall();
 }
 void bootstrap();
 

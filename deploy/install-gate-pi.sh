@@ -432,6 +432,12 @@ RuntimeDirectory=rally-gate-agent
 WantedBy=multi-user.target
 EOF
 
+# The rally ports sit in Linux's ephemeral range (32768-60999): reserved, no outgoing
+# connection can hold one. Same full list as install-server-pi.sh: one value,
+# so a server and a gate on one Pi must not overwrite each other's ports.
+echo 'net.ipv4.ip_local_reserved_ports = 57430-57432,57439' | sudo tee /etc/sysctl.d/60-rally-gate.conf >/dev/null
+sudo sysctl -q -p /etc/sysctl.d/60-rally-gate.conf
+
 # A separate unit from gate-agent on purpose: gate-agent restarts forever, so a
 # bad setting turns into a crash loop — and a config UI hosted inside it would
 # die with the thing it exists to repair, leaving SSH as the only way in. See

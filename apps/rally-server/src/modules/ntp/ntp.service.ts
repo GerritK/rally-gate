@@ -5,6 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { createSocket, Socket } from 'dgram';
+import { portClashHint } from '../../port-owner';
 
 /**
  * Seconds between the NTP epoch (1900-01-01) and the Unix epoch (1970-01-01).
@@ -198,14 +199,15 @@ export class NtpService implements OnModuleInit, OnModuleDestroy {
         this.logger.log(`Embedded NTP server listening on port ${port}/udp`);
         resolve();
       });
-    }).catch((err: NodeJS.ErrnoException) => {
+    }).catch(async (err: NodeJS.ErrnoException) => {
+      const hint = await portClashHint(port, 'udp', err);
       // Logged and swallowed, unlike the broker's bind failure which aborts
       // startup. A gate with no time source still delivers detections, and the
       // heartbeat offset measurement (GatesService) makes the resulting skew
       // visible on the Hardware page — whereas refusing to start would take
       // timing down entirely to protect it.
       this.logger.error(
-        `Embedded NTP server cannot listen on port ${port}/udp: ${err.message}. ` +
+        `Embedded NTP server cannot listen on port ${port}/udp: ${err.message}${hint}. ` +
           'Gates will fall back to whatever other time source they have; watch ' +
           'the Hardware page clock column for drift.',
       );

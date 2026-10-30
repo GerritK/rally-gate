@@ -23,8 +23,8 @@ export async function ensureWindowsFirewall(): Promise<void> {
   }
   const logger = new Logger('WindowsFirewall');
 
-  // ponytail: checks the rule exists, not its ports; delete the "rally-gate"
-  // rules after changing PORT/MQTT_PORT/NTP_PORT and they are recreated.
+  // ponytail: checks the rule exists, not its ports or reservations; delete the
+  // "rally-gate" rules after changing PORT/MQTT_PORT/NTP_PORT and both are redone.
   try {
     await run('netsh', [
       'advfirewall',
@@ -44,8 +44,22 @@ export async function ensureWindowsFirewall(): Promise<void> {
     `New-NetFirewallRule -DisplayName '${RULE_NAME}' -Direction Inbound ` +
     `-Action Allow -Profile Any -RemoteAddress LocalSubnet ` +
     `-Protocol ${protocol} -LocalPort ${ports.join(',')}`;
+  // Our ports sit in Windows' dynamic range, where any program's outgoing
+  // socket or a Hyper-V/WSL boot-time block can take them. An administered
+  // exclusion keeps both away and still lets this server bind; it persists.
+  // netsh refuses a port that is in use, hence main.ts runs this before binding.
+  const reserve = (protocol: string, ports: (string | number)[]) =>
+    ports
+      .flatMap((port) =>
+        ['ipv4', 'ipv6'].map(
+          (ip) =>
+            `netsh int ${ip} add excludedportrange protocol=${protocol} startport=${port} numberofports=1`,
+        ),
+      )
+      .join('; ');
   const elevated = Buffer.from(
-    `${rule('TCP', tcp)}; ${rule('UDP', udp)}`,
+    `${reserve('tcp', tcp)}; ${reserve('udp', udp.slice(0, 1))}; ` +
+      `${rule('TCP', tcp)}; ${rule('UDP', udp)}`,
     'utf16le',
   ).toString('base64');
 

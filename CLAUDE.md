@@ -84,6 +84,8 @@ Dedicated ports, never framework defaults (3000/5173/1883). **Every number in 57
 | 57440 | Vite dev server for `apps/web` — dev only |
 | 57449 | Vite dev server for `gate-config` — dev only |
 
+**They sit inside the OS ephemeral ranges on purpose** (Windows 49152+, often widened; Linux 32768–60999; Hyper-V/WSL also grab blocks there at boot), so another program's socket can hold one: the Windows UAC step (`windows-firewall.ts`) and the Pi installers reserve them, and a bind failure names the program holding the port (`apps/rally-server/src/port-owner.ts`). Moving below 32768 wouldn't help a machine with a widened range.
+
 **A Vite dev server runs on its service's port + 10**, so no dev port takes a slot an installer, firewall rule or sticker might need. New server-side services take the next free number up from 57432. Every API route is under `/api` (details in `apps/rally-server/CLAUDE.md`).
 
 ## Architecture

@@ -8,6 +8,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { createServer, Server, Socket } from 'net';
 import { Aedes, type AuthenticateError, type Client } from 'aedes';
 import { DETECTION_TOPIC_PREFIX } from '@rally-gate/shared';
+import { portClashHint } from '../../port-owner';
 import { GateLogin, GatePairingService } from '../gates/gate-pairing.service';
 
 function remoteAddress(client: Client): string | null {
@@ -89,11 +90,8 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
         this.logger.log(`Embedded MQTT broker listening on port ${port}`);
         resolve();
       });
-    }).catch((err: NodeJS.ErrnoException) => {
-      const hint =
-        err.code === 'EADDRINUSE'
-          ? ' — another rally-server is probably already running'
-          : '';
+    }).catch(async (err: NodeJS.ErrnoException) => {
+      const hint = await portClashHint(port, 'tcp', err);
       this.logger.error(
         `Embedded MQTT broker cannot listen on port ${port}: ${err.message}${hint}. Gates cannot deliver detections, so startup is aborted rather than continuing without timing.`,
       );

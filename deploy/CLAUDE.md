@@ -9,6 +9,7 @@
   - env vars `GATE_ID`/`MQTT_HOST`/`MQTT_PORT`/`HOTSPOT_PASSWORD` as in `FIELDS` (`apps/gate/src/fields.ts`, default port 57431), and `EXIT_CONFIG_INVALID` (3) for `RestartPreventExitStatus=`.
 - It defaults `MQTT_HOST` to `rally-server.local`, the name `DiscoveryService` advertises, so it asks for no address. That needs `avahi-daemon`/`libnss-mdns` on the gate (installed explicitly) and a server not in a bridged container — Docker Desktop's "host" network is a VM, so there a gate still needs a typed IP. An explicit `MQTT_HOST` always wins.
 - It configures chrony with a file in `/etc/chrony/conf.d/`, relying on Debian's `chrony.conf` including that directory and keeping `makestep 1 3` — the gate clock policy in `docs/decoder-adapters.md`, so don't consolidate it into a full `chrony.conf`. It comments out Debian's `pool`/DHCP sources, so rally-server's SNTP on 57432/udp is a gate's only time source.
+- Both installers write the same `/etc/sysctl.d/60-rally-gate.conf` with `net.ipv4.ip_local_reserved_ports = 57430-57432,57439`, because the ports are in Linux's ephemeral range. Always the full list of field ports: the key is one value, so a server and a gate on one Pi would otherwise drop each other's. A new field port goes on both lines.
 - **Never close a gate gap with a new install prompt** — see "Zero-config gates" in `docs/development-roadmap.md`.
 
 Timing sync is the one thing here with no automated check at all: `npm test` can't see it and CI can't boot a second host.
