@@ -2,8 +2,8 @@
 
 Designed 2026-10-30. Built so far: roles, invitations, devices, the
 organiser login and the public page (step 1 in `development-roadmap.md` "Next"),
-the broker login with gate pairing (step 2), and gate-config's pass (step 3)
-on the Pi; the ESP32's settings page is still open.
+the broker login with gate pairing (step 2), and gate-config's pass on the
+Pi and the ESP32 (step 3).
 
 ## What it protects against
 
@@ -166,9 +166,10 @@ Nothing is typed on a gate (`development-roadmap.md` "Zero-config gates").
   server's self-signed certificate at pairing, with the same window as the
   key and the same problem for lent gates, while browser traffic stays plain
   anyway. The token scheme works unchanged under TLS should that change.
-- **Updates keep the key**: re-running the installer, USB flashing and OTA
-  leave it alone. A new SD card or erasing the ESP32's flash is a new
-  identity. There is deliberately no "new identity" button — one pressed
+- **Updates keep the key**: re-running the installer, USB flashing, the
+  browser flasher without "erase" and OTA leave it alone. A new SD card,
+  erasing the ESP32's flash, or esptool with the release's merged image (it
+  covers NVS) is a new identity. There is deliberately no "new identity" button — one pressed
   mid-rally un-approves a gate.
 - **Pairing**, like Bluetooth: normally an unknown gate, or a paired gate id
   with a different key, is refused at MQTT connect and shows up only in the

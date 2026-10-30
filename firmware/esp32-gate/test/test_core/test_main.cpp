@@ -217,6 +217,29 @@ void test_gate_password() {
   TEST_ASSERT_EQUAL_STRING("key:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", out);
 }
 
+// The vector access.spec.ts and gate-pairing.service.spec.ts share.
+void test_config_pass() {
+  uint8_t key[32];
+  memset(key, 0xaa, sizeof key);
+  const char *pass = "1800000060000.cec4c7c97d5c4899e5ebc6b33e679d2bbb5e6a4eb34632478ad54024ecedd02b";
+  const int64_t now = 1800000000000LL;
+  TEST_ASSERT_TRUE(validSigned(key, "config.G1.", pass, 60000, now));
+  TEST_ASSERT_TRUE(validSigned(key, "config.G1.", pass, 60000, now + 69000));
+  TEST_ASSERT_FALSE(validSigned(key, "config.G1.", pass, 60000, now + 71000));
+  TEST_ASSERT_FALSE(validSigned(key, "config.G1.", pass, 60000, now - 11000));
+  TEST_ASSERT_FALSE(validSigned(key, "config.G2.", pass, 60000, now));
+  // The broker token for the same expiry is no pass.
+  TEST_ASSERT_FALSE(validSigned(
+      key, "config.G1.", "1800000060000.4231b15975d7e3739ed595c7308c5cb7aee07c44536aa735be18c701e45de59a",
+      60000, now));
+  TEST_ASSERT_FALSE(validSigned(key, "config.G1.", "", 60000, now));
+  TEST_ASSERT_FALSE(validSigned(key, "config.G1.", "1800000060000.", 60000, now));
+  char session[86];
+  signExpiry(key, "session.", now + 3600000, session);
+  TEST_ASSERT_TRUE(validSigned(key, "session.", session, 3600000, now));
+  TEST_ASSERT_FALSE(validSigned(key, "config.G1.", session, 60000, now));
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_ntp_timestamp_roundtrip);
@@ -241,5 +264,6 @@ int main() {
   RUN_TEST(test_status_reader_missing_withholds_ready);
   RUN_TEST(test_sha256);
   RUN_TEST(test_gate_password);
+  RUN_TEST(test_config_pass);
   return UNITY_END();
 }

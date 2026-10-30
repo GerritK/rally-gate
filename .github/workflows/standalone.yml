@@ -67,7 +67,8 @@ jobs:
           if-no-files-found: error
 
   # One image per supported board, merged from offset 0 (bootloader, partition
-  # table, boot_app0, app) so esptool or the browser flasher writes one file.
+  # table, boot_app0, app) so esptool writes one file. It overwrites NVS with
+  # 0xFF, so the browser flasher gets it in parts (pages job).
   firmware:
     runs-on: ubuntu-latest
     defaults:
@@ -158,13 +159,28 @@ jobs:
       - run: |
           cp firmware/esp32-gate/install/index.html site/
           cp -r firmware/esp32-gate/web/fonts site/
-          bin=$(cd site && ls *-esp32-xiao-s3.bin)
+          # The merged image in parts, leaving out NVS (0x9000-0xe000): the
+          # gate's key and settings live there (docs/auth.md "Gates").
+          bin=$(ls site/*-esp32-xiao-s3.bin)
+          python3 - "$bin" <<'PY'
+          import sys
+          d = open(sys.argv[1], 'rb').read()
+          for name, start, end in (('bootloader', 0, 0x8000), ('partitions', 0x8000, 0x9000),
+                                   ('boot_app0', 0xE000, 0x10000), ('app', 0x10000, len(d))):
+              open(f'site/{name}.bin', 'wb').write(d[start:end])
+          PY
+          rm "$bin"
           cat > site/manifest.json <<JSON
           {
             "name": "Rally Gate ESP32 gate",
             "version": "$GITHUB_REF_NAME",
             "new_install_prompt_erase": true,
-            "builds": [{ "chipFamily": "ESP32-S3", "parts": [{ "path": "$bin", "offset": 0 }] }]
+            "builds": [{ "chipFamily": "ESP32-S3", "parts": [
+              { "path": "bootloader.bin", "offset": 0 },
+              { "path": "partitions.bin", "offset": 32768 },
+              { "path": "boot_app0.bin", "offset": 57344 },
+              { "path": "app.bin", "offset": 65536 }
+            ] }]
           }
           JSON
       - uses: actions/upload-pages-artifact@v5

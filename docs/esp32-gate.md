@@ -132,6 +132,14 @@ inlines the fonts and gzips it into the image, about 95 KB. Vuetify itself
 stays out: Node in the firmware build and a few hundred KB more over the
 emergency Wi-Fi, for one page.
 
+Changes need a session, as on a Pi (`auth.md` "gate-config"): open on the
+emergency Wi-Fi (the request came in on the AP's address) and until the broker
+accepts the login or 3 minutes after power-on pass, otherwise only through the
+dashboard's pass. `web.cpp` checks it with `validSigned` in `gate_core.h`,
+which the native tests hold to the server's vector. A session opened in the
+window before the clock was ever set expires with the first sync, since its
+expiry was in boot time: by then the server is there to hand out a pass.
+
 **The page and the reader share one firmware**, where a Pi keeps gate-config
 in a process of its own so that it survives an agent stuck in a crash loop
 (`gate-config-ui.md`). A microcontroller has no second process to put it in.
@@ -218,6 +226,12 @@ Every release carries one merged image per supported board
 USB-C, Install, nothing else on the laptop. It lives on Pages, not on the
 release, because Web Serial needs HTTPS and release assets can't be fetched
 cross-origin. Pre-releases get the image but don't replace the page.
+
+The merged image overwrites NVS (0x9000–0xe000) with 0xFF: `merge_bin`
+pads the gaps, so esptool with it erases the gate's key, Wi-Fi and settings.
+The `pages` job therefore cuts it into its four parts and the manifest writes
+each at its offset, leaving NVS alone; only the flasher's "erase" box wipes
+it. Erase on a first install only.
 
 Variants are per board only, never per feature: one firmware carries NFC and
 beam, the reader is detected and the beam switched on at runtime, as `ADAPTER`

@@ -108,8 +108,11 @@ One line each; the linked doc has the detail. History is in git.
      removed, `GATES_AUTO_ACCEPT` for dev. No server proof and no TLS: the
      operating rule covers a fake server (`auth.md` "Gates"). The ESP32
      keeps its key in NVS and logs in the same way. Done.
-  3. gate-config and ESP32: signed pass, the 3-minute power-on window, the
-     same on `web.cpp`. Check whether browser flashing erases NVS.
+  3. gate-config and ESP32. Built: the dashboard opens a gate's page with a
+     pass signed with its key, a session cookie for an hour, read-only
+     without one, open on the gate's own hotspot and for 3 minutes after
+     power-on until the broker accepts the gate, "Shut down all gates" with
+     its own pass, the same on `web.cpp`. Done.
 
 - **Class and category badges in rankings** ("2WD · Rookie") on Results
   and the PDFs: only the classes the current filter doesn't already imply

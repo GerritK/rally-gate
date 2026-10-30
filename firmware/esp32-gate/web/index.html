@@ -119,6 +119,7 @@
 
 <main>
   <div id="notice" class="alert" role="status" hidden></div>
+  <div id="locked" class="alert tonal info" hidden></div>
 
   <section class="card">
     <h2>Status</h2>
@@ -262,6 +263,7 @@ for (const input of document.querySelectorAll('.field input'))
   input.addEventListener('input', () => fieldError(input, ''));
 
 let saved = null;
+let wasUnlocked = true;
 
 async function refresh() {
   let s;
@@ -286,6 +288,14 @@ async function refresh() {
   if (s.hotspot && $('onHotspot').hidden)
     alert($('onHotspot'), 'info', 'This gate runs its emergency Wi-Fi. Joining a network restarts it and takes that Wi-Fi down, so this page goes unreachable — reconnect to the network you picked and reopen it. If the gate cannot join, the emergency Wi-Fi is back within a minute.', true);
   $('onHotspot').hidden = !s.hotspot;
+
+  // docs/auth.md "gate-config": on the rally Wi-Fi every change needs a pass.
+  if (s.unlocked !== wasUnlocked) {
+    wasUnlocked = s.unlocked;
+    if (!s.unlocked) alert($('locked'), 'info', "Read only. To change this gate, open it from the dashboard's Hardware page (Open gate config), or join the gate's emergency Wi-Fi. For 3 minutes after switching on, until it reaches the server, it is open as well.", true);
+    $('locked').hidden = s.unlocked;
+    for (const el of document.querySelectorAll('form input, .card-actions button')) el.disabled = !s.unlocked;
+  }
 
   $('recent').replaceChildren(...s.recent.flatMap((t) =>
     [span(t.uid), span(t.time ? new Date(t.time).toLocaleTimeString() : 'clock not set')]));

@@ -364,9 +364,21 @@ inline void hexLower(const uint8_t *b, size_t len, char *out) {
   out[2 * len] = '\0';
 }
 
+// "<expiryMs>.<hex HMAC(key, prefix + expiryMs)>": the broker token (prefix
+// "<gateId>."), the config pass ("config.<gateId>.") and the session cookie
+// ("session."), as in apps/gate (docs/auth.md). out needs 86 bytes.
+inline void signExpiry(const uint8_t key[32], const char *prefix, int64_t expiryMs, char out[86]) {
+  char msg[64];
+  int n = snprintf(msg, sizeof msg, "%s%lld", prefix, (long long)expiryMs);
+  uint8_t mac[32];
+  hmacSha256(key, (const uint8_t *)msg, n, mac);
+  n = snprintf(out, 86, "%lld.", (long long)expiryMs);
+  hexLower(mac, 32, out + n);
+}
+
 // The MQTT password, as gatePassword() in apps/gate/src/agent/gate-key.ts:
-// "<expiryMs>.<hex HMAC(key, gateId.expiryMs)>", or "key:<hex key>" once the
-// server answered CONNACK 4 (docs/auth.md "Gates"). out needs 86 bytes.
+// the signed token, or "key:<hex key>" once the server answered CONNACK 4
+// (docs/auth.md "Gates"). out needs 86 bytes.
 inline void gatePassword(const uint8_t key[32], const char *gateId, int64_t expiryMs,
                          bool sendKey, char out[86]) {
   if (sendKey) {
@@ -374,12 +386,26 @@ inline void gatePassword(const uint8_t key[32], const char *gateId, int64_t expi
     hexLower(key, 32, out + 4);
     return;
   }
-  char msg[64];
-  int n = snprintf(msg, sizeof msg, "%s.%lld", gateId, (long long)expiryMs);
-  uint8_t mac[32];
-  hmacSha256(key, (const uint8_t *)msg, n, mac);
-  n = snprintf(out, 86, "%lld.", (long long)expiryMs);
-  hexLower(mac, 32, out + n);
+  char prefix[40];
+  snprintf(prefix, sizeof prefix, "%s.", gateId);
+  signExpiry(key, prefix, expiryMs, out);
+}
+
+// A pass or session cookie signed with prefix, its expiry within lifetimeMs
+// of now, 10 s of slack either way for clocks, as access.ts in apps/gate.
+inline bool validSigned(const uint8_t key[32], const char *prefix, const char *value,
+                        int64_t lifetimeMs, int64_t nowMs) {
+  char *end;
+  long long expiry = strtoll(value, &end, 10);
+  if (end == value || *end != '.' || expiry < nowMs - 10000 || expiry > nowMs + lifetimeMs + 10000)
+    return false;
+  char expected[86];
+  signExpiry(key, prefix, expiry, expected);
+  size_t len = strlen(expected);
+  if (strlen(value) != len) return false;
+  uint8_t diff = 0;  // constant time, like timingSafeEqual
+  for (size_t i = 0; i < len; i++) diff |= expected[i] ^ value[i];
+  return diff == 0;
 }
 
 }  // namespace gate
