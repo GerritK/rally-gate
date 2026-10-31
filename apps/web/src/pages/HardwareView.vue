@@ -50,7 +50,7 @@ import GateClockChips from '../components/GateClockChips.vue';
 import GateOnlineChip from '../components/GateOnlineChip.vue';
 import GateVersion from '../components/GateVersion.vue';
 import { useRouter } from 'vue-router';
-import { entryName, isOnline, required } from '../format';
+import { entryName, formatWholeSeconds, isOnline, required } from '../format';
 
 let gatesSource: EventSource;
 
@@ -58,6 +58,17 @@ const gates = ref<Gate[]>([]);
 const gateAssignments = ref<GateAssignment[]>([]);
 const stages = ref<Stage[]>([]);
 const pairing = ref<GatePairingState | null>(null);
+/** Seconds until pairing closes; null when closed or open until the first approval. */
+const pairingLeft = computed(() =>
+  pairing.value?.open && pairing.value.closesAt
+    ? Math.max(
+        0,
+        Math.ceil(
+          (Date.parse(pairing.value.closesAt) - serverNow.value) / 1000,
+        ),
+      )
+    : null,
+);
 const clockCorrectionThresholdMs = ref(DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS);
 const gateDialogOpen = ref(false);
 const gateDraft = ref({ id: '', name: '' });
@@ -100,6 +111,18 @@ function closePowerOff() {
 }
 
 const gateIds = computed(() => new Set(gates.value.map((g) => g.id)));
+// A waiting gate already in the list (key changed) is approved in its own row.
+const keyChangedIds = computed(
+  () =>
+    new Set(
+      (pairing.value?.waiting ?? [])
+        .map((w) => w.gateId)
+        .filter((id) => gateIds.value.has(id)),
+    ),
+);
+const newWaiting = computed(() =>
+  (pairing.value?.waiting ?? []).filter((w) => !gateIds.value.has(w.gateId)),
+);
 
 /**
  * Each gate's latest read with the car it matched, for testing gates and
@@ -260,12 +283,25 @@ onUnmounted(() => {
       <v-spacer />
       <v-btn
         v-if="can('setup')"
+        v-tooltip:bottom="
+          pairingLeft !== null ? $t('hardware.pairingExtend') : ''
+        "
         variant="tonal"
+        :color="pairing?.open ? 'info' : undefined"
         prepend-icon="mdi-link-variant"
         class="mr-2"
         @click="onOpenPairing"
       >
-        {{ $t('hardware.pairGates') }}
+        <template v-if="pairingLeft !== null">
+          {{ $t('hardware.pairingActive') }}
+          <span class="rg-timing ml-2">
+            {{ formatWholeSeconds(pairingLeft) }}
+          </span>
+        </template>
+        <template v-else-if="pairing?.open">
+          {{ $t('hardware.pairingActive') }}
+        </template>
+        <template v-else>{{ $t('hardware.pairGates') }}</template>
       </v-btn>
       <v-btn
         v-if="can('setup')"
@@ -280,35 +316,52 @@ onUnmounted(() => {
       <v-alert v-if="pairing?.open" type="info" variant="tonal" class="mb-4">
         {{
           pairing.closesAt
-            ? $t('hardware.pairingOpen', {
-                time: formatClockTime(pairing.closesAt),
-              })
+            ? $t('hardware.pairingOpen')
             : $t('hardware.pairingFirst')
         }}
       </v-alert>
       <p v-else-if="can('setup')" class="text-medium-emphasis mb-4">
         {{ $t('hardware.pairingHint') }}
       </p>
-      <v-table
-        v-if="pairing?.waiting.length"
-        density="comfortable"
-        class="mb-4"
+      <p
+        v-if="pairing?.open && !pairing.waiting.length"
+        class="text-medium-emphasis mb-4"
       >
+        {{ $t('hardware.noneWaiting') }}
+      </p>
+      <v-table density="comfortable">
+        <thead>
+          <tr>
+            <th>{{ $t('hardware.gate') }}</th>
+            <th>{{ $t('hardware.status') }}</th>
+            <th>{{ $t('hardware.lastRead') }}</th>
+            <th>{{ $t('gate.clock') }}</th>
+            <th width="1%"></th>
+          </tr>
+        </thead>
         <tbody>
-          <tr v-for="waiting in pairing.waiting" :key="waiting.gateId">
+          <tr v-for="waiting in newWaiting" :key="`waiting-${waiting.gateId}`">
+            <td class="text-no-wrap">{{ waiting.gateId }}</td>
             <td class="text-no-wrap">
-              {{ waiting.gateId }}
+              <v-chip
+                size="small"
+                color="warning"
+                prepend-icon="mdi-link-variant"
+              >
+                {{ $t('hardware.awaitingApproval') }}
+              </v-chip>
               <v-chip
                 v-if="waiting.keyChanged"
                 v-tooltip:top="$t('hardware.keyChangedHint')"
                 size="small"
                 color="warning"
+                prepend-icon="mdi-key-alert"
                 class="ml-2"
               >
                 {{ $t('hardware.keyChanged') }}
               </v-chip>
             </td>
-            <td class="text-medium-emphasis">
+            <td colspan="2" class="text-medium-emphasis">
               {{
                 $t('hardware.waitingSince', {
                   time: formatClockTime(waiting.since),
@@ -316,61 +369,81 @@ onUnmounted(() => {
                 })
               }}
             </td>
-            <td v-if="can('setup')" class="text-no-wrap text-right">
-              <v-btn
-                variant="tonal"
-                color="primary"
-                class="mr-2"
-                @click="onAcceptGate(waiting.gateId)"
-              >
-                {{ $t('hardware.accept') }}
-              </v-btn>
-              <v-btn variant="text" @click="onRejectGate(waiting.gateId)">
-                {{ $t('hardware.reject') }}
-              </v-btn>
+            <td class="text-no-wrap text-right">
+              <template v-if="can('setup')">
+                <v-btn
+                  variant="tonal"
+                  size="small"
+                  prepend-icon="mdi-check"
+                  @click="onAcceptGate(waiting.gateId)"
+                >
+                  {{ $t('hardware.accept') }}
+                </v-btn>
+                <!-- Like Delete: kept out of a slip's reach. -->
+                <v-menu>
+                  <template #activator="{ props: menu }">
+                    <v-btn
+                      v-bind="menu"
+                      icon="mdi-dots-vertical"
+                      size="small"
+                      variant="text"
+                      :aria-label="
+                        $t('common.moreFor', { name: waiting.gateId })
+                      "
+                    />
+                  </template>
+                  <v-list density="compact">
+                    <v-list-item
+                      prepend-icon="mdi-close"
+                      :title="$t('hardware.reject')"
+                      @click="onRejectGate(waiting.gateId)"
+                    />
+                  </v-list>
+                </v-menu>
+              </template>
             </td>
           </tr>
-        </tbody>
-      </v-table>
-      <p v-else-if="pairing?.open" class="text-medium-emphasis mb-4">
-        {{ $t('hardware.noneWaiting') }}
-      </p>
-      <v-table density="comfortable">
-        <thead>
-          <tr>
-            <th>{{ $t('stages.id') }}</th>
-            <th>{{ $t('stages.name') }}</th>
-            <th>{{ $t('hardware.online') }}</th>
-            <th>{{ $t('hardware.lastHeartbeat') }}</th>
-            <th>{{ $t('hardware.lastRead') }}</th>
-            <th>{{ $t('gate.clock') }}</th>
-            <th>{{ $t('gate.capabilities') }}</th>
-            <th>{{ $t('gate.version') }}</th>
-            <th width="1%"></th>
-          </tr>
-        </thead>
-        <tbody>
           <tr
             v-for="gate in gates"
             :key="gate.id"
             class="cursor-pointer"
             @click="router.push(`/hardware/gates/${gate.id}`)"
           >
-            <td class="text-no-wrap">{{ gate.id }}</td>
-            <td>{{ gate.name }}</td>
-            <td><GateOnlineChip :gate="gate" /></td>
-            <td
-              v-tooltip:top="
-                gate.lastHeartbeatAt
-                  ? formatClockTime(gate.lastHeartbeatAt)
-                  : ''
-              "
-            >
-              {{
-                gate.lastHeartbeatAt
-                  ? formatRelativeTime(gate.lastHeartbeatAt, serverNow)
-                  : $t('hardware.never')
-              }}
+            <td class="text-no-wrap">
+              <div>{{ gate.name }}</div>
+              <div
+                v-if="gate.name !== gate.id"
+                class="text-caption text-medium-emphasis"
+              >
+                {{ gate.id }}
+              </div>
+            </td>
+            <td class="text-no-wrap">
+              <span
+                v-tooltip:top="
+                  gate.lastHeartbeatAt
+                    ? $t('hardware.lastHeartbeatAt', {
+                        time: formatRelativeTime(
+                          gate.lastHeartbeatAt,
+                          serverNow,
+                        ),
+                      })
+                    : $t('hardware.noHeartbeat')
+                "
+              >
+                <GateOnlineChip :gate="gate" />
+              </span>
+              <GateVersion :gate="gate" mismatch-only class="ml-2" />
+              <v-chip
+                v-if="keyChangedIds.has(gate.id)"
+                v-tooltip:top="$t('hardware.keyChangedHint')"
+                size="small"
+                color="warning"
+                prepend-icon="mdi-key-alert"
+                class="ml-2"
+              >
+                {{ $t('hardware.keyChanged') }}
+              </v-chip>
             </td>
             <td>
               <template v-if="lastReads.get(gate.id)">
@@ -397,9 +470,16 @@ onUnmounted(() => {
                 :correction-threshold-ms="clockCorrectionThresholdMs"
               />
             </td>
-            <td>{{ gate.capabilities ?? '-' }}</td>
-            <td><GateVersion :gate="gate" /></td>
-            <td class="text-no-wrap">
+            <td class="text-no-wrap text-right">
+              <v-btn
+                v-if="keyChangedIds.has(gate.id) && can('setup')"
+                variant="tonal"
+                size="small"
+                prepend-icon="mdi-check"
+                @click.stop="onAcceptGate(gate.id)"
+              >
+                {{ $t('hardware.accept') }}
+              </v-btn>
               <v-menu v-if="can('setup')">
                 <template #activator="{ props: menu }">
                   <v-btn
@@ -412,6 +492,12 @@ onUnmounted(() => {
                   />
                 </template>
                 <v-list density="compact">
+                  <v-list-item
+                    v-if="keyChangedIds.has(gate.id)"
+                    prepend-icon="mdi-close"
+                    :title="$t('hardware.reject')"
+                    @click="onRejectGate(gate.id)"
+                  />
                   <v-list-item
                     prepend-icon="mdi-open-in-new"
                     :title="$t('hardware.openGateConfig')"
@@ -444,8 +530,8 @@ onUnmounted(() => {
               </v-menu>
             </td>
           </tr>
-          <tr v-if="gates.length === 0">
-            <td colspan="9" class="rg-empty">
+          <tr v-if="gates.length === 0 && !pairing?.waiting.length">
+            <td colspan="5" class="rg-empty">
               {{ $t('hardware.empty') }}
             </td>
           </tr>

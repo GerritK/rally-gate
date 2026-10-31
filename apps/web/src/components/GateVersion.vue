@@ -2,7 +2,7 @@
 import type { Gate } from '../api/gates';
 import { serverVersion } from '../api/version';
 
-defineProps<{ gate: Gate }>();
+defineProps<{ gate: Gate; mismatchOnly?: boolean }>();
 </script>
 
 <template>
@@ -17,5 +17,7 @@ defineProps<{ gate: Gate }>();
   >
     {{ gate.version }}
   </v-chip>
-  <span v-else class="rg-timing">{{ gate.version ?? '-' }}</span>
+  <span v-else-if="!mismatchOnly" class="rg-timing">{{
+    gate.version ?? '-'
+  }}</span>
 </template>
