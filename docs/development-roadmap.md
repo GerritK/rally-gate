@@ -98,6 +98,32 @@ One line each; the linked doc has the detail. History is in git.
      power-on until the broker accepts the gate, "Shut down all gates" with
      its own pass, the same on `web.cpp`. Done.
 
+- **Unlimited runs on a shakedown** (first field test, 2026-10): one
+  combined start/finish gate, cars drove, paused, adjusted, went again, and
+  every next attempt meant voiding the last. Today a `NONE` stage allows
+  one counting attempt like any other (partial unique index, a finished car's
+  start passing ignored, `attemptAlreadyCounts` on a hand-made run). Decided:
+  - Only `NONE`, not `QUALIFYING`: qualifying orders the first counted stage.
+  - After a finish, the next start passing opens a new attempt by itself.
+    Phantom runs from a car crossing the gate without meaning to start are
+    accepted ("own fault"); a marshal voids them.
+  - Not a lap mode: one passing at a combined gate finishes *or* starts,
+    never both.
+  - Results rank by **best** time and show the number of runs; every run
+    stays in Live Timing and on the entry.
+  - Live Timing still suggests the next starters: fewest runs first, then
+    start number. Anyone can still start out of turn.
+  - Voiding stays per run and only takes that run out of the best time; a
+    marshal may add a run by hand while another one counts.
+
+  Open: a per-stage "unlimited runs" switch instead of tying it to `NONE`;
+  whether a passing shortly after a finish (within `minDurationMs`) is
+  ignored like one shortly after a start; what happens to `scoring` once a
+  stage has several runs (lock it, or refuse leaving `NONE`). The "not
+  voided means it counts" invariant and the unique index become "at most one
+  open run" on such a stage; `event-model.md` gets the section when it's
+  built.
+
 - **Class and category badges in rankings** ("2WD · Rookie") on Results
   and the PDFs: only the classes the current filter doesn't already imply
   (filtered to 2WD, a 2WD badge says nothing), and no column at all while
