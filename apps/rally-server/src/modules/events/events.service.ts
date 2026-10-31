@@ -366,7 +366,12 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  @OnEvent('mqtt.message')
+  /**
+   * The broker awaits this before it PUBACKs (`BrokerService`), so it must
+   * throw when the detection isn't stored: the gate then keeps it and
+   * publishes it again. Hence `suppressErrors: false`.
+   */
+  @OnEvent('mqtt.message', { suppressErrors: false })
   async handleMqttMessage({
     topic,
     payload,

@@ -29,6 +29,10 @@ from the two, see "Transponders" below), `timestampServer`,
 rewritten; the time the rules used is `timestampGate + clockCorrectionMs` (see
 "Clock offset" in `architecture.md`).
 
+The broker acknowledges a detection (PUBACK) only once it is stored: if the
+insert fails (database unreachable), the connection drops unacknowledged and
+the gate sends the detection again.
+
 `processed: false` means the rules threw, or a finish or split found no run
 for its car at all: a start gate that was off Wi-Fi replays its start after the
 finish, so such a passing waits up to 10 minutes (`AWAIT_START_MS`, from

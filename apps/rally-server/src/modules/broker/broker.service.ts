@@ -53,31 +53,43 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
         done(error, false);
       },
       // A gate speaks for itself only, and listens to nothing.
-      authorizePublish: (client, packet, callback) =>
-        callback(
-          !client ||
-            !gates.has(client) ||
-            packet.topic.startsWith(`${DETECTION_TOPIC_PREFIX}/${client.id}/`)
-            ? null
-            : new Error(`${client.id} may not publish to ${packet.topic}`),
-        ),
+      authorizePublish: (client, packet, callback) => {
+        // client is null for internally-originated packets.
+        if (!client) {
+          return callback(null);
+        }
+        if (
+          gates.has(client) &&
+          !packet.topic.startsWith(`${DETECTION_TOPIC_PREFIX}/${client.id}/`)
+        ) {
+          return callback(
+            new Error(`${client.id} may not publish to ${packet.topic}`),
+          );
+        }
+        // Handled here rather than on 'publish' because Aedes PUBACKs a QoS 1
+        // packet only after this calls back: a detection the database didn't
+        // take errors, Aedes drops the connection unacknowledged, and the
+        // gate keeps the detection and publishes it again on reconnect.
+        this.events
+          .emitAsync('mqtt.message', {
+            topic: packet.topic,
+            payload: packet.payload,
+            address: remoteAddress(client),
+          })
+          .then(
+            () => callback(null),
+            (err: Error) => {
+              this.logger.warn(
+                `Not acknowledging ${packet.topic} from ${client.id}, the gate will send it again: ${err.message}`,
+              );
+              callback(err);
+            },
+          );
+      },
       authorizeSubscribe: (client, subscription, callback) =>
         callback(null, gates.has(client) ? null : subscription),
     });
     this.server = createServer(this.aedes.handle);
-
-    this.aedes.on('publish', (packet, client) => {
-      // client is null for internally-originated packets; only forward
-      // messages that actually came from a connected gate-agent.
-      if (!client) {
-        return;
-      }
-      this.events.emit('mqtt.message', {
-        topic: packet.topic,
-        payload: packet.payload,
-        address: remoteAddress(client),
-      });
-    });
 
     // Awaited, so a bind failure rejects out of onModuleInit and Nest aborts
     // startup. Without a listener on 'error', node rethrows it *after* Nest

@@ -1,4 +1,5 @@
 import { ConflictException } from '@nestjs/common';
+import { EVENT_LISTENER_METADATA } from '@nestjs/event-emitter';
 import { GateRole, StageStatus, EntryStatus } from '@rally-gate/shared';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { GatesService } from '../gates/gates.service';
@@ -297,6 +298,7 @@ describe('EventsService redelivered detections', () => {
   });
 
   it('still fails loudly when the insert fails for another reason', async () => {
+    // The broker withholds the PUBACK on this, so the gate sends it again.
     const { service } = makeService({
       insert: jest.fn().mockRejectedValue(new Error('SQLITE_FULL')),
     });
@@ -304,6 +306,20 @@ describe('EventsService redelivered detections', () => {
     await expect(service.handleMqttMessage(detection())).rejects.toThrow(
       'SQLITE_FULL',
     );
+  });
+
+  it('lets that failure reach the broker instead of swallowing it', () => {
+    // @OnEvent's default would turn the throw above into a log line and an
+    // acknowledged, lost detection.
+    const [{ options }] = Reflect.getMetadata(
+      EVENT_LISTENER_METADATA,
+      Object.getOwnPropertyDescriptor(
+        EventsService.prototype,
+        'handleMqttMessage',
+      )!.value as object,
+    ) as { options: { suppressErrors?: boolean } }[];
+
+    expect(options.suppressErrors).toBe(false);
   });
 });
 
