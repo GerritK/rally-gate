@@ -6,7 +6,7 @@ import { StageRunsService } from '../stage-runs/stage-runs.service';
 import { StagesService } from '../stages/stages.service';
 import { EntriesService } from '../entries/entries.service';
 import { DetectionEventRecord } from './detection-event.entity';
-import { EventsService } from './events.service';
+import { AWAIT_START_MS, EventsService } from './events.service';
 import { withFakeTransaction } from '../../common/fake-transaction';
 
 const GATE = { id: 'G1', name: 'G1', clockOffsetMs: null };
@@ -19,6 +19,10 @@ function makeService(opts: {
   matches?: unknown[];
   pending?: unknown[];
   startRun?: jest.Mock;
+  finishRun?: jest.Mock;
+  recordSplit?: jest.Mock;
+  /** Whether the entry has any run on the stage; defaults to none. */
+  hasRun?: boolean;
   stageStatus?: StageStatus;
   assignment?: unknown;
   stored?: unknown;
@@ -70,7 +74,14 @@ function makeService(opts: {
       .mockImplementation((_v: string, _s: string, at: Date) =>
         Promise.resolve({ id: 'r1', startTime: at }),
       );
-  const stageRunsService = { startRun } as unknown as StageRunsService;
+  const finishRun = opts.finishRun ?? jest.fn().mockResolvedValue(null);
+  const recordSplit = opts.recordSplit ?? jest.fn().mockResolvedValue(null);
+  const stageRunsService = {
+    startRun,
+    finishRun,
+    recordSplit,
+    hasRun: jest.fn().mockResolvedValue(opts.hasRun ?? false),
+  } as unknown as StageRunsService;
   const stagesService = {
     findOne: jest.fn().mockResolvedValue({
       id: 'SS1',
@@ -88,7 +99,16 @@ function makeService(opts: {
     stagesService,
     emitter as never,
   );
-  return { service, events, saved, startRun, emitter, findByTransponder };
+  return {
+    service,
+    events,
+    saved,
+    startRun,
+    finishRun,
+    recordSplit,
+    emitter,
+    findByTransponder,
+  };
 }
 
 function detection(overrides: Record<string, unknown> = {}) {
@@ -284,6 +304,103 @@ describe('EventsService redelivered detections', () => {
     await expect(service.handleMqttMessage(detection())).rejects.toThrow(
       'SQLITE_FULL',
     );
+  });
+});
+
+describe('EventsService finish or split before its start', () => {
+  // A start gate off Wi-Fi replays its starts on reconnect, after the finish.
+  const timedAt = new Date('2026-01-01T12:00:00.000Z');
+  const at = (role: GateRole) => ({ assignment: { stageId: 'SS1', role } });
+
+  it('keeps a finish pending until its start is in, then times it', async () => {
+    const finishRun = jest
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockImplementation((_e: string, _s: string, finishTime: Date) =>
+        Promise.resolve({ id: 'r1', finishTime }),
+      );
+    const { service, events, saved } = makeService({
+      ...at(GateRole.STAGE_FINISH),
+      finishRun,
+    });
+
+    await service.handleMqttMessage(detection());
+    expect(saved.at(-1)).toMatchObject({ eventId: 'e1', processed: false });
+
+    events.find.mockResolvedValue([{ ...saved[0] }]);
+    await expect(service.reprocessPending()).resolves.toBe(1);
+
+    expect(finishRun).toHaveBeenLastCalledWith('v1', 'SS1', timedAt);
+    expect(saved.at(-1)).toMatchObject({ eventId: 'e1', processed: true });
+  });
+
+  it('keeps a split pending until its start is in, then records it', async () => {
+    const recordSplit = jest
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockImplementation(
+        (_e: string, _s: string, _g: string, _i: number, timestamp: Date) =>
+          Promise.resolve({ id: 's1', timestamp }),
+      );
+    const { service, events, saved } = makeService({
+      ...at(GateRole.STAGE_SPLIT),
+      recordSplit,
+    });
+
+    await service.handleMqttMessage(detection());
+    expect(saved.at(-1)).toMatchObject({ processed: false });
+
+    events.find.mockResolvedValue([{ ...saved[0] }]);
+    await expect(service.reprocessPending()).resolves.toBe(1);
+
+    expect(recordSplit).toHaveBeenLastCalledWith('v1', 'SS1', 'G1', 0, timedAt);
+    expect(saved.at(-1)).toMatchObject({ processed: true });
+  });
+
+  it('applies a finish once when the gate sends it again while it waits', async () => {
+    const { service, events, finishRun } = makeService(
+      at(GateRole.STAGE_FINISH),
+    );
+
+    await service.handleMqttMessage(detection());
+    events.existsBy.mockResolvedValue(true);
+    await service.handleMqttMessage(detection());
+
+    expect(events.insert).toHaveBeenCalledTimes(1);
+    expect(finishRun).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not hold a second finish for a car that already finished', async () => {
+    // A double trigger at the finish beam: there's a run, just no open one.
+    const { service, saved } = makeService({
+      ...at(GateRole.STAGE_FINISH),
+      hasRun: true,
+    });
+
+    await service.handleMqttMessage(detection());
+
+    expect(saved.at(-1)).toMatchObject({ processed: true });
+  });
+
+  it('stops waiting for the start after AWAIT_START_MS', async () => {
+    const { service, saved } = makeService({
+      ...at(GateRole.STAGE_FINISH),
+      pending: [
+        {
+          eventId: 'e1',
+          gateId: 'G1',
+          entryId: 'v1',
+          timestampGate: timedAt,
+          timestampServer: new Date(Date.now() - AWAIT_START_MS - 1),
+          clockCorrectionMs: 0,
+          processed: false,
+        },
+      ],
+    });
+
+    await service.reprocessPending();
+
+    expect(saved.at(-1)).toMatchObject({ eventId: 'e1', processed: true });
   });
 });
 

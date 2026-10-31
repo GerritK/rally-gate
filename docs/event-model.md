@@ -29,11 +29,15 @@ from the two, see "Transponders" below), `timestampServer`,
 rewritten; the time the rules used is `timestampGate + clockCorrectionMs` (see
 "Clock offset" in `architecture.md`).
 
-`processed: false` means the rules threw. The raw detection is always saved
-first, a 30s sweep retries oldest-first with the stored correction, and
-`GET /events/pending` plus a dashboard banner make the backlog visible. An
-unknown gate or unregistered transponder is marked processed — retrying changes
-nothing and would bury real problems.
+`processed: false` means the rules threw, or a finish or split found no run
+for its car at all: a start gate that was off Wi-Fi replays its start after the
+finish, so such a passing waits up to 10 minutes (`AWAIT_START_MS`, from
+arrival) for the start, then is ignored like any finish without a start. A
+finish for a car that already finished is ignored at once. The raw detection
+is always saved first, a 30s sweep retries oldest-first with the stored
+correction, and `GET /events/pending` plus a dashboard banner make the backlog
+visible. An unknown gate or unregistered transponder is marked processed —
+retrying changes nothing and would bury real problems.
 
 ### Unassigned passings
 

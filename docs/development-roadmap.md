@@ -60,32 +60,24 @@ One line each; the linked doc has the detail. History is in git.
 
 ## Next
 
-- **Audit findings (2026-10-19)**, most urgent first. 1 and 2 were
-  reproduced against the built server.
-  1. *A finish or split before its delayed start is lost.* A start gate that
-     drops off Wi-Fi replays its start later; the finish arriving first finds
-     no open run, is ignored and still marked processed, so the run stays
-     STARTED and becomes a DNF at close, with nothing on the pending list.
-     Fix: when `finishRun`/`recordSplit` find no open run, leave the
-     detection unprocessed for ~10 minutes so the 30 s retry sweep applies it
-     once the start is in (`EventsService.applyRulesForRecord`); test
-     "finish before start".
-  2. *A detection is lost when storing it fails.* The broker PUBACKs before
+- **Audit findings (2026-10-19)**, most urgent first. 1 was reproduced
+  against the built server.
+  1. *A detection is lost when storing it fails.* The broker PUBACKs before
      `EventsService` inserts, so with the database unreachable (Postgres
      restarting) the gate drops it (the ESP32 deletes it from flash) and the
      server logs only `ECONNREFUSED`. Fix: catch in `handleMqttMessage`, keep
      the failed detections in memory and retry them in `reprocessPending`;
      the full fix is to PUBACK only after the insert (Aedes
      `authorizePublish`).
-  3. *Gate services run as the installing user,* which on Raspberry Pi OS has
+  2. *Gate services run as the installing user,* which on Raspberry Pi OS has
      `NOPASSWD: ALL`, so the narrow sudoers rules and `rally-gate-net` don't
      bound anything once gate-config or gate-agent runs foreign code. Fix: a
      system user (`useradd --system --groups gpio,plugdev rally-gate`) as
      `User=` of both units, owning `/etc/rally-gate`.
-  4. *From the 11th open dashboard* the console shows `possible EventEmitter
+  3. *From the 11th open dashboard* the console shows `possible EventEmitter
      memory leak detected` (EventEmitter2 allows 10 listeners per event).
      Fix: `EventEmitterModule.forRoot({ maxListeners: 100 })`.
-  5. *A correction across midnight is refused:* start 23:58, finish typed as
+  4. *A correction across midnight is refused:* start 23:58, finish typed as
      00:03:10 lands on the start's day, before the start (entering the stage
      time works). Fix: in `combineDateAndTime` callers, add a day when the
      finish isn't after the start; test in `format.spec.ts`.

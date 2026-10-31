@@ -229,6 +229,11 @@ export class StageRunsService {
     });
   }
 
+  /** Whether the entry has any attempt on this stage, open or finished. */
+  hasRun(entryId: string, stageId: string): Promise<boolean> {
+    return this.stageRuns.existsBy({ entryId, stageId, voided: false });
+  }
+
   /** The entry's most recent completed attempt on this stage, if any. */
   private findFinished(
     entryId: string,

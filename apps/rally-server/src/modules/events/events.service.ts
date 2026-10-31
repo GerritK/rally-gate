@@ -44,6 +44,14 @@ const DETECTION_TOPIC_REGEX = new RegExp(
 export const REPROCESS_INTERVAL_MS = 30_000;
 
 /**
+ * How long a finish or split with no run to attach to stays pending. A start
+ * gate that dropped off Wi-Fi replays its starts on reconnect, after the
+ * finishes that depend on them; the retry sweep applies those once the start
+ * is in. Measured on the server clock from arrival, not on the gate's.
+ */
+export const AWAIT_START_MS = 10 * 60_000;
+
+/**
  * Long enough for any real transponder or gate id, short enough that a
  * malformed publisher can't fill the event database one detection at a time.
  */
@@ -533,7 +541,21 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       // nothing to apply and retrying won't change that, so it's marked
       // processed to keep the pending list to real problems.
       if (gate && record.entryId) {
-        await this.applyRules(gate, record.entryId, effectiveTime(record));
+        const applied = await this.applyRules(
+          gate,
+          record.entryId,
+          effectiveTime(record),
+        );
+        if (
+          applied === null &&
+          Date.now() - record.timestampServer.getTime() < AWAIT_START_MS
+        ) {
+          this.logger.warn(
+            `Detection ${record.eventId} from gate ${record.gateId} has no run to finish or split yet; keeping it pending until its start arrives`,
+          );
+          await this.emitPendingChanged();
+          return false;
+        }
       }
       record.processed = true;
       await this.events.save(record);
@@ -550,13 +572,15 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Returns whether this passing changed anything. The live path ignores it
-   * (repeats are expected there); a marshal's assignment must not.
+   * (repeats are expected there); a marshal's assignment must not. Null (also
+   * falsy) is a finish or split for an entry with no run on the stage at all:
+   * its start may still be on its way.
    */
   private async applyRules(
     gate: Gate,
     entryId: string,
     at: Date,
-  ): Promise<boolean> {
+  ): Promise<boolean | null> {
     const assignment = await this.gateAssignmentsService.findActiveForGate(
       gate.id,
     );
@@ -596,8 +620,9 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       const run = await this.stageRunsService.finishRun(entryId, stageId, at);
       if (run) {
         this.emitter.emit('stage-run.updated', run);
+        return true;
       }
-      return !!run;
+      return this.awaitsStart(entryId, stageId);
     }
     if (assignment.role === GateRole.STAGE_START_FINISH) {
       const run = await this.stageRunsService.startOrFinishRun(
@@ -626,10 +651,21 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       );
       if (split) {
         this.emitter.emit('stage-run.split', split);
+        return split.timestamp.getTime() === at.getTime();
       }
-      return split?.timestamp.getTime() === at.getTime();
+      return this.awaitsStart(entryId, stageId);
     }
     return false;
+  }
+
+  /** Null when the entry has no run here, so the passing may wait for one. */
+  private async awaitsStart(
+    entryId: string,
+    stageId: string,
+  ): Promise<false | null> {
+    return (await this.stageRunsService.hasRun(entryId, stageId))
+      ? false
+      : null;
   }
 }
 
