@@ -9,12 +9,13 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
  *
  * **Several rows per (entryId, stageId) are allowed** — a red-flagged stage
  * gets re-run, and the earlier attempt is kept as evidence rather than
- * overwritten. Only the most recent attempt counts toward results
- * (`latestAttempts` in `stage-runs.service.ts`).
+ * overwritten. A shakedown also keeps every run the car drove. Results take
+ * the fastest finished one (`countingRuns` in `stage-runs.service.ts`).
  */
 @Entity()
 /**
- * Partial unique index: **at most one non-voided attempt per entry+stage**.
+ * Partial unique index: **at most one non-voided attempt per entry, stage
+ * and run** — on a counted stage `run` is always 1, so one per entry+stage.
  *
  * This is the invariant the whole re-run model rests on — *not voided means
  * it counts*. Without it an attempt could fail to count for two different
@@ -25,9 +26,14 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
  * It also catches two detections of one passing processed concurrently,
  * which both clear the `findActive` check.
  */
-@Index(['entryId', 'stageId'], {
+@Index(['entryId', 'stageId', 'run'], {
   unique: true,
   where: '"voided" = false',
+})
+/** At most one open run per entry+stage, a shakedown included. */
+@Index(['entryId', 'stageId'], {
+  unique: true,
+  where: '"voided" = false AND "finishTime" IS NULL',
 })
 export class StageRun {
   @PrimaryGeneratedColumn('uuid')
@@ -35,11 +41,18 @@ export class StageRun {
 
   /**
    * 1 for an entry's first go at this stage, incrementing for each re-run;
-   * highest wins (`latestAttempts`). Not a creation timestamp or `startTime`:
+   * highest is the latest. Not a creation timestamp or `startTime`:
    * see "StageRun" in `docs/event-model.md`.
    */
   @Column({ type: 'int', default: 1 })
   attempt: number;
+
+  /**
+   * Always 1 on a counted stage. On a shakedown (`StageScoring.NONE`) each
+   * run takes its `attempt`, so every non-voided one counts side by side.
+   */
+  @Column({ type: 'int', default: 1 })
+  run: number;
 
   /**
    * Struck out by a marshal, typically after a red flag. A voided attempt

@@ -240,6 +240,7 @@
     "totalTime": "Total Time",
     "gap": "Gap",
     "stages": "Stages",
+    "runs": "Runs",
     "status": "Status",
     "outcome": "Outcome"
   },
@@ -673,6 +674,7 @@
     "labelHint": "e.g. Anna – Start SS2",
     "role": "Role",
     "stages": "Stages",
+    "runs": "Runs",
     "stagesRequired": "Pick at least one stage",
     "code": "Code",
     "devices": "Devices",

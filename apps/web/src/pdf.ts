@@ -139,6 +139,7 @@ export function stagePdf(
   subtitle: string,
   results: StageResults,
 ): PdfSection {
+  const withRuns = results.classification.some((e) => e.runs !== undefined);
   const body = results.classification.map((e) => [
     String(e.position),
     String(e.startNumber),
@@ -155,6 +156,7 @@ export function stagePdf(
           )
         : '-';
     }),
+    ...(withRuns ? [time(String(e.runs ?? 0))] : []),
   ]);
   const anyBest = body.some((row) =>
     row.some((c) => typeof c === 'object' && c.styles.fontStyle === 'bold'),
@@ -172,6 +174,7 @@ export function stagePdf(
       ...results.splitGates.map((g) =>
         t('gateRole.split', { n: g.splitIndex }),
       ),
+      ...(withRuns ? [t('table.runs')] : []),
     ],
     body,
     repeat: 6,

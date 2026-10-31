@@ -34,6 +34,14 @@ const splitsOf = (entryId: string) =>
     split: splits.get(entryId),
   }));
 
+/** A shakedown's results carry how often each car drove it. */
+const withRuns = computed(() =>
+  props.results.classification.some((placing) => placing.runs !== undefined),
+);
+const columns = computed(
+  () => 6 + props.results.splitGates.length + (withRuns.value ? 1 : 0),
+);
+
 const legendMarks = computed<TimingMark[]>(() =>
   props.results.classification.some((placing) =>
     props.results.splitsByGate.some(
@@ -82,6 +90,7 @@ const legendMarks = computed<TimingMark[]>(() =>
           </th>
           <th class="rg-time">{{ $t('table.time') }}</th>
           <th class="rg-time">{{ $t('table.gap') }}</th>
+          <th v-if="withRuns" class="rg-time">{{ $t('table.runs') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -127,16 +136,17 @@ const legendMarks = computed<TimingMark[]>(() =>
             {{ formatDuration(placing.durationMs) }}
           </td>
           <td class="rg-timing rg-time">{{ formatGap(placing.gapMs) }}</td>
+          <td v-if="withRuns" class="rg-timing rg-time">{{ placing.runs }}</td>
         </tr>
         <tr v-if="results.classification.length === 0">
-          <td :colspan="6 + results.splitGates.length" class="rg-empty">
+          <td :colspan="columns" class="rg-empty">
             {{ $t('results.noneFinished') }}
           </td>
         </tr>
       </tbody>
       <tfoot v-if="legendMarks.length > 0">
         <tr>
-          <td :colspan="6 + results.splitGates.length">
+          <td :colspan="columns">
             <TableLegend :marks="legendMarks" />
           </td>
         </tr>

@@ -7,6 +7,8 @@ export interface Placing extends Crew {
   startNumber: number | null;
   durationMs: number;
   gapMs: number;
+  /** Runs the car drove, on a shakedown's stage results only (`durationMs` is its fastest). */
+  runs?: number;
 }
 
 export interface OverallPlacing extends Placing {

@@ -6,6 +6,7 @@ import {
   isOutOfEvent,
   isScrutineered,
   StageRunStatus,
+  StageScoring,
   StageStatus,
   type Starter,
 } from '@rally-gate/shared';
@@ -27,6 +28,7 @@ import {
 } from '../api/gate-assignments';
 import { fetchGates, type Gate } from '../api/gates';
 import { serverNow } from '../api/time';
+import { countingRun } from '../counting-run';
 import { closeLiveStream, openLiveStream, upsert } from '../api/live';
 import { rallyName } from '../api/rally-info';
 import {
@@ -120,8 +122,10 @@ type RowState =
 
 interface Row {
   starter: Starter;
-  /** The attempt that counts — an entry has at most one non-voided one. */
+  /** The attempt that counts — on a shakedown the open run, else the fastest. */
   run?: StageRun;
+  /** Non-voided runs; more than one only on a shakedown. */
+  runCount: number;
   voidedRuns: StageRun[];
   state: RowState;
   /** Set on the first row of a main-class block. */
@@ -191,6 +195,9 @@ const ROW_STATE_DISPLAY: Record<
   },
 };
 
+/** A shakedown is driven as often as a car likes; its fastest run counts. */
+const shakedown = computed(() => stage.value?.scoring === StageScoring.NONE);
+
 const rows = computed<Row[]>(() => {
   const order = startOrder.value;
   if (!order) return [];
@@ -205,7 +212,7 @@ const rows = computed<Row[]>(() => {
 
   const base = order.starters.map((starter): Omit<Row, 'classHeader'> => {
     const runs = runsByEntry.get(starter.entryId) ?? [];
-    const run = runs.find((r) => !r.voided);
+    const run = countingRun(runs);
     const voidedRuns = runs
       .filter((r) => r.voided)
       .sort((a, b) => a.attempt - b.attempt);
@@ -217,7 +224,13 @@ const rows = computed<Row[]>(() => {
     else if (entry && isOutOfEvent(entry.status)) state = 'OUT';
     else if (voidedRuns.length > 0 && !closed) state = 'RERUN';
     else state = closed ? 'DNS' : 'WAITING';
-    return { starter, run, voidedRuns, state };
+    return {
+      starter,
+      run,
+      runCount: runs.filter((r) => !r.voided).length,
+      voidedRuns,
+      state,
+    };
   });
 
   // Next = the first waiting car, even before one that started: an early start
@@ -339,9 +352,18 @@ const onStage = computed(() =>
     ),
 );
 
-/** Cars yet to start, in start order. */
+/** Cars yet to start, in start order; on a shakedown every car off stage,
+ *  fewest runs first. */
 const dueToStart = computed(() =>
-  rows.value.filter((row) => row.state === 'NEXT' || row.state === 'WAITING'),
+  shakedown.value
+    ? rows.value
+        .filter((row) =>
+          ['NEXT', 'WAITING', 'FINISHED', 'RERUN'].includes(row.state),
+        )
+        .sort((a, b) => a.runCount - b.runCount)
+    : rows.value.filter(
+        (row) => row.state === 'NEXT' || row.state === 'WAITING',
+      ),
 );
 
 // ---- Unassigned passings, with a suggested entry -----------------------
@@ -568,7 +590,8 @@ async function clearedToStart(verb: string): Promise<boolean> {
 function canStart(row: Row): boolean {
   return (
     stage.value?.status === StageStatus.ACTIVE &&
-    ['NEXT', 'WAITING', 'RERUN'].includes(row.state)
+    (['NEXT', 'WAITING', 'RERUN'].includes(row.state) ||
+      (shakedown.value && row.state === 'FINISHED'))
   );
 }
 
@@ -1245,6 +1268,7 @@ onUnmounted(() => {
           <th>{{ $t('table.crew') }}</th>
           <th v-if="!startOrder.grouped">{{ $t('classes.class') }}</th>
           <th>{{ $t('table.status') }}</th>
+          <th v-if="shakedown">{{ $t('table.runs') }}</th>
           <th class="rg-time">
             {{ $t('gateRole.start') }}<span class="rg-time-mark" />
           </th>
@@ -1259,7 +1283,7 @@ onUnmounted(() => {
       <tbody>
         <template v-for="row in rows" :key="row.starter.entryId">
           <tr v-if="row.classHeader" class="rg-class-row">
-            <td colspan="10">{{ row.classHeader }}</td>
+            <td :colspan="shakedown ? 11 : 10">{{ row.classHeader }}</td>
           </tr>
           <tr :class="{ 'rg-next-row': row.state === 'NEXT' }">
             <td class="rg-timing">{{ row.starter.position }}</td>
@@ -1296,12 +1320,13 @@ onUnmounted(() => {
                 {{ $t('live.notScrutineered') }}
               </v-chip>
               <span
-                v-if="row.run && row.run.attempt > 1"
+                v-if="row.run && row.run.attempt > 1 && !shakedown"
                 class="text-caption text-medium-emphasis ml-1"
               >
                 {{ $t('live.attempt', { n: row.run.attempt }) }}
               </span>
             </td>
+            <td v-if="shakedown" class="rg-timing">{{ row.runCount }}</td>
             <td class="rg-time">
               <ClockTime
                 v-if="row.run"
@@ -1339,8 +1364,10 @@ onUnmounted(() => {
                 {{ $t('live.correct') }}
               </v-btn>
               <v-btn
-                v-else-if="
-                  !row.run && canStart(row) && can('timeRun', stage.id)
+                v-if="
+                  (!row.run || row.state === 'FINISHED') &&
+                  canStart(row) &&
+                  can('timeRun', stage.id)
                 "
                 size="small"
                 variant="text"
@@ -1430,6 +1457,7 @@ onUnmounted(() => {
                 $t('live.attempt', { n: voided.attempt })
               }}</span>
             </td>
+            <td v-if="shakedown"></td>
             <td class="rg-time">
               <ClockTime
                 :time="voided.startTime"
@@ -1480,7 +1508,7 @@ onUnmounted(() => {
           </tr>
         </template>
         <tr v-if="rows.length === 0">
-          <td colspan="10" class="rg-empty">
+          <td :colspan="shakedown ? 11 : 10" class="rg-empty">
             {{ $t('live.noEntries') }}
           </td>
         </tr>

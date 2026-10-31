@@ -93,7 +93,8 @@ positive (classification sorts ascending, so a zero or negative time would win).
 A stage either starts and finishes at separate gates or at one gate in the
 `stage_start_finish` role, never both (refused with a 409 on assignment). A
 passing there finishes the car's open run, or starts one if it has none; a
-finished car passing again is ignored like any restart. Within the stage's
+finished car passing again is ignored like any restart, except on a
+shakedown, where it starts the next run. Within the stage's
 `minDurationMs` of the start (optional, default
 `DEFAULT_MIN_STAGE_DURATION_MS`, 10 s) a passing is ignored: the same
 passing reported twice, or the car pulling away after Start now. That also
@@ -113,11 +114,14 @@ minimum of a car's start gets no suggestion: it is that car breaking the beam
 again, typically pulling away slowly enough to outlast the gate's
 `BEAM_LOCKOUT_MS`, and is dismissed.
 
-**At most one non-voided attempt per entry+stage**, enforced by a partial
-unique index (`where "voided" = false`). The invariant is *not voided means it
-counts*: if several attempts could survive, a superseded run would show
-`FINISHED` with a duration while missing from the results. Results use the
-highest surviving `attempt` (`latestAttempts`).
+**At most one non-voided attempt per entry, stage and `run`**, enforced by a
+partial unique index (`where "voided" = false`), and at most one open one per
+entry+stage by a second (`and "finishTime" is null`). `run` is always 1 on a
+counted stage, so there the first index means one attempt per entry+stage.
+The invariant is *not voided means it counts*: if several attempts could
+survive, a superseded run would show `FINISHED` with a duration while
+missing from the results. Results use the surviving one (`countingRuns`); on
+a shakedown, where every run survives, the fastest finished one.
 
 `attempt` is an explicit counter rather than a creation timestamp because
 `@CreateDateColumn` stores only seconds on sqlite, and `startTime` is editable.
@@ -224,6 +228,18 @@ on its results and their PDF. **Nothing global reads it** (`countsInOverall`):
 the overall skips it, so driving only it classifies no one and it sets no
 notional; its penalties never reach a total and count from 1 on that stage
 alone, even for a type counted through the rally.
+
+**A shakedown (`NONE`) is driven as often as a car likes**, until the stage
+closes. A finished car's next start, at the gate or by Start now, opens a new
+run with `run = attempt`; a start while its run is open is refused as a
+duplicate, and one from before its last finish is a late passing, ignored, so
+runs never overlap. Every non-voided run counts: the results rank each car's
+fastest finished run with its splits and show how many it drove (`runs`), so
+a car with one finished run is never DNF. Live Timing and Up next suggest the
+car off stage with the fewest runs, then start order; the entry page lists
+every run. A combined gate has no lockout after a finish beyond the beam's
+own: a car rolling back through starts a phantom run, harmless since only
+finished runs count, and voided like any other.
 
 The one exception is the start order, and only for `QUALIFYING`: under
 "overall time", while no counted stage has closed, a stage is ordered by the

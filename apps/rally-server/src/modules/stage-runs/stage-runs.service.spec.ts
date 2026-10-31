@@ -1,9 +1,14 @@
 import { withFakeTransaction } from '../../common/fake-transaction';
-import { ChangeAction, StageRunStatus, StageStatus } from '@rally-gate/shared';
+import {
+  ChangeAction,
+  StageRunStatus,
+  StageScoring,
+  StageStatus,
+} from '@rally-gate/shared';
 import type { StageRun } from './stage-run.entity';
 import {
   deriveStageRunStatus,
-  latestAttempts,
+  countingRuns,
   StageRunsService,
 } from './stage-runs.service';
 
@@ -18,7 +23,7 @@ function uniqueViolation(): Error {
   });
 }
 
-describe('latestAttempts', () => {
+describe('countingRuns', () => {
   const run = (
     entryId: string,
     stageId: string,
@@ -32,31 +37,34 @@ describe('latestAttempts', () => {
       durationMs,
     }) as StageRun;
 
-  it('keeps only the most recent attempt per entry and stage', () => {
-    const first = run('v1', 'SS1', 1, 90_000);
-    const rerun = run('v1', 'SS1', 2, 120_000);
+  it('takes the fastest finished run of a shakedown', () => {
+    const slow = run('v1', 'SD', 1, 120_000);
+    const fast = run('v1', 'SD', 2, 90_000);
+    const slower = run('v1', 'SD', 3, 130_000);
 
-    expect(latestAttempts([first, rerun])).toEqual([rerun]);
+    expect(countingRuns([slow, fast, slower])).toEqual([fast]);
   });
 
-  it('picks the re-run even when it is the slower time', () => {
-    const quickVoided = run('v1', 'SS1', 1, 60_000);
-    const slowRerun = run('v1', 'SS1', 2, 200_000);
+  it('counts an open run only while the car has no finished one', () => {
+    const finished = run('v1', 'SD', 1, 120_000);
+    const open = { ...run('v1', 'SD', 2, 0), durationMs: null };
 
-    expect(latestAttempts([slowRerun, quickVoided])).toEqual([slowRerun]);
+    expect(countingRuns([finished, open])).toEqual([finished]);
+    expect(countingRuns([open, finished])).toEqual([finished]);
+    expect(countingRuns([open])).toEqual([open]);
   });
 
   it('ignores a voided attempt so results fall back to the surviving one', () => {
     const original = run('v1', 'SS1', 1, 90_000);
     const voidedRerun = { ...run('v1', 'SS1', 2, 120_000), voided: true };
 
-    expect(latestAttempts([original, voidedRerun])).toEqual([original]);
+    expect(countingRuns([original, voidedRerun])).toEqual([original]);
   });
 
   it('yields no result at all when every attempt is voided', () => {
     const only = { ...run('v1', 'SS1', 1, 90_000), voided: true };
 
-    expect(latestAttempts([only])).toEqual([]);
+    expect(countingRuns([only])).toEqual([]);
   });
 
   it('keeps attempts on different stages and by different entries apart', () => {
@@ -64,7 +72,7 @@ describe('latestAttempts', () => {
     const b = run('v1', 'SS2', 1, 95_000);
     const c = run('v2', 'SS1', 1, 88_000);
 
-    expect(latestAttempts([a, b, c])).toHaveLength(3);
+    expect(countingRuns([a, b, c])).toHaveLength(3);
   });
 });
 
@@ -118,7 +126,7 @@ function makeService(
 describe('StageRunsService.findSplitsForStageAtIndex', () => {
   it('drops a voided attempt so its splits leave the live leaderboard', async () => {
     // Regression: this queried the repository directly instead of going
-    // through findByStage, so it never applied latestAttempts and a voided
+    // through findByStage, so it never applied countingRuns and a voided
     // attempt's split times kept showing on the split classification.
     const surviving = {
       id: 'r2',
@@ -318,6 +326,7 @@ describe('StageRunsService.unvoidRun', () => {
     entryId: 'v1',
     stageId: 's1',
     attempt: 1,
+    run: 1,
     voided: true,
     startTime: new Date('2026-01-01T00:00:00.000Z'),
     finishTime: new Date('2026-01-01T00:01:30.000Z'),
@@ -361,7 +370,7 @@ describe('StageRunsService.unvoidRun', () => {
     ['a lower attempt survives', { id: 'r0', attempt: 0 }],
   ])('refuses when %s', async (_label, survivor) => {
     const { service, stageRuns } = makeUnvoidService([
-      { ...survivor, voided: false, finishTime: new Date() },
+      { ...survivor, run: 1, voided: false, finishTime: new Date() },
     ]);
 
     await expect(service.unvoidRun('r1', null)).rejects.toThrow(
@@ -370,9 +379,19 @@ describe('StageRunsService.unvoidRun', () => {
     expect(stageRuns.save).not.toHaveBeenCalled();
   });
 
+  it('restores a shakedown run beside the other runs that count', async () => {
+    const { service } = makeUnvoidService([
+      { id: 'r2', attempt: 2, run: 2, voided: false, finishTime: new Date() },
+    ]);
+
+    const restored = await service.unvoidRun('r1', null);
+
+    expect(restored.voided).toBe(false);
+  });
+
   it('refuses rather than cascading a void onto the surviving run', async () => {
     const { service, stageRuns } = makeUnvoidService([
-      { id: 'r2', attempt: 2, voided: false, finishTime: new Date() },
+      { id: 'r2', attempt: 2, run: 1, voided: false, finishTime: new Date() },
     ]);
 
     await expect(service.unvoidRun('r1', null)).rejects.toThrow();
@@ -633,5 +652,76 @@ describe('StageRunsService.startRun', () => {
 
     expect(result.id).toBe('r1');
     expect(result.status).toBe(StageRunStatus.STARTED);
+  });
+
+  describe('a car that already finished', () => {
+    const finished = {
+      id: 'r1',
+      entryId: 'v1',
+      stageId: 's1',
+      attempt: 1,
+      run: 1,
+      voided: false,
+      startTime: new Date('2026-01-01T00:00:00.000Z'),
+      finishTime: new Date('2026-01-01T00:01:30.000Z'),
+      durationMs: 90_000,
+    };
+
+    function makeFinishedService(scoring: StageScoring) {
+      const stageRuns = withFakeTransaction({
+        findOneBy: jest.fn().mockResolvedValue(null), // no open run
+        findOne: jest.fn().mockResolvedValue(finished), // findFinished, nextAttempt
+        create: jest.fn().mockImplementation((r: unknown) => r),
+        save: jest.fn().mockImplementation((r) => Promise.resolve(r)),
+      });
+      const stagesService = {
+        findOne: jest
+          .fn()
+          .mockResolvedValue({ status: StageStatus.ACTIVE, scoring }),
+      };
+      const service = new StageRunsService(
+        stageRuns as never,
+        {} as never,
+        stagesService as never,
+        { emit: jest.fn() } as never,
+      );
+      return { service, stageRuns };
+    }
+
+    it('ignores a restart on a counted stage', async () => {
+      const { service, stageRuns } = makeFinishedService(StageScoring.OVERALL);
+
+      const result = await service.startRun(
+        'v1',
+        's1',
+        new Date('2026-01-01T00:05:00.000Z'),
+      );
+
+      expect(result.id).toBe('r1');
+      expect(stageRuns.save).not.toHaveBeenCalled();
+    });
+
+    it('starts its next run on a shakedown', async () => {
+      const { service } = makeFinishedService(StageScoring.NONE);
+      const at = new Date('2026-01-01T00:05:00.000Z');
+
+      const result = await service.startRun('v1', 's1', at);
+
+      expect(result).toMatchObject({ attempt: 2, run: 2, startTime: at });
+      expect(result.status).toBe(StageRunStatus.STARTED);
+    });
+
+    it('ignores a shakedown start from before its last finish', async () => {
+      const { service, stageRuns } = makeFinishedService(StageScoring.NONE);
+
+      const result = await service.startRun(
+        'v1',
+        's1',
+        new Date('2026-01-01T00:01:00.000Z'),
+      );
+
+      expect(result.id).toBe('r1');
+      expect(stageRuns.save).not.toHaveBeenCalled();
+    });
   });
 });

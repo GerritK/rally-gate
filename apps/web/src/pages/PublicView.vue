@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { countingRun } from '../counting-run';
 import { StageRunStatus, StageStatus } from '@rally-gate/shared';
 import { t } from '@rally-gate/ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -87,8 +88,8 @@ const STATE_DISPLAY = {
 /** The start list with each car's attempt that counts. */
 const rows = computed(() =>
   (startOrder.value?.starters ?? []).map((starter) => {
-    const run = stageRuns.value.find(
-      (r) => r.entryId === starter.entryId && !r.voided,
+    const run = countingRun(
+      stageRuns.value.filter((r) => r.entryId === starter.entryId),
     );
     const state =
       run?.status === StageRunStatus.STARTED ||

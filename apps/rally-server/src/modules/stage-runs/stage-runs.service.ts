@@ -11,6 +11,7 @@ import {
   ApiErrorCode,
   ChangeAction,
   StageRunStatus,
+  StageScoring,
   StageStatus,
   type RunSnapshot,
 } from '@rally-gate/shared';
@@ -59,15 +60,17 @@ export function deriveStageRunStatus(
 }
 
 /**
- * Collapses a set of runs to the most recent attempt per entry+stage.
+ * Collapses a set of runs to the one that counts per entry+stage.
  *
  * A stage that gets red-flagged is re-run, and both attempts are kept — the
- * earlier one is evidence, not garbage. Results only ever count the latest,
- * so every query feeding classification passes through here rather than
- * leaving each caller to remember.
+ * earlier one is evidence, not garbage — so only a non-voided run counts. On
+ * a counted stage the unique index leaves one; on a shakedown every run
+ * survives and the fastest finished one is the result, an open one only
+ * while there is none. Every query feeding classification passes through
+ * here rather than leaving each caller to remember.
  */
-export function latestAttempts(runs: StageRun[]): StageRun[] {
-  const latest = new Map<string, StageRun>();
+export function countingRuns(runs: StageRun[]): StageRun[] {
+  const counting = new Map<string, StageRun>();
   for (const run of runs) {
     // Every attempt voided means no result at all — the correct reading of
     // "that run didn't happen".
@@ -75,14 +78,27 @@ export function latestAttempts(runs: StageRun[]): StageRun[] {
       continue;
     }
     const key = `${run.entryId}:${run.stageId}`;
-    const seen = latest.get(key);
-    // The unique index already guarantees one survivor per key; this is a
-    // tiebreak rather than trusting the schema blindly with a result.
-    if (!seen || run.attempt > seen.attempt) {
-      latest.set(key, run);
+    const seen = counting.get(key);
+    if (
+      !seen ||
+      (run.durationMs != null &&
+        (seen.durationMs == null || run.durationMs < seen.durationMs))
+    ) {
+      counting.set(key, run);
     }
   }
-  return [...latest.values()];
+  return [...counting.values()];
+}
+
+/** Non-voided runs per entry, the open one included. */
+export function runCounts(runs: StageRun[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const run of runs) {
+    if (!run.voided) {
+      counts.set(run.entryId, (counts.get(run.entryId) ?? 0) + 1);
+    }
+  }
+  return counts;
 }
 
 /**
@@ -188,27 +204,32 @@ export class StageRunsService {
     }));
   }
 
-  // The three finders below feed results, so each returns only the latest
-  // attempt per entry+stage. `findAll` deliberately does not — the
+  // The finders below feed results, so each returns only the run that
+  // counts per entry+stage. `findAll` deliberately does not — the
   // dashboard shows every attempt, including superseded ones.
 
   async findFinishedByStage(stageId: string): Promise<StageRun[]> {
     const runs = await this.stageRuns.find({
       where: { stageId, finishTime: Not(IsNull()) },
     });
-    return latestAttempts(runs).sort(
+    return countingRuns(runs).sort(
       (a, b) => (a.durationMs ?? 0) - (b.durationMs ?? 0),
     );
   }
 
   async findByStage(stageId: string): Promise<StageRun[]> {
-    return latestAttempts(await this.stageRuns.find({ where: { stageId } }));
+    return countingRuns(await this.stageRuns.find({ where: { stageId } }));
   }
 
   async findAllFinished(): Promise<StageRun[]> {
-    return latestAttempts(
+    return countingRuns(
       await this.stageRuns.find({ where: { finishTime: Not(IsNull()) } }),
     );
+  }
+
+  /** Runs each entry drove on the stage, for a shakedown's results. */
+  async countRunsByStage(stageId: string): Promise<Map<string, number>> {
+    return runCounts(await this.stageRuns.find({ where: { stageId } }));
   }
 
   /**
@@ -234,15 +255,21 @@ export class StageRunsService {
     return this.stageRuns.existsBy({ entryId, stageId, voided: false });
   }
 
-  /** The entry's most recent completed attempt on this stage, if any. */
+  /** The entry's last completed run on this stage, if any. */
   private findFinished(
     entryId: string,
     stageId: string,
   ): Promise<StageRun | null> {
     return this.stageRuns.findOne({
       where: { entryId, stageId, finishTime: Not(IsNull()), voided: false },
-      order: { attempt: 'DESC' },
+      order: { finishTime: 'DESC' },
     });
+  }
+
+  /** A shakedown is run as often as a car likes; every run counts. */
+  private async isShakedown(stageId: string): Promise<boolean> {
+    const stage = await this.stagesService.findOne(stageId);
+    return stage?.scoring === StageScoring.NONE;
   }
 
   /**
@@ -271,7 +298,20 @@ export class StageRunsService {
       return this.withStatus(existing);
     }
     const finished = await this.findFinished(entryId, stageId);
-    if (finished) {
+    const shakedown = await this.isShakedown(stageId);
+    if (
+      finished &&
+      shakedown &&
+      startTime.getTime() <= finished.finishTime!.getTime()
+    ) {
+      // A start from before the last finish is a late passing of a run
+      // already timed, not a new one; runs never overlap.
+      this.logger.warn(
+        `Start ${startTime.toISOString()} for entry ${entryId} on shakedown ${stageId} is not after its last finish, ignoring it`,
+      );
+      return this.withStatus(finished);
+    }
+    if (finished && !shakedown) {
       // Re-runs are supported, but a gate detection must not be what starts
       // one. The start gate stays live for the rest of the field while a
       // finished car is recovered back past it, so treating any post-finish
@@ -285,11 +325,13 @@ export class StageRunsService {
       );
       return this.withStatus(finished);
     }
+    const attempt = await this.nextAttempt(entryId, stageId);
     const run = this.stageRuns.create({
       entryId,
       stageId,
       startTime,
-      attempt: await this.nextAttempt(entryId, stageId),
+      attempt,
+      run: shakedown ? attempt : 1,
     });
     try {
       return this.withStatus(await this.stageRuns.save(run));
@@ -444,10 +486,12 @@ export class StageRunsService {
     if (finishTime) {
       assertValidRunDuration(startTime, finishTime);
     }
+    const attempt = await this.nextAttempt(input.entryId, input.stageId);
     const run = this.stageRuns.create({
       entryId: input.entryId,
       stageId: input.stageId,
-      attempt: await this.nextAttempt(input.entryId, input.stageId),
+      attempt,
+      run: (await this.isShakedown(input.stageId)) ? attempt : 1,
       startTime,
       finishTime,
       startManual: true,
@@ -536,10 +580,10 @@ export class StageRunsService {
   }
 
   /**
-   * Reverses a void. Allowed exactly when no other attempt survives, since a
-   * entry has at most one non-voided attempt per stage. Refuses rather than
-   * cascading: striking out a run the car actually drove is the marshal's
-   * call to make explicitly, not a side effect of "restore".
+   * Reverses a void. Allowed exactly when no other attempt survives in its
+   * place: the same `run`, or, both open, the entry's one open run. Refuses
+   * rather than cascading: striking out a run the car actually drove is the
+   * marshal's call to make explicitly, not a side effect of "restore".
    */
   async unvoidRun(id: string, by: string | null): Promise<StageRunWithStatus> {
     const run = await this.findOneOrFail(id);
@@ -551,7 +595,11 @@ export class StageRunsService {
           voided: false,
         },
       })
-    ).find((other) => other.id !== run.id);
+    ).find(
+      (other) =>
+        other.id !== run.id &&
+        (other.run === run.run || (!other.finishTime && !run.finishTime)),
+    );
 
     if (survivor) {
       throw new ConflictException(
@@ -627,7 +675,7 @@ export class StageRunsService {
     splitIndex: number,
   ): Promise<StageRunSplitPair[]> {
     // Through findByStage, not a direct query: that is what applies
-    // `latestAttempts`, so a voided attempt's splits stop appearing on the
+    // `countingRuns`, so a voided attempt's splits stop appearing on the
     // live split leaderboard.
     const runs = await this.findByStage(stageId);
     const stageClosed = await this.isStageClosed(stageId);

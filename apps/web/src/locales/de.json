@@ -240,6 +240,7 @@
     "totalTime": "Gesamtzeit",
     "gap": "Abstand",
     "stages": "WPs",
+    "runs": "Läufe",
     "status": "Status",
     "outcome": "Ergebnis"
   },
@@ -673,6 +674,7 @@
     "labelHint": "z. B. Anna – Start WP2",
     "role": "Rolle",
     "stages": "WPs",
+    "runs": "Läufe",
     "stagesRequired": "Wähle mindestens eine WP",
     "code": "Code",
     "devices": "Geräte",

@@ -10,6 +10,7 @@ import {
   SplitPlacing,
   SplitGateInfo,
   StageOutcome,
+  StageScoring,
   StageStatus,
   EntryStatus,
 } from '@rally-gate/shared';
@@ -65,11 +66,11 @@ export class ClassificationService {
     stageId: string,
     classIds: string[] = [],
   ): Promise<Placing[]> {
-    await this.stagesService.findOneOrFail(stageId);
+    const stage = await this.stagesService.findOneOrFail(stageId);
     const entries = await this.entriesService.findAll();
     const inClass = await this.rankable(classIds, entries);
     const runs = await this.stageRunsService.findFinishedByStage(stageId);
-    return this.rank(
+    const placings = this.rank(
       runs
         .filter((run) => inClass(run.entryId))
         .map((run) => ({
@@ -78,6 +79,14 @@ export class ClassificationService {
         })),
       entries,
     );
+    if (stage.scoring !== StageScoring.NONE) {
+      return placings;
+    }
+    const counts = await this.stageRunsService.countRunsByStage(stageId);
+    return placings.map((placing) => ({
+      ...placing,
+      runs: counts.get(placing.entryId) ?? 0,
+    }));
   }
 
   /**

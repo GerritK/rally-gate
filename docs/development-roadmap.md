@@ -20,7 +20,8 @@ One line each; the linked doc has the detail. History is in git.
 - **Timing:** start/finish/split and combined start/finish gates,
   stage/split/overall classification, DNF/DNS, corrections, missed starts,
   voiding and re-runs, notional times, class rankings (`event-model.md`).
-- **Stages outside the overall:** qualifying and shakedown (`event-model.md`).
+- **Stages outside the overall:** qualifying, and shakedown with as many
+  runs as a car likes, its fastest counting (`event-model.md`).
 - **Rally status:** Setup → Running → Closed with route locks
   (`event-model.md` "Rally status").
 - **Penalties:** a catalogue of flat or tiered types, per stage or per rally,

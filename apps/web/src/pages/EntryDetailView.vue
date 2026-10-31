@@ -110,47 +110,65 @@ const standing = computed(() =>
 );
 
 /** One row per stage in stage order: the attempt that counts (a voided one
- *  never does) with its rank among all classes, or what kept it from one. */
+ *  never does) with its rank among all classes, or what kept it from one. A
+ *  shakedown gets a row per run, the rank on its fastest. */
 const stageRows = computed(() =>
   [...stages.value]
     .sort((a, b) => a.stageNumber - b.stageNumber)
-    .map((stage) => {
-      const run = runs.value.find(
-        (r) =>
-          r.entryId === props.entryId && r.stageId === stage.id && !r.voided,
-      );
-      const rank = stageRanks.value
-        .get(stage.id)
-        ?.find((e) => e.entryId === props.entryId);
-      let state: { label: string; color?: string } | null = null;
-      if (run?.status === StageRunStatus.STARTED) {
-        state = {
-          label: t('runState.onStage'),
-          color: runStatusColor(StageRunStatus.STARTED),
-        };
-      } else if (run?.status === StageRunStatus.CANCELLED) {
-        state = {
-          label: 'DNF',
-          color: runStatusColor(StageRunStatus.CANCELLED),
-        };
-      } else if (!run && stage.status === StageStatus.CLOSED) {
-        state = { label: 'DNS', color: 'warning' };
-      } else if (!run) {
-        state = {
-          label:
-            stage.status === StageStatus.ACTIVE
-              ? t('runState.waiting')
-              : t('stageStatus.notStarted'),
-        };
-      }
-      // What a stage without a finish costs in the overall, so the rows
-      // add up to the total above them.
-      const notional = standing.value?.stageTimes.find(
-        (t) => t.stageId === stage.id && t.notional,
-      );
-      return { stage, run, rank, state, notional };
+    .flatMap((stage) => {
+      const counting = runs.value
+        .filter(
+          (r) =>
+            r.entryId === props.entryId && r.stageId === stage.id && !r.voided,
+        )
+        .sort((a, b) => a.attempt - b.attempt);
+      return counting.length > 1
+        ? counting.map((run) => stageRow(stage, run, true))
+        : [stageRow(stage, counting[0])];
     }),
 );
+
+function stageRow(
+  stage: Stage,
+  run: StageRun | undefined,
+  oneOfSeveral = false,
+) {
+  const placing = stageRanks.value
+    .get(stage.id)
+    ?.find((e) => e.entryId === props.entryId);
+  // On a shakedown only the fastest run is the one ranked.
+  const rank =
+    placing && (!oneOfSeveral || run?.durationMs === placing.durationMs)
+      ? placing
+      : undefined;
+  let state: { label: string; color?: string } | null = null;
+  if (run?.status === StageRunStatus.STARTED) {
+    state = {
+      label: t('runState.onStage'),
+      color: runStatusColor(StageRunStatus.STARTED),
+    };
+  } else if (run?.status === StageRunStatus.CANCELLED) {
+    state = {
+      label: 'DNF',
+      color: runStatusColor(StageRunStatus.CANCELLED),
+    };
+  } else if (!run && stage.status === StageStatus.CLOSED) {
+    state = { label: 'DNS', color: 'warning' };
+  } else if (!run) {
+    state = {
+      label:
+        stage.status === StageStatus.ACTIVE
+          ? t('runState.waiting')
+          : t('stageStatus.notStarted'),
+    };
+  }
+  // What a stage without a finish costs in the overall, so the rows
+  // add up to the total above them.
+  const notional = standing.value?.stageTimes.find(
+    (t) => t.stageId === stage.id && t.notional,
+  );
+  return { key: run?.id ?? stage.id, stage, run, rank, state, notional };
+}
 
 /** In stage order, the whole rally's last: the order their tiers count in. */
 const penaltyRows = computed(() => {
@@ -457,8 +475,8 @@ onMounted(refresh);
         </thead>
         <tbody>
           <tr
-            v-for="{ stage, run, rank, state, notional } in stageRows"
-            :key="stage.id"
+            v-for="{ key, stage, run, rank, state, notional } in stageRows"
+            :key="key"
           >
             <td>
               <router-link
