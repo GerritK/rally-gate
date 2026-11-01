@@ -114,10 +114,28 @@ Values live in `theme.ts`. The rules:
   and column padding don't add up to the 16px used around them. Live
   Timing's Up next / On stage grid (1fr 2fr, stacked below 960px) is the
   pattern.
-- **A row of many items scrolls sideways** rather than squeezing items out
-  (the gate line keeps a minimum width per gate).
-- **Phone and tablet:** check portrait tablet width (~820px). Long names
-  truncate with an ellipsis and keep the full name in a tooltip.
+- **Every flexible grid track is `minmax(0, …)`**, the stacked one-column
+  variant too. A bare `1fr` grows with its content: Live Timing's stacked
+  cards once made the whole page 700px wide on a phone.
+- **Vuetify's breakpoints only**: `@media (max-width: 599px)` (below `sm`)
+  or `959px` (below `md`) in CSS, `useDisplay()` in a script. No other
+  widths, no `matchMedia`.
+- **The page never scrolls sideways**; only a table or a row of many items
+  does, inside its card (the gate line keeps a minimum width per gate).
+- **What a marshal taps is on screen without a sideways scroll** on a
+  portrait tablet. A table they work in mid-event pins its action column
+  to the right edge (`.rg-actions` in `utilities.css`, on its `<th>` and
+  `<td>`), and leaves out a column the row's own page shows (Entries'
+  transponder below `md`). The app bar's buttons stay reachable on a
+  phone: below `sm` its chips are icons and the date goes.
+- **A card header wraps, never squeezes its title**: below about 10rem of
+  title the `#append` buttons drop under it (`utilities.css`, for every
+  card). A row of a card's content with a chip at its end wraps the same
+  way (`flex-wrap`, the chip `ms-auto`).
+- **Phone and tablet:** check every changed page at 390px and at portrait
+  tablet width (~820px). Long names truncate with an ellipsis
+  (`PersonName` and `CarName` do it wherever their box has a width) and
+  keep the full name in a tooltip.
 - **A record's page is its parts as cards**, the same parts its edit
   dialog has (an entry: Crew, Car, Registration), under one card with what
   identifies it and the Edit button. Side by side as they fit, the cards of
@@ -283,7 +301,9 @@ Values live in `theme.ts`. The rules:
   such as the class filter keeps it, and so does a message raised after the
   navigation its own action triggered ("Stage added" on the new stage).
 - **Dialogs go fullscreen on phones** (`:fullscreen="smAndDown"`), which is
-  mostly `gate-config`.
+  mostly `gate-config`. Every dialog with a form or a list, not only
+  `FormDialog`; a confirmation (`useConfirm()`, a shut-down question) stays
+  small.
 
 ## App bar
 
@@ -293,7 +313,10 @@ status on the right.
 - `apps/web`: the open event's name alone; the logo names the product (its
   alt text is "Rally Gate"). Right: rally status chip (a link to Setup,
   never the action itself), live chip, server clock with date, a cog
-  to Setup, separated by vertical dividers.
+  to Setup, separated by vertical dividers. On a phone the chips are icons
+  (their label stays as `aria-label`), and the logo, the date and the cog
+  go (the drawer has Setup, the favicon the logo), so the event name keeps
+  some room.
 - `gate-config`: "Gate Config" small above the gate's name. That line names
   the tool, not the product: the two apps look alike on purpose, and a
   marshal switching between them on a phone needs to see which one is open.

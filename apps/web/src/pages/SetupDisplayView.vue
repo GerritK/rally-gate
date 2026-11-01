@@ -141,16 +141,16 @@ onMounted(async () => {
   gap: 12px;
   max-width: 420px;
 }
-/* Settings left, the example beside them; stacked on a phone. */
+/* Settings left, the example beside them; stacked below md. */
 .rg-display-crew {
   display: grid;
   grid-template-columns: minmax(0, 420px) minmax(0, 360px);
   gap: 16px 32px;
   align-items: start;
 }
-@media (max-width: 759px) {
+@media (max-width: 959px) {
   .rg-display-crew {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

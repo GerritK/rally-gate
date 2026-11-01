@@ -1448,7 +1448,7 @@ onUnmounted(() => {
                   {{ $t('live.overdue') }}
                 </v-chip>
               </td>
-              <td class="text-right" style="width: 1%">
+              <td class="text-right rg-actions" style="width: 1%">
                 <v-btn
                   v-if="can('timeRun', stage.id)"
                   size="small"
@@ -1492,7 +1492,7 @@ onUnmounted(() => {
             {{ $t('gateRole.finish') }}<span class="rg-time-mark" />
           </th>
           <th class="rg-time">{{ $t('table.time') }}</th>
-          <th></th>
+          <th class="rg-actions"></th>
         </tr>
       </thead>
       <tbody>
@@ -1597,7 +1597,7 @@ onUnmounted(() => {
                 formatDuration(row.run.durationMs)
               }}</template>
             </td>
-            <td class="text-no-wrap text-right">
+            <td class="text-no-wrap text-right rg-actions">
               <v-btn
                 v-if="row.run && can('correctRun', stage.id)"
                 size="small"
@@ -1851,13 +1851,17 @@ onUnmounted(() => {
 }
 @media (max-width: 959px) {
   .rg-stage-flow {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
 /* The next car is a marshal's main cue, so it gets more than the chip. */
+/* An image, so it also tints the opaque .rg-actions cell. */
 .rg-next-row td {
-  background: rgba(var(--v-theme-info), 0.12);
+  background-image: linear-gradient(
+    rgba(var(--v-theme-info), 0.12),
+    rgba(var(--v-theme-info), 0.12)
+  );
 }
 .rg-next-row td:first-child {
   box-shadow: inset 3px 0 0 rgb(var(--v-theme-info));

@@ -2,6 +2,7 @@
 import { can } from '../api/auth';
 import { RallyStatus, StageStatus } from '@rally-gate/shared';
 import { onMounted, ref } from 'vue';
+import { useDisplay } from 'vuetify';
 import {
   createEvent,
   fetchEventInfo,
@@ -50,6 +51,7 @@ const newEvent = ref({ name: '', date: today() });
 const switchingTo = ref<string | null>(null);
 const { markSaved } = useUnsavedChanges(() => rallyInfo.value);
 const confirm = useConfirm();
+const { smAndDown } = useDisplay();
 /** Null until Start rally is pressed: the check runs on the data as it is
  *  then, not as it was when the page opened. */
 const findings = ref<CheckFinding[] | null>(null);
@@ -276,6 +278,7 @@ onMounted(async () => {
   <v-dialog
     :model-value="!!findings"
     max-width="600"
+    :fullscreen="smAndDown"
     @update:model-value="findings = null"
   >
     <v-card v-if="findings" :title="$t('rally.checkTitle')">
@@ -401,7 +404,7 @@ onMounted(async () => {
     />
   </FormDialog>
 
-  <v-dialog v-model="openDialog" max-width="600">
+  <v-dialog v-model="openDialog" max-width="600" :fullscreen="smAndDown">
     <v-card v-if="eventInfo">
       <v-card-title>{{ $t('setup.openEvent') }}</v-card-title>
       <v-card-subtitle>

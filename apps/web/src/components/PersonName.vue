@@ -35,6 +35,8 @@ const flag = computed(() =>
   text-transform: uppercase;
   letter-spacing: 0.04em;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .rg-flag {
   height: 0.9em;

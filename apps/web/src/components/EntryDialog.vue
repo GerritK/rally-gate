@@ -185,7 +185,7 @@ async function onSave() {
    one .rg-section-title draws between stacked sections. */
 .rg-columns {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   column-gap: 24px;
   row-gap: 16px;
   /* Each section its own height: stretched to its taller neighbour, its
@@ -202,7 +202,7 @@ async function onSave() {
 /* Stacked on a phone: back to one section after another. */
 @media (max-width: 599px) {
   .rg-columns {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .rg-columns > section + section {
     padding-top: 16px;

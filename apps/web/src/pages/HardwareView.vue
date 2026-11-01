@@ -336,7 +336,7 @@ onUnmounted(() => {
             <th>{{ $t('hardware.status') }}</th>
             <th>{{ $t('hardware.lastRead') }}</th>
             <th>{{ $t('gate.clock') }}</th>
-            <th width="1%"></th>
+            <th width="1%" class="rg-actions"></th>
           </tr>
         </thead>
         <tbody>
@@ -369,7 +369,7 @@ onUnmounted(() => {
                 })
               }}
             </td>
-            <td class="text-no-wrap text-right">
+            <td class="text-no-wrap text-right rg-actions">
               <template v-if="can('setup')">
                 <v-btn
                   variant="tonal"
@@ -470,7 +470,7 @@ onUnmounted(() => {
                 :correction-threshold-ms="clockCorrectionThresholdMs"
               />
             </td>
-            <td class="text-no-wrap text-right">
+            <td class="text-no-wrap text-right rg-actions">
               <v-btn
                 v-if="keyChangedIds.has(gate.id) && can('setup')"
                 variant="tonal"

@@ -19,6 +19,10 @@ defineProps<{ car: Pick<Crew, 'body' | 'chassis'> }>();
   line-height: 1.2;
   white-space: nowrap;
 }
+.rg-car-name > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* Smaller, like the co-driver under the driver. */
 .rg-chassis {
   font-size: 0.85em;

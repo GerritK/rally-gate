@@ -18,9 +18,13 @@ import { fetchServerVersion, serverVersion } from './api/version';
 import { loadDisplaySettings } from './crew';
 import { eventName, RALLY_STATUS_DISPLAY } from './format';
 import { useRoute, useRouter } from 'vue-router';
+import { useDisplay } from 'vuetify';
 import { isPublicPath, NAV_ITEMS } from './router';
 
 const drawer = ref(true);
+// A phone has room for the event name only without the logo and with the
+// bar's chips as icons.
+const { xs } = useDisplay();
 const route = useRoute();
 const router = useRouter();
 const loggedIn = computed(() => !!session.value?.role);
@@ -97,7 +101,12 @@ onMounted(() => {
       </template>
       <v-app-bar-title>
         <div class="d-flex align-center ga-3">
-          <img :src="logoUrl" alt="Rally Gate" class="app-bar-logo" />
+          <img
+            v-if="!xs"
+            :src="logoUrl"
+            alt="Rally Gate"
+            class="app-bar-logo"
+          />
           <div class="app-bar-event">
             {{ rallyName || fileName }}
           </div>
@@ -109,24 +118,32 @@ onMounted(() => {
         <v-chip
           :to="loggedIn ? '/setup' : undefined"
           :color="RALLY_STATUS_DISPLAY[rallyStatus].color"
-          :prepend-icon="RALLY_STATUS_DISPLAY[rallyStatus].icon"
+          :prepend-icon="
+            xs ? undefined : RALLY_STATUS_DISPLAY[rallyStatus].icon
+          "
           size="small"
           variant="tonal"
           v-tooltip:bottom="t('rallyStatus.title')"
+          :aria-label="RALLY_STATUS_DISPLAY[rallyStatus].label"
         >
-          {{ RALLY_STATUS_DISPLAY[rallyStatus].label }}
+          <v-icon v-if="xs" :icon="RALLY_STATUS_DISPLAY[rallyStatus].icon" />
+          <template v-else>{{
+            RALLY_STATUS_DISPLAY[rallyStatus].label
+          }}</template>
         </v-chip>
-        <v-divider vertical inset class="mx-4" />
+        <v-divider vertical inset class="app-bar-divider" />
         <v-chip
           v-if="liveStatus"
           :color="LIVE_DISPLAY[liveStatus].color"
-          :prepend-icon="LIVE_DISPLAY[liveStatus].icon"
+          :prepend-icon="xs ? undefined : LIVE_DISPLAY[liveStatus].icon"
           size="small"
           variant="tonal"
+          :aria-label="t(LIVE_DISPLAY[liveStatus].label)"
         >
-          {{ t(LIVE_DISPLAY[liveStatus].label) }}
+          <v-icon v-if="xs" :icon="LIVE_DISPLAY[liveStatus].icon" />
+          <template v-else>{{ t(LIVE_DISPLAY[liveStatus].label) }}</template>
         </v-chip>
-        <v-divider v-if="liveStatus" vertical inset class="mx-4" />
+        <v-divider v-if="liveStatus" vertical inset class="app-bar-divider" />
         <div v-tooltip:bottom="t('app.serverTime')" class="text-center">
           <div class="rg-timing app-bar-clock">
             {{
@@ -138,7 +155,10 @@ onMounted(() => {
               })
             }}
           </div>
-          <div class="text-caption text-medium-emphasis app-bar-label">
+          <div
+            v-if="!xs"
+            class="text-caption text-medium-emphasis app-bar-label"
+          >
             {{
               new Date(serverNow).toLocaleDateString(currentLocale(), {
                 day: '2-digit',
@@ -148,12 +168,13 @@ onMounted(() => {
             }}
           </div>
         </div>
-        <v-divider vertical inset class="mx-4" />
+        <v-divider vertical inset class="app-bar-divider" />
         <LocaleMenu />
         <!-- No active state: the drawer already marks Setup, and a lit cog
              in the app bar reads as a pressed button. -->
+        <!-- On a phone the drawer's Setup entry is enough. -->
         <v-btn
-          v-if="loggedIn"
+          v-if="loggedIn && !xs"
           to="/setup"
           :active="false"
           icon="mdi-cog-outline"
@@ -161,12 +182,13 @@ onMounted(() => {
           :aria-label="t('nav.setup')"
         />
         <v-btn
-          v-else-if="route.path !== '/login'"
+          v-else-if="!loggedIn && route.path !== '/login'"
           to="/login"
           variant="text"
           prepend-icon="mdi-login"
+          :aria-label="t('login.title')"
         >
-          {{ t('login.title') }}
+          <span class="d-none d-sm-inline">{{ t('login.title') }}</span>
         </v-btn>
       </template>
     </v-app-bar>
@@ -216,6 +238,14 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.app-bar-divider {
+  margin-inline: 16px;
+}
+@media (max-width: 599px) {
+  .app-bar-divider {
+    margin-inline: 4px;
+  }
+}
 .app-bar-label {
   line-height: 1.1;
 }

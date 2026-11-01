@@ -71,7 +71,7 @@ onMounted(refresh);
             </th>
             <th v-if="classes.length > 0">{{ $t('classes.classes') }}</th>
             <th>{{ $t('table.status') }}</th>
-            <th width="1%"></th>
+            <th width="1%" class="rg-actions"></th>
           </tr>
         </thead>
         <tbody>
@@ -99,7 +99,7 @@ onMounted(refresh);
             <td>
               <StatusChip :display="ENTRY_STATUS_DISPLAY[entry.status]" />
             </td>
-            <td class="text-no-wrap text-right">
+            <td class="text-no-wrap text-right rg-actions">
               <EntryStatusActions :entry="entry" @saved="replace" />
             </td>
           </tr>

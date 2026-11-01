@@ -47,7 +47,15 @@ const steps = computed(() =>
             class="rg-podium-number"
           />
           <CrewName :crew="step.placing" class="rg-podium-crew" />
-          <CarName :car="step.placing" class="text-medium-emphasis" />
+          <CarName
+            :car="step.placing"
+            class="text-medium-emphasis"
+            v-tooltip:top="
+              [step.placing.body, step.placing.chassis]
+                .filter(Boolean)
+                .join(' · ')
+            "
+          />
           <div class="rg-timing font-weight-bold">
             {{ formatDuration(step.placing.durationMs) }}
           </div>
@@ -82,6 +90,10 @@ const steps = computed(() =>
   align-items: center;
   gap: 4px;
   text-align: center;
+}
+/* Long car names end in an ellipsis instead of running into the next step. */
+.rg-podium-place > * {
+  max-width: 100%;
 }
 .rg-podium-number {
   font-size: 1.25rem;

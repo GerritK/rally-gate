@@ -144,3 +144,36 @@ input[type='time']::-webkit-calendar-picker-indicator {
   padding-block: 24px;
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
+
+/*
+ * A card header wraps instead of squeezing its title: Vuetify's grid gives
+ * the #append buttons their full width, and on a phone "Results" became
+ * "Res…". Below about 10rem of title the buttons drop under it, still right.
+ */
+.v-card-item {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.v-card-item__content {
+  flex: 1 1 10rem;
+}
+.v-card-item__append {
+  flex-wrap: wrap;
+  margin-inline-start: auto;
+}
+
+/*
+ * The action column of a table a marshal works in mid-event (Live Timing,
+ * Entries, Hardware): put .rg-actions on its <th> and <td>. When the table
+ * is wider than a tablet it scrolls sideways, but this column stays put at
+ * the right edge, so Start now or Check in never needs a sideways scroll.
+ * Opaque, or scrolled cells show through; a row tint on top of it goes in
+ * background-image (see Live Timing's next row).
+ */
+.v-table > .v-table__wrapper > table > thead > tr > th.rg-actions,
+.v-table > .v-table__wrapper > table > tbody > tr > td.rg-actions {
+  position: sticky;
+  right: 0;
+  background-color: rgb(var(--v-theme-surface));
+}

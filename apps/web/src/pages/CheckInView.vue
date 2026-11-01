@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { useDisplay } from 'vuetify';
 import { isOutOfEvent, EntryStatus } from '@rally-gate/shared';
 import { fetchEntries, type Entry } from '../api/entries';
 import { fetchEntryClasses, type EntryClass } from '../api/entry-classes';
@@ -161,12 +162,14 @@ const withStep = computed(() =>
     : undefined,
 );
 
+const { mdAndUp } = useDisplay();
+
 /** On a phone the card sits above the list, so a car picked far down would
  *  be selected out of sight: bring the card up. Beside the list it stays in
  *  view by itself. */
 async function pick(id: string) {
   selectedId.value = id;
-  if (!window.matchMedia('(max-width: 959px)').matches) return;
+  if (mdAndUp.value) return;
   await nextTick();
   carCard.value?.$el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -386,7 +389,7 @@ onMounted(refresh);
 }
 @media (max-width: 959px) {
   .rg-checkin-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .rg-checkin-car {
     position: static;

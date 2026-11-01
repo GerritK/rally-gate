@@ -146,7 +146,7 @@ onUnmounted(() => cancelTonesExcept(new Set()));
             :idle="!rows[0].slot"
           />
         </div>
-        <div class="d-flex align-center ga-4">
+        <div class="d-flex flex-wrap align-center ga-4">
           <div class="rg-next-number">
             <StartNumber :number="rows[0].starter.startNumber" />
           </div>
