@@ -64,7 +64,7 @@ the public page reads: `/auth/session`, `/version`, `/time`, GET
 | `/stage-runs/countdown` | POST `{ stageId, entryId }` | the Countdown button: a run whose `startTime` and `plannedStartTime` are the slot, server clock now + `countdownMs`, at least `minStartGapMs` after the stage's latest slot. 409 `stageNotActive`, `notManualStart` (not `SLOT_MANUAL`), `entryAlreadyStarting` (queued, on stage, or finished on a counted stage; on a shakedown it is the next run), `entryOutOfEvent`. Recorded in the change history (`event-model.md` "Start slots") |
 | `/stage-runs/:id/cancel-countdown` | POST | deletes the slot run, recorded; 409 `countdownNotCancellable` once it has a start passing or a finish |
 | `/stages/:id/timetable/delay` | POST `{ delayMs }` | Delay (`SLOT_SCHEDULE`): `delayMs` ≥ 1, never forward (400). Before activation the first start moves; while active, every slot run still ahead whose car hasn't left. Recorded with no entry. 409 `notTimetableStart`, `noFirstStart`, `stageNotActive` (closed) |
-| `/stages/:id/timetable/new-slot` | POST `{ entryId }` | New slot (`SLOT_SCHEDULE`, active stage): the car's slot run moves to the last slot + interval, never into a gap; a car with no run (withdrawn at activation, voided) gets one. Recorded. 409 `stageNotActive`, `notTimetableStart`, `slotAlreadyLeft` (it has a start passing), `entryAlreadyStarting` (finished, or a run without a slot), `entryOutOfEvent` |
+| `/stages/:id/timetable/new-slot` | POST `{ entryId }` | New slot (`SLOT_SCHEDULE`, active stage): the car's slot run moves to the last slot + interval, never into a gap; a car with no run (withdrawn at activation, voided) gets one. Recorded. 409 `stageNotActive`, `notTimetableStart`, `slotAlreadyLeft` (it has a start passing, checked as the slot is written), `entryAlreadyStarting` (finished, or a run without a slot), `entryOutOfEvent` |
 | `/stage-runs/:id/dismiss-jump-start` | POST | sets `jumpStartDismissed`: the marshal gives no penalty, the mark stays. 409 `noJumpStart`. Needs `penalties` |
 | `/events` | GET | the 100 most recent detections; `?gateId=` for one gate's |
 | `/events/at-start?stageId=` | GET | entry ids waiting at the stage's start: a detection at one of its `stage_pre_start` gates after the car's last run on any stage (`event-model.md` "Pre-start gate"); empty without such a gate |
@@ -96,6 +96,7 @@ reconnect.
 
 - `detection`, `stage-run`, `stage-run-split` — the record as it changes
 - `stage-run-deleted` — `{ id, stageId }`: a cancelled countdown or a deleted run
+- `stage` — `{ stageId }`: the stage or its start order changed (edit, freeze, unfreeze, activate, close, Delay, New slot); clients reload both, so a slot time is never stale on another screen. Public
 - `gate` — a `Gate` on each heartbeat
 - `gate-pairing` — `GatePairingState` on every change, a waiting gate's retry too
 - `pending-detections` — `{ pending }`, `awaiting-detections` — `{ awaiting }`:

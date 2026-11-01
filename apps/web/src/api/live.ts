@@ -20,6 +20,7 @@ interface LivePayloads {
   'pending-detections': { pending: DetectionEventRecord[] };
   'awaiting-detections': { awaiting: DetectionEventRecord[] };
   rally: RallyInfo & { status: RallyStatus };
+  stage: { stageId: string };
 }
 
 export type LiveHandlers = {

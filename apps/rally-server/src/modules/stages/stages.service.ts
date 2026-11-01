@@ -110,6 +110,7 @@ export class StagesService {
       );
     }
     await this.stages.save({ ...rest, firstStartTime: firstStart, id });
+    this.changed(id);
     return this.findOne(id) as Promise<Stage>;
   }
 
@@ -176,6 +177,7 @@ export class StagesService {
       );
       await this.emitter.emitAsync('stage.closed', { stageId: id, gateIds });
     }
+    this.changed(id);
     return saved;
   }
 
@@ -232,6 +234,8 @@ export class StagesService {
     const saved = await this.stages.save(stage);
     // Awaited so the start order is frozen by the time the response arrives.
     await this.emitter.emitAsync('stage.activated', saved);
+    // After the listeners: a timetable's slot runs exist by now.
+    this.changed(id);
     return saved;
   }
 
@@ -241,6 +245,15 @@ export class StagesService {
       startOrder: entryIds,
       startOrderFrozenAt: entryIds ? new Date() : null,
     });
+    this.changed(id);
+  }
+
+  /**
+   * Live Timing and the public page reload the stage and its start order:
+   * a slot time posted at the line must never be stale on another screen.
+   */
+  changed(stageId: string): void {
+    this.emitter.emit('stage.changed', { stageId });
   }
 }
 

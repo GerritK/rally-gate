@@ -18,6 +18,7 @@ const LIVE_EVENTS: Record<LiveEventType, string> = {
   'pending-detections': 'detection.pending-changed',
   'awaiting-detections': 'detection.awaiting-changed',
   rally: 'rally.updated',
+  stage: 'stage.changed',
 };
 
 /** What the public page needs; passings, transponders and gates are internal. */
@@ -26,6 +27,7 @@ const PUBLIC_LIVE_EVENTS: LiveEventType[] = [
   'stage-run-deleted',
   'stage-run-split',
   'rally',
+  'stage',
 ];
 
 @Controller('live')

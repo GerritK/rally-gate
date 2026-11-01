@@ -63,16 +63,18 @@ function toggleFullscreen() {
 }
 
 // Rescheduled whenever the queue changes or sound comes on; a cancelled
-// countdown falls out of the queue and is silenced.
+// countdown falls out of the queue and is silenced. Keyed by slot time too:
+// Delay and New slot move a run's slot, and its old tones must go with it.
 watch(
   [() => props.rows.map((row) => row.slot), soundEnabled],
   ([slots]) => {
     const now = Date.now() + serverOffsetMs.value;
     const queued = slots.filter((slot): slot is StageRun => !!slot);
+    const key = (slot: StageRun) => `${slot.id}@${slot.startTime}`;
     for (const slot of queued) {
-      scheduleTones(slot.id, new Date(slot.startTime).getTime(), now);
+      scheduleTones(key(slot), new Date(slot.startTime).getTime(), now);
     }
-    cancelTonesExcept(new Set(queued.map((slot) => slot.id)));
+    cancelTonesExcept(new Set(queued.map(key)));
   },
   { immediate: true },
 );

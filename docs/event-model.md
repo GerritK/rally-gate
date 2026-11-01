@@ -525,7 +525,8 @@ stage that hasn't run would have shown as started on every results page.
 - A car already out of the event at activation gets no run and leaves its
   gap; one withdrawn later keeps its run, DNS at close.
 - Before activation a late crew is appended to the list and takes the next
-  slot by position; after it, a run at last slot + interval.
+  slot by position; after it, a run at last slot + interval, none for a crew
+  registered as out of the event.
 - "The last slot" is the latest slot run (voided too) or the end of the
   posted list, whichever is later, so New slot never lands in a gap left by
   withdrawn cars at the end.

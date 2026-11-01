@@ -68,7 +68,10 @@ function makeService(
     activateForStage: jest.fn().mockResolvedValue({ deactivatedStageIds: [] }),
     removeForStage: jest.fn().mockResolvedValue(undefined),
   };
-  const emitter = { emitAsync: jest.fn().mockResolvedValue([]) };
+  const emitter = {
+    emit: jest.fn(),
+    emitAsync: jest.fn().mockResolvedValue([]),
+  };
   return {
     service: new StagesService(
       stages as never,

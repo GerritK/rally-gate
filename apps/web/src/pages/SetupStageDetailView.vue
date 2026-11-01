@@ -129,10 +129,14 @@ function durationRule(value: string | null) {
     : t('stage.durationRule');
 }
 
+/** Tenths mean nothing in a timetable. */
+const wholeSeconds = (ms: number | null) =>
+  ms === null ? null : Math.round(ms / 1000) * 1000;
+
 /** The server refuses less than a second. */
 function intervalRule(value: string | null) {
   if (!value?.trim()) return true;
-  const ms = parseStageDuration(value);
+  const ms = wholeSeconds(parseStageDuration(value));
   return ms !== null && ms >= 1000 ? true : t('stage.intervalRule');
 }
 
@@ -179,7 +183,9 @@ async function onSaveStage() {
         expectedDurationMs: parseStageDuration(expectedText.value ?? ''),
         minDurationMs: parseStageDuration(minText.value ?? ''),
         firstStartTime: firstStartIso(),
-        slotIntervalMs: parseStageDuration(intervalText.value ?? ''),
+        slotIntervalMs: wholeSeconds(
+          parseStageDuration(intervalText.value ?? ''),
+        ),
       }),
     );
     notify(t('stage.saved'));

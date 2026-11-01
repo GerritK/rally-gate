@@ -637,13 +637,13 @@ async function onCountdown(entryId: string) {
   }
 }
 
-/** After the last slot; the server knows the timetable's end. */
+/** After the last slot; the server knows the timetable's end. The start
+ *  list's slot times follow through the live stream's `stage` event. */
 async function onNewSlot(entryId: string) {
   if (!props.stageId || startingEntryId.value) return;
   startingEntryId.value = entryId;
   try {
     upsertStageRun(await newSlot(props.stageId, entryId));
-    startOrder.value = await fetchStartOrder(props.stageId);
   } finally {
     startingEntryId.value = null;
   }
@@ -656,7 +656,11 @@ async function onNewSlot(entryId: string) {
  */
 /** Typed like every duration here ("2:00"). */
 const delayDialog = ref({ open: false, text: '', activateAfter: false });
-const delayMs = computed(() => parseStageDuration(delayDialog.value.text));
+/** Whole seconds: tenths mean nothing in a timetable. */
+const delayMs = computed(() => {
+  const ms = parseStageDuration(delayDialog.value.text);
+  return ms === null ? null : Math.round(ms / 1000) * 1000 || null;
+});
 
 function openDelay() {
   delayDialog.value = { open: true, text: '', activateAfter: false };
@@ -665,11 +669,8 @@ function openDelay() {
 async function onDelay() {
   if (!props.stageId) return;
   await delaySlots(props.stageId, delayMs.value!);
-  if (delayDialog.value.activateAfter) {
-    await onActivateStage(false, true);
-  } else {
-    startOrder.value = await fetchStartOrder(props.stageId);
-  }
+  // The stage and its slot times come back through the live stream.
+  if (delayDialog.value.activateAfter) await onActivateStage(false, true);
 }
 
 function activateWithoutDelay() {
@@ -859,6 +860,13 @@ async function refreshStages() {
     fetchStages(),
     fetchGateAssignments(),
   ]);
+}
+
+async function reloadStage(stageId: string) {
+  await refreshStages();
+  if (stageId === props.stageId) {
+    startOrder.value = await fetchStartOrder(stageId);
+  }
 }
 
 async function onActivateStage(force = false, delayOffered = false) {
@@ -1101,6 +1109,8 @@ onMounted(async () => {
         if (run.stageId === props.stageId) void loadAtStart();
       },
       'stage-run-split': upsertSplit,
+      // Another screen moved a slot, delayed, froze or activated.
+      stage: ({ stageId }) => void reloadStage(stageId),
       'pending-detections': ({ pending }) => {
         pendingDetections.value = pending;
       },

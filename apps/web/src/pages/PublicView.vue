@@ -142,6 +142,7 @@ onMounted(async () => {
       'stage-run': () => void refresh(),
       'stage-run-deleted': () => void refresh(),
       'stage-run-split': () => void refresh(),
+      stage: () => void refresh(),
     },
     () => void refresh(),
   );

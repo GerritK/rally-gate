@@ -4,6 +4,7 @@ import {
   ChangeAction,
   DEFAULT_COUNTDOWN_MS,
   DEFAULT_MIN_START_GAP_MS,
+  EntryStatus,
   GateRole,
   PRE_START_TRIGGER_MAX_AGE_MS,
   StageRunStatus,
@@ -49,6 +50,7 @@ describe('start paths', () => {
   let runs: StageRunsService;
   let events: EventsService;
   let emitter: { emit: jest.Mock };
+  let stageChanged: jest.Mock;
   let seq = 0;
 
   beforeEach(async () => {
@@ -85,6 +87,7 @@ describe('start paths', () => {
         stage.firstStartTime = at;
         return Promise.resolve();
       },
+      changed: (stageChanged = jest.fn()),
     };
     const settings = {
       getNumber: (_key: string, fallback: number) => Promise.resolve(fallback),
@@ -802,8 +805,53 @@ describe('start paths', () => {
     });
 
     it('slots a crew registered after activation after the last', async () => {
-      await runs.slotForLateEntry({ id: 'v3' });
+      await runs.slotForLateEntry({ id: 'v3', status: EntryStatus.REGISTERED });
       expect((await runOf('v3')).plannedStartTime).toEqual(at(3 * MIN));
+    });
+
+    it('gives no slot to a crew registered as withdrawn', async () => {
+      await runs.slotForLateEntry({ id: 'v3', status: EntryStatus.WITHDRAWN });
+      expect(await runOf('v3')).toBeUndefined();
+    });
+
+    it('tells every screen when New slot or Delay changes a slot time', async () => {
+      await runs.newSlot('v1', 'SS1', null);
+      await runs.delaySlots('SS1', MIN, null);
+      expect(stageChanged).toHaveBeenCalledTimes(2);
+      expect(stageChanged).toHaveBeenCalledWith('SS1');
+    });
+
+    /** v1's run as read just before its start passing landed. */
+    async function staleAfterPassing() {
+      const stale = { ...(await runOf('v1')) };
+      await pass('START', stale.plannedStartTime!, -500, '111');
+      return stale;
+    }
+
+    it('refuses New slot when the car leaves between the read and the write', async () => {
+      const stale = await staleAfterPassing();
+      jest
+        .spyOn(runs as unknown as { findActive: () => unknown }, 'findActive')
+        .mockResolvedValueOnce(stale);
+      await expect(runs.newSlot('v1', 'SS1', null)).rejects.toMatchObject({
+        response: { code: 'slotAlreadyLeft' },
+      });
+      const run = await runOf('v1');
+      expect(run.plannedStartTime).toEqual(at(0));
+      expect(run.startPassingAt).toEqual(at(-500));
+      expect(await changes()).toHaveLength(0);
+    });
+
+    it('leaves a car that left during a Delay on its slot, its passing kept', async () => {
+      const stale = await staleAfterPassing();
+      jest
+        .spyOn(dataSource.getRepository(StageRun), 'find')
+        .mockResolvedValueOnce([stale, await runOf('v2')]);
+      await runs.delaySlots('SS1', MIN, null);
+      const v1 = await runOf('v1');
+      expect(v1.plannedStartTime).toEqual(at(0));
+      expect(v1.startPassingAt).toEqual(at(-500));
+      expect((await runOf('v2')).plannedStartTime).toEqual(at(2 * MIN));
     });
 
     it('marks a car at the start before its slot is due', async () => {

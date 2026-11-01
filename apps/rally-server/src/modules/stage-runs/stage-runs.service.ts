@@ -15,6 +15,8 @@ import {
   DEFAULT_JUMP_START_TOLERANCE_MS,
   DEFAULT_MIN_START_GAP_MS,
   DEFAULT_SLOT_INTERVAL_MS,
+  EntryStatus,
+  isOutOfEvent,
   JUMP_START_TOLERANCE_MS_KEY,
   MIN_START_GAP_MS_KEY,
   SLOT_PASSING_AFTER_MS,
@@ -88,6 +90,14 @@ function postedEndMs(stage: Stage): number {
     slotIntervalMs(stage) * (stage.startOrder.length - 1)
   );
 }
+
+const slotAlreadyLeft = (entryId: string, stageId: string) =>
+  new ConflictException(
+    apiError(
+      ApiErrorCode.SLOT_ALREADY_LEFT,
+      `Entry ${entryId} has left on its slot on ${stageId}`,
+    ),
+  );
 
 function assertTimetable(stage: Stage): void {
   if (stage.startMode !== StartMode.SLOT_SCHEDULE) {
@@ -628,7 +638,15 @@ export class StageRunsService {
 
   /** A crew registered after activation starts after the last slot. */
   @OnEvent('entry.created')
-  async slotForLateEntry({ id }: { id: string }): Promise<void> {
+  async slotForLateEntry({
+    id,
+    status,
+  }: {
+    id: string;
+    status: EntryStatus;
+  }): Promise<void> {
+    // Registered as withdrawn: no slot. New slot gives it one if it rejoins.
+    if (isOutOfEvent(status)) return;
     for (const stage of await this.stagesService.findAll()) {
       if (
         stage.status === StageStatus.ACTIVE &&
@@ -663,14 +681,7 @@ export class StageRunsService {
     }
     assertTimetable(stage);
     const open = await this.findActive(entryId, stageId);
-    if (open?.startPassingAt) {
-      throw new ConflictException(
-        apiError(
-          ApiErrorCode.SLOT_ALREADY_LEFT,
-          `Entry ${entryId} has left on its slot on ${stageId}`,
-        ),
-      );
-    }
+    if (open?.startPassingAt) throw slotAlreadyLeft(entryId, stageId);
     if (
       (open && !open.plannedStartTime) ||
       (!open && (await this.findFinished(entryId, stageId)))
@@ -680,21 +691,46 @@ export class StageRunsService {
     const slot = new Date(
       (await this.lastSlotMs(stage)) + slotIntervalMs(stage),
     );
-    const before = open ? runSnapshot(open) : null;
-    const run =
-      open ??
-      this.stageRuns.create({
-        entryId,
-        stageId,
-        attempt: await this.nextAttempt(entryId, stageId),
-        run: 1,
+    let saved: StageRun;
+    if (open) {
+      saved = { ...open, startTime: slot, plannedStartTime: slot };
+      await this.stageRuns.manager.transaction(async (manager) => {
+        // Conditional: a start passing recorded since the read means the car
+        // left, and its slot is its start time now; moving it would time the
+        // car from a later slot.
+        const { affected } = await manager.update(
+          StageRun,
+          { id: open.id, startPassingAt: IsNull(), finishTime: IsNull() },
+          { startTime: slot, plannedStartTime: slot },
+        );
+        if (!affected) throw slotAlreadyLeft(entryId, stageId);
+        await recordChange(manager, by, {
+          action: ChangeAction.SLOT_MOVED,
+          entryId,
+          stageId,
+          subjectId: open.id,
+          before: runSnapshot(open),
+          after: runSnapshot(saved),
+        });
       });
-    run.startTime = slot;
-    run.plannedStartTime = slot;
-    const withStatus = await this.withStatus(
-      await this.saveRecorded(run, by, ChangeAction.SLOT_MOVED, before),
-    );
+    } else {
+      saved = await this.saveRecorded(
+        this.stageRuns.create({
+          entryId,
+          stageId,
+          attempt: await this.nextAttempt(entryId, stageId),
+          run: 1,
+          startTime: slot,
+          plannedStartTime: slot,
+        }),
+        by,
+        ChangeAction.SLOT_MOVED,
+        null,
+      );
+    }
+    const withStatus = await this.withStatus(saved);
     this.emitter.emit('stage-run.updated', withStatus);
+    this.stagesService.changed(stageId);
     return withStatus;
   }
 
@@ -763,14 +799,25 @@ export class StageRunsService {
           },
         })
       : [];
-    for (const run of moved) {
-      run.plannedStartTime = new Date(
-        run.plannedStartTime!.getTime() + delayMs,
-      );
-      run.startTime = run.plannedStartTime;
-    }
+    const delayed: StageRun[] = [];
     await this.stageRuns.manager.transaction(async (manager) => {
-      await manager.save(StageRun, moved);
+      for (const run of moved) {
+        const slot = new Date(run.plannedStartTime!.getTime() + delayMs);
+        // Conditional: a car that left since the read keeps its slot.
+        const { affected } = await manager.update(
+          StageRun,
+          {
+            id: run.id,
+            voided: false,
+            startPassingAt: IsNull(),
+            finishTime: IsNull(),
+          },
+          { startTime: slot, plannedStartTime: slot },
+        );
+        if (affected) {
+          delayed.push({ ...run, startTime: slot, plannedStartTime: slot });
+        }
+      }
       await recordChange(manager, by, {
         action: ChangeAction.SLOTS_DELAYED,
         entryId: null,
@@ -789,9 +836,10 @@ export class StageRunsService {
         new Date(stage.firstStartTime.getTime() + delayMs),
       );
     }
-    for (const run of moved) {
+    for (const run of delayed) {
       this.emitter.emit('stage-run.updated', await this.withStatus(run));
     }
+    this.stagesService.changed(stageId);
   }
 
   private alreadyStarting(entryId: string, stageId: string) {

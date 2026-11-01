@@ -8,4 +8,6 @@ export type LiveEventType =
   | 'gate-pairing'
   | 'pending-detections'
   | 'awaiting-detections'
-  | 'rally';
+  | 'rally'
+  /** `{ stageId }`: its stage or start order changed, slot times included. */
+  | 'stage';
