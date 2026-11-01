@@ -18,7 +18,7 @@ import StartNumber from './StartNumber.vue';
 /**
  * Live Timing's Up next, the same in every start mode; only the buttons
  * differ (`docs/frontend-structure.md`). A car with `slot` set is counting
- * down. Fullscreen shows only this card, for a tablet at the line, and
+ * down; on a timetable the others show the slot from the start list. Fullscreen shows only this card, for a tablet at the line, and
  * `readonly` drops every button for a screen that only shows it.
  */
 export interface UpNextRow {
@@ -33,9 +33,11 @@ export interface UpNextRow {
 const props = defineProps<{
   title: string;
   rows: UpNextRow[];
-  /** Which button starts a car; none on a stage not running. */
-  action: 'startNow' | 'countdown' | null;
+  /** Which button starts a car (New slot on a timetable); none on a stage not running. */
+  action: 'startNow' | 'countdown' | 'newSlot' | null;
   canCancel?: boolean;
+  /** Timetable: Delay in the header. */
+  canDelay?: boolean;
   /** An entry or run id whose request is in flight. */
   busyId?: string | null;
   readonly?: boolean;
@@ -44,6 +46,8 @@ const emit = defineEmits<{
   startNow: [entryId: string];
   countdown: [entryId: string];
   cancel: [run: StageRun];
+  newSlot: [entryId: string];
+  delay: [];
 }>();
 
 const card = ref<HTMLElement | null>(null);
@@ -84,7 +88,11 @@ onUnmounted(() => cancelTonesExcept(new Set()));
           {{ title }}
           <v-spacer />
           <v-btn
-            v-if="action === 'countdown' && !soundEnabled && !readonly"
+            v-if="
+              (action === 'countdown' || action === 'newSlot') &&
+              !soundEnabled &&
+              !readonly
+            "
             size="small"
             variant="tonal"
             color="warning"
@@ -92,6 +100,15 @@ onUnmounted(() => cancelTonesExcept(new Set()));
             @click="enableSound"
           >
             {{ $t('countdown.enableSound') }}
+          </v-btn>
+          <v-btn
+            v-if="canDelay && !readonly"
+            size="small"
+            variant="tonal"
+            prepend-icon="mdi-clock-plus-outline"
+            @click="emit('delay')"
+          >
+            {{ $t('timetable.delay') }}
           </v-btn>
           <v-btn
             icon="mdi-fullscreen"
@@ -108,6 +125,12 @@ onUnmounted(() => cancelTonesExcept(new Set()));
           class="d-flex justify-center mb-4 rg-countdown"
         >
           <StartCountdown :slot="rows[0].slot.startTime" />
+        </div>
+        <div
+          v-else-if="rows[0].starter.slotTime"
+          class="d-flex justify-center mb-4 rg-countdown"
+        >
+          <ClockTime :time="rows[0].starter.slotTime" />
         </div>
         <div class="d-flex align-center ga-4">
           <div class="rg-next-number">
@@ -135,8 +158,21 @@ onUnmounted(() => cancelTonesExcept(new Set()));
             class="ms-auto"
           />
         </div>
+        <v-btn
+          v-if="action === 'newSlot' && !readonly"
+          variant="tonal"
+          size="large"
+          block
+          class="mt-4"
+          prepend-icon="mdi-calendar-arrow-right"
+          :disabled="!!rows[0].slot?.startPassingAt"
+          :loading="busyId === rows[0].starter.entryId"
+          @click="emit('newSlot', rows[0].starter.entryId)"
+        >
+          {{ $t('timetable.newSlot') }}
+        </v-btn>
         <!-- Where Countdown was, the same size, so nothing moves. -->
-        <template v-if="rows[0].slot">
+        <template v-else-if="rows[0].slot">
           <v-btn
             v-if="!readonly"
             variant="tonal"
@@ -201,7 +237,17 @@ onUnmounted(() => cancelTonesExcept(new Set()));
               <template v-if="row.slot">
                 <ClockTime :time="row.slot.startTime" />
                 <v-btn
-                  v-if="canCancel && !readonly"
+                  v-if="action === 'newSlot' && !readonly"
+                  icon="mdi-calendar-arrow-right"
+                  size="small"
+                  variant="text"
+                  :title="$t('timetable.newSlot')"
+                  :disabled="!!row.slot.startPassingAt"
+                  :loading="busyId === row.starter.entryId"
+                  @click="emit('newSlot', row.starter.entryId)"
+                />
+                <v-btn
+                  v-else-if="canCancel && !readonly"
                   icon="mdi-close"
                   size="small"
                   variant="text"
@@ -210,8 +256,21 @@ onUnmounted(() => cancelTonesExcept(new Set()));
                   @click="emit('cancel', row.slot)"
                 />
               </template>
+              <ClockTime
+                v-else-if="row.starter.slotTime"
+                :time="row.starter.slotTime"
+              />
               <v-btn
-                v-else-if="action === 'countdown' && !readonly"
+                v-if="!row.slot && action === 'newSlot' && !readonly"
+                icon="mdi-calendar-arrow-right"
+                size="small"
+                variant="text"
+                :title="$t('timetable.newSlot')"
+                :loading="busyId === row.starter.entryId"
+                @click="emit('newSlot', row.starter.entryId)"
+              />
+              <v-btn
+                v-else-if="!row.slot && action === 'countdown' && !readonly"
                 icon="mdi-timer-play-outline"
                 size="small"
                 variant="tonal"

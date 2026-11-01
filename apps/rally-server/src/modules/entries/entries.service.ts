@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   ApiErrorCode,
@@ -49,6 +50,7 @@ export class EntriesService {
     private readonly entries: Repository<Entry>,
     @InjectRepository(EntryClass)
     private readonly classes: Repository<EntryClass>,
+    private readonly emitter: EventEmitter2,
   ) {}
 
   findAll(): Promise<Entry[]> {
@@ -70,8 +72,9 @@ export class EntriesService {
   async create({ classIds, ...data }: EntryInput): Promise<Entry> {
     const entry = this.entries.create(data);
     entry.classes = (await this.resolveClasses(classIds)) ?? [];
+    let saved: Entry;
     try {
-      return await this.entries.save(entry);
+      saved = await this.entries.save(entry);
     } catch (err) {
       if (isUniqueViolation(err)) {
         throw new ConflictException(
@@ -84,6 +87,9 @@ export class EntriesService {
       }
       throw err;
     }
+    // Awaited: a timetable stage running now has its slot by the response.
+    await this.emitter.emitAsync('entry.created', saved);
+    return saved;
   }
 
   async update(

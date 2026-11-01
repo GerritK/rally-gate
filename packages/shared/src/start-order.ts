@@ -26,6 +26,11 @@ export interface Starter extends Crew {
   entryId: string;
   startNumber: number;
   mainClassName: string | null;
+  /**
+   * ISO 8601, timetable stages with a frozen list only: the car's slot run
+   * once the stage is active, before that first start + interval × (position − 1).
+   */
+  slotTime: string | null;
 }
 
 export interface StartOrder {

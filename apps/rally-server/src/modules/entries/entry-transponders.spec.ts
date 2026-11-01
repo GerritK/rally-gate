@@ -27,6 +27,7 @@ describe('entry transponders through sqlite', () => {
     service = new EntriesService(
       dataSource.getRepository(Entry),
       dataSource.getRepository(EntryClass),
+      { emitAsync: () => Promise.resolve([]) } as never,
     );
   });
 

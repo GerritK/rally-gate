@@ -8,10 +8,14 @@ import {
   StartOrderDirection,
   StartOrderGrouping,
   StartOrderKey,
+  StartMode,
 } from '@rally-gate/shared';
 import { ClassificationService } from '../classification/classification.service';
 import { SettingsService } from '../settings/settings.service';
+import { Stage } from '../stages/stage.entity';
 import { StagesService } from '../stages/stages.service';
+import { StageRun } from '../stage-runs/stage-run.entity';
+import { StageRunsService } from '../stage-runs/stage-runs.service';
 import { EntriesService } from '../entries/entries.service';
 import { StartOrderService } from './start-order.service';
 
@@ -31,11 +35,12 @@ const entries = [
 function makeService(
   settings: Record<string, string>,
   times: { overall?: Record<string, number>; stage?: Record<string, number> },
-  stage: { startOrder: string[] | null; status?: StageStatus } = {
+  stage: Partial<Stage> & { startOrder: string[] | null } = {
     startOrder: null,
   },
   entrants: unknown[] = entries,
   firstScoring = StageScoring.OVERALL,
+  runs: Partial<StageRun>[] = [],
 ) {
   const stages = [
     {
@@ -66,6 +71,10 @@ function makeService(
     findAll: jest.fn().mockResolvedValue(stages),
     setStartOrder: jest.fn().mockResolvedValue(undefined),
   };
+  const stageRunsService = {
+    findByStage: jest.fn().mockResolvedValue(runs),
+    createTimetableRuns: jest.fn().mockResolvedValue(undefined),
+  };
   const service = new StartOrderService(
     stagesService as unknown as StagesService,
     {
@@ -75,8 +84,9 @@ function makeService(
     {
       get: jest.fn((key: string) => Promise.resolve(settings[key] ?? null)),
     } as unknown as SettingsService,
+    stageRunsService as unknown as StageRunsService,
   );
-  return { service, stagesService, classification };
+  return { service, stagesService, classification, stageRunsService };
 }
 
 const order = async (service: StartOrderService, stageId = 'SS2') =>
@@ -246,5 +256,126 @@ describe('StartOrderService', () => {
       /stays frozen/,
     );
     expect(active.stagesService.setStartOrder).not.toHaveBeenCalled();
+  });
+
+  describe('timetable', () => {
+    const first = new Date('2026-11-07T10:00:00.000Z');
+    const timetable = {
+      startMode: StartMode.SLOT_SCHEDULE,
+      firstStartTime: first,
+      slotIntervalMs: 30_000,
+    };
+    const slotsOf = async (service: StartOrderService) =>
+      Object.fromEntries(
+        (await service.getStartOrder('SS2')).starters.map((e) => [
+          e.entryId,
+          e.slotTime,
+        ]),
+      );
+    const at = (ms: number) => new Date(first.getTime() + ms).toISOString();
+
+    it('gives slots only once the list is frozen', async () => {
+      const { service } = makeService(
+        {},
+        {},
+        { startOrder: null, ...timetable },
+      );
+      expect(Object.values(await slotsOf(service))).toEqual(
+        entries.map(() => null),
+      );
+    });
+
+    it('gives no slots on a stage that starts at the gate', async () => {
+      const { service } = makeService(
+        {},
+        {},
+        { startOrder: ['a', 'b'], ...timetable, startMode: StartMode.GATE },
+      );
+      expect((await slotsOf(service)).a).toBeNull();
+    });
+
+    it('is first start plus interval times position, 60 s by default', async () => {
+      const { service } = makeService(
+        {},
+        {},
+        { startOrder: ['c', 'a', 'b'], ...timetable, slotIntervalMs: null },
+      );
+      const slots = await slotsOf(service);
+      expect([slots.c, slots.a, slots.b]).toEqual([
+        at(0),
+        at(60_000),
+        at(120_000),
+      ]);
+    });
+
+    it('leaves a withdrawn car its slot and puts a late crew after the last', async () => {
+      const { service } = makeService(
+        {},
+        {},
+        { startOrder: ['a', 'b', 'd'], ...timetable },
+        withOut
+          .filter((v) => v.id !== 'c' && v.id !== 'e')
+          .concat({
+            id: 'late',
+            startNumber: 20,
+            driverFirstName: 'L',
+            classes: [],
+          } as never),
+      );
+      expect(await slotsOf(service)).toEqual({
+        a: at(0),
+        b: at(30_000),
+        d: at(60_000),
+        late: at(90_000),
+      });
+    });
+
+    it('reads the slots of a running stage from its slot runs', async () => {
+      const { service } = makeService(
+        {},
+        {},
+        { startOrder: ['a', 'b'], ...timetable, status: StageStatus.ACTIVE },
+        entries.slice(0, 2),
+        StageScoring.OVERALL,
+        [
+          {
+            entryId: 'a',
+            voided: false,
+            plannedStartTime: new Date(at(90_000)),
+          },
+          { entryId: 'b', voided: true, plannedStartTime: new Date(at(0)) },
+        ],
+      );
+      expect(await slotsOf(service)).toEqual({ a: at(90_000), b: at(30_000) });
+    });
+
+    it('refuses to freeze a timetable without a first start', async () => {
+      const { service, stagesService } = makeService(
+        {},
+        {},
+        { startOrder: null, ...timetable, firstStartTime: null },
+      );
+      await expect(service.freeze('SS2')).rejects.toThrow(/no first start/);
+      expect(stagesService.setStartOrder).not.toHaveBeenCalled();
+    });
+
+    it('turns the slots into runs on activation, none for a car out of the event', async () => {
+      const stage = {
+        id: 'SS2',
+        startOrder: ['a', 'b', 'd'],
+        ...timetable,
+        status: StageStatus.ACTIVE,
+      };
+      const { service, stageRunsService } = makeService(
+        {},
+        {},
+        stage,
+        withOut.filter((v) => v.id !== 'c' && v.id !== 'e'),
+      );
+      await service.freezeOnActivation(stage as unknown as Stage);
+      expect(stageRunsService.createTimetableRuns).toHaveBeenCalledWith('SS2', [
+        { entryId: 'b', slot: new Date(at(30_000)) },
+      ]);
+    });
   });
 });

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import {
   ApiErrorCode,
+  COUNTDOWN_MS_KEY,
+  DEFAULT_COUNTDOWN_MS,
   DEFAULT_JUMP_START_TOLERANCE_MS,
   DEFAULT_MIN_STAGE_DURATION_MS,
   GateRole,
   isOutOfEvent,
   isScrutineered,
-  isSlotStart,
   JUMP_START_PENALTY_TYPE_ID_KEY,
   JUMP_START_TOLERANCE_MS_KEY,
   StageRunStatus,
@@ -37,13 +38,16 @@ import { serverNow } from '../api/time';
 import { fetchSetting } from '../api/settings';
 import { fetchPenalties, type Penalty } from '../api/penalties';
 import { countingRun } from '../counting-run';
-import { isQueued } from '../countdown';
+import { catchUpDelayMinutes, isQueued } from '../countdown';
+import FormDialog from '../components/FormDialog.vue';
 import { closeLiveStream, openLiveStream, upsert } from '../api/live';
 import { rallyName } from '../api/rally-info';
 import {
   activateStage,
   closeStage,
+  delaySlots,
   fetchStages,
+  newSlot,
   type Stage,
 } from '../api/stages';
 import {
@@ -82,7 +86,12 @@ import StartNumber from '../components/StartNumber.vue';
 import JumpStartChip from '../components/JumpStartChip.vue';
 import UpNextCard, { type UpNextRow } from '../components/UpNextCard.vue';
 import { driverName } from '../crew';
-import { formatStageDuration, t, useConfirm } from '@rally-gate/ui';
+import {
+  formatStageDuration,
+  parseStageDuration,
+  t,
+  useConfirm,
+} from '@rally-gate/ui';
 import { carriersOf, suggestEntries } from '../passing-suggestions';
 import { printPdf, startListPdf } from '../pdf';
 import {
@@ -397,9 +406,6 @@ const dueToStart = computed(() =>
       ),
 );
 
-/** On a slot stage the start time is the slot, set by a countdown. */
-const slotStage = computed(() => isSlotStart(stage.value?.startMode));
-
 /** Counting down first, by slot, then the cars still to start. */
 const upNext = computed<UpNextRow[]>(() => {
   const queued = rows.value
@@ -420,8 +426,17 @@ const upNextAction = computed(() => {
   )
     return null;
   if (stage.value.startMode === StartMode.SLOT_MANUAL) return 'countdown';
-  return slotStage.value ? null : 'startNow';
+  if (stage.value.startMode === StartMode.SLOT_SCHEDULE) return 'newSlot';
+  return 'startNow';
 });
+
+const timetable = computed(
+  () => stage.value?.startMode === StartMode.SLOT_SCHEDULE,
+);
+/** A timetable's frozen list: its slot times are posted with it. */
+const hasSlots = computed(
+  () => !!startOrder.value?.starters.some((s) => s.slotTime),
+);
 
 // ---- Unassigned passings, with a suggested entry -----------------------
 
@@ -604,6 +619,7 @@ function upsertSplit(split: StageSplit) {
 }
 
 const startingEntryId = ref<string | null>(null);
+const countdownMs = ref(DEFAULT_COUNTDOWN_MS);
 
 function removeStageRun({ id }: { id: string }) {
   stageRuns.value = stageRuns.value.filter((r) => r.id !== id);
@@ -619,6 +635,46 @@ async function onCountdown(entryId: string) {
   } finally {
     startingEntryId.value = null;
   }
+}
+
+/** After the last slot; the server knows the timetable's end. */
+async function onNewSlot(entryId: string) {
+  if (!props.stageId || startingEntryId.value) return;
+  startingEntryId.value = entryId;
+  try {
+    upsertStageRun(await newSlot(props.stageId, entryId));
+    startOrder.value = await fetchStartOrder(props.stageId);
+  } finally {
+    startingEntryId.value = null;
+  }
+}
+
+/**
+ * Delay, from the card or offered on activating a timetable stage whose
+ * first slot has passed: then `activateAfter`, and the dialog also offers
+ * activating without one.
+ */
+/** Typed like every duration here ("2:00"). */
+const delayDialog = ref({ open: false, text: '', activateAfter: false });
+const delayMs = computed(() => parseStageDuration(delayDialog.value.text));
+
+function openDelay() {
+  delayDialog.value = { open: true, text: '', activateAfter: false };
+}
+
+async function onDelay() {
+  if (!props.stageId) return;
+  await delaySlots(props.stageId, delayMs.value!);
+  if (delayDialog.value.activateAfter) {
+    await onActivateStage(false, true);
+  } else {
+    startOrder.value = await fetchStartOrder(props.stageId);
+  }
+}
+
+function activateWithoutDelay() {
+  delayDialog.value.open = false;
+  void onActivateStage(false, true);
 }
 
 async function onCancelCountdown(run: StageRun) {
@@ -805,9 +861,28 @@ async function refreshStages() {
   ]);
 }
 
-async function onActivateStage(force = false) {
+async function onActivateStage(force = false, delayOffered = false) {
   if (!props.stageId || activatingStage.value) return;
-  if (!force && !(await clearedToStart('live.activate'))) return;
+  if (!force && !delayOffered && !(await clearedToStart('live.activate')))
+    return;
+  // Before activation the first start is the first slot, frozen list or not.
+  const firstSlot = stage.value?.firstStartTime;
+  const minutes =
+    timetable.value && firstSlot && !delayOffered
+      ? catchUpDelayMinutes(
+          new Date(firstSlot).getTime(),
+          serverNow.value,
+          countdownMs.value,
+        )
+      : null;
+  if (minutes) {
+    delayDialog.value = {
+      open: true,
+      text: formatStageDuration(minutes * 60_000),
+      activateAfter: true,
+    };
+    return;
+  }
   activatingStage.value = true;
   let conflictingStageIds: string[] | undefined;
   try {
@@ -1000,6 +1075,9 @@ onMounted(async () => {
         (v) =>
           (jumpStartToleranceMs.value =
             Number(v) || DEFAULT_JUMP_START_TOLERANCE_MS),
+      ),
+      fetchSetting(COUNTDOWN_MS_KEY).then(
+        (v) => (countdownMs.value = Number(v) || DEFAULT_COUNTDOWN_MS),
       ),
       fetchSetting(JUMP_START_PENALTY_TYPE_ID_KEY).then(
         (v) => (jumpStartPenaltyTypeId.value = v || null),
@@ -1237,11 +1315,14 @@ onUnmounted(() => {
       "
       :rows="upNext"
       :action="upNextAction"
-      :can-cancel="can('timeRun', stage.id)"
+      :can-cancel="!timetable && can('timeRun', stage.id)"
+      :can-delay="timetable && can('timeRun', stage.id)"
       :busy-id="startingEntryId"
       @start-now="onStartNow"
       @countdown="onCountdown"
       @cancel="onCancelCountdown"
+      @new-slot="onNewSlot"
+      @delay="openDelay"
     />
     <!-- Shown before activation too, so activating doesn't reflow the page. -->
     <div>
@@ -1370,6 +1451,7 @@ onUnmounted(() => {
       <thead>
         <tr>
           <th style="width: 56px">{{ $t('table.pos') }}</th>
+          <th v-if="hasSlots">{{ $t('timetable.slot') }}</th>
           <th style="width: 72px">#</th>
           <th>{{ $t('table.crew') }}</th>
           <th v-if="!startOrder.grouped">{{ $t('classes.class') }}</th>
@@ -1389,10 +1471,18 @@ onUnmounted(() => {
       <tbody>
         <template v-for="row in rows" :key="row.starter.entryId">
           <tr v-if="row.classHeader" class="rg-class-row">
-            <td :colspan="shakedown ? 11 : 10">{{ row.classHeader }}</td>
+            <td :colspan="(shakedown ? 11 : 10) + (hasSlots ? 1 : 0)">
+              {{ row.classHeader }}
+            </td>
           </tr>
           <tr :class="{ 'rg-next-row': row.state === 'NEXT' }">
             <td class="rg-timing">{{ row.starter.position }}</td>
+            <td v-if="hasSlots">
+              <ClockTime
+                v-if="row.starter.slotTime"
+                :time="row.starter.slotTime"
+              />
+            </td>
             <td>
               <StartNumber :number="row.starter.startNumber" />
             </td>
@@ -1658,6 +1748,50 @@ onUnmounted(() => {
     :entries="entries"
     @saved="loadPenalties"
   />
+  <FormDialog
+    v-model="delayDialog.open"
+    :title="
+      delayDialog.activateAfter
+        ? $t('timetable.slotsPassedTitle')
+        : $t('timetable.delayTitle')
+    "
+    :form="delayDialog.text"
+    :save="onDelay"
+    :saved="
+      $t('timetable.delayed', {
+        time: delayMs ? formatStageDuration(delayMs) : '',
+      })
+    "
+    :save-text="
+      delayDialog.activateAfter
+        ? $t('timetable.delayAndActivate')
+        : $t('timetable.delay')
+    "
+  >
+    <p>
+      {{
+        delayDialog.activateAfter
+          ? $t('timetable.slotsPassedText')
+          : $t('timetable.delayText')
+      }}
+    </p>
+    <v-text-field
+      v-model="delayDialog.text"
+      :label="$t('timetable.delayBy')"
+      :placeholder="formatStageDuration(120_000)"
+      class="rg-timing"
+      autofocus
+      :rules="[() => delayMs !== null || $t('timetable.delayRule')]"
+    />
+    <v-btn
+      v-if="delayDialog.activateAfter"
+      variant="text"
+      class="align-self-start"
+      @click="activateWithoutDelay"
+    >
+      {{ $t('timetable.activateWithoutDelay') }}
+    </v-btn>
+  </FormDialog>
 </template>
 
 <style scoped>

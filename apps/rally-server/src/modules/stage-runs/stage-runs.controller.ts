@@ -20,6 +20,7 @@ import {
   CreateStageRunDto,
   StartCountdownDto,
 } from './dto';
+import { DelaySlotsDto, NewSlotDto } from '../stages/dto';
 import { StageRunsService } from './stage-runs.service';
 import { LockedWhen } from '../rally-info/rally-lock';
 
@@ -58,22 +59,8 @@ export class StageRunsController {
     return this.stageRunsService.createManual(body, deviceOf(principal));
   }
 
-  private async assertInEvent(entryId: string): Promise<void> {
-    const entry = await this.entriesService.findOne(entryId);
-    if (!entry) {
-      throw new NotFoundException(
-        apiError(ApiErrorCode.ENTRY_NOT_FOUND, `Entry ${entryId} not found`),
-      );
-    }
-    if (isOutOfEvent(entry.status)) {
-      throw new ConflictException(
-        apiError(
-          ApiErrorCode.ENTRY_OUT_OF_EVENT,
-          `#${entry.startNumber} is ${entry.status.toLowerCase()} and can't start`,
-          { startNumber: entry.startNumber },
-        ),
-      );
-    }
+  private assertInEvent(entryId: string): Promise<void> {
+    return assertInEvent(this.entriesService, entryId);
   }
 
   /** The Countdown button on a `SLOT_MANUAL` stage: queues the car's slot. */
@@ -173,5 +160,70 @@ export class StageRunsController {
   @Delete(':id')
   remove(@Param('id') id: string, @CurrentPrincipal() principal: Principal) {
     return this.stageRunsService.remove(id, deviceOf(principal));
+  }
+}
+
+async function assertInEvent(
+  entriesService: EntriesService,
+  entryId: string,
+): Promise<void> {
+  const entry = await entriesService.findOne(entryId);
+  if (!entry) {
+    throw new NotFoundException(
+      apiError(ApiErrorCode.ENTRY_NOT_FOUND, `Entry ${entryId} not found`),
+    );
+  }
+  if (isOutOfEvent(entry.status)) {
+    throw new ConflictException(
+      apiError(
+        ApiErrorCode.ENTRY_OUT_OF_EVENT,
+        `#${entry.startNumber} is ${entry.status.toLowerCase()} and can't start`,
+        { startNumber: entry.startNumber },
+      ),
+    );
+  }
+}
+
+/** Timetable stages (`SLOT_SCHEDULE`): Delay and New slot. */
+@Controller('stages/:id/timetable')
+export class TimetableController {
+  constructor(
+    private readonly stageRunsService: StageRunsService,
+    private readonly entriesService: EntriesService,
+  ) {}
+
+  /** Every slot not yet reached moves back; before activation, all of them. */
+  @LockedWhen(RallyStatus.CLOSED)
+  @Requires('timeRun')
+  @Post('delay')
+  async delay(
+    @Param('id') stageId: string,
+    @Body() body: DelaySlotsDto,
+    @CurrentPrincipal() principal: Principal,
+  ) {
+    assertMay(principal, 'timeRun', stageId);
+    await this.stageRunsService.delaySlots(
+      stageId,
+      body.delayMs,
+      deviceOf(principal),
+    );
+  }
+
+  /** After the last slot; 409 once the car has left on its slot. */
+  @LockedWhen(RallyStatus.CLOSED)
+  @Requires('timeRun')
+  @Post('new-slot')
+  async newSlot(
+    @Param('id') stageId: string,
+    @Body() body: NewSlotDto,
+    @CurrentPrincipal() principal: Principal,
+  ) {
+    assertMay(principal, 'timeRun', stageId);
+    await assertInEvent(this.entriesService, body.entryId);
+    return this.stageRunsService.newSlot(
+      body.entryId,
+      stageId,
+      deviceOf(principal),
+    );
   }
 }

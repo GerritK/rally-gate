@@ -42,6 +42,14 @@ export enum ApiErrorCode {
   NOT_MANUAL_START = 'notManualStart',
   ENTRY_ALREADY_STARTING = 'entryAlreadyStarting',
   COUNTDOWN_NOT_CANCELLABLE = 'countdownNotCancellable',
+  /** Timetable stages only: Delay and New slot. */
+  NOT_TIMETABLE_START = 'notTimetableStart',
+  /** First start and interval are what a posted list shows: unfreeze first. */
+  TIMETABLE_FROZEN = 'timetableFrozen',
+  NO_FIRST_START = 'noFirstStart',
+  SLOTS_ON_SHAKEDOWN = 'slotsOnShakedown',
+  /** The car left on its slot: a new slot would rewrite its start time. */
+  SLOT_ALREADY_LEFT = 'slotAlreadyLeft',
   NO_JUMP_START = 'noJumpStart',
   PASSING_NOT_WAITING = 'passingNotWaiting',
   PASSING_NOT_TIMEABLE = 'passingNotTimeable',

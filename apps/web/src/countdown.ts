@@ -78,3 +78,17 @@ export function jumpStartMs(
     new Date(run.startPassingAt).getTime();
   return earlyMs > toleranceMs ? earlyMs : null;
 }
+
+/**
+ * Activating a timetable stage after its first slot, or so close that no
+ * countdown fits: the whole minutes to delay it by so the first slot is a
+ * full countdown away. Null when no delay is needed.
+ */
+export function catchUpDelayMinutes(
+  firstSlotMs: number,
+  nowMs: number,
+  countdownMs: number,
+): number | null {
+  const shortMs = nowMs + countdownMs - firstSlotMs;
+  return shortMs > 0 ? Math.ceil(shortMs / 60_000) : null;
+}

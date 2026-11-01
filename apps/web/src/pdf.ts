@@ -19,7 +19,7 @@ import {
 } from './format';
 import type { Crew, Invitation, Starter } from '@rally-gate/shared';
 import { formatCode, joinUrl } from './api/auth';
-import { logoUrl, notifyError, t } from '@rally-gate/ui';
+import { formatClockTime, logoUrl, notifyError, t } from '@rally-gate/ui';
 import barlowBoldUrl from './assets/fonts/Barlow-Bold.ttf?url';
 import barlowRegularUrl from './assets/fonts/Barlow-Regular.ttf?url';
 import monoBoldUrl from './assets/fonts/JetBrainsMono-Bold.ttf?url';
@@ -208,8 +208,11 @@ export function startListPdf(
   rows: { starter: Starter; classHeader: string | null }[],
   grouped: boolean,
 ): PdfSection {
+  // A timetable's frozen list carries its slot times.
+  const slots = rows.some(({ starter }) => starter.slotTime);
   const head = [
     t('table.pos'),
+    ...(slots ? [t('timetable.slot')] : []),
     '#',
     t('table.crew'),
     t('table.car'),
@@ -234,6 +237,9 @@ export function startListPdf(
         : []),
       [
         String(starter.position),
+        ...(slots
+          ? [time(formatClockTime(starter.slotTime ?? undefined))]
+          : []),
         String(starter.startNumber),
         crewCell(starter),
         carCell(starter),

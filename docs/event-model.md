@@ -400,10 +400,8 @@ only while the stage is `NOT_STARTED` so a start never changes meaning mid-run:
 - `SLOT_MANUAL` — a countdown is triggered per car, by a marshal or a
   pre-start gate. For a casual meet without a timetable.
 
-Built: `GATE`, and `SLOT_MANUAL` with the Countdown button and the
-pre-start gate. The server refuses `SLOT_SCHEDULE` until its timetable is
-built, and start lights at a gate are not built either
-(`development-roadmap.md`).
+Built: all three modes and the pre-start gate. Start lights at a gate are
+not built (`development-roadmap.md`).
 
 A slot is a `StageRun` created by the trigger, `startTime` and
 `plannedStartTime` both the slot: no slot table and no server timer, and the
@@ -500,8 +498,9 @@ Per stage a first start (time only, the date from context) and an interval
 (default 60 s), one interval for everyone, no gaps between class blocks.
 Slot = first start + interval × position in the frozen start order.
 
-- Slots are computed and **stored when the start order freezes**, beside the
-  snapshot: a posted start list with times never moves silently. A withdrawn
+- Slots are **fixed when the start order freezes**: first start and
+  interval lock with the snapshot, so a posted start list with times never
+  moves silently. A withdrawn
   car keeps its slot, leaving a gap; nobody moves up. A crew registered
   later gets a slot after the last.
 - **New slot**: a car not ready goes after the last slot (last + interval),
@@ -512,6 +511,42 @@ Slot = first start + interval × position in the frozen start order.
   offers exactly this.
 - Not offered on a shakedown: a timetable for unlimited runs means nothing.
 - The slot times are on the printed start list.
+
+**Slots are derived until activation, slot runs from then on.** Before
+activation a car's slot is first start + interval × (position − 1) on the
+frozen list, so nothing but the two stage fields is stored and unfreezing
+has nothing to discard. Both fields are locked while the list is frozen
+(`timetableFrozen`): unfreeze, edit, freeze again, so a posted time never
+moves silently. Activation turns every slot into a slot run, exactly as a
+countdown makes one, so timing from the slot, jump starts, DNS, the one
+open run per entry+stage and Live Timing's queue work unchanged. Runs on a
+stage that hasn't run would have shown as started on every results page.
+
+- A car already out of the event at activation gets no run and leaves its
+  gap; one withdrawn later keeps its run, DNS at close.
+- Before activation a late crew is appended to the list and takes the next
+  slot by position; after it, a run at last slot + interval.
+- "The last slot" is the latest slot run (voided too) or the end of the
+  posted list, whichever is later, so New slot never lands in a gap left by
+  withdrawn cars at the end.
+- New slot works until the car has a start passing (`slotAlreadyLeft`),
+  before or after its slot, and gives a car without a run there one (a
+  voided run's re-run). In the change history.
+- A slot is reached once it is now or past. Delay before activation moves
+  the first start, the whole timetable; while the stage runs, every slot
+  run still ahead whose car hasn't left, a countdown already showing
+  included. One change record with no entry. Delay and the interval are
+  typed like every duration in the dashboard ("2:00").
+- Activating a timetable stage whose first slot is past, or nearer than
+  `countdownMs`, offers Delay first, prefilled with the whole minutes that
+  put the first slot a full countdown away, or activating without one.
+  Without a first start activation is refused (`noFirstStart`), as is
+  freezing.
+- The Countdown button is `SLOT_MANUAL` only. The start card shows New slot
+  per car and Delay in its header, and before activation the slot times
+  from the start list.
+- A pre-start mark shows beside the slot: a timetable slot still ahead
+  whose car hasn't left doesn't end "its last run" ("Pre-start gate").
 
 ### Pre-start gate
 
@@ -527,7 +562,9 @@ pre-start gate reused on the next stage then never marks a car with the
 tap it made for the stage before. Times are the server's receive times,
 since a tap may carry `timeUnknown`. A car counting down shows its slot
 rather than the mark, so in `SLOT_MANUAL` the mark is only seen on a car
-whose trigger was ignored. The role is assignable in every start mode and
+whose trigger was ignored. In `SLOT_SCHEDULE` every car has a slot run
+long before it is due, so one still ahead whose car hasn't left doesn't
+count as its last run, and the mark shows beside the slot. The role is assignable in every start mode and
 next to any other gates; it times nothing.
 
 A beam passing there is an unassigned passing like any other, suggested for

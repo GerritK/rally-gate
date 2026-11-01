@@ -1,4 +1,9 @@
-import { RallyStatus, StageScoring, StageStatus } from '@rally-gate/shared';
+import {
+  RallyStatus,
+  StageScoring,
+  StageStatus,
+  StartMode,
+} from '@rally-gate/shared';
 import { FindOperator } from 'typeorm';
 import { RallyInfoService } from '../rally-info/rally-info.service';
 import { StagesService } from './stages.service';
@@ -9,6 +14,10 @@ type StageRow = {
   stageNumber?: number;
   name?: string;
   scoring?: StageScoring;
+  startMode?: StartMode;
+  startOrder?: string[] | null;
+  firstStartTime?: Date | null;
+  slotIntervalMs?: number | null;
 };
 
 function makeService(
@@ -359,5 +368,70 @@ describe('StagesService.activate', () => {
       { id: 'SS1', status: StageStatus.ACTIVE },
       { id: 'SS2', status: StageStatus.CLOSED },
     ]);
+  });
+});
+
+describe('timetable stages', () => {
+  const first = new Date('2026-11-07T10:00:00.000Z');
+  const base = {
+    id: 'SS1',
+    status: StageStatus.NOT_STARTED,
+    stageNumber: 1,
+    name: 'Stage 1',
+    startMode: StartMode.SLOT_SCHEDULE,
+    firstStartTime: first,
+    slotIntervalMs: 60_000,
+  };
+
+  it('refuses a timetable on a shakedown, either way round', async () => {
+    const { service } = makeService([base]);
+    await expect(
+      service.create({
+        id: 'SD',
+        name: 'Shakedown',
+        stageNumber: 2,
+        scoring: StageScoring.NONE,
+        startMode: StartMode.SLOT_SCHEDULE,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'slotsOnShakedown' } });
+    await expect(
+      service.update('SS1', {
+        name: 'Stage 1',
+        stageNumber: 1,
+        scoring: StageScoring.NONE,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'slotsOnShakedown' } });
+  });
+
+  it('locks first start and interval while the list is frozen', async () => {
+    const { service } = makeService([{ ...base, startOrder: ['v1'] }]);
+    const edit = { name: 'Renamed', stageNumber: 1 };
+    await expect(
+      service.update('SS1', {
+        ...edit,
+        firstStartTime: '2026-11-07T10:05:00.000Z',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'timetableFrozen' } });
+    await expect(
+      service.update('SS1', { ...edit, slotIntervalMs: 30_000 }),
+    ).rejects.toMatchObject({ response: { code: 'timetableFrozen' } });
+    // The unchanged values, as the edit page sends them back, are fine.
+    await expect(
+      service.update('SS1', {
+        ...edit,
+        firstStartTime: first.toISOString(),
+        slotIntervalMs: 60_000,
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  it('refuses to activate a timetable without a first start', async () => {
+    const { service, gateAssignmentsService } = makeService([
+      { ...base, firstStartTime: null },
+    ]);
+    await expect(service.activate('SS1', false)).rejects.toMatchObject({
+      response: { code: 'noFirstStart' },
+    });
+    expect(gateAssignmentsService.activateForStage).not.toHaveBeenCalled();
   });
 });

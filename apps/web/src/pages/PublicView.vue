@@ -19,6 +19,7 @@ import { fetchStages, type Stage } from '../api/stages';
 import { fetchStartOrder, type StartOrder } from '../api/start-order';
 import { classFilterLabel, useClassQuery } from '../class-query';
 import CarName from '../components/CarName.vue';
+import ClockTime from '../components/ClockTime.vue';
 import ClassFilter from '../components/ClassFilter.vue';
 import CrewName from '../components/CrewName.vue';
 import OverallRanking from '../components/OverallRanking.vue';
@@ -88,6 +89,10 @@ const STATE_DISPLAY = {
 };
 
 /** The start list with each car's attempt that counts. */
+/** A timetable's frozen list: its slot times are posted with it. */
+const hasSlots = computed(
+  () => !!startOrder.value?.starters.some((s) => s.slotTime),
+);
 const rows = computed(() =>
   (startOrder.value?.starters ?? []).map((starter) => {
     const run = countingRun(
@@ -173,6 +178,7 @@ const go = (stageId?: string) =>
           <thead>
             <tr>
               <th style="width: 56px">{{ $t('table.pos') }}</th>
+              <th v-if="hasSlots">{{ $t('timetable.slot') }}</th>
               <th style="width: 72px">#</th>
               <th>{{ $t('table.crew') }}</th>
               <th>{{ $t('table.car') }}</th>
@@ -183,6 +189,12 @@ const go = (stageId?: string) =>
           <tbody>
             <tr v-for="row in rows" :key="row.starter.entryId">
               <td>{{ row.starter.position }}</td>
+              <td v-if="hasSlots">
+                <ClockTime
+                  v-if="row.starter.slotTime"
+                  :time="row.starter.slotTime"
+                />
+              </td>
               <td><StartNumber :number="row.starter.startNumber" /></td>
               <td><CrewName :crew="row.starter" /></td>
               <td><CarName :car="row.starter" /></td>

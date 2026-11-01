@@ -19,7 +19,13 @@ function makeService(saveImpl: (v: unknown) => Promise<unknown>) {
     create: jest.fn().mockImplementation((v: unknown) => v),
     save: jest.fn().mockImplementation(saveImpl),
   };
-  return new EntriesService(entries as never, {} as never);
+  return new EntriesService(
+    entries as never,
+    {} as never,
+    {
+      emitAsync: () => Promise.resolve([]),
+    } as never,
+  );
 }
 
 describe('EntriesService.create', () => {
@@ -59,7 +65,11 @@ describe('EntriesService.findAllClasses', () => {
         { name: '2WD', main: true },
       ]),
     };
-    const service = new EntriesService({} as never, classes as never);
+    const service = new EntriesService(
+      {} as never,
+      classes as never,
+      {} as never,
+    );
 
     const names = (await service.findAllClasses()).map((c) => c.name);
 
@@ -75,7 +85,7 @@ function makeServiceForUpdate(
     findOneBy: jest.fn().mockResolvedValue(existingEntry),
     save: jest.fn().mockImplementation(saveImpl),
   });
-  return new EntriesService(entries as never, {} as never);
+  return new EntriesService(entries as never, {} as never, {} as never);
 }
 
 describe('EntriesService.update', () => {
@@ -120,7 +130,11 @@ describe('EntriesService.update', () => {
       }),
       save: jest.fn().mockImplementation((v: unknown) => Promise.resolve(v)),
     });
-    const service = new EntriesService(entries as never, {} as never);
+    const service = new EntriesService(
+      entries as never,
+      {} as never,
+      {} as never,
+    );
 
     await service.update('v1', { driverFirstName: 'Bea' }, 'device-1');
     expect(entries.inserted).toEqual([]);

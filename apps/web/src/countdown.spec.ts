@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, it, test } from 'node:test';
 import {
+  catchUpDelayMinutes,
   countdownState,
   isQueued,
   jumpStartMs,
@@ -74,4 +75,20 @@ test('a jump start is earlier than slot minus the tolerance', () => {
     jumpStartMs({ plannedStartTime: iso(SLOT), startPassingAt: null }, 200),
     null,
   );
+});
+
+describe('catchUpDelayMinutes', () => {
+  const slot = 1_000_000_000;
+
+  it('needs no delay while a full countdown still fits', () => {
+    assert.equal(catchUpDelayMinutes(slot, slot - 10_000, 10_000), null);
+    assert.equal(catchUpDelayMinutes(slot, slot - 60_000, 10_000), null);
+  });
+
+  it('rounds up to whole minutes, never forward', () => {
+    assert.equal(catchUpDelayMinutes(slot, slot - 5_000, 10_000), 1);
+    assert.equal(catchUpDelayMinutes(slot, slot + 50_000, 10_000), 1);
+    assert.equal(catchUpDelayMinutes(slot, slot + 50_001, 10_000), 2);
+    assert.equal(catchUpDelayMinutes(slot, slot + 7 * 60_000, 10_000), 8);
+  });
 });

@@ -6,6 +6,7 @@ import {
   postRequest,
   putJson,
 } from './client';
+import type { StageRun } from './stage-runs';
 
 export interface Stage {
   id: string;
@@ -16,6 +17,11 @@ export interface Stage {
   startMode: StartMode;
   expectedDurationMs: number | null;
   minDurationMs: number | null;
+  /** Timetable only, ISO 8601. */
+  firstStartTime: string | null;
+  /** Null means DEFAULT_SLOT_INTERVAL_MS. */
+  slotIntervalMs: number | null;
+  startOrderFrozenAt: string | null;
 }
 
 export function fetchStages(): Promise<Stage[]> {
@@ -56,6 +62,8 @@ export function updateStage(
     startMode: StartMode;
     expectedDurationMs: number | null;
     minDurationMs: number | null;
+    firstStartTime: string | null;
+    slotIntervalMs: number | null;
   },
 ): Promise<Stage> {
   return putJson(`/stages/${id}`, input);
@@ -81,4 +89,17 @@ export function activateStage(stageId: string, force = false): Promise<Stage> {
   return postRequest(
     `/stages/${stageId}/activate${force ? '?force=true' : ''}`,
   );
+}
+
+/**
+ * Every slot not yet reached moves back; before activation, the whole
+ * timetable. Never forward.
+ */
+export function delaySlots(stageId: string, delayMs: number): Promise<void> {
+  return postJson(`/stages/${stageId}/timetable/delay`, { delayMs });
+}
+
+/** After the last slot. 409 once the car has left on its slot. */
+export function newSlot(stageId: string, entryId: string): Promise<StageRun> {
+  return postJson(`/stages/${stageId}/timetable/new-slot`, { entryId });
 }

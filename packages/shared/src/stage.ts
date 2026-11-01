@@ -30,7 +30,7 @@ export enum StageScoring {
 export enum StartMode {
   /** The start passing is the start time. */
   GATE = 'GATE',
-  /** Slots from a timetable. Not built yet: the server refuses it. */
+  /** Slots from a timetable: first start + interval × position. Not on a shakedown. */
   SLOT_SCHEDULE = 'SLOT_SCHEDULE',
   /** A countdown per car; its slot is the start time. */
   SLOT_MANUAL = 'SLOT_MANUAL',
@@ -53,3 +53,6 @@ export const PRE_START_TRIGGER_MAX_AGE_MS = 30_000;
 /** Whether a stage's start time is the slot rather than the start passing. */
 export const isSlotStart = (mode: StartMode | undefined): boolean =>
   mode === StartMode.SLOT_MANUAL || mode === StartMode.SLOT_SCHEDULE;
+
+/** A timetable stage that sets no `slotIntervalMs`. */
+export const DEFAULT_SLOT_INTERVAL_MS = 60_000;

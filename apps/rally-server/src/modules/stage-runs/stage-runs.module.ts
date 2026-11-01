@@ -4,7 +4,10 @@ import { StagesModule } from '../stages/stages.module';
 import { EntriesModule } from '../entries/entries.module';
 import { SettingsModule } from '../settings/settings.module';
 import { StageRun } from './stage-run.entity';
-import { StageRunsController } from './stage-runs.controller';
+import {
+  StageRunsController,
+  TimetableController,
+} from './stage-runs.controller';
 import { StageRunsService } from './stage-runs.service';
 import { StageSplit } from './stage-split.entity';
 
@@ -15,7 +18,7 @@ import { StageSplit } from './stage-split.entity';
     EntriesModule,
     SettingsModule,
   ],
-  controllers: [StageRunsController],
+  controllers: [StageRunsController, TimetableController],
   providers: [StageRunsService],
   exports: [StageRunsService],
 })

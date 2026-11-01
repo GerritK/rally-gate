@@ -10,6 +10,7 @@ import {
   RallyStatus,
   StageScoring,
   StageStatus,
+  StartMode,
 } from '@rally-gate/shared';
 import { Not, Repository } from 'typeorm';
 import { apiError } from '../../common/api-error';
@@ -57,6 +58,7 @@ export class StagesService {
       );
     }
     await this.assertStageNumberFree(stage.stageNumber);
+    assertNoShakedownTimetable(stage.id, stage.startMode, stage.scoring);
     await this.stages.save(stage);
     return this.findOne(stage.id) as Promise<Stage>;
   }
@@ -79,8 +81,41 @@ export class StagesService {
       );
     }
     await this.assertStageNumberFree(data.stageNumber, id);
-    await this.stages.save({ ...data, id });
+    assertNoShakedownTimetable(
+      id,
+      data.startMode ?? stage.startMode,
+      data.scoring ?? stage.scoring,
+    );
+    const { firstStartTime, ...rest } = data;
+    const firstStart =
+      firstStartTime === undefined
+        ? undefined
+        : firstStartTime
+          ? new Date(firstStartTime)
+          : null;
+    const changes = (a: Date | null | undefined, b: Date | null) =>
+      a !== undefined && (a?.getTime() ?? null) !== (b?.getTime() ?? null);
+    if (
+      stage.startOrder &&
+      (changes(firstStart, stage.firstStartTime) ||
+        (data.slotIntervalMs !== undefined &&
+          data.slotIntervalMs !== stage.slotIntervalMs))
+    ) {
+      throw new ConflictException(
+        apiError(
+          ApiErrorCode.TIMETABLE_FROZEN,
+          `Stage ${id}'s start list is frozen; unfreeze it to change first start or interval`,
+          { stage: id },
+        ),
+      );
+    }
+    await this.stages.save({ ...rest, firstStartTime: firstStart, id });
     return this.findOne(id) as Promise<Stage>;
+  }
+
+  /** Delay before activation: the posted times move, never silently. */
+  async setFirstStartTime(id: string, firstStartTime: Date): Promise<void> {
+    await this.stages.update(id, { firstStartTime });
   }
 
   /**
@@ -184,6 +219,7 @@ export class StagesService {
         ),
       );
     }
+    assertHasFirstStart(stage);
     const { deactivatedStageIds } =
       await this.gateAssignmentsService.activateForStage(id, force);
     // ponytail: not one transaction — a crash mid-loop can leave a bumped
@@ -205,6 +241,36 @@ export class StagesService {
       startOrder: entryIds,
       startOrderFrozenAt: entryIds ? new Date() : null,
     });
+  }
+}
+
+/** Freezing or activating a timetable stage: its slots need a first start. */
+export function assertHasFirstStart(stage: Stage): void {
+  if (stage.startMode === StartMode.SLOT_SCHEDULE && !stage.firstStartTime) {
+    throw new ConflictException(
+      apiError(
+        ApiErrorCode.NO_FIRST_START,
+        `Stage ${stage.id} starts from a timetable but has no first start`,
+        { stage: stage.id },
+      ),
+    );
+  }
+}
+
+/** A timetable for unlimited runs means nothing. */
+function assertNoShakedownTimetable(
+  id: string,
+  startMode: StartMode | undefined,
+  scoring: StageScoring | undefined,
+): void {
+  if (startMode === StartMode.SLOT_SCHEDULE && scoring === StageScoring.NONE) {
+    throw new ConflictException(
+      apiError(
+        ApiErrorCode.SLOTS_ON_SHAKEDOWN,
+        `Stage ${id} is a shakedown; it can't start from a timetable`,
+        { stage: id },
+      ),
+    );
   }
 }
 

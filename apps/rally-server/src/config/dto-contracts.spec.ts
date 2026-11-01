@@ -9,7 +9,11 @@ import {
   CorrectStageRunDto,
   CreateStageRunDto,
 } from '../modules/stage-runs/dto';
-import { CreateStageDto, UpdateStageDto } from '../modules/stages/dto';
+import {
+  CreateStageDto,
+  DelaySlotsDto,
+  UpdateStageDto,
+} from '../modules/stages/dto';
 import {
   CreateEntryDto,
   UpdateEntryDto,
@@ -204,14 +208,34 @@ describe('server-owned fields are not settable through the API', () => {
 });
 
 describe('start modes', () => {
-  it('refuses SLOT_SCHEDULE until its timetable is built', async () => {
+  it('accepts SLOT_SCHEDULE with a first start and interval', async () => {
+    await expect(
+      transform(UpdateStageDto, {
+        name: 'Pass',
+        stageNumber: 1,
+        startMode: 'SLOT_SCHEDULE',
+        firstStartTime: '2026-11-07T10:00:00.000Z',
+        slotIntervalMs: 60_000,
+      }),
+    ).resolves.toMatchObject({ startMode: 'SLOT_SCHEDULE' });
+  });
+
+  it('rejects an interval under a second', async () => {
     expect(
       await rejectionMessages(UpdateStageDto, {
         name: 'Pass',
         stageNumber: 1,
-        startMode: 'SLOT_SCHEDULE',
+        slotIntervalMs: 500,
       }),
-    ).toContain('startMode');
+    ).toContain('slotIntervalMs');
+  });
+
+  it('never delays forward', async () => {
+    for (const delayMs of [0, -60_000]) {
+      expect(await rejectionMessages(DelaySlotsDto, { delayMs })).toContain(
+        'delayMs',
+      );
+    }
   });
 
   it('accepts SLOT_MANUAL', async () => {

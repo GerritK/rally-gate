@@ -1,13 +1,14 @@
 import { StageScoring, StartMode } from '@rally-gate/shared';
 import {
   IsEnum,
-  IsIn,
   IsInt,
+  IsISO8601,
   IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 /**
@@ -42,9 +43,8 @@ export class CreateStageDto {
   @IsEnum(StageScoring)
   scoring?: StageScoring;
 
-  // SLOT_SCHEDULE waits for its timetable (roadmap, "Start countdown" 3).
   @IsOptional()
-  @IsIn([StartMode.GATE, StartMode.SLOT_MANUAL])
+  @IsEnum(StartMode)
   startMode?: StartMode;
 }
 
@@ -61,9 +61,8 @@ export class UpdateStageDto {
   @IsEnum(StageScoring)
   scoring?: StageScoring;
 
-  // SLOT_SCHEDULE waits for its timetable (roadmap, "Start countdown" 3).
   @IsOptional()
-  @IsIn([StartMode.GATE, StartMode.SLOT_MANUAL])
+  @IsEnum(StartMode)
   startMode?: StartMode;
 
   // null clears it; omitted leaves it as stored.
@@ -77,4 +76,27 @@ export class UpdateStageDto {
   @IsInt()
   @Min(1)
   minDurationMs?: number | null;
+
+  // Timetable only; null clears, omitted leaves it as stored.
+  @ValidateIf((_, value) => value !== null)
+  @IsOptional()
+  @IsISO8601()
+  firstStartTime?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1000)
+  slotIntervalMs?: number | null;
+}
+
+export class DelaySlotsDto {
+  @IsInt()
+  @Min(1)
+  delayMs: number;
+}
+
+export class NewSlotDto {
+  @IsString()
+  @IsNotEmpty()
+  entryId: string;
 }

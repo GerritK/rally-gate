@@ -458,7 +458,10 @@
     "general": "Allgemein",
     "times": "Zeiten",
     "startMode": "Startart",
-    "startModeHint": "Mit Countdown erkennt das Startgate nur Frühstarts."
+    "firstStart": "Erster Start",
+    "slotInterval": "Intervall",
+    "timetableFrozen": "Die Startliste ist mit diesen Zeiten eingefroren. In Live Timing auftauen, um sie zu ändern.",
+    "intervalRule": "Mindestens 1 Sekunde, eingegeben wie 1:00"
   },
   "runState": {
     "onStage": "Auf der Strecke",
@@ -633,7 +636,12 @@
     "notManualStart": "{stage} startet nicht per Countdown.",
     "entryAlreadyStarting": "Dieses Auto ist schon im Countdown, auf der Prüfung oder hat sie beendet. Für einen Neustart zuerst seinen Lauf annullieren.",
     "countdownNotCancellable": "Dieser Countdown lässt sich nicht mehr abbrechen: das Auto hat den Start passiert.",
-    "noJumpStart": "Dieser Lauf hat keinen Frühstart zum Verwerfen."
+    "noJumpStart": "Dieser Lauf hat keinen Frühstart zum Verwerfen.",
+    "notTimetableStart": "Diese Prüfung startet nicht nach Zeitplan.",
+    "timetableFrozen": "Die Startliste ist mit diesen Zeiten eingefroren: zum Ändern von erstem Start oder Intervall auftauen.",
+    "noFirstStart": "Diese Prüfung startet nach Zeitplan, hat aber keinen ersten Start.",
+    "slotsOnShakedown": "Ein Shakedown kann nicht nach Zeitplan starten.",
+    "slotAlreadyLeft": "Dieses Auto ist auf seinem Slot schon gestartet."
   },
   "rallyStatus": {
     "setup": "Vorbereitung",
@@ -772,7 +780,9 @@
       "ENTRY_STATUS": "Status geändert",
       "COUNTDOWN_STARTED": "Countdown gestartet",
       "COUNTDOWN_CANCELLED": "Countdown abgebrochen",
-      "JUMP_START_DISMISSED": "Frühstart: keine Strafe"
+      "JUMP_START_DISMISSED": "Frühstart: keine Strafe",
+      "SLOT_MOVED": "Neuer Slot",
+      "SLOTS_DELAYED": "Slots verzögert"
     }
   },
   "countdown": {
@@ -800,7 +810,27 @@
     "saved": "Countdown-Einstellungen gespeichert"
   },
   "startMode": {
-    "gate": "Startgate: die Startdurchfahrt ist die Startzeit",
-    "slotManual": "Countdown: der Slot ist die Startzeit"
+    "gate": "Startgate",
+    "slotManual": "Countdown",
+    "slotSchedule": "Zeitplan"
+  },
+  "timetable": {
+    "slot": "Slot",
+    "newSlot": "Neuer Slot",
+    "delay": "Verzögern",
+    "delayTitle": "Zeitplan verzögern",
+    "delayText": "Jeder noch nicht erreichte Slot wird um diese Zeit nach hinten verschoben. Slots rücken nie nach vorn.",
+    "delayRule": "Eine Zeit wie 2:00",
+    "delayed": "Slots um {time} verzögert",
+    "slotsPassedTitle": "Slots sind vorbei",
+    "slotsPassedText": "Der erste Slot ist vorbei oder zu nah für einen Countdown. Den ganzen Zeitplan vor dem Aktivieren verzögern?",
+    "delayAndActivate": "Verzögern und aktivieren",
+    "activateWithoutDelay": "Ohne Verzögerung aktivieren",
+    "delayBy": "Verzögern um"
+  },
+  "startModeHint": {
+    "GATE": "Die Startdurchfahrt ist die Startzeit.",
+    "SLOT_SCHEDULE": "Slots aus erstem Start + Intervall. Der Slot ist die Startzeit, das Startgate erkennt nur Frühstarts.",
+    "SLOT_MANUAL": "Ein Countdown pro Auto. Der Slot ist die Startzeit, das Startgate erkennt nur Frühstarts."
   }
 }

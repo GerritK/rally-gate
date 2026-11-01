@@ -41,6 +41,9 @@ describe('start paths', () => {
     startMode: StartMode;
     scoring: StageScoring;
     minDurationMs: number | null;
+    firstStartTime: Date | null;
+    slotIntervalMs: number | null;
+    startOrder: string[] | null;
   };
   let roles: Record<string, GateRole>;
   let runs: StageRunsService;
@@ -62,6 +65,9 @@ describe('start paths', () => {
       startMode: StartMode.SLOT_MANUAL,
       scoring: StageScoring.OVERALL,
       minDurationMs: null,
+      firstStartTime: null,
+      slotIntervalMs: null,
+      startOrder: null,
     };
     roles = {
       START: GateRole.STAGE_START,
@@ -74,6 +80,11 @@ describe('start paths', () => {
     const stagesService = {
       findOne: () => Promise.resolve(stage),
       findOneOrFail: () => Promise.resolve(stage),
+      findAll: () => Promise.resolve([stage]),
+      setFirstStartTime: (_id: string, at: Date) => {
+        stage.firstStartTime = at;
+        return Promise.resolve();
+      },
     };
     const settings = {
       getNumber: (_key: string, fallback: number) => Promise.resolve(fallback),
@@ -654,6 +665,150 @@ describe('start paths', () => {
       stage.startMode = StartMode.SLOT_MANUAL;
       await pass('PRE', new Date(), 0, '111');
       expect(await events.entriesAtStart('SS1')).toEqual([]);
+    });
+  });
+
+  describe('timetable', () => {
+    const MIN = 60_000;
+    let first: Date;
+    const at = (ms: number) => new Date(first.getTime() + ms);
+
+    /** Activated with v1 and v2 one interval apart, a withdrawn car's gap after them. */
+    beforeEach(async () => {
+      first = new Date(Date.now() + 10 * MIN);
+      Object.assign(stage, {
+        startMode: StartMode.SLOT_SCHEDULE,
+        firstStartTime: first,
+        slotIntervalMs: MIN,
+        startOrder: ['v1', 'v2', 'gone'],
+      });
+      await runs.createTimetableRuns('SS1', [
+        { entryId: 'v1', slot: at(0) },
+        { entryId: 'v2', slot: at(MIN) },
+      ]);
+    });
+
+    const runOf = async (entryId: string) =>
+      (await allRuns()).find((r) => r.entryId === entryId && !r.voided)!;
+    const changes = () => dataSource.getRepository(ChangeRecord).find();
+
+    it('creates one slot run per car, and none twice', async () => {
+      await runs.createTimetableRuns('SS1', [{ entryId: 'v1', slot: at(0) }]);
+      const all = await allRuns();
+      expect(all).toHaveLength(2);
+      expect((await runOf('v2')).startTime).toEqual(at(MIN));
+      expect((await runOf('v2')).plannedStartTime).toEqual(at(MIN));
+    });
+
+    it('times a car from its slot, the start passing only marks', async () => {
+      await pass('START', first, -2_000, '111');
+      await pass('FINISH', first, 95_000, '111');
+      const run = await runOf('v1');
+      expect(run.durationMs).toBe(95_000);
+      expect(run.startPassingAt).toEqual(at(-2_000));
+    });
+
+    it('never finishes before the slot', async () => {
+      await pass('FINISH', first, 0, '111');
+      expect((await runOf('v1')).finishTime).toBeNull();
+    });
+
+    it('gives New slot after the last slot, past a withdrawn car at the end', async () => {
+      const moved = await runs.newSlot('v1', 'SS1', 'device-1');
+      // Last posted slot is the withdrawn car's at 2 min: never into its gap.
+      expect(moved.plannedStartTime).toEqual(at(3 * MIN));
+      expect(moved.startTime).toEqual(at(3 * MIN));
+      expect(await allRuns()).toHaveLength(2);
+      const [change] = await changes();
+      expect(change).toMatchObject({
+        action: ChangeAction.SLOT_MOVED,
+        entryId: 'v1',
+        deviceId: 'device-1',
+      });
+      expect((await runs.newSlot('v2', 'SS1', null)).plannedStartTime).toEqual(
+        at(4 * MIN),
+      );
+    });
+
+    it('refuses New slot once the car has left on its slot', async () => {
+      await pass('START', first, 300, '111');
+      await expect(runs.newSlot('v1', 'SS1', null)).rejects.toMatchObject({
+        response: { code: 'slotAlreadyLeft' },
+      });
+    });
+
+    it('gives a voided car a new slot run, a finished one none', async () => {
+      await pass('FINISH', first, 90_000, '111');
+      await expect(runs.newSlot('v1', 'SS1', null)).rejects.toMatchObject({
+        response: { code: 'entryAlreadyStarting' },
+      });
+      await runs.voidRun((await runOf('v1')).id, null);
+      const rerun = await runs.newSlot('v1', 'SS1', null);
+      expect(rerun.attempt).toBe(2);
+      expect(rerun.plannedStartTime).toEqual(at(3 * MIN));
+    });
+
+    it('offers New slot and Delay only on a timetable stage', async () => {
+      stage.startMode = StartMode.SLOT_MANUAL;
+      await expect(runs.newSlot('v1', 'SS1', null)).rejects.toMatchObject({
+        response: { code: 'notTimetableStart' },
+      });
+      await expect(runs.delaySlots('SS1', MIN, null)).rejects.toMatchObject({
+        response: { code: 'notTimetableStart' },
+      });
+    });
+
+    it('moves only the slots not yet reached on Delay, and the posted list with them', async () => {
+      // v1's slot has passed without it; v2 is still ahead.
+      const v1 = await runOf('v1');
+      await dataSource.getRepository(StageRun).update(v1.id, {
+        startTime: at(-11 * MIN),
+        plannedStartTime: at(-11 * MIN),
+      });
+      await runs.delaySlots('SS1', 5 * MIN, 'device-1');
+
+      expect((await runOf('v1')).plannedStartTime).toEqual(at(-11 * MIN));
+      expect((await runOf('v2')).plannedStartTime).toEqual(at(6 * MIN));
+      expect((await runOf('v2')).startTime).toEqual(at(6 * MIN));
+      expect(stage.firstStartTime).toEqual(at(5 * MIN));
+      const [change] = await changes();
+      expect(change).toMatchObject({
+        action: ChangeAction.SLOTS_DELAYED,
+        entryId: null,
+        stageId: 'SS1',
+        after: { delayMs: 5 * MIN },
+      });
+    });
+
+    it('leaves a car that already left out of a Delay', async () => {
+      await pass('START', first, -3_000, '111');
+      await runs.delaySlots('SS1', MIN, null);
+      expect((await runOf('v1')).plannedStartTime).toEqual(at(0));
+      expect((await runOf('v2')).plannedStartTime).toEqual(at(2 * MIN));
+    });
+
+    it('moves the first start alone on a Delay before activation', async () => {
+      stage.status = StageStatus.NOT_STARTED;
+      await runs.delaySlots('SS1', 2 * MIN, null);
+      expect(stage.firstStartTime).toEqual(at(2 * MIN));
+      expect((await runOf('v2')).plannedStartTime).toEqual(at(MIN));
+    });
+
+    it('refuses a Delay on a closed stage', async () => {
+      stage.status = StageStatus.CLOSED;
+      await expect(runs.delaySlots('SS1', MIN, null)).rejects.toThrow(
+        ConflictException,
+      );
+    });
+
+    it('slots a crew registered after activation after the last', async () => {
+      await runs.slotForLateEntry({ id: 'v3' });
+      expect((await runOf('v3')).plannedStartTime).toEqual(at(3 * MIN));
+    });
+
+    it('marks a car at the start before its slot is due', async () => {
+      await pass('PRE', new Date(), 0, '111');
+      expect(await events.entriesAtStart('SS1')).toEqual(['v1']);
     });
   });
 

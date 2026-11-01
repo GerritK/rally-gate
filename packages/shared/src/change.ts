@@ -15,6 +15,10 @@ export enum ChangeAction {
   /** A slot set by the Countdown button (`SLOT_MANUAL`). */
   COUNTDOWN_STARTED = 'COUNTDOWN_STARTED',
   COUNTDOWN_CANCELLED = 'COUNTDOWN_CANCELLED',
+  /** New slot on a timetable: `before` is null for a car that had none. */
+  SLOT_MOVED = 'SLOT_MOVED',
+  /** Delay on a timetable: no entry, `after` holds the delay. */
+  SLOTS_DELAYED = 'SLOTS_DELAYED',
   JUMP_START_DISMISSED = 'JUMP_START_DISMISSED',
   PENALTY_ADDED = 'PENALTY_ADDED',
   PENALTY_DELETED = 'PENALTY_DELETED',
@@ -48,8 +52,16 @@ export interface EntryStatusSnapshot {
   status: string;
 }
 
+export interface DelaySnapshot {
+  delayMs: number;
+}
+
 export type ChangeSnapshot =
-  RunSnapshot | PenaltySnapshot | PassingSnapshot | EntryStatusSnapshot;
+  | RunSnapshot
+  | PenaltySnapshot
+  | PassingSnapshot
+  | EntryStatusSnapshot
+  | DelaySnapshot;
 
 /** `GET /api/entries/:id/changes`, newest first. */
 export interface ChangeView {

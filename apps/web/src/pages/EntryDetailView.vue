@@ -265,6 +265,10 @@ function snapshotFields(snapshot: ChangeSnapshot): [string, string][] {
       [t('table.time'), formatClockTime(snapshot.time)],
     ];
   }
+  // A Delay has no entry, so no entry page shows it; listed for the type.
+  if ('delayMs' in snapshot) {
+    return [[t('timetable.delay'), formatStageDuration(snapshot.delayMs)]];
+  }
   const type = penaltyTypes.value.find((p) => p.id === snapshot.typeId);
   return [
     [t('penalties.type'), type?.name ?? snapshot.note ?? ''],

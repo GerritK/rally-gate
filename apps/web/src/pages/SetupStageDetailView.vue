@@ -12,20 +12,25 @@ import { fetchGates, type Gate } from '../api/gates';
 import { fetchStage, updateStage, type Stage } from '../api/stages';
 import FormDialog from '../components/FormDialog.vue';
 import StatusChip from '../components/StatusChip.vue';
+import { fetchRallyInfo } from '../api/rally-info';
 import {
+  combineDateAndTime,
   gateRoleLabel,
   required,
   STAGE_STATUS_DISPLAY,
   stageScoringLabel,
 } from '../format';
 import {
+  formatClockTime,
   formatStageDuration,
   notify,
+  openTimePicker,
   parseStageDuration,
   t,
 } from '@rally-gate/ui';
 import {
   DEFAULT_MIN_STAGE_DURATION_MS,
+  DEFAULT_SLOT_INTERVAL_MS,
   GateRole,
   StageScoring,
   StageStatus,
@@ -44,6 +49,10 @@ const savingStage = ref(false);
  * (minimum). */
 const expectedText = ref('');
 const minText = ref('');
+const firstStartText = ref('');
+/** Blank is the default. */
+const intervalText = ref('');
+const rallyDate = ref<string | undefined>();
 const { markSaved } = useUnsavedChanges(() =>
   stage.value
     ? [
@@ -53,6 +62,8 @@ const { markSaved } = useUnsavedChanges(() =>
         stage.value.startMode,
         expectedText.value,
         minText.value,
+        firstStartText.value,
+        intervalText.value,
       ]
     : null,
 );
@@ -68,11 +79,30 @@ const scoringOptions = computed(() =>
     title: stageScoringLabel(value),
   })),
 );
-// SLOT_SCHEDULE waits for its timetable (roadmap, "Start countdown").
+// A timetable for unlimited runs means nothing: not on a shakedown.
 const startModeOptions = computed(() => [
   { value: StartMode.GATE, title: t('startMode.gate') },
+  ...(stage.value?.scoring === StageScoring.NONE
+    ? []
+    : [{ value: StartMode.SLOT_SCHEDULE, title: t('startMode.slotSchedule') }]),
   { value: StartMode.SLOT_MANUAL, title: t('startMode.slotManual') },
 ]);
+const timetable = computed(
+  () => stage.value?.startMode === StartMode.SLOT_SCHEDULE,
+);
+/** The posted list shows these times: unfreeze it to change them. */
+const timetableLocked = computed(
+  () => !stageEditable.value || !!stage.value?.startOrderFrozenAt,
+);
+
+/** Time only; the date is the first start's own, else the rally's, else today. */
+function firstStartIso(): string | null {
+  if (!firstStartText.value) return null;
+  const date =
+    stage.value?.firstStartTime ??
+    (rallyDate.value ? `${rallyDate.value}T00:00` : new Date());
+  return combineDateAndTime(date, firstStartText.value);
+}
 const roleOptions = computed(() =>
   GATE_ROLES.map((role) => ({
     value: role,
@@ -99,10 +129,19 @@ function durationRule(value: string | null) {
     : t('stage.durationRule');
 }
 
+/** The server refuses less than a second. */
+function intervalRule(value: string | null) {
+  if (!value?.trim()) return true;
+  const ms = parseStageDuration(value);
+  return ms !== null && ms >= 1000 ? true : t('stage.intervalRule');
+}
+
 function showStage(loaded: Stage) {
   stage.value = loaded;
   expectedText.value = toText(loaded.expectedDurationMs);
   minText.value = toText(loaded.minDurationMs);
+  firstStartText.value = formatClockTime(loaded.firstStartTime ?? undefined);
+  intervalText.value = toText(loaded.slotIntervalMs);
   markSaved();
 }
 
@@ -119,6 +158,7 @@ async function load() {
     fetchStage(props.stageId),
     fetchGates().then((g) => (gates.value = g)),
     refreshAssignments(),
+    fetchRallyInfo().then((info) => (rallyDate.value = info?.date)),
   ]);
   showStage(loaded);
 }
@@ -127,6 +167,7 @@ async function onSaveStage() {
   if (!stage.value || savingStage.value) return;
   if (durationRule(expectedText.value) !== true) return;
   if (durationRule(minText.value) !== true) return;
+  if (intervalRule(intervalText.value) !== true) return;
   savingStage.value = true;
   try {
     showStage(
@@ -137,6 +178,8 @@ async function onSaveStage() {
         startMode: stage.value.startMode,
         expectedDurationMs: parseStageDuration(expectedText.value ?? ''),
         minDurationMs: parseStageDuration(minText.value ?? ''),
+        firstStartTime: firstStartIso(),
+        slotIntervalMs: parseStageDuration(intervalText.value ?? ''),
       }),
     );
     notify(t('stage.saved'));
@@ -227,21 +270,51 @@ onMounted(load);
               persistent-hint
               :disabled="!stageEditable"
             />
+          </div>
+        </div>
+        <div class="rg-stage-fields">
+          <div class="rg-section-title">{{ $t('stage.times') }}</div>
+          <div class="rg-stage-row">
             <v-select
               v-model="stage.startMode"
               :items="startModeOptions"
               :label="$t('stage.startMode')"
-              :hint="$t('stage.startModeHint')"
+              :hint="$t(`startModeHint.${stage.startMode}`)"
               persistent-hint
               :disabled="!stageEditable"
             />
-          </div>
-          <div class="rg-stage-fields">
-            <div class="rg-section-title">{{ $t('stage.times') }}</div>
+            <template v-if="timetable">
+              <v-text-field
+                v-model="firstStartText"
+                type="time"
+                step="1"
+                :label="$t('stage.firstStart')"
+                class="rg-timing"
+                append-inner-icon="mdi-clock-outline"
+                :hint="
+                  stageEditable && stage.startOrderFrozenAt
+                    ? $t('stage.timetableFrozen')
+                    : ''
+                "
+                persistent-hint
+                :rules="[required]"
+                :disabled="timetableLocked"
+                @click:append-inner="openTimePicker"
+              />
+              <v-text-field
+                v-model="intervalText"
+                :label="$t('stage.slotInterval')"
+                :placeholder="formatStageDuration(DEFAULT_SLOT_INTERVAL_MS)"
+                persistent-placeholder
+                class="rg-timing"
+                :rules="[intervalRule]"
+                :disabled="timetableLocked"
+              />
+            </template>
             <v-text-field
               v-model="expectedText"
               :label="$t('stage.expectedTime')"
-              placeholder="5:00"
+              :placeholder="formatStageDuration(300_000)"
               class="rg-timing"
               hide-details="auto"
               clearable
@@ -412,6 +485,13 @@ onMounted(load);
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 16px 32px;
+  align-items: start;
+}
+/* Times: a row of their own, fields side by side as they fit. */
+.rg-stage-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px 16px;
   align-items: start;
 }
 .rg-stage-fields {

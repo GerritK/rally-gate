@@ -279,10 +279,26 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     }
     if (seenAt.size === 0) return [];
     const lastRunEnd = new Map<string, number>();
+    const now = Date.now();
+    const timetable =
+      (await this.stagesService.findOne(stageId))?.startMode ===
+      StartMode.SLOT_SCHEDULE;
     for (const run of await this.stageRunsService.findByEntries([
       ...seenAt.keys(),
     ])) {
-      // A queued slot's start is still ahead, so it ends "at the start" too.
+      // A timetable slot still ahead whose car hasn't left is no run yet:
+      // every car has one long before it is due. A manual countdown's slot
+      // does end it: the card shows that car by its slot instead.
+      if (
+        timetable &&
+        run.stageId === stageId &&
+        run.plannedStartTime &&
+        !run.startPassingAt &&
+        !run.finishTime &&
+        run.plannedStartTime.getTime() > now
+      ) {
+        continue;
+      }
       const end = (run.finishTime ?? run.startTime).getTime();
       lastRunEnd.set(
         run.entryId,

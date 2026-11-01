@@ -343,8 +343,9 @@ meant for paper has a button.
 - Results: Pos/#/Crew and the totals repeat on every sheet, so each sheet
   is a complete standing; stage times split across sheets, across first,
   then down, so they hang as a grid.
-- Start list: Pos, #, Crew, Car, Class when not grouped; main classes as
-  full-width header rows.
+- Start list: Pos, Slot on a timetable stage once frozen, #, Crew, Car,
+  Class when not grouped; main classes as full-width header rows. Rows stay
+  in start order, so a car moved by New slot shows its time out of sequence.
 - Invitations (Setup → Access) are no table: one portrait sheet each, the
   label large, role and stages, the QR code with its link under it, the code
   to type in large monospace, grouped `ABCD-EFGH`. Same foot.

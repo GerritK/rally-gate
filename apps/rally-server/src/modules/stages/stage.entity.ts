@@ -22,6 +22,17 @@ export class Stage {
   @Column({ type: 'varchar', default: StartMode.GATE })
   startMode: StartMode;
 
+  /**
+   * Timetable (`SLOT_SCHEDULE`) only. Both are what a posted start list
+   * shows, so they are locked while it is frozen; Delay moves the first start.
+   */
+  @Column({ type: Date, nullable: true })
+  firstStartTime: Date | null;
+
+  /** Null means DEFAULT_SLOT_INTERVAL_MS. */
+  @Column({ type: 'int', nullable: true })
+  slotIntervalMs: number | null;
+
   @Column({ type: 'int', nullable: true })
   expectedDurationMs: number | null;
 

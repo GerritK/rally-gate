@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import {
   ApiErrorCode,
   ChangeAction,
@@ -14,6 +14,7 @@ import {
   DEFAULT_COUNTDOWN_MS,
   DEFAULT_JUMP_START_TOLERANCE_MS,
   DEFAULT_MIN_START_GAP_MS,
+  DEFAULT_SLOT_INTERVAL_MS,
   JUMP_START_TOLERANCE_MS_KEY,
   MIN_START_GAP_MS_KEY,
   SLOT_PASSING_AFTER_MS,
@@ -29,6 +30,7 @@ import { apiError } from '../../common/api-error';
 import { isUniqueViolation } from '../../common/db-errors';
 import { recordChange, runSnapshot } from '../changes/record-change';
 import { SettingsService } from '../settings/settings.service';
+import { Stage } from '../stages/stage.entity';
 import { StagesService } from '../stages/stages.service';
 import { StageRun } from './stage-run.entity';
 import { StageSplit } from './stage-split.entity';
@@ -73,6 +75,30 @@ export function deriveStageRunStatus(
   return run.plannedStartTime && !run.startPassingAt
     ? StageRunStatus.DID_NOT_START
     : StageRunStatus.CANCELLED;
+}
+
+export const slotIntervalMs = (stage: Stage): number =>
+  stage.slotIntervalMs ?? DEFAULT_SLOT_INTERVAL_MS;
+
+/** The posted timetable's last slot, gaps included; 0 without one. */
+function postedEndMs(stage: Stage): number {
+  if (!stage.firstStartTime || !stage.startOrder?.length) return 0;
+  return (
+    stage.firstStartTime.getTime() +
+    slotIntervalMs(stage) * (stage.startOrder.length - 1)
+  );
+}
+
+function assertTimetable(stage: Stage): void {
+  if (stage.startMode !== StartMode.SLOT_SCHEDULE) {
+    throw new ConflictException(
+      apiError(
+        ApiErrorCode.NOT_TIMETABLE_START,
+        `Stage ${stage.id} doesn't start from a timetable`,
+        { stage: stage.id },
+      ),
+    );
+  }
 }
 
 /** Whether a slot stage's start passing at `at` can belong to this slot. */
@@ -552,6 +578,220 @@ export class StageRunsService {
     const withStatus = await this.withStatus(saved);
     this.emitter.emit('stage-run.updated', withStatus);
     return withStatus;
+  }
+
+  /**
+   * Activation of a timetable stage turns every slot into a slot run, so
+   * from here on it is timed like a countdown. Skips a car that already has
+   * a run there: activating twice creates nothing twice.
+   */
+  async createTimetableRuns(
+    stageId: string,
+    slots: { entryId: string; slot: Date }[],
+  ): Promise<void> {
+    const taken = new Set(
+      (await this.stageRuns.find({ where: { stageId } })).map(
+        (run) => run.entryId,
+      ),
+    );
+    const created = await this.stageRuns.save(
+      slots
+        .filter(({ entryId }) => !taken.has(entryId))
+        .map(({ entryId, slot }) =>
+          this.stageRuns.create({
+            entryId,
+            stageId,
+            attempt: 1,
+            run: 1,
+            startTime: slot,
+            plannedStartTime: slot,
+          }),
+        ),
+    );
+    for (const run of created) {
+      this.emitter.emit('stage-run.updated', await this.withStatus(run));
+    }
+  }
+
+  /**
+   * New slot on a timetable: a car not ready goes after the last slot,
+   * never into a gap, until it has left on its slot. A car with no run
+   * there (withdrawn at activation, or its run voided) gets one.
+   */
+  newSlot(
+    entryId: string,
+    stageId: string,
+    by: string | null,
+  ): Promise<StageRunWithStatus> {
+    return this.enqueue(() => this.moveToNewSlot(entryId, stageId, by));
+  }
+
+  /** A crew registered after activation starts after the last slot. */
+  @OnEvent('entry.created')
+  async slotForLateEntry({ id }: { id: string }): Promise<void> {
+    for (const stage of await this.stagesService.findAll()) {
+      if (
+        stage.status === StageStatus.ACTIVE &&
+        stage.startMode === StartMode.SLOT_SCHEDULE
+      ) {
+        try {
+          await this.newSlot(id, stage.id, null);
+        } catch (err) {
+          this.logger.error(
+            `No slot on ${stage.id} for late entry ${id}`,
+            err as Error,
+          );
+        }
+      }
+    }
+  }
+
+  private async moveToNewSlot(
+    entryId: string,
+    stageId: string,
+    by: string | null,
+  ): Promise<StageRunWithStatus> {
+    const stage = await this.stagesService.findOneOrFail(stageId);
+    if (stage.status !== StageStatus.ACTIVE) {
+      throw new ConflictException(
+        apiError(
+          ApiErrorCode.STAGE_NOT_ACTIVE,
+          `Stage ${stageId} is ${stage.status}; slots move only on an active stage`,
+          { stage: stageId },
+        ),
+      );
+    }
+    assertTimetable(stage);
+    const open = await this.findActive(entryId, stageId);
+    if (open?.startPassingAt) {
+      throw new ConflictException(
+        apiError(
+          ApiErrorCode.SLOT_ALREADY_LEFT,
+          `Entry ${entryId} has left on its slot on ${stageId}`,
+        ),
+      );
+    }
+    if (
+      (open && !open.plannedStartTime) ||
+      (!open && (await this.findFinished(entryId, stageId)))
+    ) {
+      throw this.alreadyStarting(entryId, stageId);
+    }
+    const slot = new Date(
+      (await this.lastSlotMs(stage)) + slotIntervalMs(stage),
+    );
+    const before = open ? runSnapshot(open) : null;
+    const run =
+      open ??
+      this.stageRuns.create({
+        entryId,
+        stageId,
+        attempt: await this.nextAttempt(entryId, stageId),
+        run: 1,
+      });
+    run.startTime = slot;
+    run.plannedStartTime = slot;
+    const withStatus = await this.withStatus(
+      await this.saveRecorded(run, by, ChangeAction.SLOT_MOVED, before),
+    );
+    this.emitter.emit('stage-run.updated', withStatus);
+    return withStatus;
+  }
+
+  /**
+   * The timetable's last slot: the latest slot run (voided too, the line
+   * was taken then), or the end of the posted list, whose last cars may
+   * have withdrawn and left a gap no new slot goes into.
+   */
+  private async lastSlotMs(stage: Stage): Promise<number> {
+    const latest = await this.stageRuns.findOne({
+      where: { stageId: stage.id, plannedStartTime: Not(IsNull()) },
+      order: { plannedStartTime: 'DESC' },
+    });
+    return Math.max(
+      latest?.plannedStartTime?.getTime() ?? 0,
+      postedEndMs(stage),
+    );
+  }
+
+  /**
+   * Delay: every slot not yet reached moves back, never forward. Before
+   * activation that is the whole timetable, i.e. the first start; while the
+   * stage runs, the slot runs still ahead whose car hasn't left.
+   */
+  delaySlots(
+    stageId: string,
+    delayMs: number,
+    by: string | null,
+  ): Promise<void> {
+    return this.enqueue(() => this.delay(stageId, delayMs, by));
+  }
+
+  private async delay(
+    stageId: string,
+    delayMs: number,
+    by: string | null,
+  ): Promise<void> {
+    const stage = await this.stagesService.findOneOrFail(stageId);
+    if (stage.status === StageStatus.CLOSED) {
+      throw new ConflictException(
+        apiError(ApiErrorCode.STAGE_NOT_ACTIVE, `Stage ${stageId} is closed`, {
+          stage: stageId,
+        }),
+      );
+    }
+    assertTimetable(stage);
+    if (!stage.firstStartTime) {
+      throw new ConflictException(
+        apiError(
+          ApiErrorCode.NO_FIRST_START,
+          `Stage ${stageId} has no first start to delay`,
+          { stage: stageId },
+        ),
+      );
+    }
+    const now = Date.now();
+    const running = stage.status === StageStatus.ACTIVE;
+    const moved = running
+      ? await this.stageRuns.find({
+          where: {
+            stageId,
+            voided: false,
+            finishTime: IsNull(),
+            startPassingAt: IsNull(),
+            plannedStartTime: MoreThan(new Date(now)),
+          },
+        })
+      : [];
+    for (const run of moved) {
+      run.plannedStartTime = new Date(
+        run.plannedStartTime!.getTime() + delayMs,
+      );
+      run.startTime = run.plannedStartTime;
+    }
+    await this.stageRuns.manager.transaction(async (manager) => {
+      await manager.save(StageRun, moved);
+      await recordChange(manager, by, {
+        action: ChangeAction.SLOTS_DELAYED,
+        entryId: null,
+        stageId,
+        subjectId: stageId,
+        after: { delayMs },
+      });
+    });
+    // shortcut: once running, the first start moves as a whole while the
+    // posted end is still ahead, so a withdrawn car's gap slot already passed
+    // shows moved on the start list too. Only that display is off, and only
+    // for a car that isn't starting.
+    if (!running || postedEndMs(stage) > now) {
+      await this.stagesService.setFirstStartTime(
+        stageId,
+        new Date(stage.firstStartTime.getTime() + delayMs),
+      );
+    }
+    for (const run of moved) {
+      this.emitter.emit('stage-run.updated', await this.withStatus(run));
+    }
   }
 
   private alreadyStarting(entryId: string, stageId: string) {

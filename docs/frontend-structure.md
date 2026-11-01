@@ -52,8 +52,11 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
   (`UpNextCard`): Start now in `GATE` mode; Countdown in `SLOT_MANUAL`, in
   the same place, and while the first car counts down its seconds, lights and
   Cancel there. Queued cars lead the list, each "Then" row with its slot time
-  and Cancel, the others with a small Countdown. Fullscreen and Enable sound
-  sit in the card's header. A car seen at a pre-start gate gets an "At the
+  and Cancel, the others with a small Countdown. In `SLOT_SCHEDULE` New slot
+  takes Countdown's and Cancel's places and Delay sits in the header; before
+  activation the rows show their slot from the start list, no countdown.
+  Fullscreen and Enable sound sit in the card's header. Live Timing's and the
+  public start list show a Slot column once a timetable's list is frozen. A car seen at a pre-start gate gets an "At the
   start" chip (a flag icon in a "Then" row); a car not seen gets nothing, and
   the order stays the start order.
 - **Overall and a stage's results are one page** (`ResultsView`), two

@@ -12,12 +12,21 @@ import {
   StartOrderDirection,
   StartOrderGrouping,
   StartOrderKey,
+  StartMode,
 } from '@rally-gate/shared';
 import { apiError } from '../../common/api-error';
 import { ClassificationService } from '../classification/classification.service';
 import { SettingsService } from '../settings/settings.service';
 import { Stage } from '../stages/stage.entity';
-import { countsInOverall, StagesService } from '../stages/stages.service';
+import {
+  assertHasFirstStart,
+  countsInOverall,
+  StagesService,
+} from '../stages/stages.service';
+import {
+  slotIntervalMs,
+  StageRunsService,
+} from '../stage-runs/stage-runs.service';
 import { Entry } from '../entries/entry.entity';
 import {
   compareClassNames,
@@ -41,6 +50,7 @@ export class StartOrderService {
     private readonly entriesService: EntriesService,
     private readonly classificationService: ClassificationService,
     private readonly settingsService: SettingsService,
+    private readonly stageRunsService: StageRunsService,
   ) {}
 
   async getStartOrder(stageId: string): Promise<StartOrder> {
@@ -51,13 +61,8 @@ export class StartOrderService {
     // withdrawn as out. Anything still computed leaves such a car out.
     const eligible = entries.filter((v) => !isOutOfEvent(v.status));
     const ids = stage.startOrder ?? (await this.compute(stage, eligible));
-    const byId = new Map(entries.map((entry) => [entry.id, entry]));
-    const listed = new Set(ids);
-    const ordered = [
-      ...ids.flatMap((id) => byId.get(id) ?? []),
-      // Registered after the freeze; `findAll` is already by start number.
-      ...eligible.filter((entry) => !listed.has(entry.id)),
-    ];
+    const ordered = withLateEntries(ids, entries);
+    const slots = await this.slotTimes(stage, ordered);
     return {
       stageId,
       frozen: stage.startOrder !== null,
@@ -72,8 +77,43 @@ export class StartOrderService {
         startNumber: entry.startNumber,
         ...crewOf(entry),
         mainClassName: mainClassOf(entry)?.name ?? null,
+        slotTime: slots?.get(entry.id)?.toISOString() ?? null,
       })),
     };
+  }
+
+  /**
+   * A timetable's slots, frozen lists only: a car's slot run once the stage
+   * runs (New slot and Delay move those), else first start + interval ×
+   * (position − 1). A withdrawn car keeps its slot, so nobody moves up.
+   */
+  private async slotTimes(
+    stage: Stage,
+    ordered: Entry[],
+  ): Promise<Map<string, Date> | null> {
+    if (
+      stage.startMode !== StartMode.SLOT_SCHEDULE ||
+      !stage.startOrder ||
+      !stage.firstStartTime
+    ) {
+      return null;
+    }
+    const first = stage.firstStartTime.getTime();
+    const slots = new Map(
+      ordered.map((entry, index) => [
+        entry.id,
+        new Date(first + slotIntervalMs(stage) * index),
+      ]),
+    );
+    if (stage.status !== StageStatus.NOT_STARTED) {
+      const runs = await this.stageRunsService.findByStage(stage.id);
+      for (const run of runs) {
+        if (!run.voided && run.plannedStartTime) {
+          slots.set(run.entryId, run.plannedStartTime);
+        }
+      }
+    }
+    return slots;
   }
 
   /**
@@ -83,6 +123,7 @@ export class StartOrderService {
   async freeze(stageId: string): Promise<StartOrder> {
     const stage = await this.stagesService.findOneOrFail(stageId);
     if (!stage.startOrder) {
+      assertHasFirstStart(stage);
       await this.snapshot(stage);
     }
     return this.getStartOrder(stageId);
@@ -107,17 +148,35 @@ export class StartOrderService {
     return this.getStartOrder(stageId);
   }
 
-  /** A list frozen by hand beforehand is kept as published. */
+  /**
+   * A list frozen by hand beforehand is kept as published. A timetable
+   * stage's slots become slot runs here, from the list as frozen; a car
+   * already out of the event gets none and leaves its gap.
+   */
   @OnEvent('stage.activated')
   async freezeOnActivation(stage: Stage): Promise<void> {
-    if (stage.startOrder) {
-      return;
-    }
     try {
-      await this.snapshot(stage);
+      if (!stage.startOrder) {
+        await this.snapshot(stage);
+      }
+      if (stage.startMode !== StartMode.SLOT_SCHEDULE) {
+        return;
+      }
+      const frozen = await this.stagesService.findOneOrFail(stage.id);
+      const entries = await this.entriesService.findAll();
+      const ordered = withLateEntries(frozen.startOrder ?? [], entries);
+      const slots =
+        (await this.slotTimes(frozen, ordered)) ?? new Map<string, Date>();
+      await this.stageRunsService.createTimetableRuns(
+        stage.id,
+        ordered
+          .filter((entry) => !isOutOfEvent(entry.status))
+          .map((entry) => ({ entryId: entry.id, slot: slots.get(entry.id)! })),
+      );
     } catch (err) {
       // The emitter swallows handler errors. The list then stays computed
-      // live, which the response shows as `frozen: false`.
+      // live, which the response shows as `frozen: false`; a timetable's
+      // missing slots show as an empty start card.
       this.logger.error(`Freezing the start order of ${stage.id} failed`, err);
     }
   }
@@ -230,6 +289,19 @@ export class StartOrderService {
     const value = await this.settingsService.get(key);
     return Object.values(values).find((v) => v === value) ?? defaultValue;
   }
+}
+
+/** The list's entries, then any eligible crew registered after it was frozen. */
+function withLateEntries(ids: string[], entries: Entry[]): Entry[] {
+  const byId = new Map(entries.map((entry) => [entry.id, entry]));
+  const listed = new Set(ids);
+  return [
+    ...ids.flatMap((id) => byId.get(id) ?? []),
+    // `findAll` is already by start number.
+    ...entries.filter(
+      (entry) => !listed.has(entry.id) && !isOutOfEvent(entry.status),
+    ),
+  ];
 }
 
 /** The server allows several main classes per entry; the first by name counts. */
