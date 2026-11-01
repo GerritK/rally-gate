@@ -475,6 +475,12 @@ carry `timeUnknown`). Triggers are the Countdown button on the start card or a
 detection at a `stage_pre_start` gate; a light-barrier passing there needs a
 marshal to assign it first, and then the assignment is the trigger, so a late
 assignment never makes a slot in the past.
+A gate's own detection triggers only while its effective time is at most
+`PRE_START_TRIGGER_MAX_AGE_MS` (30 s) before now: a gate that was offline
+replays its taps on reconnect, and a slot from now for a tap minutes old would
+be a phantom run on a shakedown. An older one only marks the car at the start;
+one retried by the sweep is judged against now too, since its slot would be
+from now. A tap with `timeUnknown` has no age and always triggers.
 
 - Slots queue: the next is at earliest the previous + `minStartGapMs`
   (event-wide, default 30 s), since two cars can't start from one line.

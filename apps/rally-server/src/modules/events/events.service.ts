@@ -18,6 +18,7 @@ import {
   GateRole,
   isOutOfEvent,
   isSlotStart,
+  PRE_START_TRIGGER_MAX_AGE_MS,
   SLOT_PASSING_AFTER_MS,
   StageStatus,
   StartMode,
@@ -606,6 +607,8 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
           gate,
           record.entryId,
           effectiveTime(record),
+          undefined,
+          isStaleTap(record),
         );
         if (
           applied === null &&
@@ -636,13 +639,15 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
    * (repeats are expected there); a marshal's assignment must not. Null (also
    * falsy) is a finish or split for an entry with no run on the stage at all:
    * its start may still be on its way. `assigned` is a marshal's assignment
-   * of an unidentified passing, absent for a gate's own detection.
+   * of an unidentified passing, absent for a gate's own detection; `stale`
+   * a gate's detection too old to start a countdown.
    */
   private async applyRules(
     gate: Gate,
     entryId: string,
     at: Date,
     assigned?: { by: string | null },
+    stale = false,
   ): Promise<boolean | null> {
     const assignment = await this.gateAssignmentsService.findActiveForGate(
       gate.id,
@@ -697,6 +702,12 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
           assigned.by,
         );
         return true;
+      }
+      if (stale) {
+        this.logger.warn(
+          `Pre-start detection for entry ${entryId} at gate ${gate.id} is older than ${PRE_START_TRIGGER_MAX_AGE_MS} ms, marking it at the start without a countdown`,
+        );
+        return false;
       }
       return !!(await this.stageRunsService.triggerCountdown(entryId, stageId));
     }
@@ -827,6 +838,26 @@ const passingSnapshot = (record: DetectionEventRecord) => ({
   gateId: record.gateId,
   time: effectiveTime(record).toISOString(),
 });
+
+/**
+ * Judged against now, not the receive time: the slot is from now, so a
+ * detection retried by the sweep is as late as one replayed by its gate. A
+ * tap with `metadata.timeUnknown` has no age to judge and is never stale.
+ */
+function isStaleTap(record: DetectionEventRecord): boolean {
+  let metadata: { timeUnknown?: unknown } | undefined;
+  try {
+    ({ metadata } = JSON.parse(record.rawPayload) as {
+      metadata?: { timeUnknown?: unknown };
+    });
+  } catch {
+    // Stored only once parsed, so this is a hand-made record.
+  }
+  return (
+    metadata?.timeUnknown !== true &&
+    Date.now() - effectiveTime(record).getTime() > PRE_START_TRIGGER_MAX_AGE_MS
+  );
+}
 
 function effectiveTime(record: DetectionEventRecord): Date {
   return new Date(record.timestampGate.getTime() + record.clockCorrectionMs);

@@ -5,6 +5,7 @@ import {
   DEFAULT_COUNTDOWN_MS,
   DEFAULT_MIN_START_GAP_MS,
   GateRole,
+  PRE_START_TRIGGER_MAX_AGE_MS,
   StageRunStatus,
   StageScoring,
   StageStatus,
@@ -124,6 +125,7 @@ describe('start paths', () => {
     offsetMs: number,
     transponderId?: string,
     eventId = `e${++seq}`,
+    metadata?: Record<string, unknown>,
   ): Promise<DetectionEventRecord> {
     await events.handleMqttMessage({
       topic: `rally/gates/${gateId}/detections`,
@@ -134,6 +136,7 @@ describe('start paths', () => {
           transponderId,
           timestampGate: new Date(base.getTime() + offsetMs).toISOString(),
           source: 'test',
+          metadata,
         }),
       ),
     });
@@ -473,12 +476,13 @@ describe('start paths', () => {
   });
 
   describe('pre-start gate', () => {
-    // A tap may carry `timeUnknown`, so its gate timestamp is anything.
-    const tapClock = new Date('2000-01-01T00:00:00.000Z');
+    /** A tap now, as a gate with a synced clock sends it. */
+    const tap = (transponderId: string, eventId?: string) =>
+      pass('PRE', new Date(), 0, transponderId, eventId);
 
-    it('triggers the countdown from the server receive time, not the gate timestamp', async () => {
+    it('triggers the countdown from the server receive time', async () => {
       const before = Date.now();
-      await pass('PRE', tapClock, 0, '111');
+      await tap('111');
 
       const [run] = await allRuns();
       expect(run.plannedStartTime!.getTime()).toBeGreaterThanOrEqual(
@@ -494,9 +498,36 @@ describe('start paths', () => {
       });
     });
 
+    it('only marks a car at the start for a tap replayed late, starting no countdown', async () => {
+      stage.startMode = StartMode.SLOT_MANUAL;
+      const late = await pass(
+        'PRE',
+        new Date(),
+        -(PRE_START_TRIGGER_MAX_AGE_MS + 1_000),
+        '111',
+      );
+      expect(late.processed).toBe(true);
+      expect(await allRuns()).toHaveLength(0);
+      expect(await events.entriesAtStart('SS1')).toEqual(['v1']);
+    });
+
+    it('triggers for a tap whose gate clock is unknown, whatever its timestamp says', async () => {
+      await pass(
+        'PRE',
+        new Date('2000-01-01T00:00:00.000Z'),
+        0,
+        '111',
+        undefined,
+        {
+          timeUnknown: true,
+        },
+      );
+      expect(await allRuns()).toHaveLength(1);
+    });
+
     it('queues taps like the button, in tap order', async () => {
-      await pass('PRE', tapClock, 0, '222');
-      await pass('PRE', tapClock, 0, '111');
+      await tap('222');
+      await tap('111');
 
       const [first, second] = await allRuns();
       expect(first.entryId).toBe('v2');
@@ -506,37 +537,37 @@ describe('start paths', () => {
     });
 
     it('stores and ignores a tap for a car already queued or on stage', async () => {
-      await pass('PRE', tapClock, 0, '111');
-      const again = await pass('PRE', tapClock, 0, '111');
+      await tap('111');
+      const again = await tap('111');
       expect(again.processed).toBe(true);
       expect(await allRuns()).toHaveLength(1);
 
       const [run] = await allRuns();
       await pass('START', run.plannedStartTime!, 0, '111');
-      await pass('PRE', tapClock, 0, '111');
+      await tap('111');
       expect(await allRuns()).toHaveLength(1);
     });
 
     it('ignores a tap for a car that finished a counted stage', async () => {
-      await pass('PRE', tapClock, 0, '111');
+      await tap('111');
       const [run] = await allRuns();
       await pass('FINISH', run.plannedStartTime!, 60_000, '111');
-      await pass('PRE', tapClock, 0, '111');
+      await tap('111');
       expect(await allRuns()).toHaveLength(1);
     });
 
     it('makes one slot of a replayed detection', async () => {
-      await pass('PRE', tapClock, 0, '111', 'replayed');
-      await pass('PRE', tapClock, 0, '111', 'replayed');
+      await tap('111', 'replayed');
+      await tap('111', 'replayed');
       expect(await allRuns()).toHaveLength(1);
     });
 
     it('makes every tap on a shakedown the next run', async () => {
       stage.scoring = StageScoring.NONE;
-      await pass('PRE', tapClock, 0, '111');
+      await tap('111');
       const [first] = await allRuns();
       await pass('FINISH', first.plannedStartTime!, 60_000, '111');
-      await pass('PRE', tapClock, 0, '111');
+      await tap('111');
 
       expect((await allRuns()).map((r) => r.run)).toEqual([1, 2]);
     });
@@ -559,7 +590,7 @@ describe('start paths', () => {
     });
 
     it('refuses to assign a beam passing to a car already queued, leaving it listed', async () => {
-      await pass('PRE', tapClock, 0, '111');
+      await tap('111');
       const beam = await pass('PRE', new Date(), 0);
 
       await expect(
@@ -573,7 +604,7 @@ describe('start paths', () => {
 
     it('triggers nothing on a gate-start stage', async () => {
       stage.startMode = StartMode.GATE;
-      await pass('PRE', tapClock, 0, '111');
+      await tap('111');
       expect(await allRuns()).toHaveLength(0);
     });
   });
