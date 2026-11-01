@@ -59,3 +59,13 @@ export class StartCountdownDto {
   @IsNotEmpty()
   stageId: string;
 }
+
+export class DnsDto {
+  @IsString()
+  @IsNotEmpty()
+  entryId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  stageId: string;
+}

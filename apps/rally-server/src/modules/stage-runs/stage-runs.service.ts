@@ -44,8 +44,10 @@ import { recordChange, runSnapshot } from '../changes/record-change';
 import { SettingsService } from '../settings/settings.service';
 import { Stage } from '../stages/stage.entity';
 import { StagesService } from '../stages/stages.service';
+import { DidNotStart } from './did-not-start.entity';
 import { StageRun } from './stage-run.entity';
 import { StageSplit } from './stage-split.entity';
+import { isUntouchedSlot } from './untouched-slot';
 
 export interface StageRunSplitPair {
   run: StageRun;
@@ -70,8 +72,7 @@ export type StageRunWithStatus = StageRun & { status: StageRunStatus };
 /** Status is derived, never stored — see the note on `StageRun`. */
 export function deriveStageRunStatus(
   run: Pick<StageRun, 'finishTime'> &
-    Partial<Pick<StageRun, 'voided' | 'plannedStartTime' | 'startPassingAt'>>,
-  stageClosed: boolean,
+    Partial<Pick<StageRun, 'voided' | 'retired'>>,
 ): StageRunStatus {
   // First: a voided run usually does have a finishTime, and FINISHED would
   // present a struck-out time as a result.
@@ -81,12 +82,7 @@ export function deriveStageRunStatus(
   if (run.finishTime) {
     return StageRunStatus.FINISHED;
   }
-  if (!stageClosed) {
-    return StageRunStatus.STARTED;
-  }
-  return run.plannedStartTime && !run.startPassingAt
-    ? StageRunStatus.DID_NOT_START
-    : StageRunStatus.CANCELLED;
+  return run.retired ? StageRunStatus.CANCELLED : StageRunStatus.STARTED;
 }
 
 export const slotIntervalMs = (stage: Stage): number =>
@@ -228,6 +224,8 @@ export class StageRunsService {
     private readonly stagesService: StagesService,
     private readonly emitter: EventEmitter2,
     private readonly settings: SettingsService,
+    @InjectRepository(DidNotStart)
+    private readonly dns: Repository<DidNotStart>,
   ) {}
 
   /** Serialises countdowns, so two at once can't take the same slot. */
@@ -253,12 +251,8 @@ export class StageRunsService {
     return stage?.status === StageStatus.CLOSED;
   }
 
-  private async withStatus(run: StageRun): Promise<StageRunWithStatus> {
-    return { ...run, status: await this.deriveStatus(run) };
-  }
-
-  private async deriveStatus(run: StageRun): Promise<StageRunStatus> {
-    return deriveStageRunStatus(run, await this.isStageClosed(run.stageId));
+  private withStatus(run: StageRun): Promise<StageRunWithStatus> {
+    return Promise.resolve({ ...run, status: deriveStageRunStatus(run) });
   }
 
   async findAll(stageId?: string): Promise<StageRunWithStatus[]> {
@@ -266,14 +260,7 @@ export class StageRunsService {
       where: stageId ? { stageId } : {},
       order: { startTime: 'DESC' },
     });
-    const stages = await this.stagesService.findAll();
-    const closedStageIds = new Set(
-      stages.filter((s) => s.status === StageStatus.CLOSED).map((s) => s.id),
-    );
-    return runs.map((run) => ({
-      ...run,
-      status: deriveStageRunStatus(run, closedStageIds.has(run.stageId)),
-    }));
+    return runs.map((run) => ({ ...run, status: deriveStageRunStatus(run) }));
   }
 
   // The finders below feed results, so each returns only the run that
@@ -308,7 +295,8 @@ export class StageRunsService {
    * The entry's in-progress attempt on this stage, if any. Voided runs are
    * excluded throughout: voiding is what releases an entry to run again, so
    * a voided row must stop counting as either "already running" or "already
-   * finished" everywhere the rule engine checks.
+   * finished" everywhere the rule engine checks. A retired run is not in
+   * progress either: a gate finish or split after a DNF times nothing.
    */
   private findActive(
     entryId: string,
@@ -319,6 +307,7 @@ export class StageRunsService {
       stageId,
       finishTime: IsNull(),
       voided: false,
+      retired: false,
     });
   }
 
@@ -336,6 +325,22 @@ export class StageRunsService {
       where: { entryId, stageId, finishTime: Not(IsNull()), voided: false },
       order: { finishTime: 'DESC' },
     });
+  }
+
+  /** Finished or DNF: on a counted stage either blocks another start. */
+  private async findDone(
+    entryId: string,
+    stageId: string,
+  ): Promise<StageRun | null> {
+    return (
+      (await this.findFinished(entryId, stageId)) ??
+      this.stageRuns.findOneBy({
+        entryId,
+        stageId,
+        voided: false,
+        retired: true,
+      })
+    );
   }
 
   /** Every attempt of these entries on any stage. */
@@ -374,8 +379,10 @@ export class StageRunsService {
       );
       return this.withStatus(existing);
     }
-    const finished = await this.findFinished(entryId, stageId);
     const shakedown = await this.isShakedown(stageId);
+    const finished = shakedown
+      ? await this.findFinished(entryId, stageId)
+      : await this.findDone(entryId, stageId);
     if (
       finished &&
       shakedown &&
@@ -411,7 +418,9 @@ export class StageRunsService {
       run: shakedown ? attempt : 1,
     });
     try {
-      return this.withStatus(await this.stageRuns.save(run));
+      const saved = await this.stageRuns.save(run);
+      await this.clearDns(entryId, stageId);
+      return this.withStatus(saved);
     } catch (err) {
       if (!isUniqueViolation(err)) {
         throw err;
@@ -421,7 +430,7 @@ export class StageRunsService {
       // catches it, since both callers can clear `findActive` first.
       const raced =
         (await this.findActive(entryId, stageId)) ??
-        (await this.findFinished(entryId, stageId));
+        (await this.findDone(entryId, stageId));
       return this.withStatus(raced!);
     }
   }
@@ -542,7 +551,7 @@ export class StageRunsService {
     const shakedown = stage.scoring === StageScoring.NONE;
     const busy =
       (await this.findActive(entryId, stageId)) ??
-      (shakedown ? null : await this.findFinished(entryId, stageId));
+      (shakedown ? null : await this.findDone(entryId, stageId));
     if (busy) {
       if (ignoreBusy) {
         this.logger.log(
@@ -595,6 +604,7 @@ export class StageRunsService {
       }
       throw err;
     }
+    await this.clearDns(entryId, stageId);
     const withStatus = await this.withStatus(saved);
     this.emitter.emit('stage-run.updated', withStatus);
     return withStatus;
@@ -694,7 +704,7 @@ export class StageRunsService {
     if (open?.startPassingAt) throw slotAlreadyLeft(entryId, stageId);
     if (
       (open && !open.plannedStartTime) ||
-      (!open && (await this.findFinished(entryId, stageId)))
+      (!open && (await this.findDone(entryId, stageId)))
     ) {
       throw this.alreadyStarting(entryId, stageId);
     }
@@ -737,6 +747,7 @@ export class StageRunsService {
         ChangeAction.SLOT_MOVED,
         null,
       );
+      await this.clearDns(entryId, stageId);
     }
     const withStatus = await this.withStatus(saved);
     this.emitter.emit('stage-run.updated', withStatus);
@@ -803,6 +814,7 @@ export class StageRunsService {
           where: {
             stageId,
             voided: false,
+            retired: false,
             finishTime: IsNull(),
             startPassingAt: IsNull(),
             plannedStartTime: MoreThan(new Date(now)),
@@ -964,6 +976,7 @@ export class StageRunsService {
         where: {
           stageId,
           voided: false,
+          retired: false,
           plannedStartTime: Not(IsNull()),
           ...(entryId ? { entryId } : {}),
         },
@@ -1109,6 +1122,10 @@ export class StageRunsService {
         ? parseTime(patch.finishTime, 'finishTime')
         : null;
       run.finishManual = !!run.finishTime;
+      // A finish typed in is the marshal's call, unlike a gate passing after
+      // DNF. Cleared on a closed stage, the run is DNF again: closing left no
+      // run open, and nothing could finish it now.
+      run.retired = !run.finishTime && (await this.isStageClosed(run.stageId));
     }
     // Checked against the merged result, not the patch: correcting only one
     // of the two still has to leave the pair ordered.
@@ -1152,6 +1169,8 @@ export class StageRunsService {
       startManual: true,
       finishManual: !!finishTime,
       durationMs: durationMs(startTime, finishTime),
+      // On a closed stage nothing could finish it; closing left no run open.
+      retired: !finishTime && (await this.isStageClosed(input.stageId)),
     });
     let saved: StageRun;
     try {
@@ -1170,6 +1189,7 @@ export class StageRunsService {
       }
       throw err;
     }
+    await this.clearDns(input.entryId, input.stageId);
     const withStatus = await this.withStatus(saved);
     this.emitter.emit('stage-run.updated', withStatus);
     return withStatus;
@@ -1185,12 +1205,13 @@ export class StageRunsService {
     if (
       run.voided ||
       run.finishTime ||
+      run.retired ||
       (await this.isStageClosed(run.stageId))
     ) {
       throw new ConflictException(
         apiError(
           ApiErrorCode.RUN_NOT_FINISHABLE,
-          `StageRun ${id} is ${run.voided ? 'voided' : run.finishTime ? 'already finished' : 'on a closed stage'}`,
+          `StageRun ${id} is ${run.voided ? 'voided' : run.finishTime ? 'already finished' : run.retired ? 'DNF' : 'on a closed stage'}`,
         ),
       );
     }
@@ -1274,6 +1295,200 @@ export class StageRunsService {
     return withStatus;
   }
 
+  /**
+   * DNF on this stage, at once: the car leaves "On stage", its splits stop
+   * counting and a gate finish after it times nothing. On a shakedown it
+   * only ends the open run, so the car can start again.
+   */
+  async retireRun(id: string, by: string | null): Promise<StageRunWithStatus> {
+    const run = await this.findOneOrFail(id);
+    await this.assertStageOpen(run.stageId);
+    if (run.voided || run.finishTime || run.retired) {
+      throw new ConflictException(
+        apiError(
+          ApiErrorCode.RUN_NOT_RETIRABLE,
+          `StageRun ${id} is voided, finished or DNF already`,
+        ),
+      );
+    }
+    const before = runSnapshot(run);
+    run.retired = true;
+    const withStatus = await this.withStatus(
+      await this.saveRecorded(run, by, ChangeAction.RUN_RETIRED, before),
+    );
+    this.emitter.emit('stage-run.updated', withStatus);
+    return withStatus;
+  }
+
+  /** Undoes a DNF while the stage runs. 409s like unvoid if the car has
+   *  started another run since (a shakedown). */
+  async unretireRun(
+    id: string,
+    by: string | null,
+  ): Promise<StageRunWithStatus> {
+    const run = await this.findOneOrFail(id);
+    await this.assertStageOpen(run.stageId);
+    if (!run.retired) {
+      return this.withStatus(run);
+    }
+    const open = run.voided
+      ? null
+      : await this.findActive(run.entryId, run.stageId);
+    if (open) {
+      throw new ConflictException(
+        apiError(
+          ApiErrorCode.OTHER_ATTEMPT_COUNTS,
+          `Attempt ${open.attempt} is open on this stage; void it first if attempt ${run.attempt} should count instead`,
+          { blockingAttempt: open.attempt, attempt: run.attempt },
+        ),
+      );
+    }
+    const before = runSnapshot(run);
+    run.retired = false;
+    const withStatus = await this.withStatus(
+      await this.saveRecorded(run, by, ChangeAction.RUN_UNRETIRED, before),
+    );
+    this.emitter.emit('stage-run.updated', withStatus);
+    return withStatus;
+  }
+
+  findDns(stageId?: string): Promise<DidNotStart[]> {
+    return this.dns.find({ where: stageId ? { stageId } : {} });
+  }
+
+  /**
+   * DNS on this stage, at once: the car drops out of Up next and the start
+   * card. Only without a counting run, but an untouched slot run (no start
+   * passing, no split) is deleted as a cancelled countdown is: its slot
+   * stays empty and nobody moves up.
+   */
+  async markDns(
+    entryId: string,
+    stageId: string,
+    by: string | null,
+  ): Promise<void> {
+    const stage = await this.assertStageOpen(stageId);
+    if (stage.status === StageStatus.NOT_STARTED) {
+      throw new ConflictException(
+        apiError(
+          ApiErrorCode.STAGE_NOT_STARTED,
+          `Stage ${stageId} hasn't started`,
+          { stage: stageId },
+        ),
+      );
+    }
+    if (stage.scoring === StageScoring.NONE) {
+      throw new ConflictException(
+        apiError(
+          ApiErrorCode.DNS_ON_SHAKEDOWN,
+          `Stage ${stageId} is a shakedown; nobody is due to start it`,
+        ),
+      );
+    }
+    const runs = await this.stageRuns.findBy({
+      entryId,
+      stageId,
+      voided: false,
+    });
+    const slot =
+      runs.length === 1 &&
+      isUntouchedSlot(runs[0]) &&
+      !(await this.stageSplits.existsBy({ stageRunId: runs[0].id }))
+        ? runs[0]
+        : null;
+    const attemptCounts = () =>
+      new ConflictException(
+        apiError(
+          ApiErrorCode.ATTEMPT_ALREADY_COUNTS,
+          `Entry ${entryId} has a run on stage ${stageId} that counts`,
+        ),
+      );
+    if (runs.length > 0 && !slot) throw attemptCounts();
+    if (!slot && (await this.dns.existsBy({ entryId, stageId }))) return;
+    await this.stageRuns.manager.transaction(async (manager) => {
+      if (slot) {
+        // Conditional: a start passing recorded since the read means the car
+        // left after all.
+        const { affected } = await manager.delete(StageRun, {
+          id: slot.id,
+          startPassingAt: IsNull(),
+          finishTime: IsNull(),
+        });
+        if (!affected) throw attemptCounts();
+        await recordChange(manager, by, {
+          action: ChangeAction.COUNTDOWN_CANCELLED,
+          entryId,
+          stageId,
+          subjectId: slot.id,
+          before: runSnapshot(slot),
+        });
+      }
+      await manager.save(DidNotStart, { entryId, stageId });
+      await recordChange(manager, by, {
+        action: ChangeAction.DNS_MARKED,
+        entryId,
+        stageId,
+        subjectId: stageId,
+      });
+    });
+    if (slot) {
+      this.emitter.emit('stage-run.deleted', { id: slot.id, stageId });
+    }
+    this.emitter.emit('dns.changed', { entryId, stageId, dns: true });
+  }
+
+  /** Undoes a DNS while the stage runs; the car is due to start again. */
+  async undoDns(
+    entryId: string,
+    stageId: string,
+    by: string | null,
+  ): Promise<void> {
+    await this.assertStageOpen(stageId);
+    const deleted = await this.stageRuns.manager.transaction(
+      async (manager) => {
+        const { affected } = await manager.delete(DidNotStart, {
+          entryId,
+          stageId,
+        });
+        if (affected) {
+          await recordChange(manager, by, {
+            action: ChangeAction.DNS_UNDONE,
+            entryId,
+            stageId,
+            subjectId: stageId,
+          });
+        }
+        return !!affected;
+      },
+    );
+    if (deleted) {
+      this.emitter.emit('dns.changed', { entryId, stageId, dns: false });
+    }
+  }
+
+  /** A run started for the car ends its DNS on the stage. */
+  private async clearDns(entryId: string, stageId: string): Promise<void> {
+    const { affected } = await this.dns.delete({ entryId, stageId });
+    if (affected) {
+      this.emitter.emit('dns.changed', { entryId, stageId, dns: false });
+    }
+  }
+
+  /** DNF, DNS and their undo stop once the stage closes. */
+  private async assertStageOpen(stageId: string): Promise<Stage> {
+    const stage = await this.stagesService.findOneOrFail(stageId);
+    if (stage.status === StageStatus.CLOSED) {
+      throw new ConflictException(
+        apiError(
+          ApiErrorCode.STAGE_ALREADY_CLOSED,
+          `Stage ${stageId} is closed; its DNF and DNS are final`,
+          { stage: stageId },
+        ),
+      );
+    }
+    return stage;
+  }
+
   async remove(id: string, by: string | null): Promise<void> {
     await this.deleteRecorded(
       await this.findOneOrFail(id),
@@ -1348,10 +1563,8 @@ export class StageRunsService {
     // `countingRuns`, so a voided attempt's splits stop appearing on the
     // live split leaderboard.
     const runs = await this.findByStage(stageId);
-    const stageClosed = await this.isStageClosed(stageId);
     const activeRuns = runs.filter(
-      (run) =>
-        deriveStageRunStatus(run, stageClosed) !== StageRunStatus.CANCELLED,
+      (run) => deriveStageRunStatus(run) !== StageRunStatus.CANCELLED,
     );
     if (activeRuns.length === 0) {
       return [];

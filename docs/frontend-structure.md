@@ -8,7 +8,7 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
 | Route | Nav | Contents |
 |---|---|---|
 | `/` | — | redirect to `/live` |
-| `/live/:stageId?` | Live Timing | the marshal view, laid out like the stage: the stage's gates with their health, Up next beside On stage (Up next marks the cars at the start; on a slot stage it is the start card, see below; On stage in expected arrival order, unidentified passings with a suggested entry), every entry in start order with run state, corrections, Enter time and Add penalties; Activate / Close, freeze and print the start list. No stage picks the active one, else the next |
+| `/live/:stageId?` | Live Timing | the marshal view, laid out like the stage: the stage's gates with their health, Up next beside On stage (Up next marks the cars at the start; on a slot stage it is the start card, see below; On stage in expected arrival order, unidentified passings with a suggested entry), every entry in start order with run state, corrections, Enter time and Add penalties, DNF and DNS; Activate / Close, freeze and print the start list. No stage picks the active one, else the next |
 | `/results/overall` | Results | podium, overall classification, each stage column the time driven, the fastest marked, the gap to it in the tooltip, its header linking to that stage's results, a Penalties column once anyone has one, filterable by class; Print / Print all open a PDF (every class's ranking on its own sheets) |
 | `/results/stages/:stageId` | Results | podium, stage classification with a column per split (the time and its rank, the fastest marked, the gap to it in the tooltip), DNF/DNS, filterable by class; Print / Print all open a PDF (every class's ranking on its own sheets) |
 | `/entries` | Entries | registration in a dialog, status, classes; per row the status's next step (Check in, Passed) and ⋮ for the rest (back a step, Withdraw, Disqualify, Reinstate); Check-in in the header; a row opens the entry |
@@ -48,6 +48,16 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
   "Enable sound" after every load until tapped; Countdown counts as the tap.
   Jump starts are marked on the car's row (On stage and the start list),
   where penalties are given.
+- **DNF and DNS sit in the ⋮ menus where the car is**, not on a button: DNF
+  in the On stage row and in the start-list row while the car is on stage,
+  DNS in Up next (the start card on a slot stage, each row) and in the
+  start-list row of a car without a run; Undo in the same start-list menu
+  until the stage closes. Both confirm with the car named on the button
+  ("DNF #12"), since the effect (out of On stage, out of Up next) is easily
+  missed; undo doesn't. The menu entry isn't red, only the DNF chip it
+  leads to (`design-system.md` "Colour"). No reason
+  field and no "withdraw too?": a car that won't drive again is withdrawn at
+  the desk.
 - **Up next keeps its layout in every start mode; only the buttons change**
   (`UpNextCard`): Start now in `GATE` mode; Countdown in `SLOT_MANUAL`, in
   the same place, and while the first car counts down its seconds, lights and
@@ -78,8 +88,8 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
 - **Splits are columns of the stage classification**, not a ranking of their
   own: Results is read after the stage, so a car still on stage has no row.
   Mid-stage, Live Timing's On stage card shows each car's split against the
-  best. Once the stage closes, a DNF's splits no longer count towards a
-  split's rank or best.
+  best. A DNF's splits no longer count towards a split's rank or best, from
+  the moment it is marked.
 - **Gate assignments live under their stage**; the gate-centric view of "what
   is every gate doing" is the Hardware page, and a gate's own page lists its
   assignments read-only, linking to each stage.

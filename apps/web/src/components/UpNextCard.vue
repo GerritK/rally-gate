@@ -46,6 +46,8 @@ const props = defineProps<{
   delayMs?: number;
   /** An entry or run id whose request is in flight. */
   busyId?: string | null;
+  /** DNS in each row's menu; not on a car that passed the start. */
+  canDns?: boolean;
   readonly?: boolean;
 }>();
 const emit = defineEmits<{
@@ -54,7 +56,11 @@ const emit = defineEmits<{
   cancel: [run: StageRun];
   newSlot: [entryId: string];
   delay: [];
+  dns: [entryId: string];
 }>();
+
+const dnsOffered = (row: UpNextRow) =>
+  props.canDns && !props.readonly && !row.slot?.startPassingAt;
 
 const card = ref<HTMLElement | null>(null);
 
@@ -165,12 +171,31 @@ onUnmounted(() => cancelTonesExcept(new Set()));
           >
             {{ $t('live.atStart') }}
           </v-chip>
-          <ClassChip
-            v-if="rows[0].starter.mainClassName"
-            :name="rows[0].starter.mainClassName"
-            main
-            class="ms-auto"
-          />
+          <div class="d-flex align-center ga-2 ms-auto">
+            <ClassChip
+              v-if="rows[0].starter.mainClassName"
+              :name="rows[0].starter.mainClassName"
+              main
+            />
+            <v-menu v-if="dnsOffered(rows[0])">
+              <template #activator="{ props: menu }">
+                <v-btn
+                  v-bind="menu"
+                  size="small"
+                  variant="text"
+                  icon="mdi-dots-vertical"
+                  :aria-label="$t('common.moreActions')"
+                />
+              </template>
+              <v-list density="compact">
+                <v-list-item
+                  prepend-icon="mdi-minus-circle-outline"
+                  :title="$t('live.markDns')"
+                  @click="emit('dns', rows[0].starter.entryId)"
+                />
+              </v-list>
+            </v-menu>
+          </div>
         </div>
         <v-btn
           v-if="action === 'newSlot' && !readonly"
@@ -294,6 +319,24 @@ onUnmounted(() => cancelTonesExcept(new Set()));
                   :loading="busyId === row.starter.entryId"
                   @click="onCountdown(row.starter.entryId)"
                 />
+                <v-menu v-if="dnsOffered(row)">
+                  <template #activator="{ props: menu }">
+                    <v-btn
+                      v-bind="menu"
+                      size="small"
+                      variant="text"
+                      icon="mdi-dots-vertical"
+                      :aria-label="$t('common.moreActions')"
+                    />
+                  </template>
+                  <v-list density="compact">
+                    <v-list-item
+                      prepend-icon="mdi-minus-circle-outline"
+                      :title="$t('live.markDns')"
+                      @click="emit('dns', row.starter.entryId)"
+                    />
+                  </v-list>
+                </v-menu>
               </div>
             </div>
           </div>

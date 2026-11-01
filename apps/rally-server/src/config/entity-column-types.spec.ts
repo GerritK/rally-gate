@@ -11,6 +11,7 @@ import { GateAssignment } from '../modules/gates/gate-assignment.entity';
 import { Gate } from '../modules/gates/gate.entity';
 import { RallyInfo } from '../modules/rally-info/rally-info.entity';
 import { Setting } from '../modules/settings/setting.entity';
+import { DidNotStart } from '../modules/stage-runs/did-not-start.entity';
 import { StageRun } from '../modules/stage-runs/stage-run.entity';
 import { StageSplit } from '../modules/stage-runs/stage-split.entity';
 import { Stage } from '../modules/stages/stage.entity';
@@ -32,6 +33,7 @@ const ENTITIES = [
   Stage,
   StageRun,
   StageSplit,
+  DidNotStart,
   Entry,
   EntryClass,
   EntryTransponder,

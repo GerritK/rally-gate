@@ -22,7 +22,7 @@ import {
   type Placing,
   type OverallPlacing,
 } from '../api/classification';
-import { fetchStageRuns, type StageRun } from '../api/stage-runs';
+import { fetchDns, fetchStageRuns, type StageRun } from '../api/stage-runs';
 import { fetchStages, type Stage } from '../api/stages';
 import { fetchEntries, type Entry } from '../api/entries';
 import { fetchEntryClasses, type EntryClass } from '../api/entry-classes';
@@ -63,6 +63,8 @@ const entries = ref<Entry[]>([]);
 const classes = ref<EntryClass[]>([]);
 const stages = ref<Stage[]>([]);
 const runs = ref<StageRun[]>([]);
+/** Stages this car is DNS on. */
+const dnsStageIds = ref<string[]>([]);
 /** Each started stage's classification, all classes. */
 const stageRanks = ref(new Map<string, Placing[]>());
 const overall = ref<OverallPlacing[]>([]);
@@ -152,12 +154,9 @@ function stageRow(
       label: 'DNF',
       color: runStatusColor(StageRunStatus.CANCELLED),
     };
-  } else if (
-    (!run && stage.status === StageStatus.CLOSED) ||
-    run?.status === StageRunStatus.DID_NOT_START
-  ) {
+  } else if (!run && dnsStageIds.value.includes(stage.id)) {
     state = { label: 'DNS', color: 'warning' };
-  } else if (!run) {
+  } else if (!run && stage.status !== StageStatus.CLOSED) {
     state = {
       label:
         stage.status === StageStatus.ACTIVE
@@ -306,6 +305,7 @@ async function refresh() {
     penalties.value,
     penaltyTypes.value,
     changes.value,
+    dnsStageIds.value,
   ] = await Promise.all([
     fetchEntries(),
     fetchEntryClasses(),
@@ -315,6 +315,11 @@ async function refresh() {
     fetchPenalties(props.entryId),
     fetchPenaltyTypes(),
     fetchChanges(props.entryId),
+    fetchDns().then((rows) =>
+      rows
+        .filter((row) => row.entryId === props.entryId)
+        .map((row) => row.stageId),
+    ),
   ]);
   const started = stages.value.filter(
     (s) => s.status !== StageStatus.NOT_STARTED,

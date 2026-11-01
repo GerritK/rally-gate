@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { StagesModule } from '../stages/stages.module';
 import { EntriesModule } from '../entries/entries.module';
 import { SettingsModule } from '../settings/settings.module';
+import { DidNotStart } from './did-not-start.entity';
 import { StageRun } from './stage-run.entity';
 import {
   StageRunsController,
@@ -13,7 +14,7 @@ import { StageSplit } from './stage-split.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([StageRun, StageSplit]),
+    TypeOrmModule.forFeature([StageRun, StageSplit, DidNotStart]),
     StagesModule,
     EntriesModule,
     SettingsModule,

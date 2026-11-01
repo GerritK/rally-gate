@@ -11,6 +11,7 @@ const LIVE_EVENTS: Record<LiveEventType, string> = {
   'stage-run': 'stage-run.updated',
   'stage-run-deleted': 'stage-run.deleted',
   'stage-run-split': 'stage-run.split',
+  dns: 'dns.changed',
   gate: 'gate.heartbeat',
   'gate-pairing': 'gate.pairing-changed',
   // Whole lists rather than deltas, so a client that reconnects is correct
@@ -26,6 +27,7 @@ const PUBLIC_LIVE_EVENTS: LiveEventType[] = [
   'stage-run',
   'stage-run-deleted',
   'stage-run-split',
+  'dns',
   'rally',
   'stage',
 ];

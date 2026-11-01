@@ -4,6 +4,8 @@ export type LiveEventType =
   | 'stage-run'
   | 'stage-run-deleted'
   | 'stage-run-split'
+  /** `{ entryId, stageId, dns }`: a DNS row written (`dns: true`) or deleted. */
+  | 'dns'
   | 'gate'
   | 'gate-pairing'
   | 'pending-detections'

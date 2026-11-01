@@ -26,7 +26,7 @@ Any login may read, except the invitation and device lists and
 `/auth/server-urls` (organiser only, `@Private`). Without a login, only what
 the public page reads: `/auth/session`, `/version`, `/time`, GET
 `/rally-info`, `/stages`, `/stages/:id`, `/stages/:id/start-order`,
-`/stage-runs`, `/stage-runs/splits`, `/classification/*`, `/entry-classes`,
+`/stage-runs`, `/stage-runs/splits`, `/stage-runs/dns`, `/classification/*`, `/entry-classes`,
 `/settings/:key`, `/live`, plus the login routes.
 
 | Endpoint | Methods | Notes |
@@ -53,7 +53,7 @@ the public page reads: `/auth/session`, `/version`, `/time`, GET
 | `/penalties` | GET `?entryId=`, POST, `/:id` DELETE | `{ entryId, stageId?, typeId?, count?, seconds?, note? }`: a type, or free text with `seconds` and `note` (400). 409 on a stage not started. Read back with its computed `penaltyMs` (`event-model.md` "Penalties") |
 | `/stages` | GET, POST, `/:id` GET/PUT/DELETE | sorted by `stageNumber`; `status` is server-owned. `startMode` `GATE`, `SLOT_SCHEDULE` or `SLOT_MANUAL`, editable like the rest only while `NOT_STARTED`. Timetable: `firstStartTime` (ISO, `null` clears) and `slotIntervalMs` (≥ 1000, `null` is the 60 s default), 409 `timetableFrozen` when either changes while the start list is frozen. 409 `slotsOnShakedown` for `SLOT_SCHEDULE` on a stage scored `NONE`, either way round. Activating a timetable stage without a first start: 409 `noFirstStart` |
 | `/stages/:id/activate` | POST | activates the stage's gate assignments. 409 `otherStageActive` with `params.conflictingStageIds` if a gate is active elsewhere (`?force=true` closes that stage), 409 if already `CLOSED`, `startRallyFirst` for a stage scored `OVERALL` before the rally starts, `lockedWhileClosed` once it is closed |
-| `/stages/:id/close` | POST | deactivates its gates, marks it `CLOSED`. Terminal |
+| `/stages/:id/close` | POST | deactivates its gates, marks it `CLOSED` and, in the same transaction, writes DNF for open runs and DNS for cars without a counting run (`event-model.md` "DNF and DNS"). Terminal |
 | `/stages/:id/start-order` | GET | `{ frozen, frozenAt, grouped, entries }`; computed live until frozen. Each starter's `slotTime` (ISO) on a timetable stage with a frozen list, else `null`: its slot run's once the stage is active, before that first start + interval × (position − 1). Since the list was frozen: `slotMoved` per starter (New slot moved it) and `delayMs` (Delays added up), both read from the change history. See `event-model.md` "Start order" |
 | `/stages/:id/start-order/freeze` | POST | stores the snapshot; no-op if already frozen (activation also freezes, and on a timetable stage turns every slot into a slot run, none for a car out of the event). 409 `noFirstStart` on a timetable stage without one |
 | `/stages/:id/start-order/unfreeze` | POST | back to live; 409 unless the stage is `NOT_STARTED` |
@@ -61,6 +61,8 @@ the public page reads: `/auth/session`, `/version`, `/time`, GET
 | `/stage-runs/splits?stageId=` | GET | every split of every attempt on the stage, one request per page |
 | `/stage-runs/:id/finish` | POST | "Finish now": hand-timed finish stamped with the server clock. 409 if already finished, voided or the stage is closed |
 | `/stage-runs/:id/void`, `/unvoid` | POST | red flag / reverse it — see "Voiding" in `event-model.md`. Unvoid 409s with `params.blockingAttempt` |
+| `/stage-runs/:id/retire`, `/unretire` | POST | DNF on the stage, at once, and its undo (`event-model.md` "DNF and DNS"). 409 `runNotRetirable` unless the run is open, `stageAlreadyClosed` once the stage is closed; unretire 409s `otherAttemptCounts` if the car started another run since (shakedown). Needs `correctRun` |
+| `/stage-runs/dns` | GET `?stageId=`, POST `{ entryId, stageId }`, `/undo` POST | DNS rows `{ entryId, stageId }`; POST marks one and deletes an untouched slot run, `/undo` deletes it. 409 `stageNotStarted`, `stageAlreadyClosed`, `dnsOnShakedown`, `attemptAlreadyCounts` (a counting run), `entryOutOfEvent`. A start passing, Start now, a countdown or POST `/stage-runs` deletes the row. Changes need `correctRun` |
 | `/stage-runs/countdown` | POST `{ stageId, entryId }` | the Countdown button: a run whose `startTime` and `plannedStartTime` are the slot, server clock now + `countdownMs`, at least `minStartGapMs` after the stage's latest slot. 409 `stageNotActive`, `notManualStart` (not `SLOT_MANUAL`), `entryAlreadyStarting` (queued, on stage, or finished on a counted stage; on a shakedown it is the next run), `entryOutOfEvent`. Recorded in the change history (`event-model.md` "Start slots") |
 | `/stage-runs/:id/cancel-countdown` | POST | deletes the slot run, recorded; 409 `countdownNotCancellable` once it has a start passing or a finish |
 | `/stages/:id/timetable/delay` | POST `{ delayMs }` | Delay (`SLOT_SCHEDULE`): `delayMs` ≥ 1, never forward (400). Before activation the first start moves; while active, every slot run still ahead whose car hasn't left. Recorded with no entry. 409 `notTimetableStart`, `noFirstStart`, `stageNotActive` (closed) |
@@ -77,7 +79,7 @@ the public page reads: `/auth/session`, `/version`, `/time`, GET
 | `/classification/stages/:stageId` | GET | ranked with gaps |
 | `/classification/stages/:stageId/split-gates` | GET | the stage's split points |
 | `/classification/stages/:stageId/splits/:splitIndex` | GET | live, includes `STARTED` runs, excludes `CANCELLED` |
-| `/classification/stages/:stageId/non-finishers` | GET | DNF; DNS only once the stage is `CLOSED`; DSQ for a disqualified car that drove it, at any time. Disqualified cars are in no ranking (`event-model.md` "Entry status") |
+| `/classification/stages/:stageId/non-finishers` | GET | DNF (a retired run) and DNS (a DNS row of a car still in the event), from stored data at any time; DSQ for a disqualified car that drove it. Disqualified cars are in no ranking (`event-model.md` "Entry status") |
 | `/rally-info` | GET, PUT | the event's name/details and its `status` (server-owned); singleton, since one database is one event |
 | `/rally-info/start`, `/close`, `/reopen` | POST | `SETUP` → `RUNNING` → `CLOSED`, reopen back to `RUNNING`; 409 `rallyStatusInvalid` from any other status. Close 409s `carsOnStage` with `params.count`, else closes the running stages |
 | `/event` | GET, POST `{ name, date }`, `/open` POST `{ file }` | the open event file and the others in the folder, `switchable: false` when fixed by config. POST creates/opens by restarting the server (202, then poll GET); 409 while a stage is `ACTIVE` — see `deployment-modes.md` |
@@ -96,6 +98,7 @@ reconnect.
 
 - `detection`, `stage-run`, `stage-run-split` — the record as it changes
 - `stage-run-deleted` — `{ id, stageId }`: a cancelled countdown or a deleted run
+- `dns` — `{ entryId, stageId, dns }`: a DNS row written (`true`, by a marshal or closing the stage) or deleted
 - `stage` — `{ stageId }`: the stage or its start order changed (edit, freeze, unfreeze, activate, close, Delay, New slot); clients reload both, so a slot time is never stale on another screen. Public
 - `gate` — a `Gate` on each heartbeat
 - `gate-pairing` — `GatePairingState` on every change, a waiting gate's retry too
@@ -104,7 +107,7 @@ reconnect.
 - `rally` — `RallyInfo` on every change, status included; every stream
   carries it, so the app bar follows on any page with one
 
-Without a login the stream carries `stage-run`, `stage-run-deleted`, `stage-run-split` and `rally`
+Without a login the stream carries `stage-run`, `stage-run-deleted`, `stage-run-split`, `dns`, `stage` and `rally`
 only: passings, transponders and gates are internal.
 
 A gate's own configuration is not here: gate-config (`apps/gate`) serves it on the gate

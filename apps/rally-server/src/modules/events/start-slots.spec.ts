@@ -7,7 +7,6 @@ import {
   EntryStatus,
   GateRole,
   PRE_START_TRIGGER_MAX_AGE_MS,
-  StageRunStatus,
   StageScoring,
   StageStatus,
   StartMode,
@@ -15,12 +14,10 @@ import {
 } from '@rally-gate/shared';
 import { DataSource } from 'typeorm';
 import { ChangeRecord } from '../changes/change-record.entity';
+import { DidNotStart } from '../stage-runs/did-not-start.entity';
 import { StageRun } from '../stage-runs/stage-run.entity';
 import { StageSplit } from '../stage-runs/stage-split.entity';
-import {
-  deriveStageRunStatus,
-  StageRunsService,
-} from '../stage-runs/stage-runs.service';
+import { StageRunsService } from '../stage-runs/stage-runs.service';
 import { DetectionEventRecord } from './detection-event.entity';
 import { EventsService } from './events.service';
 
@@ -57,7 +54,13 @@ describe('start paths', () => {
     dataSource = new DataSource({
       type: 'better-sqlite3',
       database: ':memory:',
-      entities: [StageRun, StageSplit, DetectionEventRecord, ChangeRecord],
+      entities: [
+        StageRun,
+        StageSplit,
+        DidNotStart,
+        DetectionEventRecord,
+        ChangeRecord,
+      ],
       synchronize: true,
     });
     await dataSource.initialize();
@@ -98,6 +101,7 @@ describe('start paths', () => {
       stagesService as never,
       emitter as never,
       settings as never,
+      dataSource.getRepository(DidNotStart),
     );
     events = new EventsService(
       dataSource.getRepository(DetectionEventRecord),
@@ -872,30 +876,6 @@ describe('start paths', () => {
     it('marks a car at the start before its slot is due', async () => {
       await pass('PRE', new Date(), 0, '111');
       expect(await events.entriesAtStart('SS1')).toEqual(['v1']);
-    });
-  });
-
-  describe('a slot nobody drove', () => {
-    it('is DNS once the stage closes, a driven unfinished one DNF', () => {
-      const slot = new Date();
-      expect(
-        deriveStageRunStatus(
-          { finishTime: null, plannedStartTime: slot, startPassingAt: null },
-          true,
-        ),
-      ).toBe(StageRunStatus.DID_NOT_START);
-      expect(
-        deriveStageRunStatus(
-          { finishTime: null, plannedStartTime: slot, startPassingAt: slot },
-          true,
-        ),
-      ).toBe(StageRunStatus.CANCELLED);
-      expect(
-        deriveStageRunStatus(
-          { finishTime: null, plannedStartTime: slot, startPassingAt: null },
-          false,
-        ),
-      ).toBe(StageRunStatus.STARTED);
     });
   });
 });

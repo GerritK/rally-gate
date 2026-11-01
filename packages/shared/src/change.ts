@@ -12,6 +12,12 @@ export enum ChangeAction {
   RUN_VOIDED = 'RUN_VOIDED',
   RUN_RESTORED = 'RUN_RESTORED',
   RUN_DELETED = 'RUN_DELETED',
+  /** DNF on the stage, and its undo. */
+  RUN_RETIRED = 'RUN_RETIRED',
+  RUN_UNRETIRED = 'RUN_UNRETIRED',
+  /** DNS on the stage, and its undo: no run, so no snapshot. */
+  DNS_MARKED = 'DNS_MARKED',
+  DNS_UNDONE = 'DNS_UNDONE',
   /** A slot set by the Countdown button (`SLOT_MANUAL`). */
   COUNTDOWN_STARTED = 'COUNTDOWN_STARTED',
   COUNTDOWN_CANCELLED = 'COUNTDOWN_CANCELLED',

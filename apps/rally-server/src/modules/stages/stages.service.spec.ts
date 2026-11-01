@@ -61,6 +61,15 @@ function makeService(
       if (idx !== -1) state.splice(idx, 1);
       return Promise.resolve(undefined);
     }),
+    // Closing's transaction: no runs or entries here, `close-stage.spec.ts`
+    // has those against real sqlite.
+    manager: {
+      transaction: <T>(work: (manager: unknown) => Promise<T>) =>
+        work({
+          save: (_target: unknown, s: StageRow) => stages.save(s),
+          find: () => Promise.resolve([]),
+        }),
+    },
   };
   const gateAssignmentsService = {
     deactivateForStage: jest.fn().mockResolvedValue(undefined),

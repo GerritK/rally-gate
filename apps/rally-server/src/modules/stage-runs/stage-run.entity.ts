@@ -2,10 +2,9 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 /**
  * No `status` column — STARTED/FINISHED/CANCELLED is derived from
- * `finishTime` plus whether the stage has been closed, see
- * `deriveStageRunStatus` in `stage-runs.service.ts`. Storing it separately
- * would let it drift out of sync with the timestamps it's supposed to
- * summarize.
+ * `finishTime`, `retired` and `voided`, see `deriveStageRunStatus` in
+ * `stage-runs.service.ts`. Storing it separately would let it drift out of
+ * sync with the timestamps it's supposed to summarize.
  *
  * **Several rows per (entryId, stageId) are allowed** — a red-flagged stage
  * gets re-run, and the earlier attempt is kept as evidence rather than
@@ -30,10 +29,13 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
   unique: true,
   where: '"voided" = false',
 })
-/** At most one open run per entry+stage, a shakedown included. */
+/**
+ * At most one open run per entry+stage, a shakedown included. A retired
+ * run is closed: on a shakedown the car may start again after a DNF.
+ */
 @Index(['entryId', 'stageId'], {
   unique: true,
-  where: '"voided" = false AND "finishTime" IS NULL',
+  where: '"voided" = false AND "retired" = false AND "finishTime" IS NULL',
 })
 export class StageRun {
   @PrimaryGeneratedColumn('uuid')
@@ -65,6 +67,15 @@ export class StageRun {
    */
   @Column({ default: false })
   voided: boolean;
+
+  /**
+   * DNF on this stage: set by a marshal, or by closing the stage on a run
+   * still open. Unlike `voided` the run still counts, as a non-finish: it
+   * gets the notional time and blocks a restart on a counted stage. A gate
+   * finish after it times nothing; a finish typed in by correction clears it.
+   */
+  @Column({ default: false })
+  retired: boolean;
 
   /**
    * Set by a marshal (Start now / Finish now / a correction) instead of a

@@ -65,8 +65,8 @@ Roles decide what a login may **change**:
 | Role | May change |
 |---|---|
 | Organiser | everything, plus invitations and gate approval; alone disqualifies and reinstates (a jury decision) |
-| Timing | every stage: corrections, voiding, penalties, assigning passings, activate/close; withdraws entries |
-| Stage marshal | only the stages on its invitation: assigning passings, manual start/finish, corrections |
+| Timing | every stage: corrections, DNF/DNS, voiding, penalties, assigning passings, activate/close; withdraws entries |
+| Stage marshal | only the stages on its invitation: assigning passings, manual start/finish, corrections, DNF/DNS |
 | Check-in | entries and transponders, check-in and scrutineering steps, withdrawing |
 
 The table is `PERMISSIONS` in `packages/shared/src/permissions.ts`, read by
@@ -108,7 +108,8 @@ A login is a **device with a role**, not a person with a password.
   change to a result is a `ChangeRecord` with the **device id** (null: the
   server machine) and the value before and after, and the entry page's
   History names it "Anna – Start SS2 · device 2". Recorded: Start now, Finish
-  now, typed and corrected times, void/restore/delete, penalties added and
+  now, typed and corrected times, void/restore/delete, DNF and DNS and their
+  undo, penalties added and
   deleted, passings assigned and dismissed, entry status changes. Not
   recorded: setup edits, gate-timed passings (those are `DetectionEventRecord`
   already). Append-only, written in the change's own transaction. What it

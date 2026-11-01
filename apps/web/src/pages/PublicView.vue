@@ -2,7 +2,7 @@
 import { countingRun } from '../counting-run';
 import { isQueued } from '../countdown';
 import { serverNow } from '../api/time';
-import { StageRunStatus, StageStatus } from '@rally-gate/shared';
+import { StageRunStatus } from '@rally-gate/shared';
 import { t } from '@rally-gate/ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -14,7 +14,7 @@ import {
 } from '../api/classification';
 import { fetchEntryClasses, type EntryClass } from '../api/entry-classes';
 import { closeLiveStream, openLiveStream } from '../api/live';
-import { fetchStageRuns, type StageRun } from '../api/stage-runs';
+import { fetchDns, fetchStageRuns, type StageRun } from '../api/stage-runs';
 import { fetchStages, type Stage } from '../api/stages';
 import { fetchStartOrder, type StartOrder } from '../api/start-order';
 import { classFilterLabel, useClassQuery } from '../class-query';
@@ -44,6 +44,7 @@ const classes = ref<EntryClass[]>([]);
 const selectedClassIds = useClassQuery();
 const startOrder = ref<StartOrder | null>(null);
 const stageRuns = ref<StageRun[]>([]);
+const dnsIds = ref<string[]>([]);
 const stageResults = ref<StageResults | null>(null);
 const overall = ref<OverallPlacing[] | null>(null);
 let liveSource: EventSource;
@@ -106,7 +107,7 @@ const rows = computed(() =>
           run?.status === StageRunStatus.FINISHED ||
           run?.status === StageRunStatus.CANCELLED
         ? run.status
-        : stage.value?.status === StageStatus.CLOSED
+        : dnsIds.value.includes(starter.entryId)
           ? 'dns'
           : 'waiting';
     return {
@@ -124,11 +125,13 @@ async function refresh() {
     overall.value = await fetchOverallClassification(selectedClassIds.value);
     return;
   }
-  [startOrder.value, stageRuns.value, stageResults.value] = await Promise.all([
-    fetchStartOrder(stageId),
-    fetchStageRuns(stageId),
-    fetchStageResults(stageId, selectedClassIds.value),
-  ]);
+  [startOrder.value, stageRuns.value, stageResults.value, dnsIds.value] =
+    await Promise.all([
+      fetchStartOrder(stageId),
+      fetchStageRuns(stageId),
+      fetchStageResults(stageId, selectedClassIds.value),
+      fetchDns(stageId).then((rows) => rows.map((row) => row.entryId)),
+    ]);
 }
 
 watch(() => [props.stageId, route.query.classes], refresh);
@@ -142,6 +145,7 @@ onMounted(async () => {
       'stage-run': () => void refresh(),
       'stage-run-deleted': () => void refresh(),
       'stage-run-split': () => void refresh(),
+      dns: () => void refresh(),
       stage: () => void refresh(),
     },
     () => void refresh(),

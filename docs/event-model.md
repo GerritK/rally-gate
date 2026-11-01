@@ -60,7 +60,7 @@ automatically**: a wrong assignment is a wrong time nobody notices in the
 results. (A start passing on a slot stage is the exception, since it sets no
 time: "Start slots".) Passings are matched in time order. At a start gate the
 suggestion is the first car yet to start, so an early start doesn't skip the cars before it
-and a no-show stays suggested until it is withdrawn; at a
+and a no-show stays suggested until it is marked DNS or withdrawn; at a
 split or finish gate it is the first car on stage in expected arrival order —
 most splits passed, then the earlier start (at a split, one without that split
 yet). An overtake is just a suggestion the marshal
@@ -131,9 +131,9 @@ Application-set `Date`s keep milliseconds on both drivers —
 `timestamp-precision.spec.ts` pins that against real sqlite.
 
 `status` is derived on read, never stored (`deriveStageRunStatus`): `FINISHED`
-once `finishTime` is set, otherwise `STARTED`, or `CANCELLED` (DNF) once the
-stage is closed; `VOIDED` if voided. Closing a stage therefore writes nothing to
-its runs.
+once `finishTime` is set, otherwise `STARTED`, or `CANCELLED` (DNF) once
+`retired`; `VOIDED` if voided. Nothing in it depends on the stage: closing
+writes DNF and DNS ("DNF and DNS").
 
 `startManual`/`finishManual` record which ends a marshal set by hand: Start
 now, Finish now (both stamped with the server clock) or a correction. A hand
@@ -160,6 +160,51 @@ ends stay gate-timed.
 `POST /stage-runs/:id/unvoid` reverses it and 409s with `{ blockingAttempt }`
 if another attempt already counts. It refuses rather than cascades: discarding a
 run the car actually drove is a call the marshal makes explicitly.
+
+### DNF and DNS
+
+Both are per stage and stored, so a result never derives them. Withdrawn is
+a different thing: the car is out of the rally (an entry status, set at the
+desk); DNF and DNS say what happened on one stage. A marshal sets either at
+once in Live Timing, which is why neither waits for the stage to close: a
+broken-down car otherwise stayed "On stage", and an absent one stayed
+suggested in Up next and on the start card. Both and their undo take the
+correction permission (a stage marshal on their own stages, the
+organiser), are locked once the rally is closed, and end with the stage: a
+closed stage's DNF and DNS are final (`stageAlreadyClosed`). In the change
+history.
+
+**DNF** is `StageRun.retired` (`POST /stage-runs/:id/retire`, undone by
+`/unretire`), only on an open run. The run reads `CANCELLED`, leaves On stage
+and the live split ranking, and is listed among the stage's non-finishers at
+once; in the overall it costs the notional time like any missing finish. It
+still counts, so a counted stage refuses a restart. A finish passing after
+it is stored as evidence and times nothing; a finish entered by Correct
+clears it, being the marshal's explicit call. On a shakedown DNF only ends
+the open run: the car may start again (the open-run index skips retired
+runs), and undoing the old DNF then 409s like unvoid.
+
+**DNS** is a `DidNotStart` row `(entryId, stageId)` (`POST /stage-runs/dns`,
+undone by `/dns/undo`), not a run: a run has a start time, and a DNS row must
+stay out of the open-run index and `countingRuns`. Only on a running stage,
+for a car with no counting run, never for a car out of the event or on a
+shakedown. An untouched slot run (no start passing, no split) doesn't count:
+DNS deletes it like Cancel deletes a countdown, so the slot stays empty and
+nobody moves up; the start card skips the car. The car leaves Up next and is
+listed as DNS in the stage results. If it turns up after all, a start
+passing, Start now, a countdown or a run entered by hand deletes the row and
+starts it normally.
+
+**Closing a stage writes both**, in the transaction that sets `CLOSED`
+(`writeClose`, also when a forced activation closes a stage): every open run
+becomes DNF; a slot run without a start passing becomes DNF if it has a
+split, else it is deleted and becomes DNS (on a shakedown just deleted); and
+every car without a counting run gets a DNS row, except one out of the event
+and except on a shakedown. A run typed in on a closed stage without a finish
+is DNF at once, and so is one whose finish a correction clears there: no run
+is open on a closed stage. A crew registered (or reinstated) after the stage
+closed gets no row there and isn't listed as DNS, but still the notional
+time, which depends on having no counting run, not on the label.
 
 ## StageSplit
 
@@ -449,10 +494,10 @@ On a combined start/finish gate, passings before slot + `minDurationMs` are
 the start passing (checked for a jump start); the first one after is the
 finish.
 
-A slot nobody drove becomes DNS when the stage closes, like any missing run:
-derived (`DID_NOT_START`), close writes nothing. "Nobody drove" is no start
-passing and no finish, so a car the start gate missed that never finished
-reads DNS too, which costs the same notional time.
+A slot nobody drove becomes DNS when the stage closes: closing deletes the
+slot run and writes a DNS row ("DNF and DNS"). "Nobody drove" is no start
+passing, no split and no finish, so a car the start gate missed that never
+reached a split reads DNS too, which costs the same notional time.
 
 ### Countdown
 
@@ -523,7 +568,8 @@ open run per entry+stage and Live Timing's queue work unchanged. Runs on a
 stage that hasn't run would have shown as started on every results page.
 
 - A car already out of the event at activation gets no run and leaves its
-  gap; one withdrawn later keeps its run, DNS at close.
+  gap; one withdrawn later keeps its run, which closing deletes if nobody
+  drove it, writing no DNS (out of the event is neither).
 - Before activation a late crew is appended to the list and takes the next
   slot by position; after it, a run at last slot + interval, none for a crew
   registered as out of the event.

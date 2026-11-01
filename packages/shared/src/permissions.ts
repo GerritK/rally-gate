@@ -14,6 +14,7 @@ export const PERMISSIONS = {
   activateStage: [AccessRole.TIMING],
   /** Start now, Countdown, a typed start, Finish now. */
   timeRun: [AccessRole.TIMING, AccessRole.STAGE_MARSHAL],
+  /** Correct a run's times; DNF and DNS, and their undo. */
   correctRun: [AccessRole.TIMING, AccessRole.STAGE_MARSHAL],
   /** Void, unvoid, delete an attempt. */
   voidRun: [AccessRole.TIMING],

@@ -22,12 +22,18 @@ function makeService(
   stage: { status: StageStatus },
   runs: unknown[],
   entries: unknown[],
+  dnsEntryIds: string[] = [],
 ) {
   const stagesService = {
     findOneOrFail: jest.fn().mockResolvedValue(stage),
   } as unknown as StagesService;
   const stageRunsService = {
     findByStage: jest.fn().mockResolvedValue(runs),
+    findDns: jest
+      .fn()
+      .mockResolvedValue(
+        dnsEntryIds.map((entryId) => ({ entryId, stageId: 'WP1' })),
+      ),
   } as unknown as StageRunsService;
   const entriesService = {
     findAll: jest.fn().mockResolvedValue(entries),
@@ -508,48 +514,20 @@ describe('ClassificationService.getNonFinishers', () => {
     { id: 'v3', startNumber: 3, driverFirstName: 'Finished' },
   ];
 
-  it('reports no one while the stage is still open, even with no runs yet', async () => {
-    const service = makeService(
-      { status: StageStatus.NOT_STARTED },
-      [],
-      entries,
-    );
+  it('reports no one without a stored DNF or DNS, even with no runs yet', async () => {
+    const runs = [{ entryId: 'v1', finishTime: undefined, retired: false }];
+    const service = makeService({ status: StageStatus.ACTIVE }, runs, entries);
     expect(await service.getNonFinishers('WP1')).toEqual([]);
   });
 
-  it('reports no one before the stage closes, even with an unfinished run — it is still running, not DNF', async () => {
-    const runs = [{ entryId: 'v1', finishTime: undefined }];
-    const service = makeService(
-      { status: StageStatus.NOT_STARTED },
-      runs,
-      entries,
-    );
-    expect(await service.getNonFinishers('WP1')).toEqual([]);
-  });
-
-  it('reports DNF (unfinished run) and DNS (no run at all) once the stage is closed', async () => {
+  it('lists a retired run as DNF and a DNS row as DNS at once, before the stage closes', async () => {
     const runs = [
-      { entryId: 'v1', finishTime: undefined },
+      { entryId: 'v1', finishTime: undefined, retired: true },
       { entryId: 'v3', finishTime: new Date() },
     ];
-    const service = makeService({ status: StageStatus.CLOSED }, runs, entries);
-    const result = await service.getNonFinishers('WP1');
-    expect(result).toEqual([
-      expect.objectContaining({ entryId: 'v1', outcome: 'DNF' }),
-      expect.objectContaining({ entryId: 'v2', outcome: 'DNS' }),
+    const service = makeService({ status: StageStatus.ACTIVE }, runs, entries, [
+      'v2',
     ]);
-  });
-
-  it('reports a slot nobody drove as DNS, one driven and unfinished as DNF', async () => {
-    const slot = new Date('2026-11-01T10:00:00Z');
-    const runs = [
-      // Passed the start, never finished.
-      { entryId: 'v1', plannedStartTime: slot, startPassingAt: slot },
-      // Counted down, never came.
-      { entryId: 'v2', plannedStartTime: slot, startPassingAt: null },
-      { entryId: 'v3', finishTime: new Date() },
-    ];
-    const service = makeService({ status: StageStatus.CLOSED }, runs, entries);
     expect(await service.getNonFinishers('WP1')).toEqual([
       expect.objectContaining({ entryId: 'v1', outcome: 'DNF' }),
       expect.objectContaining({ entryId: 'v2', outcome: 'DNS' }),
@@ -566,18 +544,27 @@ describe('ClassificationService.getNonFinishers', () => {
         status: EntryStatus.DISQUALIFIED,
       },
     ];
-    const runs = [{ entryId: 'v4', finishTime: undefined }];
+    const runs = [{ entryId: 'v4', finishTime: undefined, retired: true }];
     const open = makeService({ status: StageStatus.ACTIVE }, runs, withDsq);
     expect(await open.getNonFinishers('WP1')).toEqual([
       expect.objectContaining({ entryId: 'v4', outcome: 'DSQ' }),
     ]);
 
-    // Closed, its unfinished run is DSQ, not DNF; and a disqualified car
-    // that never ran isn't a DNS.
+    // Its retired run is DSQ, not DNF; and a car out of the event since its
+    // DNS row was written isn't a DNS.
     const closed = makeService(
       { status: StageStatus.CLOSED },
       [...runs, { entryId: 'v3', finishTime: new Date() }],
-      withDsq,
+      [
+        ...withDsq,
+        {
+          id: 'v5',
+          startNumber: 5,
+          driverFirstName: 'Withdrawn',
+          status: EntryStatus.WITHDRAWN,
+        },
+      ],
+      ['v1', 'v2', 'v5'],
     );
     const outcomes = (await closed.getNonFinishers('WP1')).map((e) => [
       e.entryId,

@@ -12,8 +12,8 @@ import {
   StageOutcome,
   StageRunStatus,
   StageScoring,
-  StageStatus,
   EntryStatus,
+  isOutOfEvent,
 } from '@rally-gate/shared';
 import { countsInOverall } from '../stages/stages.service';
 import { apiError } from '../../common/api-error';
@@ -97,8 +97,8 @@ export class ClassificationService {
    * times" in `docs/event-model.md`) rather than simply a shorter total —
    * otherwise retiring early would look like winning.
    *
-   * Only **CLOSED** stages count, the same trigger `getNonFinishers` uses: a
-   * stage still running has no result to penalise anyone against. So the
+   * Only **CLOSED** stages count: a stage still running has no result to
+   * penalise anyone against. So the
    * overall table moves when a stage closes, not continuously during one.
    * And only those scored `OVERALL`: here a shakedown or qualifying stage is
    * as if it never ran, so driving only one doesn't classify a crew.
@@ -228,7 +228,7 @@ export class ClassificationService {
     splitIndex: number,
     classIds: string[] = [],
   ): Promise<SplitPlacing[]> {
-    const stage = await this.stagesService.findOneOrFail(stageId);
+    await this.stagesService.findOneOrFail(stageId);
     const entries = await this.entriesService.findAll();
     const inClass = await this.rankable(classIds, entries);
     const pairs = (
@@ -239,14 +239,13 @@ export class ClassificationService {
       (a, b) => a.split.elapsedMs - b.split.elapsedMs,
     );
     const leaderMs = sorted[0]?.split.elapsedMs ?? 0;
-    const stageClosed = stage.status === StageStatus.CLOSED;
     return sorted.map((pair, index) => ({
       position: index + 1,
       ...rowOf(entryById, pair.run.entryId),
       splitIndex,
       elapsedMs: pair.split.elapsedMs,
       gapMs: pair.split.elapsedMs - leaderMs,
-      stageRunStatus: deriveStageRunStatus(pair.run, stageClosed),
+      stageRunStatus: deriveStageRunStatus(pair.run),
     }));
   }
 
@@ -254,7 +253,7 @@ export class ClassificationService {
     stageId: string,
     classIds: string[] = [],
   ): Promise<StageOutcome[]> {
-    const stage = await this.stagesService.findOneOrFail(stageId);
+    await this.stagesService.findOneOrFail(stageId);
     const entries = await this.entriesService.findAll();
     const inClass = await this.classFilter(classIds, entries);
     const runs = await this.stageRunsService.findByStage(stageId);
@@ -271,30 +270,23 @@ export class ClassificationService {
       .filter((entryId) => disqualified.has(entryId))
       .map((entryId) => toOutcome(entryId, 'DSQ'));
 
-    if (stage.status !== StageStatus.CLOSED) {
-      // Before the stage closes, an unfinished run is still running, not DNF,
-      // and "no run yet" just means "hasn't started" — not DNS.
-      return dsq.filter((row) => inClass(row.entryId));
-    }
-    // A slot nobody drove is a DNS like a car with no run at all.
-    const driven = runs.filter(
-      (run) => deriveStageRunStatus(run, true) !== StageRunStatus.DID_NOT_START,
-    );
-    const dnf = driven
-      .filter((run) => !run.finishTime && !disqualified.has(run.entryId))
-      .map((run) => toOutcome(run.entryId, 'DNF'));
-    const startedEntryIds = new Set(driven.map((run) => run.entryId));
-    const dns = entries
+    // Both stored, by a marshal or by closing the stage, so listed at once.
+    const dnf = runs
       .filter(
-        (entry) =>
-          !startedEntryIds.has(entry.id) &&
-          // A withdrawn or excluded car isn't a "did not start" — it wasn't
-          // entered in the stage at all, so listing it alongside crews who
-          // were due out and failed to appear misrepresents both.
-          entry.status !== EntryStatus.WITHDRAWN &&
-          entry.status !== EntryStatus.DISQUALIFIED,
+        (run) =>
+          deriveStageRunStatus(run) === StageRunStatus.CANCELLED &&
+          !disqualified.has(run.entryId),
       )
-      .map((entry) => toOutcome(entry.id, 'DNS'));
+      .map((run) => toOutcome(run.entryId, 'DNF'));
+    // A car withdrawn or excluded since isn't a "did not start": it is out
+    // of the event, and listing it beside crews who failed to appear
+    // misrepresents both.
+    const dns = (await this.stageRunsService.findDns(stageId))
+      .filter((row) => {
+        const entry = entryById.get(row.entryId);
+        return !!entry && !isOutOfEvent(entry.status);
+      })
+      .map((row) => toOutcome(row.entryId, 'DNS'));
     return [...dnf, ...dns, ...dsq].filter((row) => inClass(row.entryId));
   }
 

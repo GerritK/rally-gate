@@ -1,4 +1,5 @@
 import type {
+  DidNotStart,
   GatePairingState,
   LiveEventType,
   RallyStatus,
@@ -15,6 +16,7 @@ interface LivePayloads {
   'stage-run': StageRun;
   'stage-run-deleted': { id: string; stageId: string };
   'stage-run-split': StageSplit;
+  dns: DidNotStart & { dns: boolean };
   gate: Gate;
   'gate-pairing': GatePairingState;
   'pending-detections': { pending: DetectionEventRecord[] };

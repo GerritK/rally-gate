@@ -77,30 +77,32 @@ describe('countingRuns', () => {
 });
 
 describe('deriveStageRunStatus', () => {
-  it('is FINISHED once a finishTime is set, regardless of stage closed', () => {
-    const run = { finishTime: new Date() };
-    expect(deriveStageRunStatus(run, false)).toBe(StageRunStatus.FINISHED);
-    expect(deriveStageRunStatus(run, true)).toBe(StageRunStatus.FINISHED);
+  it('is FINISHED once a finishTime is set', () => {
+    expect(deriveStageRunStatus({ finishTime: new Date() })).toBe(
+      StageRunStatus.FINISHED,
+    );
   });
 
-  it('is STARTED when unfinished and the stage is still open', () => {
-    expect(deriveStageRunStatus({ finishTime: undefined }, false)).toBe(
+  it('is STARTED when unfinished and not retired', () => {
+    expect(deriveStageRunStatus({ finishTime: undefined })).toBe(
       StageRunStatus.STARTED,
     );
   });
 
-  it('is CANCELLED when unfinished and the stage has been closed', () => {
-    expect(deriveStageRunStatus({ finishTime: undefined }, true)).toBe(
+  it('is CANCELLED when retired, a DNF', () => {
+    expect(deriveStageRunStatus({ finishTime: null, retired: true })).toBe(
       StageRunStatus.CANCELLED,
     );
   });
 
   it('is VOIDED ahead of FINISHED, even with a finish time recorded', () => {
     const run = { finishTime: new Date(), voided: true };
-    expect(deriveStageRunStatus(run, false)).toBe(StageRunStatus.VOIDED);
-    expect(deriveStageRunStatus(run, true)).toBe(StageRunStatus.VOIDED);
+    expect(deriveStageRunStatus(run)).toBe(StageRunStatus.VOIDED);
   });
 });
+
+/** No DNS rows: the run paths here clear none. */
+const noDns = () => ({ delete: jest.fn().mockResolvedValue({ affected: 0 }) });
 
 function makeService(
   run: Record<string, unknown> | null,
@@ -120,6 +122,7 @@ function makeService(
     stagesService as never,
     emitter as never,
     {} as never,
+    noDns() as never,
   );
   return { service, stageRuns, emitter };
 }
@@ -162,6 +165,7 @@ describe('StageRunsService.findSplitsForStageAtIndex', () => {
       } as never,
       { emit: jest.fn() } as never,
       {} as never,
+      noDns() as never,
     );
 
     const pairs = await service.findSplitsForStageAtIndex('s1', 1);
@@ -267,7 +271,7 @@ describe('StageRunsService.correctRun', () => {
     expect(corrected.status).toBe(StageRunStatus.STARTED);
   });
 
-  it('reports CANCELLED when finishTime is cleared and the stage is closed', async () => {
+  it('makes the run DNF again when finishTime is cleared on a closed stage', async () => {
     const { service } = makeService(
       { ...baseRun },
       { status: StageStatus.CLOSED },
@@ -352,6 +356,7 @@ describe('StageRunsService.unvoidRun', () => {
         stagesService as never,
         { emit: jest.fn() } as never,
         {} as never,
+        noDns() as never,
       ),
       stageRuns,
     };
@@ -417,6 +422,7 @@ describe('StageRunsService.createManual', () => {
       stagesService as never,
       emitter as never,
       {} as never,
+      noDns() as never,
     );
 
     await expect(
@@ -443,6 +449,7 @@ describe('StageRunsService.createManual', () => {
       { findOne: jest.fn().mockResolvedValue(null) } as never,
       { emit: jest.fn() } as never,
       {} as never,
+      noDns() as never,
     );
     const before = Date.now();
 
@@ -488,6 +495,7 @@ describe('StageRunsService.finishNow', () => {
       stagesService as never,
       emitter as never,
       {} as never,
+      noDns() as never,
     );
     return { service, stageRuns, emitter };
   }
@@ -535,6 +543,7 @@ describe('StageRunsService.startOrFinishRun', () => {
       {} as never,
       {} as never,
       {} as never,
+      noDns() as never,
     );
     const internals = service as unknown as {
       findActive: () => Promise<StageRun | null>;
@@ -650,6 +659,7 @@ describe('StageRunsService.startRun', () => {
       stagesService as never,
       { emit: jest.fn() } as never,
       {} as never,
+      noDns() as never,
     );
 
     const result = await service.startRun(
@@ -693,6 +703,7 @@ describe('StageRunsService.startRun', () => {
         stagesService as never,
         { emit: jest.fn() } as never,
         {} as never,
+        noDns() as never,
       );
       return { service, stageRuns };
     }

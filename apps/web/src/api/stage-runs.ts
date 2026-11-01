@@ -1,4 +1,4 @@
-import { StageRunStatus } from '@rally-gate/shared';
+import type { DidNotStart, StageRunStatus } from '@rally-gate/shared';
 import {
   apiFetch,
   deleteRequest,
@@ -19,6 +19,8 @@ export interface StageRun {
   attempt: number;
   /** Struck out by a marshal (red flag) — kept as evidence, counts for nothing. */
   voided: boolean;
+  /** DNF on this stage: by a marshal, or the stage closed with it open. */
+  retired: boolean;
   /** Hand-set (Start now / Finish now / a correction) rather than gate-timed. */
   startManual: boolean;
   finishManual: boolean;
@@ -113,4 +115,33 @@ export function voidStageRun(id: string): Promise<StageRun> {
  */
 export function unvoidStageRun(id: string): Promise<StageRun> {
   return postRequest(`/stage-runs/${id}/unvoid`);
+}
+
+/** DNF on the stage, at once. */
+export function retireStageRun(id: string): Promise<StageRun> {
+  return postRequest(`/stage-runs/${id}/retire`);
+}
+
+/** Until the stage closes. */
+export function unretireStageRun(id: string): Promise<StageRun> {
+  return postRequest(`/stage-runs/${id}/unretire`);
+}
+
+/** DNS rows, of one stage or all. */
+export function fetchDns(stageId?: string): Promise<DidNotStart[]> {
+  return apiFetch(
+    stageId
+      ? `/stage-runs/dns?stageId=${encodeURIComponent(stageId)}`
+      : '/stage-runs/dns',
+  );
+}
+
+/** Only without a counting run; deletes an untouched slot run. */
+export function markDns(row: DidNotStart): Promise<void> {
+  return postJson('/stage-runs/dns', row);
+}
+
+/** Until the stage closes. */
+export function undoDns(row: DidNotStart): Promise<void> {
+  return postJson('/stage-runs/dns/undo', row);
 }

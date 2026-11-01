@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import {
   ApiErrorCode,
   RallyStatus,
+  StageRunStatus,
   StageScoring,
   StageStatus,
   StartMode,
@@ -16,6 +17,7 @@ import { Not, Repository } from 'typeorm';
 import { apiError } from '../../common/api-error';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { RallyInfoService } from '../rally-info/rally-info.service';
+import { writeClose } from './close-stage';
 import { CreateStageDto, UpdateStageDto } from './dto';
 import { Stage } from './stage.entity';
 
@@ -160,15 +162,31 @@ export class StagesService {
   /**
    * Closing a stage also deactivates its gates — a closed stage shouldn't
    * keep recording detections against it (`EventsService` only checks
-   * `GateAssignment.active`, not `Stage.status`). Any still-unfinished run
-   * becomes CANCELLED for free since that status is derived, not stored.
+   * `GateAssignment.active`, not `Stage.status`). It writes DNF and DNS
+   * with the status (`writeClose`), so results never derive them.
    */
   async close(id: string): Promise<Stage> {
     const stage = await this.findOneOrFail(id);
     const wasActive = stage.status === StageStatus.ACTIVE;
     await this.gateAssignmentsService.deactivateForStage(id);
     stage.status = StageStatus.CLOSED;
-    const saved = await this.stages.save(stage);
+    const { saved, retired, unstarted, dns } =
+      await this.stages.manager.transaction((manager) =>
+        writeClose(manager, stage),
+      );
+    for (const run of retired) {
+      this.emitter.emit('stage-run.updated', {
+        ...run,
+        retired: true,
+        status: StageRunStatus.CANCELLED,
+      });
+    }
+    for (const run of unstarted) {
+      this.emitter.emit('stage-run.deleted', { id: run.id, stageId: id });
+    }
+    for (const row of dns) {
+      this.emitter.emit('dns.changed', { ...row, dns: true });
+    }
     // Only a stage that ran: a never-activated one's gates may be timing
     // another stage right now, and their passings belong to that one.
     if (wasActive) {
@@ -192,7 +210,7 @@ export class StagesService {
    * closed (not just deactivated) — its gates are gone either way, so
    * anything still `STARTED` on it can never get a real finish detection
    * again; closing marks those DNF instead of leaving them stuck `STARTED`
-   * forever (see `close`'s CANCELLED-on-close behavior).
+   * forever (`close` writes them).
    *
    * Before Start rally only a stage outside the overall runs (shakedown,
    * qualifying), so a rally never starts unnoticed; once closed, none.

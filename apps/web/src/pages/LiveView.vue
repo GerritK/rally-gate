@@ -14,6 +14,7 @@ import {
   StageScoring,
   StageStatus,
   StartMode,
+  type DidNotStart,
   type Starter,
 } from '@rally-gate/shared';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -59,6 +60,11 @@ import {
   fetchSplitsForStage,
   finishStageRunNow,
   fetchStageRuns,
+  fetchDns,
+  markDns,
+  retireStageRun,
+  undoDns,
+  unretireStageRun,
   unvoidStageRun,
   voidStageRun,
   type StageRun,
@@ -119,6 +125,8 @@ const pendingDetections = ref<DetectionEventRecord[]>([]);
 const awaitingDetections = ref<DetectionEventRecord[]>([]);
 /** Entries seen at a pre-start gate since their last run. */
 const atStartIds = ref<string[]>([]);
+/** Entries marked DNS on this stage. */
+const dnsIds = ref<string[]>([]);
 /** Only what a marshal picked by hand; otherwise the suggestion applies. */
 const pickedEntryIds = ref<Record<string, string>>({});
 const flashingGateIds = ref<Record<string, boolean>>({});
@@ -275,10 +283,10 @@ const rows = computed<Row[]>(() => {
     } else if (run?.status === StageRunStatus.STARTED) state = 'ON_STAGE';
     else if (run?.status === StageRunStatus.FINISHED) state = 'FINISHED';
     else if (run?.status === StageRunStatus.CANCELLED) state = 'DNF';
-    else if (run?.status === StageRunStatus.DID_NOT_START) state = 'DNS';
     else if (entry && isOutOfEvent(entry.status)) state = 'OUT';
+    else if (dnsIds.value.includes(starter.entryId)) state = 'DNS';
     else if (voidedRuns.length > 0 && !closed) state = 'RERUN';
-    else state = closed ? 'DNS' : 'WAITING';
+    else state = 'WAITING';
     return {
       starter,
       run,
@@ -828,6 +836,76 @@ async function onUnvoidRun(run: StageRun) {
   upsertStageRun(await unvoidStageRun(run.id));
 }
 
+/** DNF, DNS and their undo: a marshal on a running stage. */
+const canDnfDns = computed(
+  () =>
+    stage.value?.status === StageStatus.ACTIVE &&
+    can('correctRun', stage.value.id),
+);
+
+/** Not on a shakedown, nor for a car out of the event: neither is a DNS. */
+function canMarkDns(entryId: string): boolean {
+  const entry = entryById.value.get(entryId);
+  return (
+    canDnfDns.value &&
+    !shakedown.value &&
+    !!entry &&
+    !isOutOfEvent(entry.status) &&
+    !dnsIds.value.includes(entryId)
+  );
+}
+
+function startNumberOf(entryId: string): number | undefined {
+  return entryById.value.get(entryId)?.startNumber;
+}
+
+async function onRetire(run: StageRun) {
+  const number = startNumberOf(run.entryId);
+  if (
+    !(await confirm({
+      title: t('live.dnfTitle', { number }),
+      text: t('live.dnfText'),
+      confirmText: t('live.dnfConfirm', { number }),
+    }))
+  )
+    return;
+  upsertStageRun(await retireStageRun(run.id));
+}
+
+async function onUnretire(run: StageRun) {
+  upsertStageRun(await unretireStageRun(run.id));
+}
+
+function applyDns({ entryId, stageId, dns }: DidNotStart & { dns: boolean }) {
+  if (stageId !== props.stageId) return;
+  const others = dnsIds.value.filter((id) => id !== entryId);
+  dnsIds.value = dns ? [...others, entryId] : others;
+}
+
+/** A slot run it had goes through the live stream's `stage-run-deleted`. */
+async function onMarkDns(entryId: string) {
+  if (!props.stageId) return;
+  const number = startNumberOf(entryId);
+  if (
+    !(await confirm({
+      title: t('live.dnsTitle', { number }),
+      text: t('live.dnsText'),
+      confirmText: t('live.dnsConfirm', { number }),
+    }))
+  )
+    return;
+  const row = { entryId, stageId: props.stageId };
+  await markDns(row);
+  applyDns({ ...row, dns: true });
+}
+
+async function onUndoDns(entryId: string) {
+  if (!props.stageId) return;
+  const row = { entryId, stageId: props.stageId };
+  await undoDns(row);
+  applyDns({ ...row, dns: false });
+}
+
 async function onDeleteRun(run: StageRun) {
   if (
     !(await confirm({
@@ -1015,16 +1093,19 @@ async function loadStage() {
     stageRuns.value = [];
     splitsByRun.value = {};
     atStartIds.value = [];
+    dnsIds.value = [];
     return;
   }
-  const [order, runs, splits] = await Promise.all([
+  const [order, runs, splits, dns] = await Promise.all([
     fetchStartOrder(props.stageId),
     fetchStageRuns(props.stageId),
     fetchSplitsForStage(props.stageId),
+    fetchDns(props.stageId),
     loadAtStart(),
   ]);
   startOrder.value = order;
   stageRuns.value = runs;
+  dnsIds.value = dns.map((row) => row.entryId);
   const byRun: Record<string, StageSplit[]> = {};
   for (const split of splits) {
     (byRun[split.stageRunId] ??= []).push(split);
@@ -1124,6 +1205,7 @@ onMounted(async () => {
         if (run.stageId === props.stageId) void loadAtStart();
       },
       'stage-run-split': upsertSplit,
+      dns: applyDns,
       // Another screen moved a slot, delayed, froze or activated.
       stage: ({ stageId }) => void reloadStage(stageId),
       'pending-detections': ({ pending }) => {
@@ -1346,11 +1428,13 @@ onUnmounted(() => {
       :lights="stage.startMode !== StartMode.GATE"
       :delay-ms="startOrder?.delayMs"
       :busy-id="startingEntryId"
+      :can-dns="canDnfDns && !shakedown"
       @start-now="onStartNow"
       @countdown="onCountdown"
       @cancel="onCancelCountdown"
       @new-slot="onNewSlot"
       @delay="openDelay"
+      @dns="onMarkDns"
     />
     <!-- Shown before activation too, so activating doesn't reflow the page. -->
     <div>
@@ -1459,6 +1543,24 @@ onUnmounted(() => {
                 >
                   {{ $t('live.finishNow') }}
                 </v-btn>
+                <v-menu v-if="canDnfDns">
+                  <template #activator="{ props: menu }">
+                    <v-btn
+                      v-bind="menu"
+                      size="small"
+                      variant="text"
+                      icon="mdi-dots-vertical"
+                      :aria-label="$t('common.moreActions')"
+                    />
+                  </template>
+                  <v-list density="compact">
+                    <v-list-item
+                      prepend-icon="mdi-close"
+                      :title="$t('live.markDnf')"
+                      @click="onRetire(car.run)"
+                    />
+                  </v-list>
+                </v-menu>
               </td>
             </tr>
           </tbody>
@@ -1637,7 +1739,10 @@ onUnmounted(() => {
                 v-if="
                   !row.run &&
                   stage.status !== StageStatus.NOT_STARTED &&
-                  (can('timeRun', stage.id) || can('penalties'))
+                  (can('timeRun', stage.id) ||
+                    can('penalties') ||
+                    canMarkDns(row.starter.entryId) ||
+                    (row.state === 'DNS' && canDnfDns))
                 "
               >
                 <template #activator="{ props: menu }">
@@ -1662,9 +1767,28 @@ onUnmounted(() => {
                     :title="$t('penalties.add')"
                     @click="penaltyDialog?.add(row.starter.entryId, stage.id)"
                   />
+                  <v-list-item
+                    v-if="canMarkDns(row.starter.entryId)"
+                    prepend-icon="mdi-minus-circle-outline"
+                    :title="$t('live.markDns')"
+                    @click="onMarkDns(row.starter.entryId)"
+                  />
+                  <v-list-item
+                    v-if="row.state === 'DNS' && canDnfDns"
+                    prepend-icon="mdi-undo"
+                    :title="$t('live.undoDns')"
+                    @click="onUndoDns(row.starter.entryId)"
+                  />
                 </v-list>
               </v-menu>
-              <v-menu v-if="row.run && (can('penalties') || can('voidRun'))">
+              <v-menu
+                v-if="
+                  row.run &&
+                  (can('penalties') ||
+                    can('voidRun') ||
+                    (canDnfDns && ['ON_STAGE', 'DNF'].includes(row.state)))
+                "
+              >
                 <template #activator="{ props: menu }">
                   <v-btn
                     v-bind="menu"
@@ -1680,6 +1804,18 @@ onUnmounted(() => {
                     prepend-icon="mdi-flag-variant-outline"
                     :title="$t('penalties.add')"
                     @click="penaltyDialog?.add(row.run!.entryId, stage.id)"
+                  />
+                  <v-list-item
+                    v-if="canDnfDns && row.state === 'ON_STAGE'"
+                    prepend-icon="mdi-close"
+                    :title="$t('live.markDnf')"
+                    @click="onRetire(row.run!)"
+                  />
+                  <v-list-item
+                    v-if="canDnfDns && row.state === 'DNF'"
+                    prepend-icon="mdi-undo"
+                    :title="$t('live.undoDnf')"
+                    @click="onUnretire(row.run!)"
                   />
                   <v-list-item
                     v-if="can('voidRun')"

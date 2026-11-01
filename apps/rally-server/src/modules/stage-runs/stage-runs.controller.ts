@@ -18,6 +18,7 @@ import { EntriesService } from '../entries/entries.service';
 import {
   CorrectStageRunDto,
   CreateStageRunDto,
+  DnsDto,
   StartCountdownDto,
 } from './dto';
 import { DelaySlotsDto, NewSlotDto } from '../stages/dto';
@@ -43,6 +44,47 @@ export class StageRunsController {
   @Get('splits')
   findSplitsForStage(@Query('stageId') stageId: string) {
     return this.stageRunsService.findSplitsForStage(stageId);
+  }
+
+  /** DNS rows, of one stage or all; the public start list shows them. */
+  @Public()
+  @Get('dns')
+  findDns(@Query('stageId') stageId?: string) {
+    return this.stageRunsService.findDns(stageId);
+  }
+
+  /** DNS on the stage: only without a counting run, never for a car out of
+   *  the event or on a shakedown. Deletes an untouched slot run. */
+  @LockedWhen(RallyStatus.CLOSED)
+  @Requires('correctRun')
+  @Post('dns')
+  async markDns(
+    @Body() body: DnsDto,
+    @CurrentPrincipal() principal: Principal,
+  ) {
+    assertMay(principal, 'correctRun', body.stageId);
+    await this.assertInEvent(body.entryId);
+    await this.stageRunsService.markDns(
+      body.entryId,
+      body.stageId,
+      deviceOf(principal),
+    );
+  }
+
+  /** Until the stage closes. */
+  @LockedWhen(RallyStatus.CLOSED)
+  @Requires('correctRun')
+  @Post('dns/undo')
+  async undoDns(
+    @Body() body: DnsDto,
+    @CurrentPrincipal() principal: Principal,
+  ) {
+    assertMay(principal, 'correctRun', body.stageId);
+    await this.stageRunsService.undoDns(
+      body.entryId,
+      body.stageId,
+      deviceOf(principal),
+    );
   }
 
   /** Start now, or a time entered by hand. 409 for a car out of the event:
@@ -153,6 +195,38 @@ export class StageRunsController {
   @Post(':id/unvoid')
   unvoid(@Param('id') id: string, @CurrentPrincipal() principal: Principal) {
     return this.stageRunsService.unvoidRun(id, deviceOf(principal));
+  }
+
+  /** DNF on the stage, at once; 409 on a finished, voided or closed run. */
+  @LockedWhen(RallyStatus.CLOSED)
+  @Requires('correctRun')
+  @Post(':id/retire')
+  async retire(
+    @Param('id') id: string,
+    @CurrentPrincipal() principal: Principal,
+  ) {
+    assertMay(
+      principal,
+      'correctRun',
+      await this.stageRunsService.stageIdOf(id),
+    );
+    return this.stageRunsService.retireRun(id, deviceOf(principal));
+  }
+
+  /** Undoes a DNF until the stage closes. */
+  @LockedWhen(RallyStatus.CLOSED)
+  @Requires('correctRun')
+  @Post(':id/unretire')
+  async unretire(
+    @Param('id') id: string,
+    @CurrentPrincipal() principal: Principal,
+  ) {
+    assertMay(
+      principal,
+      'correctRun',
+      await this.stageRunsService.stageIdOf(id),
+    );
+    return this.stageRunsService.unretireRun(id, deviceOf(principal));
   }
 
   @LockedWhen(RallyStatus.CLOSED)
