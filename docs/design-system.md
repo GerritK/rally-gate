@@ -322,6 +322,8 @@ status on the right.
 - `gate-config`: "Gate Config" small above the gate's name. That line names
   the tool, not the product: the two apps look alike on purpose, and a
   marshal switching between them on a phone needs to see which one is open.
+  Right: language, the agent's status chip, an icon on a phone (its text,
+  an error message included, is in the Status card).
 
 ## Logo
 

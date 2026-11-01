@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useDisplay } from 'vuetify';
 import {
   LocaleMenu,
   logoUrl,
@@ -83,6 +84,14 @@ const decoder = ref<DecoderStatus | null>(null);
 let decoderTimer: ReturnType<typeof setInterval> | undefined;
 
 const agentOnline = computed(() => status.value?.agent.output === 'active');
+const agentText = computed(() =>
+  agentOnline.value
+    ? t('gateConfig.running')
+    : (status.value?.agent.output ?? t('gateConfig.unknown')),
+);
+// A phone has room for the gate's name only with the app bar's chip as an
+// icon; the Status card spells it out.
+const { xs } = useDisplay();
 
 // Wording, icons and threshold as the dashboard's GateClockChips.
 const clockChip = computed(() => {
@@ -458,15 +467,22 @@ onUnmounted(() => {
              timing values follow (see packages/ui/theme.ts). -->
         <v-chip
           :color="agentOnline ? 'success' : 'error'"
-          :prepend-icon="agentOnline ? 'mdi-check-circle' : 'mdi-alert-circle'"
+          :prepend-icon="
+            xs
+              ? undefined
+              : agentOnline
+                ? 'mdi-check-circle'
+                : 'mdi-alert-circle'
+          "
           size="small"
           variant="flat"
+          :aria-label="agentText"
         >
-          {{
-            agentOnline
-              ? t('gateConfig.running')
-              : (status?.agent.output ?? t('gateConfig.unknown'))
-          }}
+          <v-icon
+            v-if="xs"
+            :icon="agentOnline ? 'mdi-check-circle' : 'mdi-alert-circle'"
+          />
+          <template v-else>{{ agentText }}</template>
         </v-chip>
       </template>
     </v-app-bar>
@@ -498,11 +514,7 @@ onUnmounted(() => {
                   size="small"
                   variant="flat"
                 >
-                  {{
-                    agentOnline
-                      ? t('gateConfig.running')
-                      : (status?.agent.output ?? t('gateConfig.unknown'))
-                  }}
+                  {{ agentText }}
                 </v-chip>
               </dd>
               <dt>{{ t('gateConfig.clock') }}</dt>
