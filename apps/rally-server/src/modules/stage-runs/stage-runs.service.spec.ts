@@ -119,6 +119,7 @@ function makeService(
     stageSplits as never,
     stagesService as never,
     emitter as never,
+    {} as never,
   );
   return { service, stageRuns, emitter };
 }
@@ -160,6 +161,7 @@ describe('StageRunsService.findSplitsForStageAtIndex', () => {
         findOne: jest.fn().mockResolvedValue({ status: StageStatus.ACTIVE }),
       } as never,
       { emit: jest.fn() } as never,
+      {} as never,
     );
 
     const pairs = await service.findSplitsForStageAtIndex('s1', 1);
@@ -349,6 +351,7 @@ describe('StageRunsService.unvoidRun', () => {
         {} as never,
         stagesService as never,
         { emit: jest.fn() } as never,
+        {} as never,
       ),
       stageRuns,
     };
@@ -413,6 +416,7 @@ describe('StageRunsService.createManual', () => {
       {} as never,
       stagesService as never,
       emitter as never,
+      {} as never,
     );
 
     await expect(
@@ -438,6 +442,7 @@ describe('StageRunsService.createManual', () => {
       {} as never,
       { findOne: jest.fn().mockResolvedValue(null) } as never,
       { emit: jest.fn() } as never,
+      {} as never,
     );
     const before = Date.now();
 
@@ -482,6 +487,7 @@ describe('StageRunsService.finishNow', () => {
       {} as never,
       stagesService as never,
       emitter as never,
+      {} as never,
     );
     return { service, stageRuns, emitter };
   }
@@ -524,6 +530,7 @@ describe('StageRunsService.startOrFinishRun', () => {
 
   function makeCombinedService(open: StageRun | null) {
     const service = new StageRunsService(
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -642,6 +649,7 @@ describe('StageRunsService.startRun', () => {
       {} as never,
       stagesService as never,
       { emit: jest.fn() } as never,
+      {} as never,
     );
 
     const result = await service.startRun(
@@ -684,6 +692,7 @@ describe('StageRunsService.startRun', () => {
         {} as never,
         stagesService as never,
         { emit: jest.fn() } as never,
+        {} as never,
       );
       return { service, stageRuns };
     }

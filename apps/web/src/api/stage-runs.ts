@@ -22,6 +22,11 @@ export interface StageRun {
   /** Hand-set (Start now / Finish now / a correction) rather than gate-timed. */
   startManual: boolean;
   finishManual: boolean;
+  /** The slot on a slot stage, also its start time; null when gate-started. */
+  plannedStartTime: string | null;
+  /** The earliest start passing on a slot stage: the jump-start evidence. */
+  startPassingAt: string | null;
+  jumpStartDismissed: boolean;
 }
 
 export interface StageSplit {
@@ -66,6 +71,25 @@ export function correctStageRun(
 /** Hand-timed finish, stamped by the server. 409 if already finished. */
 export function finishStageRunNow(id: string): Promise<StageRun> {
   return postRequest(`/stage-runs/${id}/finish`);
+}
+
+/** The Countdown button: queues the car's slot. 409 if it is queued, on
+ *  stage, or finished a counted stage. */
+export function startCountdown(input: {
+  entryId: string;
+  stageId: string;
+}): Promise<StageRun> {
+  return postJson('/stage-runs/countdown', input);
+}
+
+/** 409 once the car passed the start. */
+export function cancelCountdown(id: string): Promise<void> {
+  return postRequest(`/stage-runs/${id}/cancel-countdown`);
+}
+
+/** No penalty for this jump start; the mark stays. */
+export function dismissJumpStart(id: string): Promise<StageRun> {
+  return postRequest(`/stage-runs/${id}/dismiss-jump-start`);
 }
 
 export function deleteStageRun(id: string): Promise<void> {

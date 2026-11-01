@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { countingRun } from '../counting-run';
+import { isQueued } from '../countdown';
+import { serverNow } from '../api/time';
 import { StageRunStatus, StageStatus } from '@rally-gate/shared';
 import { t } from '@rally-gate/ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -91,15 +93,22 @@ const rows = computed(() =>
     const run = countingRun(
       stageRuns.value.filter((r) => r.entryId === starter.entryId),
     );
-    const state =
-      run?.status === StageRunStatus.STARTED ||
-      run?.status === StageRunStatus.FINISHED ||
-      run?.status === StageRunStatus.CANCELLED
+    // A car counting down hasn't left yet: it isn't ticking.
+    const queued = isQueued(run, serverNow.value);
+    const state = queued
+      ? 'waiting'
+      : run?.status === StageRunStatus.STARTED ||
+          run?.status === StageRunStatus.FINISHED ||
+          run?.status === StageRunStatus.CANCELLED
         ? run.status
         : stage.value?.status === StageStatus.CLOSED
           ? 'dns'
           : 'waiting';
-    return { starter, run, display: STATE_DISPLAY[state] };
+    return {
+      starter,
+      run: queued ? undefined : run,
+      display: STATE_DISPLAY[state],
+    };
   }),
 );
 
@@ -126,6 +135,7 @@ onMounted(async () => {
   liveSource = openLiveStream(
     {
       'stage-run': () => void refresh(),
+      'stage-run-deleted': () => void refresh(),
       'stage-run-split': () => void refresh(),
     },
     () => void refresh(),

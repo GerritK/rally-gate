@@ -104,7 +104,7 @@ One line each; the linked doc has the detail. History is in git.
   order, each its own commit:
   1. Slot model, `SLOT_MANUAL` with the Countdown button, the start card
      with countdown, sound and fullscreen, the jump-start mark and penalty.
-     Plan the card's layout first.
+     Done.
   2. `stage_pre_start`: at the start in every mode, the trigger in
      `SLOT_MANUAL`.
   3. `SLOT_SCHEDULE`: first start and interval, slots stored on freeze, New

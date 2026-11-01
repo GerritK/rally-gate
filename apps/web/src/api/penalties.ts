@@ -58,8 +58,9 @@ export function deletePenaltyType(id: string): Promise<void> {
   return deleteRequest(`/penalty-types/${id}`);
 }
 
-export function fetchPenalties(entryId: string): Promise<Penalty[]> {
-  return apiFetch(`/penalties?entryId=${entryId}`);
+/** One entry's, or every penalty of the rally. */
+export function fetchPenalties(entryId?: string): Promise<Penalty[]> {
+  return apiFetch(entryId ? `/penalties?entryId=${entryId}` : '/penalties');
 }
 
 /** 409 on a stage that hasn't started. */

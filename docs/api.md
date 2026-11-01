@@ -51,7 +51,7 @@ the public page reads: `/auth/session`, `/version`, `/time`, GET
 | `/entry-classes` | GET, POST, `/:id` PUT/DELETE | `{ name, main? }`, name unique (409), main classes listed first. DELETE takes the class off its entries |
 | `/penalty-types` | GET, POST, `/:id` PUT/DELETE | `{ name, scope, tiers: [{ fromCount, seconds }] }`, tiers from 1 ascending (400), name unique (409). PUT reprices given penalties, DELETE deletes them |
 | `/penalties` | GET `?entryId=`, POST, `/:id` DELETE | `{ entryId, stageId?, typeId?, count?, seconds?, note? }`: a type, or free text with `seconds` and `note` (400). 409 on a stage not started. Read back with its computed `penaltyMs` (`event-model.md` "Penalties") |
-| `/stages` | GET, POST, `/:id` GET/PUT/DELETE | sorted by `stageNumber`; `status` is server-owned |
+| `/stages` | GET, POST, `/:id` GET/PUT/DELETE | sorted by `stageNumber`; `status` is server-owned. `startMode` `GATE` or `SLOT_MANUAL` (`SLOT_SCHEDULE` is a 400 until its timetable is built), editable like the rest only while `NOT_STARTED` |
 | `/stages/:id/activate` | POST | activates the stage's gate assignments. 409 `otherStageActive` with `params.conflictingStageIds` if a gate is active elsewhere (`?force=true` closes that stage), 409 if already `CLOSED`, `startRallyFirst` for a stage scored `OVERALL` before the rally starts, `lockedWhileClosed` once it is closed |
 | `/stages/:id/close` | POST | deactivates its gates, marks it `CLOSED`. Terminal |
 | `/stages/:id/start-order` | GET | `{ frozen, frozenAt, grouped, entries }`; computed live until frozen. See `event-model.md` "Start order" |
@@ -61,6 +61,9 @@ the public page reads: `/auth/session`, `/version`, `/time`, GET
 | `/stage-runs/splits?stageId=` | GET | every split of every attempt on the stage, one request per page |
 | `/stage-runs/:id/finish` | POST | "Finish now": hand-timed finish stamped with the server clock. 409 if already finished, voided or the stage is closed |
 | `/stage-runs/:id/void`, `/unvoid` | POST | red flag / reverse it — see "Voiding" in `event-model.md`. Unvoid 409s with `params.blockingAttempt` |
+| `/stage-runs/countdown` | POST `{ stageId, entryId }` | the Countdown button: a run whose `startTime` and `plannedStartTime` are the slot, server clock now + `countdownMs`, at least `minStartGapMs` after the stage's latest slot. 409 `stageNotActive`, `notManualStart` (not `SLOT_MANUAL`), `entryAlreadyStarting` (queued, on stage, or finished on a counted stage; on a shakedown it is the next run), `entryOutOfEvent`. Recorded in the change history (`event-model.md` "Start slots") |
+| `/stage-runs/:id/cancel-countdown` | POST | deletes the slot run, recorded; 409 `countdownNotCancellable` once it has a start passing or a finish |
+| `/stage-runs/:id/dismiss-jump-start` | POST | sets `jumpStartDismissed`: the marshal gives no penalty, the mark stays. 409 `noJumpStart`. Needs `penalties` |
 | `/events` | GET | the 100 most recent detections; `?gateId=` for one gate's |
 | `/events/awaiting-entry` | GET | unassigned passings (no transponder, or one on several entries) at live gates, oldest first |
 | `/events/:eventId/assign` | POST `{ entryId }` | times the passing as that entry; 409 when the rules would do nothing (e.g. finish before start) |
@@ -76,7 +79,7 @@ the public page reads: `/auth/session`, `/version`, `/time`, GET
 | `/rally-info/start`, `/close`, `/reopen` | POST | `SETUP` → `RUNNING` → `CLOSED`, reopen back to `RUNNING`; 409 `rallyStatusInvalid` from any other status. Close 409s `carsOnStage` with `params.count`, else closes the running stages |
 | `/event` | GET, POST `{ name, date }`, `/open` POST `{ file }` | the open event file and the others in the folder, `switchable: false` when fixed by config. POST creates/opens by restarting the server (202, then poll GET); 409 while a stage is `ACTIVE` — see `deployment-modes.md` |
 | `/event/known-gates` | GET, `/:id` DELETE | gates this computer remembers across events (standalone only); DELETE forgets one, the open event keeps it |
-| `/settings/:key` | GET, PUT | `clockCorrectionThresholdMs`, `notionalPenaltyMs`, `startOrderGrouping`/`startOrderKey`/`startOrderDirection` (enums in `packages/shared/src/start-order.ts`; an unknown value reads as the default) |
+| `/settings/:key` | GET, PUT | `clockCorrectionThresholdMs`, `notionalPenaltyMs`, `startOrderGrouping`/`startOrderKey`/`startOrderDirection` (enums in `packages/shared/src/start-order.ts`; an unknown value reads as the default), `countdownMs`, `jumpStartToleranceMs` (locked once the rally runs), `minStartGapMs`, `jumpStartPenaltyTypeId` (empty: only mark) |
 
 Every mutating endpoint binds a DTO class, and unknown fields are a 400 — see
 `apps/rally-server/CLAUDE.md` for which fields are deliberately absent.
@@ -89,6 +92,7 @@ and the dashboard freezes. Clients refetch in `onopen`, which also fires on ever
 reconnect.
 
 - `detection`, `stage-run`, `stage-run-split` — the record as it changes
+- `stage-run-deleted` — `{ id, stageId }`: a cancelled countdown or a deleted run
 - `gate` — a `Gate` on each heartbeat
 - `gate-pairing` — `GatePairingState` on every change, a waiting gate's retry too
 - `pending-detections` — `{ pending }`, `awaiting-detections` — `{ awaiting }`:
@@ -96,7 +100,7 @@ reconnect.
 - `rally` — `RallyInfo` on every change, status included; every stream
   carries it, so the app bar follows on any page with one
 
-Without a login the stream carries `stage-run`, `stage-run-split` and `rally`
+Without a login the stream carries `stage-run`, `stage-run-deleted`, `stage-run-split` and `rally`
 only: passings, transponders and gates are internal.
 
 A gate's own configuration is not here: gate-config (`apps/gate`) serves it on the gate

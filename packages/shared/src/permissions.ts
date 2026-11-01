@@ -12,7 +12,7 @@ export const PERMISSIONS = {
   setup: [],
   /** Activate and close a stage. */
   activateStage: [AccessRole.TIMING],
-  /** Start now, a typed start, Finish now. */
+  /** Start now, Countdown, a typed start, Finish now. */
   timeRun: [AccessRole.TIMING, AccessRole.STAGE_MARSHAL],
   correctRun: [AccessRole.TIMING, AccessRole.STAGE_MARSHAL],
   /** Void, unvoid, delete an attempt. */

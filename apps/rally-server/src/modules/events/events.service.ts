@@ -17,17 +17,24 @@ import {
   DetectionEvent,
   GateRole,
   isOutOfEvent,
+  isSlotStart,
+  SLOT_PASSING_AFTER_MS,
   StageStatus,
   TransponderKind,
 } from '@rally-gate/shared';
 import { In, Repository } from 'typeorm';
 import { apiError } from '../../common/api-error';
 import { recordChange } from '../changes/record-change';
+import type { GateAssignment } from '../gates/gate-assignment.entity';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { Gate } from '../gates/gate.entity';
 import { GatesService } from '../gates/gates.service';
 import { EntriesService } from '../entries/entries.service';
-import { StageRunsService } from '../stage-runs/stage-runs.service';
+import {
+  StageRunsService,
+  type StageRunWithStatus,
+} from '../stage-runs/stage-runs.service';
+import type { Stage } from '../stages/stage.entity';
 import { StagesService } from '../stages/stages.service';
 import { DetectionEventRecord } from './detection-event.entity';
 
@@ -459,12 +466,9 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         `Transponder ${transponderId} is on ${matches.length} entries — holding the passing for a marshal`,
       );
     }
-    // Only a passing at a live gate needs a marshal; one at an idle gate (setup,
-    // someone walking through) has nothing to be timed against.
-    const awaitingEntry =
-      (!transponderId || shared) &&
-      !!gate &&
-      !!(await this.gateAssignmentsService.findActiveForGate(gate.id));
+    const assignment = gate
+      ? await this.gateAssignmentsService.findActiveForGate(gate.id)
+      : null;
 
     // Gate clocks are independent of each other and of the server's, so a
     // duration built from two gates' raw timestamps carries their
@@ -475,12 +479,26 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       : 0;
     const timestampGate = new Date(detection.timestampGate);
 
+    const unidentified = !transponderId || shared;
+    // The one automatic assignment: a start passing on a slot stage sets no
+    // time, only the jump-start mark a marshal confirms.
+    const slotRun =
+      unidentified && assignment
+        ? await this.slotRunNear(
+            assignment,
+            new Date(timestampGate.getTime() + clockCorrectionMs),
+          )
+        : null;
+    // Only a passing at a live gate needs a marshal; one at an idle gate (setup,
+    // someone walking through) has nothing to be timed against.
+    const awaitingEntry = unidentified && !!assignment && !slotRun;
+
     const record = this.events.create({
       eventId: detection.eventId,
       gateId: detection.gateId,
       transponderId: transponderId ?? null,
       transponderKind,
-      entryId: entry?.id ?? null,
+      entryId: entry?.id ?? slotRun?.entryId ?? null,
       awaitingEntry,
       timestampGate,
       timestampServer: new Date(),
@@ -615,6 +633,17 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       );
       return false;
     }
+    if (isSlotStart(stage.startMode)) {
+      const slotRole = await this.applySlotRules(
+        stage,
+        assignment,
+        entryId,
+        at,
+      );
+      if (slotRole !== undefined) {
+        return slotRole;
+      }
+    }
     if (assignment.role === GateRole.STAGE_START) {
       const run = await this.stageRunsService.startRun(entryId, stageId, at);
       this.emitter.emit('stage-run.updated', run);
@@ -661,6 +690,70 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       return this.awaitsStart(entryId, stageId);
     }
     return false;
+  }
+
+  /**
+   * A slot stage's start and combined gates (`docs/event-model.md` "Start
+   * slots"): a passing there never opens a run, the slot did. Undefined for
+   * the roles that work as on any stage.
+   */
+  private async applySlotRules(
+    stage: Stage,
+    assignment: GateAssignment,
+    entryId: string,
+    at: Date,
+  ): Promise<boolean | undefined> {
+    let run: StageRunWithStatus | null;
+    if (assignment.role === GateRole.STAGE_START) {
+      run = await this.stageRunsService.recordStartPassing(
+        entryId,
+        stage.id,
+        at,
+      );
+    } else if (assignment.role === GateRole.STAGE_START_FINISH) {
+      run = await this.stageRunsService.slotStartOrFinish(
+        entryId,
+        stage.id,
+        at,
+        stage.minDurationMs ?? DEFAULT_MIN_STAGE_DURATION_MS,
+      );
+    } else {
+      return undefined;
+    }
+    if (!run) {
+      return false;
+    }
+    this.emitter.emit('stage-run.updated', run);
+    return [run.startTime, run.finishTime, run.startPassingAt].some(
+      (time) => time?.getTime() === at.getTime(),
+    );
+  }
+
+  /** The slot an unidentified start passing belongs to, if any. */
+  private async slotRunNear(assignment: GateAssignment, at: Date) {
+    const stage = await this.stagesService.findOne(assignment.stageId);
+    if (stage?.status !== StageStatus.ACTIVE || !isSlotStart(stage.startMode)) {
+      return null;
+    }
+    if (assignment.role === GateRole.STAGE_START) {
+      return this.stageRunsService.findSlotNear(
+        stage.id,
+        at,
+        SLOT_PASSING_AFTER_MS,
+      );
+    }
+    if (assignment.role === GateRole.STAGE_START_FINISH) {
+      // Later than slot + minDurationMs it is some car's finish.
+      return this.stageRunsService.findSlotNear(
+        stage.id,
+        at,
+        Math.min(
+          SLOT_PASSING_AFTER_MS,
+          stage.minDurationMs ?? DEFAULT_MIN_STAGE_DURATION_MS,
+        ),
+      );
+    }
+    return null;
   }
 
   /** Null when the entry has no run here, so the passing may wait for one. */

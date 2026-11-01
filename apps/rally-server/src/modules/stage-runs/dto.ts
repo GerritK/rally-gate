@@ -49,3 +49,13 @@ export class CorrectStageRunDto {
   @IsISO8601()
   finishTime?: string | null;
 }
+
+export class StartCountdownDto {
+  @IsString()
+  @IsNotEmpty()
+  entryId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  stageId: string;
+}

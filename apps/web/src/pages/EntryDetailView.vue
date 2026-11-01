@@ -152,7 +152,10 @@ function stageRow(
       label: 'DNF',
       color: runStatusColor(StageRunStatus.CANCELLED),
     };
-  } else if (!run && stage.status === StageStatus.CLOSED) {
+  } else if (
+    (!run && stage.status === StageStatus.CLOSED) ||
+    run?.status === StageRunStatus.DID_NOT_START
+  ) {
     state = { label: 'DNS', color: 'warning' };
   } else if (!run) {
     state = {

@@ -71,13 +71,20 @@ const timeRule = (value: string) =>
 const reasonRule = (value: string) =>
   !!value.trim() || !draft.value.time.trim() || t('common.required');
 
-async function add(forEntryId: string, stageId: string | null) {
+/** `preset` fills counts in, e.g. one of the jump-start type. */
+async function add(
+  forEntryId: string,
+  stageId: string | null,
+  preset: Record<string, number> = {},
+) {
   types.value = await fetchPenaltyTypes();
   entryId.value = forEntryId;
   fixedStage.value = props.stages.find((s) => s.id === stageId) ?? null;
   draft.value = {
     stageId: stageId ?? WHOLE_RALLY,
-    counts: Object.fromEntries(types.value.map((type) => [type.id, ''])),
+    counts: Object.fromEntries(
+      types.value.map((type) => [type.id, preset[type.id] ?? '']),
+    ),
     note: '',
     reason: '',
     time: '',

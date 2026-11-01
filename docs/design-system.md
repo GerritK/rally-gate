@@ -381,7 +381,9 @@ writing UI, check this list:
 - `RunningTime`: a running stage time ticking in tenths, its own timer so
   only it re-renders.
 - Live Timing's own: `GateFlow` (the gate line), `RunCorrectionDialog`,
-  `PenaltyDialog` (also on the entry page).
+  `PenaltyDialog` (also on the entry page), `UpNextCard` (with
+  `StartCountdown`, the lights and seconds on their own 100 ms timer),
+  `JumpStartChip`.
 - `PassingBlock`: the oldest unidentified passing with its picker, Assign
   and ⋮, later ones as a count, "Dismiss all".
 - `FormDialog`: every add/edit dialog (see Editing): saves on Enter, keeps

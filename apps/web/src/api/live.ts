@@ -13,6 +13,7 @@ import type { StageRun, StageSplit } from './stage-runs';
 interface LivePayloads {
   detection: DetectionEventRecord;
   'stage-run': StageRun;
+  'stage-run-deleted': { id: string; stageId: string };
   'stage-run-split': StageSplit;
   gate: Gate;
   'gate-pairing': GatePairingState;

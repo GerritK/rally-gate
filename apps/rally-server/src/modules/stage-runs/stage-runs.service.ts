@@ -10,15 +10,25 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   ApiErrorCode,
   ChangeAction,
+  COUNTDOWN_MS_KEY,
+  DEFAULT_COUNTDOWN_MS,
+  DEFAULT_JUMP_START_TOLERANCE_MS,
+  DEFAULT_MIN_START_GAP_MS,
+  JUMP_START_TOLERANCE_MS_KEY,
+  MIN_START_GAP_MS_KEY,
+  SLOT_PASSING_AFTER_MS,
+  SLOT_PASSING_BEFORE_MS,
   StageRunStatus,
   StageScoring,
   StageStatus,
+  StartMode,
   type RunSnapshot,
 } from '@rally-gate/shared';
-import { In, IsNull, Not, Repository } from 'typeorm';
+import { In, IsNull, MoreThan, Not, Or, Repository } from 'typeorm';
 import { apiError } from '../../common/api-error';
 import { isUniqueViolation } from '../../common/db-errors';
 import { recordChange, runSnapshot } from '../changes/record-change';
+import { SettingsService } from '../settings/settings.service';
 import { StagesService } from '../stages/stages.service';
 import { StageRun } from './stage-run.entity';
 import { StageSplit } from './stage-split.entity';
@@ -45,7 +55,8 @@ export type StageRunWithStatus = StageRun & { status: StageRunStatus };
 
 /** Status is derived, never stored — see the note on `StageRun`. */
 export function deriveStageRunStatus(
-  run: Pick<StageRun, 'finishTime'> & Partial<Pick<StageRun, 'voided'>>,
+  run: Pick<StageRun, 'finishTime'> &
+    Partial<Pick<StageRun, 'voided' | 'plannedStartTime' | 'startPassingAt'>>,
   stageClosed: boolean,
 ): StageRunStatus {
   // First: a voided run usually does have a finishTime, and FINISHED would
@@ -56,7 +67,18 @@ export function deriveStageRunStatus(
   if (run.finishTime) {
     return StageRunStatus.FINISHED;
   }
-  return stageClosed ? StageRunStatus.CANCELLED : StageRunStatus.STARTED;
+  if (!stageClosed) {
+    return StageRunStatus.STARTED;
+  }
+  return run.plannedStartTime && !run.startPassingAt
+    ? StageRunStatus.DID_NOT_START
+    : StageRunStatus.CANCELLED;
+}
+
+/** Whether a slot stage's start passing at `at` can belong to this slot. */
+function isNearSlot(slot: Date, at: Date, afterMs: number): boolean {
+  const offset = at.getTime() - slot.getTime();
+  return offset >= -SLOT_PASSING_BEFORE_MS && offset <= afterMs;
 }
 
 /**
@@ -159,7 +181,11 @@ export class StageRunsService {
     private readonly stageSplits: Repository<StageSplit>,
     private readonly stagesService: StagesService,
     private readonly emitter: EventEmitter2,
+    private readonly settings: SettingsService,
   ) {}
+
+  /** Serialises countdowns, so two at once can't take the same slot. */
+  private countdownQueue: Promise<unknown> = Promise.resolve();
 
   /** For the stage marshal check, before anything is changed. */
   async stageIdOf(id: string): Promise<string> {
@@ -403,6 +429,257 @@ export class StageRunsService {
     return this.finishRun(entryId, stageId, at);
   }
 
+  /**
+   * The Countdown button (`SLOT_MANUAL`): a run whose start time is its
+   * slot, server clock, queued behind the stage's latest slot. Refuses a car
+   * already queued or on stage, or finished on a counted stage (void first
+   * for a re-run); on a shakedown it is the car's next run.
+   */
+  startCountdown(
+    entryId: string,
+    stageId: string,
+    by: string | null,
+  ): Promise<StageRunWithStatus> {
+    const next = this.countdownQueue.then(() =>
+      this.queueSlot(entryId, stageId, by),
+    );
+    this.countdownQueue = next.catch(() => undefined);
+    return next;
+  }
+
+  private async queueSlot(
+    entryId: string,
+    stageId: string,
+    by: string | null,
+  ): Promise<StageRunWithStatus> {
+    const stage = await this.stagesService.findOneOrFail(stageId);
+    if (stage.status !== StageStatus.ACTIVE) {
+      throw new ConflictException(
+        apiError(
+          ApiErrorCode.STAGE_NOT_ACTIVE,
+          `Stage ${stageId} is ${stage.status}; countdowns run only on an active stage`,
+          { stage: stageId },
+        ),
+      );
+    }
+    if (stage.startMode !== StartMode.SLOT_MANUAL) {
+      throw new ConflictException(
+        apiError(
+          ApiErrorCode.NOT_MANUAL_START,
+          `Stage ${stageId} doesn't start by countdown`,
+          { stage: stageId },
+        ),
+      );
+    }
+    const shakedown = stage.scoring === StageScoring.NONE;
+    const busy =
+      (await this.findActive(entryId, stageId)) ??
+      (shakedown ? null : await this.findFinished(entryId, stageId));
+    if (busy) {
+      throw this.alreadyStarting(entryId, stageId);
+    }
+    const countdownMs = await this.settings.getNumber(
+      COUNTDOWN_MS_KEY,
+      DEFAULT_COUNTDOWN_MS,
+    );
+    const gapMs = await this.settings.getNumber(
+      MIN_START_GAP_MS_KEY,
+      DEFAULT_MIN_START_GAP_MS,
+    );
+    // Voided slots too: the line was taken at that time either way.
+    const latest = await this.stageRuns.findOne({
+      where: { stageId, plannedStartTime: Not(IsNull()) },
+      order: { plannedStartTime: 'DESC' },
+    });
+    const slot = new Date(
+      Math.max(
+        Date.now() + countdownMs,
+        (latest?.plannedStartTime?.getTime() ?? 0) + gapMs,
+      ),
+    );
+    const attempt = await this.nextAttempt(entryId, stageId);
+    const run = this.stageRuns.create({
+      entryId,
+      stageId,
+      attempt,
+      run: shakedown ? attempt : 1,
+      startTime: slot,
+      plannedStartTime: slot,
+    });
+    let saved: StageRun;
+    try {
+      saved = await this.saveRecorded(
+        run,
+        by,
+        ChangeAction.COUNTDOWN_STARTED,
+        null,
+      );
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        throw this.alreadyStarting(entryId, stageId);
+      }
+      throw err;
+    }
+    const withStatus = await this.withStatus(saved);
+    this.emitter.emit('stage-run.updated', withStatus);
+    return withStatus;
+  }
+
+  private alreadyStarting(entryId: string, stageId: string) {
+    return new ConflictException(
+      apiError(
+        ApiErrorCode.ENTRY_ALREADY_STARTING,
+        `Entry ${entryId} is already queued, on stage or finished on ${stageId}`,
+      ),
+    );
+  }
+
+  /**
+   * Deletes a slot until its car's first start passing; from then on the
+   * slot is its start time. Recorded: it was a countdown people saw.
+   */
+  async cancelCountdown(id: string, by: string | null): Promise<void> {
+    const run = await this.findOneOrFail(id);
+    if (
+      !run.plannedStartTime ||
+      run.startPassingAt ||
+      run.finishTime ||
+      run.voided
+    ) {
+      throw new ConflictException(
+        apiError(
+          ApiErrorCode.COUNTDOWN_NOT_CANCELLABLE,
+          `StageRun ${id} has no countdown left to cancel`,
+        ),
+      );
+    }
+    await this.deleteRecorded(run, by, ChangeAction.COUNTDOWN_CANCELLED);
+  }
+
+  /** The marshal ruled a jump start needs no penalty; the mark stays. */
+  async dismissJumpStart(
+    id: string,
+    by: string | null,
+  ): Promise<StageRunWithStatus> {
+    const run = await this.findOneOrFail(id);
+    const toleranceMs = await this.settings.getNumber(
+      JUMP_START_TOLERANCE_MS_KEY,
+      DEFAULT_JUMP_START_TOLERANCE_MS,
+    );
+    if (
+      !run.plannedStartTime ||
+      !run.startPassingAt ||
+      run.startPassingAt.getTime() >=
+        run.plannedStartTime.getTime() - toleranceMs
+    ) {
+      throw new ConflictException(
+        apiError(
+          ApiErrorCode.NO_JUMP_START,
+          `StageRun ${id} has no jump start`,
+        ),
+      );
+    }
+    const before = runSnapshot(run);
+    run.jumpStartDismissed = true;
+    const withStatus = await this.withStatus(
+      await this.saveRecorded(
+        run,
+        by,
+        ChangeAction.JUMP_START_DISMISSED,
+        before,
+      ),
+    );
+    this.emitter.emit('stage-run.updated', withStatus);
+    return withStatus;
+  }
+
+  /**
+   * The non-voided slot run nearest to a start passing at `at`, within slot
+   * −10 s to slot + `afterMs`; any car's when `entryId` is absent (a light
+   * barrier). Automatic assignment rests on this (`docs/event-model.md`).
+   */
+  async findSlotNear(
+    stageId: string,
+    at: Date,
+    afterMs: number,
+    entryId?: string,
+  ): Promise<StageRun | null> {
+    const runs = await this.stageRuns.find({
+      where: {
+        stageId,
+        voided: false,
+        plannedStartTime: Not(IsNull()),
+        ...(entryId ? { entryId } : {}),
+      },
+    });
+    const distance = (run: StageRun) =>
+      Math.abs(at.getTime() - run.plannedStartTime!.getTime());
+    return (
+      runs
+        .filter((run) => isNearSlot(run.plannedStartTime!, at, afterMs))
+        .sort((a, b) => distance(a) - distance(b))[0] ?? null
+    );
+  }
+
+  /**
+   * A start passing on a slot stage sets no time, only the evidence for the
+   * jump-start mark. The earliest counts, so a repeat or the car breaking
+   * the beam again changes nothing. Null when it is near none of the car's
+   * slots, or changed nothing.
+   */
+  async recordStartPassing(
+    entryId: string,
+    stageId: string,
+    at: Date,
+    afterMs = SLOT_PASSING_AFTER_MS,
+  ): Promise<StageRunWithStatus | null> {
+    const run = await this.findSlotNear(stageId, at, afterMs, entryId);
+    if (!run) {
+      this.logger.warn(
+        `Start passing ${at.toISOString()} for entry ${entryId} on ${stageId} is near none of its slots, ignoring it`,
+      );
+      return null;
+    }
+    // Conditional, so two passings processed at once keep the earlier one.
+    const { affected } = await this.stageRuns.update(
+      { id: run.id, startPassingAt: Or(IsNull(), MoreThan(at)) },
+      { startPassingAt: at },
+    );
+    if (!affected) {
+      return null;
+    }
+    return this.withStatus({ ...run, startPassingAt: at });
+  }
+
+  /**
+   * A combined start/finish gate on a slot stage: before slot +
+   * `minDurationMs` a passing is the start passing, the first after it the
+   * finish. A run without a slot (typed in by hand) goes the gate way.
+   */
+  async slotStartOrFinish(
+    entryId: string,
+    stageId: string,
+    at: Date,
+    minDurationMs: number,
+  ): Promise<StageRunWithStatus | null> {
+    const open = await this.findActive(entryId, stageId);
+    if (open && !open.plannedStartTime) {
+      return this.startOrFinishRun(entryId, stageId, at, minDurationMs);
+    }
+    if (
+      open?.plannedStartTime &&
+      at.getTime() >= open.plannedStartTime.getTime() + minDurationMs
+    ) {
+      return this.finishRun(entryId, stageId, at);
+    }
+    return this.recordStartPassing(
+      entryId,
+      stageId,
+      at,
+      Math.min(SLOT_PASSING_AFTER_MS, minDurationMs),
+    );
+  }
+
   async recordSplit(
     entryId: string,
     stageId: string,
@@ -414,6 +691,14 @@ export class StageRunsService {
     if (!run) {
       this.logger.warn(
         `No active stage run for entry ${entryId} on ${stageId}, ignoring split event`,
+      );
+      return null;
+    }
+    if (at.getTime() <= run.startTime.getTime()) {
+      // A negative elapsed time would lead the split ranking: a skewed
+      // clock, or a car passing a split before its slot.
+      this.logger.warn(
+        `Split ${at.toISOString()} is not after start ${run.startTime.toISOString()} for entry ${entryId} on ${stageId}, ignoring it`,
       );
       return null;
     }
@@ -620,18 +905,33 @@ export class StageRunsService {
   }
 
   async remove(id: string, by: string | null): Promise<void> {
-    const run = await this.findOneOrFail(id);
+    await this.deleteRecorded(
+      await this.findOneOrFail(id),
+      by,
+      ChangeAction.RUN_DELETED,
+    );
+  }
+
+  private async deleteRecorded(
+    run: StageRun,
+    by: string | null,
+    action: ChangeAction,
+  ): Promise<void> {
     await this.stageRuns.manager.transaction(async (manager) => {
       // No foreign keys, so splits don't cascade and have to go first.
-      await manager.delete(StageSplit, { stageRunId: id });
-      await manager.delete(StageRun, id);
+      await manager.delete(StageSplit, { stageRunId: run.id });
+      await manager.delete(StageRun, run.id);
       await recordChange(manager, by, {
-        action: ChangeAction.RUN_DELETED,
+        action,
         entryId: run.entryId,
         stageId: run.stageId,
         subjectId: run.id,
         before: runSnapshot(run),
       });
+    });
+    this.emitter.emit('stage-run.deleted', {
+      id: run.id,
+      stageId: run.stageId,
     });
   }
 

@@ -15,7 +15,11 @@ import { CurrentPrincipal, Requires, Public } from '../auth/auth.guard';
 import { assertMay, deviceOf, type Principal } from '../auth/auth.service';
 import { apiError } from '../../common/api-error';
 import { EntriesService } from '../entries/entries.service';
-import { CorrectStageRunDto, CreateStageRunDto } from './dto';
+import {
+  CorrectStageRunDto,
+  CreateStageRunDto,
+  StartCountdownDto,
+} from './dto';
 import { StageRunsService } from './stage-runs.service';
 import { LockedWhen } from '../rally-info/rally-lock';
 
@@ -50,13 +54,15 @@ export class StageRunsController {
     @CurrentPrincipal() principal: Principal,
   ) {
     assertMay(principal, 'timeRun', body.stageId);
-    const entry = await this.entriesService.findOne(body.entryId);
+    await this.assertInEvent(body.entryId);
+    return this.stageRunsService.createManual(body, deviceOf(principal));
+  }
+
+  private async assertInEvent(entryId: string): Promise<void> {
+    const entry = await this.entriesService.findOne(entryId);
     if (!entry) {
       throw new NotFoundException(
-        apiError(
-          ApiErrorCode.ENTRY_NOT_FOUND,
-          `Entry ${body.entryId} not found`,
-        ),
+        apiError(ApiErrorCode.ENTRY_NOT_FOUND, `Entry ${entryId} not found`),
       );
     }
     if (isOutOfEvent(entry.status)) {
@@ -68,7 +74,46 @@ export class StageRunsController {
         ),
       );
     }
-    return this.stageRunsService.createManual(body, deviceOf(principal));
+  }
+
+  /** The Countdown button on a `SLOT_MANUAL` stage: queues the car's slot. */
+  @LockedWhen(RallyStatus.CLOSED)
+  @Requires('timeRun')
+  @Post('countdown')
+  async startCountdown(
+    @Body() body: StartCountdownDto,
+    @CurrentPrincipal() principal: Principal,
+  ) {
+    assertMay(principal, 'timeRun', body.stageId);
+    await this.assertInEvent(body.entryId);
+    return this.stageRunsService.startCountdown(
+      body.entryId,
+      body.stageId,
+      deviceOf(principal),
+    );
+  }
+
+  /** Until the car's first start passing; 409 after. */
+  @LockedWhen(RallyStatus.CLOSED)
+  @Requires('timeRun')
+  @Post(':id/cancel-countdown')
+  async cancelCountdown(
+    @Param('id') id: string,
+    @CurrentPrincipal() principal: Principal,
+  ) {
+    assertMay(principal, 'timeRun', await this.stageRunsService.stageIdOf(id));
+    return this.stageRunsService.cancelCountdown(id, deviceOf(principal));
+  }
+
+  /** No penalty for this jump start; the mark stays. */
+  @LockedWhen(RallyStatus.CLOSED)
+  @Requires('penalties')
+  @Post(':id/dismiss-jump-start')
+  dismissJumpStart(
+    @Param('id') id: string,
+    @CurrentPrincipal() principal: Principal,
+  ) {
+    return this.stageRunsService.dismissJumpStart(id, deviceOf(principal));
   }
 
   @LockedWhen(RallyStatus.CLOSED)

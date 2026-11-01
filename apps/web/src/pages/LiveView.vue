@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import {
   ApiErrorCode,
+  DEFAULT_JUMP_START_TOLERANCE_MS,
   DEFAULT_MIN_STAGE_DURATION_MS,
   GateRole,
   isOutOfEvent,
   isScrutineered,
+  isSlotStart,
+  JUMP_START_PENALTY_TYPE_ID_KEY,
+  JUMP_START_TOLERANCE_MS_KEY,
   StageRunStatus,
   StageScoring,
   StageStatus,
+  StartMode,
   type Starter,
 } from '@rally-gate/shared';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -28,7 +33,10 @@ import {
 } from '../api/gate-assignments';
 import { fetchGates, type Gate } from '../api/gates';
 import { serverNow } from '../api/time';
+import { fetchSetting } from '../api/settings';
+import { fetchPenalties, type Penalty } from '../api/penalties';
 import { countingRun } from '../counting-run';
+import { isQueued } from '../countdown';
 import { closeLiveStream, openLiveStream, upsert } from '../api/live';
 import { rallyName } from '../api/rally-info';
 import {
@@ -38,8 +46,11 @@ import {
   type Stage,
 } from '../api/stages';
 import {
+  cancelCountdown,
   createStageRun,
   deleteStageRun,
+  dismissJumpStart,
+  startCountdown,
   fetchSplitsForStage,
   finishStageRunNow,
   fetchStageRuns,
@@ -67,6 +78,8 @@ import StagePicker from '../components/StagePicker.vue';
 import ClassChip from '../components/ClassChip.vue';
 import CrewName from '../components/CrewName.vue';
 import StartNumber from '../components/StartNumber.vue';
+import JumpStartChip from '../components/JumpStartChip.vue';
+import UpNextCard, { type UpNextRow } from '../components/UpNextCard.vue';
 import { driverName } from '../crew';
 import { formatStageDuration, t, useConfirm } from '@rally-gate/ui';
 import { carriersOf, suggestEntries } from '../passing-suggestions';
@@ -102,6 +115,10 @@ const activatingStage = ref(false);
 const closingStage = ref(false);
 const confirm = useConfirm();
 const stagesLoaded = ref(false);
+const jumpStartToleranceMs = ref(DEFAULT_JUMP_START_TOLERANCE_MS);
+const jumpStartPenaltyTypeId = ref<string | null>(null);
+/** Every penalty, to tell whether a jump start still awaits a ruling. */
+const penalties = ref<Penalty[]>([]);
 
 const FLASH_DURATION_MS = 600;
 
@@ -113,6 +130,7 @@ const entryById = computed(() => new Map(entries.value.map((v) => [v.id, v])));
 type RowState =
   | 'WAITING'
   | 'NEXT'
+  | 'QUEUED'
   | 'ON_STAGE'
   | 'FINISHED'
   | 'DNF'
@@ -150,6 +168,13 @@ const ROW_STATE_DISPLAY: Record<
     },
     color: 'info',
     icon: 'mdi-arrow-right-bold',
+  },
+  QUEUED: {
+    get label() {
+      return t('rowState.queued');
+    },
+    color: 'info',
+    icon: 'mdi-timer-sand',
   },
   ON_STAGE: {
     get label() {
@@ -218,9 +243,11 @@ const rows = computed<Row[]>(() => {
       .sort((a, b) => a.attempt - b.attempt);
     const entry = entryById.value.get(starter.entryId);
     let state: RowState;
-    if (run?.status === StageRunStatus.STARTED) state = 'ON_STAGE';
+    if (isQueued(run, serverNow.value)) state = 'QUEUED';
+    else if (run?.status === StageRunStatus.STARTED) state = 'ON_STAGE';
     else if (run?.status === StageRunStatus.FINISHED) state = 'FINISHED';
     else if (run?.status === StageRunStatus.CANCELLED) state = 'DNF';
+    else if (run?.status === StageRunStatus.DID_NOT_START) state = 'DNS';
     else if (entry && isOutOfEvent(entry.status)) state = 'OUT';
     else if (voidedRuns.length > 0 && !closed) state = 'RERUN';
     else state = closed ? 'DNS' : 'WAITING';
@@ -259,6 +286,7 @@ const stateCounts = computed(() => {
     counts.set(state, (counts.get(state) ?? 0) + 1);
   }
   const order: RowState[] = [
+    'QUEUED',
     'ON_STAGE',
     'WAITING',
     'FINISHED',
@@ -365,6 +393,31 @@ const dueToStart = computed(() =>
         (row) => row.state === 'NEXT' || row.state === 'WAITING',
       ),
 );
+
+/** On a slot stage the start time is the slot, set by a countdown. */
+const slotStage = computed(() => isSlotStart(stage.value?.startMode));
+
+/** Counting down first, by slot, then the cars still to start. */
+const upNext = computed<UpNextRow[]>(() => {
+  const queued = rows.value
+    .filter((row) => row.state === 'QUEUED')
+    .sort((a, b) => a.run!.startTime.localeCompare(b.run!.startTime));
+  return [...queued, ...dueToStart.value].map((row) => ({
+    starter: row.starter,
+    slot: row.state === 'QUEUED' ? row.run : undefined,
+    unscrutineered: !row.run && unscrutineered(row.starter.entryId),
+  }));
+});
+
+const upNextAction = computed(() => {
+  if (
+    stage.value?.status !== StageStatus.ACTIVE ||
+    !can('timeRun', stage.value.id)
+  )
+    return null;
+  if (stage.value.startMode === StartMode.SLOT_MANUAL) return 'countdown';
+  return slotStage.value ? null : 'startNow';
+});
 
 // ---- Unassigned passings, with a suggested entry -----------------------
 
@@ -544,6 +597,62 @@ function upsertSplit(split: StageSplit) {
 }
 
 const startingEntryId = ref<string | null>(null);
+
+function removeStageRun({ id }: { id: string }) {
+  stageRuns.value = stageRuns.value.filter((r) => r.id !== id);
+  delete splitsByRun.value[id];
+}
+
+/** Queues the car's slot; the server's clock sets it, not this device's. */
+async function onCountdown(entryId: string) {
+  if (!props.stageId || startingEntryId.value) return;
+  startingEntryId.value = entryId;
+  try {
+    upsertStageRun(await startCountdown({ entryId, stageId: props.stageId }));
+  } finally {
+    startingEntryId.value = null;
+  }
+}
+
+async function onCancelCountdown(run: StageRun) {
+  startingEntryId.value = run.id;
+  try {
+    await cancelCountdown(run.id);
+    removeStageRun(run);
+  } finally {
+    startingEntryId.value = null;
+  }
+}
+
+/** Until it is given or dismissed, with a penalty type set for it. */
+function suggestsJumpPenalty(run: StageRun): boolean {
+  const typeId = jumpStartPenaltyTypeId.value;
+  return (
+    !!typeId &&
+    !run.jumpStartDismissed &&
+    can('penalties') &&
+    !penalties.value.some(
+      (p) =>
+        p.entryId === run.entryId &&
+        p.stageId === run.stageId &&
+        p.typeId === typeId,
+    )
+  );
+}
+
+function onJumpStartPenalty(run: StageRun) {
+  void penaltyDialog.value?.add(run.entryId, run.stageId, {
+    [jumpStartPenaltyTypeId.value!]: 1,
+  });
+}
+
+async function onDismissJumpStart(run: StageRun) {
+  upsertStageRun(await dismissJumpStart(run.id));
+}
+
+async function loadPenalties() {
+  penalties.value = can('penalties') ? await fetchPenalties() : [];
+}
 
 const finishingRunId = ref<string | null>(null);
 
@@ -856,6 +965,15 @@ onMounted(async () => {
       fetchGates().then((g) => (gates.value = g)),
       fetchPendingEvents().then((p) => (pendingDetections.value = p)),
       fetchAwaitingEvents().then((a) => (awaitingDetections.value = a)),
+      fetchSetting(JUMP_START_TOLERANCE_MS_KEY).then(
+        (v) =>
+          (jumpStartToleranceMs.value =
+            Number(v) || DEFAULT_JUMP_START_TOLERANCE_MS),
+      ),
+      fetchSetting(JUMP_START_PENALTY_TYPE_ID_KEY).then(
+        (v) => (jumpStartPenaltyTypeId.value = v || null),
+      ),
+      loadPenalties(),
       loadStage(),
     ]);
   liveSource = openLiveStream(
@@ -863,6 +981,7 @@ onMounted(async () => {
       detection: (event) => flashGate(event.gateId),
       gate: upsertGate,
       'stage-run': upsertStageRun,
+      'stage-run-deleted': removeStageRun,
       'stage-run-split': upsertSplit,
       'pending-detections': ({ pending }) => {
         pendingDetections.value = pending;
@@ -1069,81 +1188,20 @@ onUnmounted(() => {
     v-if="stage && stage.status !== StageStatus.CLOSED"
     class="rg-stage-flow mb-4"
   >
-    <div>
-      <v-card class="h-100">
-        <v-card-item>
-          <v-card-title>
-            {{
-              stage.status === StageStatus.ACTIVE
-                ? $t('live.upNext')
-                : $t('live.firstToStart')
-            }}
-          </v-card-title>
-        </v-card-item>
-        <v-card-text v-if="dueToStart.length > 0">
-          <div class="d-flex align-center ga-4">
-            <div class="rg-next-number">
-              <StartNumber :number="dueToStart[0].starter.startNumber" />
-            </div>
-            <CrewName :crew="dueToStart[0].starter" class="rg-next-driver" />
-            <v-chip
-              v-if="unscrutineered(dueToStart[0].starter.entryId)"
-              color="warning"
-              prepend-icon="mdi-clipboard-alert-outline"
-            >
-              {{ $t('live.notScrutineered') }}
-            </v-chip>
-            <ClassChip
-              v-if="dueToStart[0].starter.mainClassName"
-              :name="dueToStart[0].starter.mainClassName"
-              main
-              class="ms-auto"
-            />
-          </div>
-          <v-btn
-            v-if="
-              stage.status === StageStatus.ACTIVE && can('timeRun', stage.id)
-            "
-            color="primary"
-            size="large"
-            block
-            prepend-icon="mdi-play"
-            class="mt-4"
-            :loading="startingEntryId === dueToStart[0].starter.entryId"
-            @click="onStartNow(dueToStart[0].starter.entryId)"
-          >
-            {{ $t('live.startNow') }}
-          </v-btn>
-          <template v-if="dueToStart.length > 1">
-            <v-divider class="mt-4 mb-2" />
-            <div class="text-overline text-medium-emphasis">
-              {{ $t('live.then') }}
-            </div>
-            <div class="rg-then-grid">
-              <div
-                v-for="row in dueToStart.slice(1, 3)"
-                :key="row.starter.entryId"
-                class="d-flex align-center ga-3"
-              >
-                <span class="rg-then-number">
-                  <StartNumber :number="row.starter.startNumber" />
-                </span>
-                <CrewName :crew="row.starter" class="rg-then-driver" />
-                <ClassChip
-                  v-if="row.starter.mainClassName"
-                  :name="row.starter.mainClassName"
-                  main
-                  class="ms-auto"
-                />
-              </div>
-            </div>
-          </template>
-        </v-card-text>
-        <v-card-text v-else class="rg-empty">
-          {{ $t('live.allStarted') }}
-        </v-card-text>
-      </v-card>
-    </div>
+    <UpNextCard
+      :title="
+        stage.status === StageStatus.ACTIVE
+          ? $t('live.upNext')
+          : $t('live.firstToStart')
+      "
+      :rows="upNext"
+      :action="upNextAction"
+      :can-cancel="can('timeRun', stage.id)"
+      :busy-id="startingEntryId"
+      @start-now="onStartNow"
+      @countdown="onCountdown"
+      @cancel="onCancelCountdown"
+    />
     <!-- Shown before activation too, so activating doesn't reflow the page. -->
     <div>
       <v-card class="h-100">
@@ -1223,7 +1281,14 @@ onUnmounted(() => {
                   formatDuration(car.run.durationMs)
                 }}</template>
               </td>
-              <td style="width: 120px">
+              <td style="width: 120px" class="text-no-wrap">
+                <JumpStartChip
+                  :run="car.run"
+                  :tolerance-ms="jumpStartToleranceMs"
+                  :suggest="suggestsJumpPenalty(car.run)"
+                  @penalty="onJumpStartPenalty(car.run)"
+                  @dismiss="onDismissJumpStart(car.run)"
+                />
                 <v-chip
                   v-if="isOverdue(car.run)"
                   size="small"
@@ -1309,6 +1374,14 @@ onUnmounted(() => {
               >
                 {{ $t('live.overdue') }}
               </v-chip>
+              <JumpStartChip
+                v-if="row.run"
+                :run="row.run"
+                :tolerance-ms="jumpStartToleranceMs"
+                :suggest="suggestsJumpPenalty(row.run)"
+                @penalty="onJumpStartPenalty(row.run)"
+                @dismiss="onDismissJumpStart(row.run)"
+              />
               <v-chip
                 v-if="!row.run && unscrutineered(row.starter.entryId)"
                 size="small"
@@ -1367,15 +1440,27 @@ onUnmounted(() => {
                 v-if="
                   (!row.run || row.state === 'FINISHED') &&
                   canStart(row) &&
-                  can('timeRun', stage.id)
+                  upNextAction
                 "
                 size="small"
                 variant="text"
-                prepend-icon="mdi-play"
+                :prepend-icon="
+                  upNextAction === 'countdown'
+                    ? 'mdi-timer-play-outline'
+                    : 'mdi-play'
+                "
                 :loading="startingEntryId === row.starter.entryId"
-                @click="onStartNow(row.starter.entryId)"
+                @click="
+                  upNextAction === 'countdown'
+                    ? onCountdown(row.starter.entryId)
+                    : onStartNow(row.starter.entryId)
+                "
               >
-                {{ $t('live.startNow') }}
+                {{
+                  upNextAction === 'countdown'
+                    ? $t('countdown.start')
+                    : $t('live.startNow')
+                }}
               </v-btn>
               <v-menu
                 v-if="
@@ -1526,7 +1611,12 @@ onUnmounted(() => {
     :entries="entries"
     @saved="upsertStageRun"
   />
-  <PenaltyDialog ref="penaltyDialog" :stages="stages" :entries="entries" />
+  <PenaltyDialog
+    ref="penaltyDialog"
+    :stages="stages"
+    :entries="entries"
+    @saved="loadPenalties"
+  />
 </template>
 
 <style scoped>
@@ -1540,34 +1630,13 @@ onUnmounted(() => {
 /* Up next beside On stage; stacked below Vuetify's md breakpoint. */
 .rg-stage-flow {
   display: grid;
-  grid-template-columns: 1fr 2fr;
+  grid-template-columns: 1fr minmax(0, 2fr);
   gap: 16px;
 }
 @media (max-width: 959px) {
   .rg-stage-flow {
     grid-template-columns: 1fr;
   }
-}
-
-/* Readable from a tablet at arm's length or more. */
-.rg-next-number {
-  font-size: 3.5rem;
-}
-
-.rg-then-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-.rg-then-number {
-  font-size: 2rem;
-}
-.rg-then-driver {
-  font-size: 1.1rem;
-}
-
-.rg-next-driver {
-  font-size: 1.75rem;
 }
 
 /* The next car is a marshal's main cue, so it gets more than the chip. */

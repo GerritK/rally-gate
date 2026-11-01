@@ -22,3 +22,27 @@ export enum StageScoring {
   QUALIFYING = 'QUALIFYING',
   NONE = 'NONE',
 }
+
+/**
+ * How a car's start is timed (`docs/event-model.md` "Start slots"). Fixed
+ * once the stage leaves NOT_STARTED, so a start never changes meaning mid-run.
+ */
+export enum StartMode {
+  /** The start passing is the start time. */
+  GATE = 'GATE',
+  /** Slots from a timetable. Not built yet: the server refuses it. */
+  SLOT_SCHEDULE = 'SLOT_SCHEDULE',
+  /** A countdown per car; its slot is the start time. */
+  SLOT_MANUAL = 'SLOT_MANUAL',
+}
+
+/**
+ * A start passing this close to a slot belongs to it, even from a light
+ * barrier: it sets no time, only the jump-start mark a marshal confirms.
+ */
+export const SLOT_PASSING_BEFORE_MS = 10_000;
+export const SLOT_PASSING_AFTER_MS = 60_000;
+
+/** Whether a stage's start time is the slot rather than the start passing. */
+export const isSlotStart = (mode: StartMode | undefined): boolean =>
+  mode === StartMode.SLOT_MANUAL || mode === StartMode.SLOT_SCHEDULE;

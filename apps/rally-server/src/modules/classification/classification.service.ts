@@ -10,6 +10,7 @@ import {
   SplitPlacing,
   SplitGateInfo,
   StageOutcome,
+  StageRunStatus,
   StageScoring,
   StageStatus,
   EntryStatus,
@@ -275,10 +276,14 @@ export class ClassificationService {
       // and "no run yet" just means "hasn't started" — not DNS.
       return dsq.filter((row) => inClass(row.entryId));
     }
-    const dnf = runs
+    // A slot nobody drove is a DNS like a car with no run at all.
+    const driven = runs.filter(
+      (run) => deriveStageRunStatus(run, true) !== StageRunStatus.DID_NOT_START,
+    );
+    const dnf = driven
       .filter((run) => !run.finishTime && !disqualified.has(run.entryId))
       .map((run) => toOutcome(run.entryId, 'DNF'));
-    const startedEntryIds = new Set(runs.map((run) => run.entryId));
+    const startedEntryIds = new Set(driven.map((run) => run.entryId));
     const dns = entries
       .filter(
         (entry) =>

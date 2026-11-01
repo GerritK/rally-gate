@@ -110,6 +110,9 @@ export function runStatusColor(status: StageRunStatus): string {
       return 'info';
     case StageRunStatus.CANCELLED:
       return 'error';
+    case StageRunStatus.DID_NOT_START:
+      // DNS only means it never came (see `outcomeColor`).
+      return 'warning';
     case StageRunStatus.VOIDED:
       // Neutral, not red: a voided run isn't a failure by the crew, it's a
       // struck-out attempt. Red is for penalties, DNF and abort.

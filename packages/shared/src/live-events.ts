@@ -2,6 +2,7 @@
 export type LiveEventType =
   | 'detection'
   | 'stage-run'
+  | 'stage-run-deleted'
   | 'stage-run-split'
   | 'gate'
   | 'gate-pairing'

@@ -392,13 +392,23 @@ be a different list from the one posted.
 
 ## Start slots
 
-**Not built yet.** How a car's start is timed is `Stage.startMode`, changeable
+How a car's start is timed is `Stage.startMode`, changeable
 only while the stage is `NOT_STARTED` so a start never changes meaning mid-run:
 
 - `GATE` — today's behaviour: the start passing is the start time.
 - `SLOT_SCHEDULE` — every car has a planned start from a timetable.
 - `SLOT_MANUAL` — a countdown is triggered per car, by a marshal or a
   pre-start gate. For a casual meet without a timetable.
+
+Built: `GATE`, and `SLOT_MANUAL` with the Countdown button. The server
+refuses `SLOT_SCHEDULE` until its timetable is built, and the pre-start gate
+and start lights at a gate are not built either (`development-roadmap.md`).
+
+A slot is a `StageRun` created by the trigger, `startTime` and
+`plannedStartTime` both the slot: no slot table and no server timer, and the
+`finish > start` check covers it unchanged. Until slot + 5 s (green shown)
+the dashboard shows the car as counting down rather than on stage. On a slot
+stage a start or combined-gate passing never opens a run; the slot did.
 
 ### The slot is the start time
 
@@ -415,19 +425,29 @@ than slot − `jumpStartToleranceMs` (200 ms: chrony and the beam edge, not
 reaction time) is marked a jump start in Live Timing, which suggests the
 penalty type set as `jumpStartPenaltyTypeId` for the marshal to confirm or
 dismiss; with no type set it only marks. Never priced automatically: a wrong
-automatic penalty is a wrong result nobody notices.
+automatic penalty is a wrong result nobody notices. The earliest start passing
+counts (`startPassingAt`), so a repeat or the car breaking the beam again
+changes nothing. The mark is derived from it and the current tolerance, which
+is why the tolerance is locked once the rally runs; the suggestion goes once a
+penalty of that type exists for the car on the stage, or the marshal dismissed
+it (`jumpStartDismissed`, in the change history).
 
 A start passing is **assigned automatically** to the car whose slot is
 nearest, within slot − 10 s to slot + 60 s, also from a light barrier. This
 is the one exception to "never assigned automatically" ("Unassigned
 passings"): the passing sets no time, only the jump-start mark the marshal
-confirms. Outside that window it stays unassigned as today.
+confirms. Outside that window it stays unassigned as today. A transponder
+passing is checked against that car's slots only; outside its window it is
+stored untimed.
 
 On a combined start/finish gate, passings before slot + `minDurationMs` are
 the start passing (checked for a jump start); the first one after is the
 finish.
 
-A slot nobody drove becomes DNS when the stage closes, like any missing run.
+A slot nobody drove becomes DNS when the stage closes, like any missing run:
+derived (`DID_NOT_START`), close writes nothing. "Nobody drove" is no start
+passing and no finish, so a car the start gate missed that never finished
+reads DNS too, which costs the same notional time.
 
 ### Countdown
 
@@ -455,7 +475,10 @@ assignment never makes a slot in the past.
 - Cancel deletes a slot until its car's first start passing, and is recorded
   in the change history; then trigger again.
 - A trigger for a car that already has an open slot or is on stage is stored
-  and ignored: a loop reads a car near it many times.
+  and ignored: a loop reads a car near it many times. The Countdown button
+  answers 409 instead, also for a car that finished a counted stage (void its
+  run first for a re-run): a person needs to hear it.
+- Countdown and Cancel are in the change history.
 - On a shakedown every trigger is the car's next run.
 
 ### Timetable: `SLOT_SCHEDULE`

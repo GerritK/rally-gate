@@ -101,6 +101,30 @@ describe('server-owned fields are not settable through the API', () => {
       { finishTime: '2026-01-01T00:01:00.000Z', finishManual: false },
       'finishManual',
     ],
+    // The slot is set by the Countdown button and measures the jump start;
+    // the start passing and the dismissal are evidence like the flags above.
+    [
+      'StageRun.plannedStartTime on correction',
+      CorrectStageRunDto,
+      { plannedStartTime: '2026-01-01T00:00:00.000Z' },
+      'plannedStartTime',
+    ],
+    [
+      'StageRun.startPassingAt on create',
+      CreateStageRunDto,
+      {
+        entryId: 'v1',
+        stageId: 'WP1',
+        startPassingAt: '2026-01-01T00:00:00.000Z',
+      },
+      'startPassingAt',
+    ],
+    [
+      'StageRun.jumpStartDismissed on correction',
+      CorrectStageRunDto,
+      { jumpStartDismissed: true },
+      'jumpStartDismissed',
+    ],
     // The frozen start order is the published list; freezing writes it.
     [
       'Stage.startOrder on update',
@@ -177,6 +201,28 @@ describe('server-owned fields are not settable through the API', () => {
       expect(messages).toContain(`property ${offendingField} should not exist`);
     },
   );
+});
+
+describe('start modes', () => {
+  it('refuses SLOT_SCHEDULE until its timetable is built', async () => {
+    expect(
+      await rejectionMessages(UpdateStageDto, {
+        name: 'Pass',
+        stageNumber: 1,
+        startMode: 'SLOT_SCHEDULE',
+      }),
+    ).toContain('startMode');
+  });
+
+  it('accepts SLOT_MANUAL', async () => {
+    await expect(
+      transform(UpdateStageDto, {
+        name: 'Pass',
+        stageNumber: 1,
+        startMode: 'SLOT_MANUAL',
+      }),
+    ).resolves.toMatchObject({ startMode: 'SLOT_MANUAL' });
+  });
 });
 
 describe('valid payloads still pass', () => {

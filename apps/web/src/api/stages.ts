@@ -1,4 +1,4 @@
-import { StageScoring, StageStatus } from '@rally-gate/shared';
+import { StageScoring, StageStatus, StartMode } from '@rally-gate/shared';
 import {
   apiFetch,
   deleteRequest,
@@ -13,6 +13,7 @@ export interface Stage {
   stageNumber: number;
   status: StageStatus;
   scoring: StageScoring;
+  startMode: StartMode;
   expectedDurationMs: number | null;
   minDurationMs: number | null;
 }
@@ -52,6 +53,7 @@ export function updateStage(
     name: string;
     stageNumber: number;
     scoring: StageScoring;
+    startMode: StartMode;
     expectedDurationMs: number | null;
     minDurationMs: number | null;
   },

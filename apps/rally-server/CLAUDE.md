@@ -33,6 +33,7 @@ Fields the DTOs leave out on purpose, because only the server may set them:
 - `RallyInfo.id` — singleton
 - `RallyInfo.status` — moved by `RallyStatusService` start/close/reopen only
 - `StageRun.startManual`/`finishManual` — evidence of a hand-set time
+- `StageRun.plannedStartTime`/`startPassingAt`/`jumpStartDismissed` — the slot, the jump-start evidence and the ruling on it
 
 `src/config/dto-contracts.spec.ts` pins this list with the real pipe config — add a case there for each new server-owned field. Since unknown properties are a 400, **a DTO change is a breaking API change**: `apps/web` and `scripts/seed-demo-data.js` change in the same commit.
 

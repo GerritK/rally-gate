@@ -1,4 +1,4 @@
-import { StageScoring, StageStatus } from '@rally-gate/shared';
+import { StageScoring, StageStatus, StartMode } from '@rally-gate/shared';
 import { Column, Entity, PrimaryColumn } from 'typeorm';
 
 @Entity()
@@ -17,6 +17,10 @@ export class Stage {
 
   @Column({ type: 'varchar', default: StageScoring.OVERALL })
   scoring: StageScoring;
+
+  /** Only editable while NOT_STARTED, like everything else here. */
+  @Column({ type: 'varchar', default: StartMode.GATE })
+  startMode: StartMode;
 
   @Column({ type: 'int', nullable: true })
   expectedDurationMs: number | null;

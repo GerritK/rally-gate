@@ -46,8 +46,14 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
   without buttons. Browsers play no sound before a tap on the page, and a
   tap at the pre-start gate or a timetable is none, so the card says
   "Enable sound" after every load until tapped; Countdown counts as the tap.
-  Jump starts are marked at the passing in Live Timing, where penalties are
-  given. The card's exact layout is designed when it is built.
+  Jump starts are marked on the car's row (On stage and the start list),
+  where penalties are given.
+- **Up next keeps its layout in every start mode; only the buttons change**
+  (`UpNextCard`): Start now in `GATE` mode; Countdown in `SLOT_MANUAL`, in
+  the same place, and while the first car counts down its seconds, lights and
+  Cancel there. Queued cars lead the list, each "Then" row with its slot time
+  and Cancel, the others with a small Countdown. Fullscreen and Enable sound
+  sit in the card's header.
 - **Overall and a stage's results are one page** (`ResultsView`), two
   URLs: track, class filter, card header, Print and "Print all" exist once.
   Only the table differs (`OverallRanking`, `StageRanking`), since the

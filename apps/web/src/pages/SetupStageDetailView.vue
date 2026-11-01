@@ -29,6 +29,7 @@ import {
   GateRole,
   StageScoring,
   StageStatus,
+  StartMode,
 } from '@rally-gate/shared';
 import { useUnsavedChanges } from '../unsaved-changes';
 
@@ -49,6 +50,7 @@ const { markSaved } = useUnsavedChanges(() =>
         stage.value.name,
         stage.value.stageNumber,
         stage.value.scoring,
+        stage.value.startMode,
         expectedText.value,
         minText.value,
       ]
@@ -66,6 +68,11 @@ const scoringOptions = computed(() =>
     title: stageScoringLabel(value),
   })),
 );
+// SLOT_SCHEDULE waits for its timetable (roadmap, "Start countdown").
+const startModeOptions = computed(() => [
+  { value: StartMode.GATE, title: t('startMode.gate') },
+  { value: StartMode.SLOT_MANUAL, title: t('startMode.slotManual') },
+]);
 const roleOptions = computed(() =>
   GATE_ROLES.map((role) => ({
     value: role,
@@ -127,6 +134,7 @@ async function onSaveStage() {
         name: stage.value.name,
         stageNumber: stage.value.stageNumber,
         scoring: stage.value.scoring,
+        startMode: stage.value.startMode,
         expectedDurationMs: parseStageDuration(expectedText.value ?? ''),
         minDurationMs: parseStageDuration(minText.value ?? ''),
       }),
@@ -216,6 +224,14 @@ onMounted(load);
               :items="scoringOptions"
               :label="$t('stage.scoring')"
               :hint="$t('stage.scoringHint')"
+              persistent-hint
+              :disabled="!stageEditable"
+            />
+            <v-select
+              v-model="stage.startMode"
+              :items="startModeOptions"
+              :label="$t('stage.startMode')"
+              :hint="$t('stage.startModeHint')"
               persistent-hint
               :disabled="!stageEditable"
             />

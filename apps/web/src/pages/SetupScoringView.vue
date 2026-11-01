@@ -2,12 +2,13 @@
 import { can } from '../api/auth';
 import {
   DEFAULT_NOTIONAL_PENALTY_MS,
+  JUMP_START_PENALTY_TYPE_ID_KEY,
   NOTIONAL_PENALTY_MS_KEY,
   PenaltyScope,
   RallyStatus,
   type PenaltyTier,
 } from '@rally-gate/shared';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import {
   createPenaltyType,
   deletePenaltyType,
@@ -122,15 +123,27 @@ async function onDeleteType(type: PenaltyType) {
 const notionalPenalty = ref(
   formatWholeSeconds(DEFAULT_NOTIONAL_PENALTY_MS / 1000),
 );
+/** '' is none: v-select can't offer null. A jump start is then only marked. */
+const jumpStartTypeId = ref('');
+const jumpStartItems = computed(() => [
+  { value: '', title: t('scoring.jumpStartNone') },
+  ...types.value.map((type) => ({ value: type.id, title: type.name })),
+]);
 const savingPenalty = ref(false);
-const { markSaved } = useUnsavedChanges(() => notionalPenalty.value);
+const { markSaved } = useUnsavedChanges(() => [
+  notionalPenalty.value,
+  jumpStartTypeId.value,
+]);
 
 async function onSavePenalty() {
   const seconds = parseWholeSeconds(notionalPenalty.value);
   if (savingPenalty.value || seconds === null) return;
   savingPenalty.value = true;
   try {
-    await saveSetting(NOTIONAL_PENALTY_MS_KEY, String(seconds * 1000));
+    await Promise.all([
+      saveSetting(NOTIONAL_PENALTY_MS_KEY, String(seconds * 1000)),
+      saveSetting(JUMP_START_PENALTY_TYPE_ID_KEY, jumpStartTypeId.value),
+    ]);
     markSaved();
     notify(t('scoring.saved'));
   } finally {
@@ -140,6 +153,11 @@ async function onSavePenalty() {
 
 onMounted(async () => {
   types.value = await fetchPenaltyTypes();
+  const storedType = await fetchSetting(JUMP_START_PENALTY_TYPE_ID_KEY);
+  // A deleted type falls back to none rather than a dangling id.
+  jumpStartTypeId.value = types.value.some((type) => type.id === storedType)
+    ? storedType!
+    : '';
   const storedMs = Number(await fetchSetting(NOTIONAL_PENALTY_MS_KEY));
   if (Number.isFinite(storedMs) && storedMs > 0) {
     notionalPenalty.value = formatWholeSeconds(Math.round(storedMs / 1000));
@@ -187,6 +205,14 @@ onMounted(async () => {
           density="comfortable"
           hide-details="auto"
           style="max-width: 260px"
+        />
+        <v-select
+          v-model="jumpStartTypeId"
+          :items="jumpStartItems"
+          :label="$t('scoring.jumpStartPenalty')"
+          density="comfortable"
+          hide-details
+          style="max-width: 300px"
         />
         <v-btn
           v-if="can('setup')"

@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { can } from '../api/auth';
 import {
+  COUNTDOWN_MS_KEY,
+  DEFAULT_COUNTDOWN_MS,
+  DEFAULT_JUMP_START_TOLERANCE_MS,
+  DEFAULT_MIN_START_GAP_MS,
+  JUMP_START_TOLERANCE_MS_KEY,
+  MIN_START_GAP_MS_KEY,
   START_ORDER_DIRECTION_KEY,
   START_ORDER_GROUPING_KEY,
   START_ORDER_KEY_KEY,
@@ -42,6 +48,48 @@ const directionOptions = computed(() => [
   },
 ]);
 
+// The countdown settings lock separately: only the tolerance moves marks
+// already shown, so it alone is fixed once the rally runs.
+const countdownLocked = lockedWhen(RallyStatus.CLOSED);
+const toleranceLocked = lockedWhen(RallyStatus.RUNNING, RallyStatus.CLOSED);
+const countdownS = ref(DEFAULT_COUNTDOWN_MS / 1000);
+const toleranceMs = ref(DEFAULT_JUMP_START_TOLERANCE_MS);
+const gapS = ref(DEFAULT_MIN_START_GAP_MS / 1000);
+const savingCountdown = ref(false);
+const countdownForm = ref<{ validate: () => Promise<{ valid: boolean }> }>();
+const { markSaved: markCountdownSaved } = useUnsavedChanges(() => [
+  countdownS.value,
+  toleranceMs.value,
+  gapS.value,
+]);
+
+/** The start lights are always the countdown's last 5 s. */
+const countdownRule = (v: number) =>
+  (Number.isInteger(v) && v >= 5) || t('countdown.countdownRule');
+const wholeRule = (min: number) => (v: number) =>
+  (Number.isInteger(v) && v >= min) || t('countdown.wholeRule', { min });
+
+async function onSaveCountdown() {
+  if (savingCountdown.value) return;
+  if (!(await countdownForm.value?.validate())?.valid) return;
+  savingCountdown.value = true;
+  try {
+    await Promise.all([
+      saveSetting(COUNTDOWN_MS_KEY, String(countdownS.value * 1000)),
+      ...(toleranceLocked.value
+        ? []
+        : [
+            saveSetting(JUMP_START_TOLERANCE_MS_KEY, String(toleranceMs.value)),
+          ]),
+      saveSetting(MIN_START_GAP_MS_KEY, String(gapS.value * 1000)),
+    ]);
+    markCountdownSaved();
+    notify(t('countdown.saved'));
+  } finally {
+    savingCountdown.value = false;
+  }
+}
+
 // Defaults mirror StartOrderService's, which also applies them while unset.
 const grouping = ref(StartOrderGrouping.MAIN_CLASS);
 const key = ref(StartOrderKey.START_NUMBER);
@@ -70,11 +118,18 @@ async function onSave() {
 }
 
 onMounted(async () => {
-  const [g, k, d] = await Promise.all([
+  const [g, k, d, c, tol, gap] = await Promise.all([
     fetchSetting(START_ORDER_GROUPING_KEY),
     fetchSetting(START_ORDER_KEY_KEY),
     fetchSetting(START_ORDER_DIRECTION_KEY),
+    fetchSetting(COUNTDOWN_MS_KEY),
+    fetchSetting(JUMP_START_TOLERANCE_MS_KEY),
+    fetchSetting(MIN_START_GAP_MS_KEY),
   ]);
+  if (c) countdownS.value = Number(c) / 1000;
+  if (tol) toleranceMs.value = Number(tol);
+  if (gap) gapS.value = Number(gap) / 1000;
+  markCountdownSaved();
   grouping.value = (g ?? grouping.value) as StartOrderGrouping;
   key.value = (k ?? key.value) as StartOrderKey;
   direction.value = (d ?? direction.value) as StartOrderDirection;
@@ -141,6 +196,71 @@ onMounted(async () => {
             color="primary"
             :loading="saving"
             :disabled="locked"
+            prepend-icon="mdi-content-save"
+          >
+            {{ $t('common.save') }}
+          </v-btn>
+        </div>
+      </v-form>
+    </v-card-text>
+  </v-card>
+
+  <v-card class="mt-4">
+    <v-card-title>{{ $t('countdown.title') }}</v-card-title>
+    <v-card-subtitle>{{ $t('countdown.explain') }}</v-card-subtitle>
+    <v-card-text>
+      <v-form
+        ref="countdownForm"
+        :readonly="!can('setup')"
+        class="d-flex flex-column ga-4"
+        @submit.prevent="onSaveCountdown"
+      >
+        <v-text-field
+          v-model.number="countdownS"
+          type="number"
+          min="5"
+          :suffix="$t('countdown.seconds')"
+          :label="$t('countdown.countdown')"
+          :hint="$t('countdown.countdownHint')"
+          persistent-hint
+          :rules="[countdownRule]"
+          :disabled="countdownLocked"
+          class="rg-timing"
+          style="max-width: 420px"
+        />
+        <v-text-field
+          v-model.number="toleranceMs"
+          type="number"
+          min="0"
+          :suffix="$t('countdown.milliseconds')"
+          :label="$t('countdown.tolerance')"
+          :hint="$t('countdown.toleranceHint')"
+          persistent-hint
+          :rules="[wholeRule(0)]"
+          :disabled="toleranceLocked"
+          class="rg-timing"
+          style="max-width: 420px"
+        />
+        <v-text-field
+          v-model.number="gapS"
+          type="number"
+          min="1"
+          :suffix="$t('countdown.seconds')"
+          :label="$t('countdown.gap')"
+          :hint="$t('countdown.gapHint')"
+          persistent-hint
+          :rules="[wholeRule(1)]"
+          :disabled="countdownLocked"
+          class="rg-timing"
+          style="max-width: 420px"
+        />
+        <div>
+          <v-btn
+            v-if="can('setup')"
+            type="submit"
+            color="primary"
+            :loading="savingCountdown"
+            :disabled="countdownLocked"
             prepend-icon="mdi-content-save"
           >
             {{ $t('common.save') }}

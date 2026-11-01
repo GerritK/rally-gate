@@ -9,6 +9,7 @@ import type { Principal } from '../auth/auth.service';
 const LIVE_EVENTS: Record<LiveEventType, string> = {
   detection: 'detection.created',
   'stage-run': 'stage-run.updated',
+  'stage-run-deleted': 'stage-run.deleted',
   'stage-run-split': 'stage-run.split',
   gate: 'gate.heartbeat',
   'gate-pairing': 'gate.pairing-changed',
@@ -22,6 +23,7 @@ const LIVE_EVENTS: Record<LiveEventType, string> = {
 /** What the public page needs; passings, transponders and gates are internal. */
 const PUBLIC_LIVE_EVENTS: LiveEventType[] = [
   'stage-run',
+  'stage-run-deleted',
   'stage-run-split',
   'rally',
 ];

@@ -37,6 +37,12 @@ export enum ApiErrorCode {
   OTHER_ATTEMPT_COUNTS = 'otherAttemptCounts',
   RUN_NOT_FINISHABLE = 'runNotFinishable',
   RUN_STARTS_IN_FUTURE = 'runStartsInFuture',
+  /** Countdowns run only on an active stage. */
+  STAGE_NOT_ACTIVE = 'stageNotActive',
+  NOT_MANUAL_START = 'notManualStart',
+  ENTRY_ALREADY_STARTING = 'entryAlreadyStarting',
+  COUNTDOWN_NOT_CANCELLABLE = 'countdownNotCancellable',
+  NO_JUMP_START = 'noJumpStart',
   PASSING_NOT_WAITING = 'passingNotWaiting',
   PASSING_NOT_TIMEABLE = 'passingNotTimeable',
   PENALTY_NOT_FOUND = 'penaltyNotFound',

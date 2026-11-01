@@ -92,4 +92,20 @@ export class StageRun {
 
   @Column({ type: 'int', nullable: true })
   durationMs?: number | null;
+
+  /**
+   * The slot on a slot stage (`docs/event-model.md` "Start slots"), server
+   * clock; null on a gate-started run. Set as `startTime` too, which a
+   * correction may move: the jump start is still measured against this.
+   */
+  @Column({ type: Date, nullable: true })
+  plannedStartTime: Date | null;
+
+  /** Effective time of the earliest start passing; slot runs only. */
+  @Column({ type: Date, nullable: true })
+  startPassingAt: Date | null;
+
+  /** The marshal ruled the jump-start mark needs no penalty. */
+  @Column({ default: false })
+  jumpStartDismissed: boolean;
 }

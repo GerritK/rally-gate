@@ -339,7 +339,9 @@
     "notionalTime": "notional time",
     "ruleOfThumb": "Rule of thumb: set it to roughly {oneStage}. The penalty only has to be big enough to outweigh the advantage a crew built on the stages it did finish — set it too low and a quick car can retire and still lead the rally.",
     "oneStage": "one stage duration",
-    "penaltyLabel": "Notional time penalty"
+    "penaltyLabel": "Notional time penalty",
+    "jumpStartPenalty": "Penalty for a jump start",
+    "jumpStartNone": "None, only mark it"
   },
   "penalties": {
     "penalties": "Penalties",
@@ -452,7 +454,9 @@
     "scoring": "Scoring",
     "scoringHint": "Ranked on its own, never counts toward the overall.",
     "general": "General",
-    "times": "Times"
+    "times": "Times",
+    "startMode": "Start mode",
+    "startModeHint": "With a countdown the start gate only detects jump starts."
   },
   "runState": {
     "onStage": "On stage",
@@ -561,7 +565,8 @@
     "finished": "Finished",
     "dnf": "DNF",
     "dns": "DNS",
-    "rerun": "Voided — re-run"
+    "rerun": "Voided — re-run",
+    "queued": "Countdown"
   },
   "errors": {
     "serverUnreachable": "The server is not reachable. Check that it is running and this device is on its network.",
@@ -621,7 +626,12 @@
     "setupLinkInvalid": "This setup link is no longer valid. Use the newest one from the server log.",
     "invitationNotFound": "This invitation no longer exists.",
     "deviceNotFound": "This device no longer exists.",
-    "foreignOrigin": "Refused: this request came from another web page."
+    "foreignOrigin": "Refused: this request came from another web page.",
+    "stageNotActive": "{stage} isn't active: countdowns run only on an active stage.",
+    "notManualStart": "{stage} doesn't start by countdown.",
+    "entryAlreadyStarting": "This car is already counting down, on stage or has finished this stage. Void its run first for a re-run.",
+    "countdownNotCancellable": "This countdown can't be cancelled any more: the car has passed the start.",
+    "noJumpStart": "This run has no jump start to dismiss."
   },
   "rallyStatus": {
     "setup": "Setup",
@@ -757,7 +767,38 @@
       "PENALTY_DELETED": "Penalty deleted",
       "PASSING_ASSIGNED": "Passing assigned",
       "PASSING_DISMISSED": "Passing dismissed",
-      "ENTRY_STATUS": "Status changed"
+      "ENTRY_STATUS": "Status changed",
+      "COUNTDOWN_STARTED": "Countdown started",
+      "COUNTDOWN_CANCELLED": "Countdown cancelled",
+      "JUMP_START_DISMISSED": "Jump start: no penalty"
     }
+  },
+  "countdown": {
+    "start": "Countdown",
+    "cancel": "Cancel countdown",
+    "go": "GO",
+    "lights": "Start lights",
+    "enableSound": "Enable sound",
+    "fullscreen": "Fullscreen",
+    "jumpStart": "Jump start −{time}",
+    "givePenalty": "Give jump-start penalty",
+    "dismissJumpStart": "No penalty",
+    "title": "Start countdown",
+    "explain": "For stages that start by countdown (Setup → Stages → start mode).",
+    "countdown": "Countdown",
+    "countdownHint": "Shown before every start; the start lights are always its last 5 seconds.",
+    "countdownRule": "At least 5 whole seconds",
+    "tolerance": "Jump-start tolerance",
+    "toleranceHint": "A start passing earlier than this before the slot is marked a jump start. Covers gate clock and light barrier, not reaction time.",
+    "gap": "Minimum gap between starts",
+    "gapHint": "A countdown queues at least this long after the previous slot.",
+    "wholeRule": "A whole number, at least {min}",
+    "seconds": "s",
+    "milliseconds": "ms",
+    "saved": "Countdown settings saved"
+  },
+  "startMode": {
+    "gate": "Start gate: the start passing is the start time",
+    "slotManual": "Countdown: the slot is the start time"
   }
 }

@@ -339,7 +339,9 @@
     "notionalTime": "Ersatzzeit",
     "ruleOfThumb": "Faustregel: ungefähr {oneStage}. Die Strafzeit muss nur den Vorsprung aufwiegen, den ein Team auf den beendeten WPs herausgefahren hat — ist sie zu niedrig, kann ein schnelles Auto ausfallen und trotzdem die Rallye anführen.",
     "oneStage": "die Dauer einer WP",
-    "penaltyLabel": "Strafzeit für Ersatzzeiten"
+    "penaltyLabel": "Strafzeit für Ersatzzeiten",
+    "jumpStartPenalty": "Strafe für einen Frühstart",
+    "jumpStartNone": "Keine, nur markieren"
   },
   "penalties": {
     "penalties": "Strafen",
@@ -452,7 +454,9 @@
     "scoring": "Wertung",
     "scoringHint": "Wird für sich gewertet, zählt nie zur Gesamtwertung.",
     "general": "Allgemein",
-    "times": "Zeiten"
+    "times": "Zeiten",
+    "startMode": "Startart",
+    "startModeHint": "Mit Countdown erkennt das Startgate nur Frühstarts."
   },
   "runState": {
     "onStage": "Auf der Strecke",
@@ -561,7 +565,8 @@
     "finished": "Im Ziel",
     "dnf": "DNF",
     "dns": "DNS",
-    "rerun": "Annulliert — Neustart"
+    "rerun": "Annulliert — Neustart",
+    "queued": "Countdown"
   },
   "errors": {
     "serverUnreachable": "Der Server ist nicht erreichbar. Prüfe, ob er läuft und dieses Gerät in seinem Netz ist.",
@@ -621,7 +626,12 @@
     "setupLinkInvalid": "Dieser Einrichtungslink gilt nicht mehr. Nimm den neuesten aus dem Server-Log.",
     "invitationNotFound": "Diese Einladung gibt es nicht mehr.",
     "deviceNotFound": "Dieses Gerät gibt es nicht mehr.",
-    "foreignOrigin": "Abgelehnt: Diese Anfrage kam von einer anderen Webseite."
+    "foreignOrigin": "Abgelehnt: Diese Anfrage kam von einer anderen Webseite.",
+    "stageNotActive": "{stage} ist nicht aktiv: Countdowns laufen nur auf einer aktiven Prüfung.",
+    "notManualStart": "{stage} startet nicht per Countdown.",
+    "entryAlreadyStarting": "Dieses Auto ist schon im Countdown, auf der Prüfung oder hat sie beendet. Für einen Neustart zuerst seinen Lauf annullieren.",
+    "countdownNotCancellable": "Dieser Countdown lässt sich nicht mehr abbrechen: das Auto hat den Start passiert.",
+    "noJumpStart": "Dieser Lauf hat keinen Frühstart zum Verwerfen."
   },
   "rallyStatus": {
     "setup": "Vorbereitung",
@@ -757,7 +767,38 @@
       "PENALTY_DELETED": "Strafe gelöscht",
       "PASSING_ASSIGNED": "Durchfahrt zugeordnet",
       "PASSING_DISMISSED": "Durchfahrt verworfen",
-      "ENTRY_STATUS": "Status geändert"
+      "ENTRY_STATUS": "Status geändert",
+      "COUNTDOWN_STARTED": "Countdown gestartet",
+      "COUNTDOWN_CANCELLED": "Countdown abgebrochen",
+      "JUMP_START_DISMISSED": "Frühstart: keine Strafe"
     }
+  },
+  "countdown": {
+    "start": "Countdown",
+    "cancel": "Countdown abbrechen",
+    "go": "LOS",
+    "lights": "Startampel",
+    "enableSound": "Ton einschalten",
+    "fullscreen": "Vollbild",
+    "jumpStart": "Frühstart −{time}",
+    "givePenalty": "Frühstart-Strafe geben",
+    "dismissJumpStart": "Keine Strafe",
+    "title": "Start-Countdown",
+    "explain": "Für Prüfungen, die per Countdown starten (Einrichtung → Prüfungen → Startart).",
+    "countdown": "Countdown",
+    "countdownHint": "Läuft vor jedem Start; die Startampel sind immer die letzten 5 Sekunden.",
+    "countdownRule": "Mindestens 5 ganze Sekunden",
+    "tolerance": "Frühstart-Toleranz",
+    "toleranceHint": "Eine Startdurchfahrt, die mehr als das vor dem Slot liegt, wird als Frühstart markiert. Deckt Gate-Uhr und Lichtschranke ab, nicht die Reaktionszeit.",
+    "gap": "Mindestabstand zwischen Starts",
+    "gapHint": "Ein Countdown reiht sich mindestens so lange nach dem vorigen Slot ein.",
+    "wholeRule": "Eine ganze Zahl, mindestens {min}",
+    "seconds": "s",
+    "milliseconds": "ms",
+    "saved": "Countdown-Einstellungen gespeichert"
+  },
+  "startMode": {
+    "gate": "Startgate: die Startdurchfahrt ist die Startzeit",
+    "slotManual": "Countdown: der Slot ist die Startzeit"
   }
 }

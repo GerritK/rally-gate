@@ -1,6 +1,7 @@
-import { StageScoring } from '@rally-gate/shared';
+import { StageScoring, StartMode } from '@rally-gate/shared';
 import {
   IsEnum,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -40,6 +41,11 @@ export class CreateStageDto {
   @IsOptional()
   @IsEnum(StageScoring)
   scoring?: StageScoring;
+
+  // SLOT_SCHEDULE waits for its timetable (roadmap, "Start countdown" 3).
+  @IsOptional()
+  @IsIn([StartMode.GATE, StartMode.SLOT_MANUAL])
+  startMode?: StartMode;
 }
 
 export class UpdateStageDto {
@@ -54,6 +60,11 @@ export class UpdateStageDto {
   @IsOptional()
   @IsEnum(StageScoring)
   scoring?: StageScoring;
+
+  // SLOT_SCHEDULE waits for its timetable (roadmap, "Start countdown" 3).
+  @IsOptional()
+  @IsIn([StartMode.GATE, StartMode.SLOT_MANUAL])
+  startMode?: StartMode;
 
   // null clears it; omitted leaves it as stored.
   @IsOptional()

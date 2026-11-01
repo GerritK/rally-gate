@@ -27,3 +27,24 @@ export const NOTIONAL_PENALTY_MS_KEY = 'notionalPenaltyMs';
  * value scales with stage length, which the code can't know.
  */
 export const DEFAULT_NOTIONAL_PENALTY_MS = 120_000;
+
+export const COUNTDOWN_MS_KEY = 'countdownMs';
+
+/** Shown before every slot; the start lights are always its last 5 s. */
+export const DEFAULT_COUNTDOWN_MS = 10_000;
+
+export const JUMP_START_TOLERANCE_MS_KEY = 'jumpStartToleranceMs';
+
+/**
+ * A start passing earlier than slot minus this is a jump start. Covers the
+ * gate clock's sync error and the beam edge, not a driver's reaction time.
+ */
+export const DEFAULT_JUMP_START_TOLERANCE_MS = 200;
+
+export const MIN_START_GAP_MS_KEY = 'minStartGapMs';
+
+/** Manual slots queue at least this far apart: one start line, one car. */
+export const DEFAULT_MIN_START_GAP_MS = 30_000;
+
+/** A penalty type id; unset or empty means a jump start is only marked. */
+export const JUMP_START_PENALTY_TYPE_ID_KEY = 'jumpStartPenaltyTypeId';

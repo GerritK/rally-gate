@@ -1,5 +1,9 @@
 import { Body, Controller, Get, Param, Put } from '@nestjs/common';
 import {
+  COUNTDOWN_MS_KEY,
+  JUMP_START_PENALTY_TYPE_ID_KEY,
+  JUMP_START_TOLERANCE_MS_KEY,
+  MIN_START_GAP_MS_KEY,
   NOTIONAL_PENALTY_MS_KEY,
   RallyStatus,
   START_ORDER_DIRECTION_KEY,
@@ -12,12 +16,17 @@ import { SettingsService } from './settings.service';
 import { Public } from '../auth/auth.guard';
 
 /** Per key, as one route stores them all: the start-order rules reorder
- *  stage start lists, the notional penalty moves every DNF/DNS's total. */
+ *  stage start lists, the notional penalty moves every DNF/DNS's total,
+ *  the jump-start tolerance moves the marks already shown. */
 const LOCKED_WHEN: Record<string, RallyStatus[]> = {
   [START_ORDER_GROUPING_KEY]: [RallyStatus.RUNNING, RallyStatus.CLOSED],
   [START_ORDER_KEY_KEY]: [RallyStatus.RUNNING, RallyStatus.CLOSED],
   [START_ORDER_DIRECTION_KEY]: [RallyStatus.RUNNING, RallyStatus.CLOSED],
   [NOTIONAL_PENALTY_MS_KEY]: [RallyStatus.CLOSED],
+  [JUMP_START_TOLERANCE_MS_KEY]: [RallyStatus.RUNNING, RallyStatus.CLOSED],
+  [COUNTDOWN_MS_KEY]: [RallyStatus.CLOSED],
+  [MIN_START_GAP_MS_KEY]: [RallyStatus.CLOSED],
+  [JUMP_START_PENALTY_TYPE_ID_KEY]: [RallyStatus.CLOSED],
 };
 
 @Controller('settings')
