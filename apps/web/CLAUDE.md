@@ -8,7 +8,6 @@ The Vue 3 dashboard. Read `docs/frontend-structure.md` before changing routes or
 - **The PDFs mirror the pages, by hand.** `pdf.ts` builds the overall, stage results and start list from the same data but with its own columns, so nothing a page gains reaches the printout by itself. Whenever a results or start-list page changes what it shows, settle with the user whether and how the PDF follows, and change both in one commit.
 - **Fully Vuetify**: `v-table`/`v-select`/`v-btn`/`v-chip`, never raw `<table>`/`<select>`/`<button>`; status values are `v-chip`s. `App.vue` is the nav shell, pages are `src/pages/*.vue`.
 - **Every text is a message key** in `src/locales/en.json` and `de.json` (rules in `packages/ui/CLAUDE.md`). Text with markup inside is `<i18n-t>` with slots, never `v-html`.
-- Every timing value gets `.rg-timing` (tabular JetBrains Mono, slashed zero).
 - **Time corrections are time-only**, no date field: `combineDateAndTime()` (`format.ts`) takes the date from context — the run's own, or today. `VTimePicker` was rejected: no seconds. A `v-text-field[type=time]` gets `append-inner-icon="mdi-clock-outline"` with `openTimePicker` (`@rally-gate/ui`) on `@click:append-inner`.
 - **`src/assets/fonts/*.ttf` are not duplicates of the `@fontsource` packages.** `pdf.ts` embeds them because jsPDF can't read WOFF/WOFF2 and no npm package ships the TTFs (licences in `THIRD_PARTY_NOTICES.md`).
 

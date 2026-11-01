@@ -32,12 +32,24 @@ One line each; the linked doc has the detail. History is in git.
   (`decoder-adapters.md`). Verified on a Pi with a real car through a loop.
 - **Beam + OpenStint** at one gate: the beam's time, the transponder's car
   (`decoder-adapters.md`). Not yet tried on hardware.
-- **Stages and gates:** gates paired once with their own key, then created by their first heartbeat, assignments as a plan
-  with per-stage activation, expected stage time (`architecture.md`).
+- **Stages and gates:** gates created by their first heartbeat, assignments
+  as a plan with per-stage activation, expected stage time
+  (`architecture.md`).
 - **Clocks:** chrony against rally-server's SNTP, measured offset with a
   correction deadband (`architecture.md` "Clock offset").
 - **Discovery:** mDNS `rally-server.local` (`architecture.md`).
 - **Start order:** computed per stage, frozen when posted (`event-model.md`).
+- **Start countdown:** the slot as start time, from a timetable (first start
+  and interval, New slot, Delay) or triggered per car by the Countdown button
+  or a pre-start gate; the start card with start lights, sound and
+  fullscreen; jump starts marked for a penalty (`event-model.md` "Start
+  slots").
+- **Access:** roles on every change, invitations with printable QR codes,
+  organiser by localhost or password, the public page, the change history;
+  gates paired once with their own key and a single-use login token;
+  gate-config pages opened from the dashboard with a signed pass, also on
+  the ESP32 (`auth.md`). No TLS: the operating rule "participants never on
+  the timing Wi-Fi" covers it.
 - **Dashboard:** Live Timing (the marshal view), Results with podium,
   Entries with check-in, Hardware, Setup (`frontend-structure.md`).
 - **Printing:** start lists and results as PDFs (`design-system.md` "Print").
@@ -51,10 +63,9 @@ One line each; the linked doc has the detail. History is in git.
 - **Gate health:** chrony state and versions in the heartbeat, "Shut down
   all gates" (`architecture.md`). Not yet tried on a Pi.
 - **Deployment:** SQLite standalone and Postgres headless, Pi installers,
-  standalone packages built in CI, new / open event, known gates; ESP32
-  gate images on every release, flashed from the browser (`esp32-gate.md`
-  "Installing")
-  (`deployment-modes.md`).
+  standalone packages built in CI, new / open event, known gates
+  (`deployment-modes.md`); ESP32 gate images on every release, flashed from
+  the browser (`esp32-gate.md` "Installing").
 - **English and German** in both web UIs, PDFs included (`api.md` for
   server error codes).
 - **CI:** build, format, lint, tests, headless stack against Postgres.
@@ -74,44 +85,6 @@ One line each; the linked doc has the detail. History is in git.
      00:03:10 lands on the start's day, before the start (entering the stage
      time works). Fix: in `combineDateAndTime` callers, add a day when the
      finish isn't after the start; test in `format.spec.ts`.
-
-- **Access and authentication** (`auth.md`), before the first real event, in
-  three steps, each shippable:
-  1. API and dashboard. Built: roles on every change, invitations with
-     printable QR codes and devices (Setup → Access), organiser by localhost
-     or password with a setup QR, `reset-admin`, `/login` and `/join/:code`,
-     the dashboard showing only what the role may do, the History of every
-     hand-made change with its device on the entry page, a rate limit on
-     `/auth/login`, and the operating rule "participants never on the timing
-     Wi-Fi" on the login page and in the README, and the public page with
-     every internal read behind the login. Done.
-  2. Broker and gates. Built: gates create their own key and log in
-     with a single-use HMAC token, the key goes out only on a server's
-     CONNACK 4 while pairing is open, Pair gates on Hardware with accept and
-     reject, waiting gates refused so their detections stay on the gate,
-     each gate publishing only on its own topics, `autoDiscoverGates`
-     removed, `GATES_AUTO_ACCEPT` for dev. No server proof and no TLS: the
-     operating rule covers a fake server (`auth.md` "Gates"). The ESP32
-     keeps its key in NVS and logs in the same way. Done.
-  3. gate-config and ESP32. Built: the dashboard opens a gate's page with a
-     pass signed with its key, a session cookie for an hour, read-only
-     without one, open on the gate's own hotspot and for 3 minutes after
-     power-on until the broker accepts the gate, "Shut down all gates" with
-     its own pass, the same on `web.cpp`. Done.
-
-- **Start countdown** (`event-model.md` "Start slots"): the slot as start
-  time, a countdown with start lights, jump starts marked. Designed, in this
-  order, each its own commit:
-  1. Slot model, `SLOT_MANUAL` with the Countdown button, the start card
-     with countdown, sound and fullscreen, the jump-start mark and penalty.
-     Done.
-  2. `stage_pre_start`: at the start in every mode, the trigger in
-     `SLOT_MANUAL`. Done.
-  3. `SLOT_SCHEDULE`: first start and interval, slots fixed on freeze, New
-     slot, Delay, slot times on the printed start list. Done.
-  4. Start lights at a gate: only the decision so far
-     (`architecture.md` "No server → gate commands"), built once a light
-     exists.
 
 - **Class and category badges in rankings** ("2WD · Rookie") on Results
   and the PDFs: only the classes the current filter doesn't already imply
@@ -142,6 +115,9 @@ One line each; the linked doc has the detail. History is in git.
   internet, so the host has nothing to step to; until then `preciseNowMs`
   logs every step past 50ms. Build it before an event whose server has
   internet, or once a logged step shows up in the field.
+- **Start lights at a gate** — only the decision so far (`architecture.md`
+  "No server → gate commands"); the countdown runs on the start card. Built
+  once a light exists.
 - **GPS/PPS per gate** — waiting on hardware (`decoder-adapters.md` "Hardware
   notes").
 - **Gate updates from the server** — rally WiFi is closed, so gates can't reach
@@ -163,9 +139,9 @@ One line each; the linked doc has the detail. History is in git.
 - **Discovery edge cases** — mDNS from a server Pi reaching gates on a physical
   LAN (only proven from a laptop and inside WSL so far), and two rally-servers on
   one network both claiming `rally-server.local`.
-- **Rally controls** — Parc Fermé, time control, service park, pre-start roles
-  (unused `GateRole` values today). All undesigned (planned start times
-  are designed: "Start countdown" under Next); don't grow Setup UI for them speculatively. When checkpoint
+- **Rally controls** — Parc Fermé, time control, service park (no
+  `GateRole` for them yet). All undesigned; don't grow Setup UI for them
+  speculatively. When checkpoint
   interval times land, give them their own formatter rather than reusing
   `formatStageDuration` (see `packages/ui/src/format.ts`).
 - **Required passings at one gate** — a stage that loops past the same gate
@@ -183,8 +159,7 @@ One line each; the linked doc has the detail. History is in git.
   The minimum interval is per entry, not per identifier: a car carrying two
   transponders of one kind is two detections per passing.
 - **Other competition formats** — circuit races (several cars at once, ended
-  by lap count or time) and regularity rallies, both asked for by the
-  community. Not wanted yet; don't build the abstraction ahead of the first
+  by lap count or time) and regularity rallies. Not wanted yet; don't build the abstraction ahead of the first
   real second format. Direction when one comes: a `Stage.kind` with
   per-kind settings (each its own DTO class), and `EventsService.applyRules`'
   role branching moved into one handler per kind that also ranks — still
@@ -231,10 +206,7 @@ One line each; the linked doc has the detail. History is in git.
 - **Renaming an event file** after a rally rename. The file name is fixed at
   creation; the app bar shows the rally name, so it rarely matters. If built:
   an explicit action, never on saving the details (that would restart the
-  server over a typo). A closed file is a plain rename; the open one is locked
-  on Windows, so `current.json` would carry `renameFrom` and the restarted
-  server renames it before TypeORM opens it — keeping the old name, with a
-  warning, if that fails.
+  server over a typo); the open file is locked on Windows.
 - **NFC stop control for beam-only finishes** — once the ESP32 check-in
   gate runs on hardware. The driver taps the entry's NFC sticker at an ESP32
   gate at the stop control, where cars halt well past the flying finish, so
@@ -262,8 +234,6 @@ One line each; the linked doc has the detail. History is in git.
   plain detections with no entry.
 - **Saved class combinations** ("2WD + Rookie") for printing — the class
   filter is a link, which covers it until someone asks.
-- **The International Flag of Planet Earth** as a crew flag: its terms
-  forbid it standing for a person.
 - Online/spectator mode: a one-way push from the local rally-server to a
   cloud service, so spectators get live timing while the rally network stays
   closed.

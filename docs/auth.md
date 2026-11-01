@@ -1,9 +1,6 @@
 # Access and authentication
 
-Designed 2026-10-30. Built so far: roles, invitations, devices, the
-organiser login and the public page (step 1 in `development-roadmap.md` "Next"),
-the broker login with gate pairing (step 2), and gate-config's pass on the
-Pi and the ESP32 (step 3).
+What stays out: `development-roadmap.md` "Beyond the auth design".
 
 ## What it protects against
 
@@ -71,9 +68,9 @@ Roles decide what a login may **change**:
 
 The table is `PERMISSIONS` in `packages/shared/src/permissions.ts`, read by
 both sides: rally-server's `@Requires` and the dashboard's `can()`. The
-dashboard **hides** what a role may never do (button, menu entry, Save; a
-form turns read-only) instead of letting the server answer 403, and keeps
-every page visible, since reading is any login's. Not logged in, every page
+dashboard hides what a role may never do (`design-system.md`
+"Confirmations") and keeps every page visible, since reading is any
+login's. Not logged in, every page
 but `/public`, `/login` and `/join` sends the browser to `/public`, which
 has no drawer and a Log in button in the app bar; the server refuses those
 reads too (`api.md`). It reloads the session on every navigation and after any 401/403, so a
@@ -128,8 +125,7 @@ A login is a **device with a role**, not a person with a password.
   (headless: `CONFIG_DIR`, a volume in `deploy/docker-compose.yml`).
 - **First start:** while no password exists, the server logs a setup link as a
   terminal QR code (installer output, `journalctl`, `docker logs`); scan it,
-  set the password on the phone. One dependency, `qrcode`, draws both this and
-  the invitation QR codes.
+  set the password on the phone.
 - **Forgotten password:** standalone — set a new one on the laptop. Headless —
   `npm run reset-admin` (or via `docker exec`) prints a new setup QR. No email
   reset; the rally is offline.
@@ -194,7 +190,6 @@ Nothing is typed on a gate (`development-roadmap.md` "Zero-config gates").
 - The broker lets a gate publish only under `rally/gates/<its id>/` and
   subscribe to nothing, and ignores a detection whose `gateId` isn't its
   topic's.
-- This replaced the `autoDiscoverGates` setting.
 - Dev only: `GATES_AUTO_ACCEPT=1` on the server keeps pairing open, approves
   every key at once and lets clients without a login publish for any gate
   (`npm run simulate`, `npm run screenshots`). `npm run dev:server` (its
@@ -248,8 +243,3 @@ for both):
 - No CORS: a cookie login doesn't work across origins anyway, and any web
   page open on a server laptop with internet could otherwise reach
   `localhost:57430` as the organiser. `apps/web` proxies `/api` in Vite.
-
-## Deliberately not in it
-
-TLS on the LAN, the login for online mode's cloud push, carrying invitations
-over to a new event, and rights per single action instead of per role.

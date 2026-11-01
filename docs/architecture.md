@@ -95,17 +95,15 @@ gate installer installs and checks with `getent hosts`.
   `ENOTFOUND rally-server.local` while the server log says it is advertising.
 - A typed `MQTT_HOST` still wins, for networks that block multicast.
 - Headless mode runs rally-server with `network_mode: host`, because a bridged
-  container can't multicast to the LAN. Consequences in `deploy/CLAUDE.md`. Docker Desktop's "host" is a VM, so there gates still
-  need a typed IP.
+  container can't multicast to the LAN. Consequences in `deploy/CLAUDE.md`.
 - The name is fixed, so two rally-servers on one network collide; `MDNS_HOST`
   is the escape hatch.
 
 ## Gate assignment: plan vs. live
 
 One physical gate serves several stages in different roles (gate 7: start of
-SS1, finish of SS2). `GateAssignment` (`gateId`, `stageId`, `role`,
-`splitIndex`, `active`) is that plan, one row per (gate, stage), created during
-setup. `Gate` itself is hardware identity only.
+SS1, finish of SS2), one `GateAssignment` per (gate, stage); the model is in
+the root `CLAUDE.md` "Architecture".
 
 - **Activation is per stage.** `POST /stages/:id/activate` flips all of that
   stage's assignments to `active` in one transaction; a marshal thinks "SS2 is
@@ -127,8 +125,6 @@ setup. `Gate` itself is hardware identity only.
 - **Closing is terminal.** Activate 409s on a `CLOSED` stage, so new detections
   can't mutate results already being reported. Fixes after close go through the
   stage-run correction endpoints.
-- `StageRun`/`StageSplit` snapshot `stageId` at creation, so reassigning a gate
-  never rewrites history.
 - `applyRules` checks both `GateAssignment.active` and `Stage.status`: they are
   written in separate steps, and a detection in between is stored untimed
   rather than attached to a dormant stage.

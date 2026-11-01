@@ -168,8 +168,7 @@ Values live in `theme.ts`. The rules:
   `GET /time`). A marshal reads times off it; a tablet's own clock may be
   off by seconds.
 - **Hand-set times are marked** (`ManualMark`, a hand icon): Start now,
-  Finish now and corrections. They carry the marshal's reaction time, and a
-  protest asks which times were hand-set.
+  Finish now and corrections (why: `event-model.md` "StageRun").
 - **Prefer an action to a typed time.** "Start now" / "Finish now" are
   stamped by the server. Typed times remain only for corrections and a
   missed start, and there a stage time ("3:12.4" off the stopwatch) derives
@@ -335,8 +334,7 @@ page's main button. The favicons (`apps/web/public/favicon.svg`,
 "Rally Gate" at the foot, in two greys (`LOGO_GREYS` in
 `apps/web/src/pdf.ts`), drawn from the same file.
 
-Rules the geometry follows, so an edit doesn't reintroduce the
-inconsistencies the first draft had:
+Rules the geometry follows:
 
 - One slant for every forward edge (dx/dy 0.64); the R's leg and the G's
   bottom-left chamfer share a second one (0.86), so they run parallel.

@@ -30,7 +30,7 @@ check-in uses the time.
 
 | Part | Choice | Why |
 |---|---|---|
-| Board | Seeed XIAO ESP32-S3 (BerryBase SE-102010634, with header) | U.FL antenna (range at the roadside is what decides whether a gate is online at all), two cores (Wi-Fi on one, a beam interrupt on the other, so the same board serves timing later), native USB (browser flashing without a serial driver), LiPo charger on board |
+| Board | Seeed XIAO ESP32-S3 | U.FL antenna (range at the roadside is what decides whether a gate is online at all), two cores (Wi-Fi on one, a beam interrupt on the other, so the same board serves timing later), native USB (browser flashing without a serial driver), LiPo charger on board |
 | Reader | PN532 V3 module, **SPI** | I²C on the ESP32 has known trouble with the PN532's clock stretching. Preferred over the RC522: more tag types, steadier. IRQ is not needed: the firmware polls with a 50ms timeout |
 | Tags | NTAG213/215 stickers; on-metal NTAG where it sits on a battery or metal | |
 | Feedback | active 3.3V buzzer + LED | the driver has to know the tap counted |
@@ -39,9 +39,8 @@ Not chosen: ESP32-C3 SuperMini (antenna notoriously weak), classic
 ESP32-WROOM DevKit (PCB antenna, USB-serial bridge, older generation; fine on
 a desk).
 
-The board has 8 MB flash, as Seeed specifies and `esptool.py flash_id`
-confirms; BerryBase's shop page saying 6 MB is a listing error. The partition
-table uses all 8 MB.
+The board has 8 MB flash (`esptool.py flash_id`), and the partition table
+uses all of it.
 
 **The antenna must be plugged in**, since without it the board has next to
 no range. In the case, keep it away from the battery and metal.
@@ -59,7 +58,7 @@ no range. In the case, keep it away from the battery and metal.
 The firmware asks the PN532 for its firmware version every 5s and
 re-initialises it if it stops answering. Its RSTPDN pin isn't broken out on
 the V3 module and an ESP32 reset leaves it powered, so a reader that answers
-but no longer reads needs a power cycle (seen once, right after flashing).
+but no longer reads needs a power cycle.
 
 Buzzer on D1, LED on D2 (through a resistor), both to GND. The LED is lit
 while the gate is connected to the server. One beep means the tap is
@@ -71,7 +70,7 @@ found. They can be turned off on the status page, power on can't.
 ## Identifying a driver
 
 **An NFC sticker on the driver's RC transmitter** is the tag: it is in the
-driver's hand anyway, needs no phone, battery or app, and costs ~EUR 0.30.
+driver's hand anyway and needs no phone, battery or app.
 The tag's UID is the `transponderId`. NTAG UIDs are 7 bytes, fixed and not
 writable. The gate ignores random UIDs (4 bytes starting `08`, ISO 14443-3):
 a phone held to the reader sends a new one per tap. Any other foreign card is
@@ -87,18 +86,11 @@ construction. A USB desk reader that types into the focused field is the
 fallback, but many emit decimal or reversed bytes: check one against the
 firmware's output first.
 
-Phones were considered and rejected:
-- **Android** can emulate a card (HCE) with a fixed ID behind an AID, which the
-  PN532 could read via `SELECT AID`. It needs our own app, and the screen must
-  be on.
-- **iPhone**: card emulation and NFC Wallet passes both need Apple's approval
-  and a commercial agreement. Not reachable for an open project.
-- Phones emulating a card send a **random UID**, so a phone's plain UID is
-  never usable.
-
-If phone support is ever demanded, the cross-platform route is a QR scanner
-module (GM65/GM805 over UART) and a `TransponderKind.QR`, which works without
-an app on either platform.
+**No phones:** their plain UID is random; Android's fixed-ID card emulation
+(HCE) needs our own app and the screen on; iPhone card emulation needs Apple's
+approval and a commercial agreement. If phone support is ever demanded, the
+app-free route is a QR scanner module (GM65/GM805 over UART) and a
+`TransponderKind.QR`.
 
 ## Firmware
 
@@ -123,14 +115,14 @@ systemd, chrony and journalctl don't exist here. It shows server connection,
 clock, reader, buffer fill and the last tags read, and sets Wi-Fi, gate name,
 server and the emergency Wi-Fi password. Reset Wi-Fi forgets the network, so
 the gate comes back up on its emergency Wi-Fi. Every change restarts the gate. It
-is plain HTML (`web/index.html`), English only, styled after gate-config's
-Vuetify page by hand: the rallyGateDark colours, Vuetify's card, outlined
-field, chip and alert look, MDI paths inline, and the latin woff2 subsets of
-Barlow, Barlow Condensed and JetBrains Mono (`web/fonts/`, copied from
-`@fontsource` so the firmware build needs no `node_modules`). `prebuild.py`
-inlines the fonts and gzips it into the image, about 95 KB. Vuetify itself
-stays out: Node in the firmware build and a few hundred KB more over the
-emergency Wi-Fi, for one page.
+is plain HTML (`web/index.html`), English only, hand-styled after gate-config
+(rallyGateDark colours, MDI paths inline, the latin woff2 font subsets copied
+into `web/fonts/` so the firmware build needs no `node_modules`).
+`prebuild.py` inlines the fonts and gzips it into the image, about 95 KB.
+Vuetify itself stays out: Node in the firmware build and a few hundred KB more
+over the emergency Wi-Fi, for one page. The default gate name is `ESP32_` plus
+the last three MAC bytes: what the device is, not what it does, since one
+board may later run a beam as well.
 
 Changes need a session, as on a Pi (`auth.md` "gate-config"): open on the
 emergency Wi-Fi (the request came in on the AP's address) and until the broker
@@ -165,9 +157,7 @@ the reader only while the loop is blocked is never seen. So the page's Wi-Fi
 scan and the mDNS lookup of
 `rally-server.local` run in the background and are polled. A beam would not
 depend on this: its time comes from the GPIO interrupt, and a blocked loop
-only delays sending it. The default gate name is `ESP32_` plus the last three MAC bytes: what the
-device is, not what it does. `capabilities` reports the reader and the
-assignment gives the role, and one board may later run a beam as well.
+only delays sending it.
 
 ### Clock
 
@@ -198,8 +188,8 @@ reference point left, so those taps are still sent, but flagged in
 `metadata`: presence proven, time of day not. For check-in that is enough.
 
 The ESP32's built-in RTC is no substitute for a DS3231: it runs from an
-inaccurate RC oscillator and doesn't survive power loss. A DS3231 (I²C,
-~EUR 3) only pays off for a gate that runs long without network and reboots.
+inaccurate RC oscillator and doesn't survive power loss. A DS3231 only pays
+off for a gate that runs long without network and reboots.
 
 ### Flash budget
 
@@ -214,9 +204,8 @@ is never a page from a different firmware version. gate-config's Vuetify
 build would not fit as it is (3.2 MB gzipped, mostly MDI and every font
 subset), which is the other reason the page is hand-styled HTML.
 
-OTA can't come from GitHub in the field, since rally Wi-Fi is closed. It is
-an upload through the status page for now, and from rally-server once
-"Gate updates from the server" (`development-roadmap.md`) exists.
+OTA isn't built yet; until then a gate is updated over USB-C (later:
+`development-roadmap.md` "Gate updates from the server").
 
 ## Installing
 

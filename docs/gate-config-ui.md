@@ -135,13 +135,9 @@ network that is still associating.
 
 ## Access
 
-`docs/auth.md` "gate-config": on the rally Wi-Fi the page is read-only until it
-is opened from the dashboard's Hardware page, which carries a pass signed with
-the gate's key; open on the gate's own hotspot, over loopback and in the
-3 minutes after power-on until the agent reaches the server. One Express
-middleware in `src/gate-config/main.ts` decides it, the signing is in
-`access.ts`. The hotspot's WPA2 password draws the boundary around the gate's
-own AP; `GET /api/config` leaves it out without a session. The Wi-Fi client password never touches
+The rules are in `docs/auth.md` "gate-config". One Express middleware in
+`src/gate-config/main.ts` decides it, the signing is in `access.ts`.
+`GET /api/config` leaves the hotspot password out without a session. The Wi-Fi client password never touches
 `gate.env` — NetworkManager stores it, and gate-config can't read it back.
 
 ## Build and testing
@@ -149,8 +145,6 @@ own AP; `GET /api/config` leaves it out without a session. The Wi-Fi client pass
 Vue + Vuetify through `packages/ui`, like `apps/web`. Built on the gate by the
 installer; `vue-tsc` is skipped there for speed.
 
-Everything touching the OS is in `src/gate-config/system.ts`, which reports failures instead
-of throwing — off a Pi every status row reads unavailable and the page still
-works. `fields.ts`, `config-file.ts` and `network.ts` are unit-tested, including injection
-cases; `rally-gate-net` was checked against a stub `nmcli` on `PATH`. On a real
+OS calls: `apps/gate/CLAUDE.md`. `fields.ts`, `config-file.ts` and `network.ts` are unit-tested, including injection
+cases. On a real
 Pi everything above is verified except the captive portal redirect.

@@ -142,9 +142,6 @@ which times were hand-set, so Live Timing marks them. Assigning an
 unassigned passing doesn't set them: the time is still the gate's. Clearing a
 finish clears its flag.
 
-Duplicate starts, and finishes without an active run, are logged and
-ignored. Marshals correct runs via `PATCH`/`POST`/`DELETE /stage-runs`.
-
 ### Voiding, and how a re-run starts
 
 A re-run is **not** started by a bare start-gate detection: the start gate stays
@@ -323,9 +320,7 @@ bar's chip only links there, so a tap on a tablet never ends a rally.
   Setup.
 
 Results PDFs say "Provisional" until Closed: a closed stage can still move
-by a penalty or a protest. Route locks are `@LockedWhen(...)` on the
-controller method; a lock on some fields only (an entry, one setting key)
-is checked in code, as a form sends every field.
+by a penalty or a protest. How a lock is enforced: `apps/rally-server/CLAUDE.md`.
 
 ## Classes
 
@@ -445,9 +440,6 @@ only while the stage is `NOT_STARTED` so a start never changes meaning mid-run:
 - `SLOT_MANUAL` — a countdown is triggered per car, by a marshal or a
   pre-start gate. For a casual meet without a timetable.
 
-Built: all three modes and the pre-start gate. Start lights at a gate are
-not built (`development-roadmap.md`).
-
 A slot is a `StageRun` created by the trigger, `startTime` and
 `plannedStartTime` both the slot: no slot table and no server timer, and the
 `finish > start` check covers it unchanged. Until slot + 5 s (green shown)
@@ -494,10 +486,9 @@ On a combined start/finish gate, passings before slot + `minDurationMs` are
 the start passing (checked for a jump start); the first one after is the
 finish.
 
-A slot nobody drove becomes DNS when the stage closes: closing deletes the
-slot run and writes a DNS row ("DNF and DNS"). "Nobody drove" is no start
-passing, no split and no finish, so a car the start gate missed that never
-reached a split reads DNS too, which costs the same notional time.
+A slot nobody drove becomes DNS on close ("DNF and DNS"). A car the start
+gate missed that never reached a split reads DNS too, which costs the same
+notional time.
 
 ### Countdown
 
@@ -528,8 +519,8 @@ from now. A tap with `timeUnknown` has no age and always triggers.
 - Slots queue: the next is at earliest the previous + `minStartGapMs`
   (event-wide, default 30 s), since two cars can't start from one line.
 - Tap order is start order. The frozen start order is not checked.
-- Cancel deletes a slot until its car's first start passing, and is recorded
-  in the change history; then trigger again.
+- Cancel deletes a slot until its car's first start passing; then trigger
+  again.
 - A trigger for a car that already has an open slot or is on stage is stored
   and ignored: a loop reads a car near it many times. The Countdown button
   answers 409 instead, also for a car that finished a counted stage (void its
@@ -543,11 +534,8 @@ Per stage a first start (time only, the date from context) and an interval
 (default 60 s), one interval for everyone, no gaps between class blocks.
 Slot = first start + interval × position in the frozen start order.
 
-- Slots are **fixed when the start order freezes**: first start and
-  interval lock with the snapshot, so a posted start list with times never
-  moves silently. A withdrawn
-  car keeps its slot, leaving a gap; nobody moves up. A crew registered
-  later gets a slot after the last.
+- Slots are **fixed when the start order freezes** (below). A withdrawn
+  car keeps its slot, leaving a gap; nobody moves up.
 - **New slot**: a car not ready goes after the last slot (last + interval),
   never into a gap, which would give it a slot earlier than it could expect.
 - **Delay**: all slots not yet reached move back by a given time, also while
@@ -592,8 +580,6 @@ stage that hasn't run would have shown as started on every results page.
 - The Countdown button is `SLOT_MANUAL` only. The start card shows New slot
   per car and Delay in its header, and before activation the slot times
   from the start list.
-- A pre-start mark shows beside the slot: a timetable slot still ahead
-  whose car hasn't left doesn't end "its last run" ("Pre-start gate").
 
 ### Pre-start gate
 

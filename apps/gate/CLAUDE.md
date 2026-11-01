@@ -6,7 +6,7 @@ Everything that runs on a Pi gate, as one package with two systemd units:
 - **`src/gate-config/`** + **`web/`** (`rally-gate-config`): the on-gate config service and its page (port 57439, captive-portal redirect on 80). Design: `docs/gate-config-ui.md` — read its "Wi-Fi goes through a wrapper" section before touching anything that shells out to `nmcli`.
 - **`src/fields.ts`** and **`src/paths.ts`** are the contract between the two: every setting with its rule and default, and the files both sides touch.
 
-Two units, not one process, on purpose: the agent restarts forever, so a config page hosted inside it would die with the thing it exists to repair.
+Two units, not one process, on purpose (`docs/gate-config-ui.md`).
 
 - Tests run on **`node:test`**: `npm test -w apps/gate`, for the plain modules only (no Vue).
 - **`FIELDS` in `src/fields.ts` is the security boundary.** `gate.env` becomes the agent's environment and anyone with a gate-config session can save it (`docs/auth.md` "gate-config": the hotspot and the power-on window need no pass), so an arbitrary key would allow `NODE_OPTIONS`/`LD_PRELOAD`. Never widen it to "whatever the form posted". The page derives its input rules and placeholders from these specs (`/api/fields`) rather than restating them. **No text on the server:** a field's label, hint and message live in `web/src/locales/*.json` under `fields.<NAME>` (`fields.spec.ts` fails if one is missing), and every refusal goes out as a code (`FieldError`, `WifiError` in `src/gate-config/api-types.ts`) the page words.

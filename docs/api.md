@@ -1,8 +1,7 @@
 # API
 
-`rally-server`, port 57430. **Every path is under `/api`**, because the same
-port serves the built dashboard and `/entries` is both a page and a resource.
-Anything outside `/api` that isn't a file returns `index.html`.
+`rally-server`, port 57430. **Every path is under `/api`** (why:
+`apps/rally-server/CLAUDE.md` "HTTP").
 
 A refusal the server raises itself (the 400/404/409s below) carries
 `{ code, message, params? }`: `code` is an `ApiErrorCode` (`packages/shared`),

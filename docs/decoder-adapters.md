@@ -44,8 +44,8 @@ reason in its log.
 
 ### Wiring an E3Z-T61 (NPN, through-beam)
 
-The E3Z-T61 is an emitter + receiver pair, NPN open-collector output, 1ms
-response time.
+The E3Z-T61 ([source](https://de.aliexpress.com/item/1005006052871002.html))
+is an emitter + receiver pair, NPN open-collector output, 1ms response time.
 
 - **Supply 12-24V DC, not the Pi's 5V** — a small step-up converter or the
   gate's 12V battery. Brown = +V, blue = 0V, on both emitter and receiver.
@@ -228,8 +228,5 @@ unexplained jump.
   session. Needs a UART/GPIO module with PPS on a GPIO (`dtoverlay=pps-gpio`),
   **not a USB dongle** — USB destroys the pulse edge. It becomes a chrony
   refclock, complements the RTC, needs sky view (forest and valleys are the real
-  risk), ~EUR 15-30 per gate. No server change: `Gate.clockOffsetMs` doubles as
+  risk). No server change: `Gate.clockOffsetMs` doubles as
   its health indicator.
-- **Light barrier** — E3Z-T61 NPN through-beam
-  ([source](https://de.aliexpress.com/item/1005006052871002.html)), wiring
-  above.

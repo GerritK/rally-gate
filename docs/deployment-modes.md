@@ -80,9 +80,8 @@ sit near zero. Reaching the 1000ms correction threshold means sync is broken.
 
 ## One database = one event
 
-There is no `Event` table, on purpose. `DB_PATH` (SQLite) / `DB_NAME`
-(Postgres) is the event: save is the file, load is pointing at it, transfer is
-copying it (`pg_dump` for Postgres). An `Event` entity would only pay off with
+`DB_PATH` (SQLite) / `DB_NAME` (Postgres) is the event (root `CLAUDE.md`;
+`pg_dump` to copy a Postgres one). An `Event` entity would only pay off with
 several events live in one server at once, which isn't the requirement.
 
 ### New / open event
@@ -121,5 +120,4 @@ fixed and the buttons are hidden.
   can copy it to a second laptop.
 
 Switching under Postgres would need `CREATE DATABASE`; Docker's restart
-policy would already do the restart. Not built, like carrying entries over and
-an online/spectator mode: `development-roadmap.md` "Deliberately deferred".
+policy would already do the restart. Not built (`development-roadmap.md`).

@@ -56,7 +56,7 @@ A Postgres-invalid type hides: `DataSource.initialize()` connects before it buil
 
 ## Event handlers and the rule engine
 
-**`@OnEvent` handlers swallow exceptions** (`suppressErrors: true` by default): a throw inside one is a log line and nothing else. That is why `EventsService` stores the raw detection *before* running the rules, `applyRulesForRecord` catches and leaves `processed: false`, and a 30 s sweep (`reprocessPending`) retries oldest first with the `clockCorrectionMs` stored on the record. An unknown gate or unregistered transponder is not a failure and is marked processed, so the pending list holds real problems only. A finish or split for a car with no run on the stage stays pending for `AWAIT_START_MS` (its start may be replayed late by a gate that was offline).
+**`@OnEvent` handlers swallow exceptions** (`suppressErrors: true` by default): a throw inside one is a log line and nothing else. That is why `EventsService` stores the raw detection *before* running the rules, `applyRulesForRecord` catches and leaves `processed: false`, and a 30 s sweep (`reprocessPending`) retries oldest first with the `clockCorrectionMs` stored on the record. What counts as pending: `docs/event-model.md` "DetectionEventRecord".
 
 **The one exception is `mqtt.message`**: `BrokerService` emits it with `emitAsync` from Aedes' `authorizePublish`, which runs before the PUBACK, and `EventsService.handleMqttMessage` is `suppressErrors: false`. A detection that wasn't stored therefore throws, goes unacknowledged and is resent by the gate. Any other `mqtt.message` listener delays every gate's PUBACK while it runs, and must not throw unless the gate should resend.
 

@@ -8,13 +8,13 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
 | Route | Nav | Contents |
 |---|---|---|
 | `/` | — | redirect to `/live` |
-| `/live/:stageId?` | Live Timing | the marshal view, laid out like the stage: the stage's gates with their health, Up next beside On stage (Up next marks the cars at the start; on a slot stage it is the start card, see below; On stage in expected arrival order, unidentified passings with a suggested entry), every entry in start order with run state, corrections, Enter time and Add penalties, DNF and DNS; Activate / Close, freeze and print the start list. No stage picks the active one, else the next |
-| `/results/overall` | Results | podium, overall classification, each stage column the time driven, the fastest marked, the gap to it in the tooltip, its header linking to that stage's results, a Penalties column once anyone has one, filterable by class; Print / Print all open a PDF (every class's ranking on its own sheets) |
-| `/results/stages/:stageId` | Results | podium, stage classification with a column per split (the time and its rank, the fastest marked, the gap to it in the tooltip), DNF/DNS, filterable by class; Print / Print all open a PDF (every class's ranking on its own sheets) |
+| `/live/:stageId?` | Live Timing | the marshal view, laid out like the stage: gates, Up next beside On stage, the start list with every run, corrections, penalties, DNF/DNS, Activate / Close (decisions below). No stage picks the active one, else the next |
+| `/results/overall` | Results | podium, overall classification, each stage column the time driven, the fastest marked, the gap to it in the tooltip, its header linking to that stage's results, a Penalties column once anyone has one, filterable by class; Print / Print all open a PDF (Print all: every class's ranking on its own sheets) |
+| `/results/stages/:stageId` | Results | podium, stage classification with a column per split (the time and its rank, the fastest marked, the gap to it in the tooltip), DNF/DNS; class filter and printing as on Overall |
 | `/entries` | Entries | registration in a dialog, status, classes; per row the status's next step (Check in, Passed) and ⋮ for the rest (back a step, Withdraw, Disqualify, Reinstate); Check-in in the header; a row opens the entry |
-| `/entries/check-in` | Entries | check-in in two stations, Desk and Scrutineering (remembered per device), since they happen at different tables and scrutineering doesn't go in entry order: counts, the cars still open here, a search by number or name, the picked car with its next step as the big button. The desk takes transponders inline and offers Check in and pass |
+| `/entries/check-in` | Entries | check-in in two stations, Desk and Scrutineering (remembered per device), since they happen at different tables and scrutineering doesn't go in entry order; the picked car's next step is the big button. The desk takes transponders inline and offers Check in and pass |
 | `/entries/:entryId` | Entries | one entry: crew with Edit, then the dialog's parts as cards (Crew, Car, Registration); Times per stage with position, gap and status, the overall standing; Penalties with what each costs and Add penalties. Result rows open it too |
-| `/hardware` | Hardware | gate roster: online (heartbeat on hover), a version only when it differs from the server's, last read with the car it matched (gate and transponder tests before the rally), clock offset, add/delete, pairing (open for 10 minutes with a countdown on its button, waiting gates in the roster to accept or reject, a changed key in that gate's own row), shut down all gates; a row opens the gate. Gates known to this computer: add to this event, forget (standalone only) |
+| `/hardware` | Hardware | gate roster: health, clock offset, last read with the car it matched (gate and transponder tests before the rally), pairing, shut down all gates; a row opens the gate. Gates known to this computer: add to this event, forget (standalone only) |
 | `/hardware/gates/:gateId` | Hardware | one gate: status, clock, address with a link to its gate-config, version, rename; its assignments on every stage; its last 100 detections, live, with clock correction and what became of each |
 | `/setup` | Setup | the event: rally details, file name, New / Open Event dialogs (standalone only); the rally status with what it locks, Start rally (behind the pre-start check), Close rally (confirmed, names the stages it closes), Reopen in ⋮ (confirmed); tiles to Stages, Classes, Start order, Scoring and Display. The app bar's cog links here |
 | `/setup/stages` | Setup | stage list, create |
@@ -32,9 +32,8 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
 
 - **The start list is Live Timing's backbone**, not a page of its own: one row
   per entry in start order, runs merged in, main classes as header rows.
-  Printing it is a PDF of the same rows (position, number, crew, car, class
-  headers), like the results (`design-system.md` "Print"). Its rules are
-  configured under Setup.
+  Printed as a PDF (`design-system.md` "Print"). Its rules are configured
+  under Setup.
 - **On a slot stage Up next becomes the start card**, not a page of its own:
   at a casual meet one laptop does everything, and a page of its own would
   have the marshal switching pages for every car; at a formal one the tablet at the line
@@ -76,10 +75,8 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
   URLs: track, class filter, card header, Print and "Print all" exist once.
   Only the table differs (`OverallRanking`, `StageRanking`), since the
   columns and the second table (not classified vs. DNF/DNS) really differ.
-- **The app bar** shows the open event, the rally status (a chip linking
-  to Setup, where it changes), the server clock and the live
-  stream's state (see `design-system.md` "App bar"). The state comes from the
-  page's own stream (`liveStatus` in `api/live.ts`), never a second
+- **The app bar** (`design-system.md` "App bar"): the live state comes from
+  the page's own stream (`liveStatus` in `api/live.ts`), never a second
   connection. The rally status rides on that stream too; a page without
   one refetches it on navigation.
 - **Live Timing loads its data directly, not only when the live stream opens**:
@@ -109,14 +106,11 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
 - **No store, no speculative components.** Each page fetches what it needs in
   `onMounted`; data volumes are tiny. The one exception is the Display
   settings (`display` in `src/crew.ts`), loaded once by `App.vue`, since
-  every crew name on every page reads them. Extract a component once it is actually
-  duplicated; the shared ones are listed in `design-system.md`. Shared pure
-  helpers are in `src/format.ts`.
+  every crew name on every page reads them. Shared components:
+  `design-system.md`; shared pure helpers: `src/format.ts`.
 - **New / Open Event live in Setup**, on the rally details card: the details
   are the event, and switching is a before-the-event action (refused while a
   stage is active), so it has no nav entry. Known gates are on Hardware,
   where gates are looked for.
 - **Switching events reloads the whole app** rather than refetching: every
   page holds the old event's data, and there is no store to reset.
-- Stage ids are caller-supplied (`WP1`, `SS2`), so the create form has an id
-  field.

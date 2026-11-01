@@ -62,6 +62,13 @@ flowchart LR
   in one go, on numbered sheets.
 - Start lists per stage, ordered by class and start number or by times so
   far, frozen and printed for posting.
+- **Start countdown** with start lights and sound on a tablet at the start:
+  from a timetable (first start and interval, with Delay and a new slot for a
+  late car) or triggered car by car, by a marshal or a pre-start gate. The
+  slot is the start time, and a car that leaves early is marked for a
+  jump-start penalty.
+- Qualifying stages that set the first stage's start order, and a shakedown
+  a car drives as often as it likes, its fastest run counting.
 - **Light barrier gates**: a Raspberry Pi with a light barrier on a GPIO pin.
   A light barrier can't tell cars apart, so a marshal confirms each passing's
   car on Live Timing, which suggests it from the start order. Verified on a Pi
@@ -77,6 +84,10 @@ flowchart LR
 - Penalties from a catalogue (flat or tiered, per stage or for the rally)
   or as free text, added to the overall.
 - Creating and switching events from the dashboard.
+- **Logins by role**: the organiser on the server laptop or with a password,
+  staff (timing, stage marshals, check-in) joining by a printed QR code. Anyone
+  without a login sees a public page with start lists and results. Gates are
+  paired once and log in with their own key.
 
 | Results | Entries | Hardware |
 |---|---|---|
@@ -90,7 +101,7 @@ flowchart LR
   check-in: a tap doesn't set a car's status yet
   ([docs/esp32-gate.md](docs/esp32-gate.md)).
 - Time controls and Parc Fermé.
-- Any login.
+- Start lights at a gate (the countdown runs on a screen at the start).
 
 What comes when: [docs/development-roadmap.md](docs/development-roadmap.md).
 
@@ -178,8 +189,11 @@ network.
 2. **Setup** → create the event, then the stages; assign gates as start,
    finish or split. Set how start lists are ordered.
 3. **Entries** → register the cars.
-4. **Hardware** → check every gate is online and its clock is in sync.
-5. **Live Timing** → freeze and print a stage's start list when you post it,
+4. **Hardware** → pair gates this server hasn't seen yet (open pairing,
+   accept each waiting gate; it remembers them across events), then check every gate is online and its clock
+   is in sync.
+5. **Setup → Access** → print invitations for the marshals' devices.
+6. **Live Timing** → freeze and print a stage's start list when you post it,
    activate the stage when it starts, close it when the last car is
    through.
 
@@ -222,7 +236,9 @@ there: [architecture](docs/architecture.md), [event model](docs/event-model.md),
 [API](docs/api.md), [deployment modes](docs/deployment-modes.md),
 [decoder adapters](docs/decoder-adapters.md),
 [frontend](docs/frontend-structure.md), [design system](docs/design-system.md),
-[gate config](docs/gate-config-ui.md),
+[gate config](docs/gate-config-ui.md), [access](docs/auth.md),
+[ESP32 gate](docs/esp32-gate.md),
+[guest Wi-Fi on OpenWRT](docs/openwrt-guest-access.md),
 [roadmap](docs/development-roadmap.md). [CLAUDE.md](CLAUDE.md) has the
 commands, checks CI runs, and the codebase's standing rules. The original
 vision document is in [ideas/](ideas/RC_Rally_Timing_Project_Documentation.md).
