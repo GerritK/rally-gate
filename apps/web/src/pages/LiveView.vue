@@ -22,6 +22,7 @@ import { can, session } from '../api/auth';
 import {
   assignEntryToEvent,
   dismissEvent,
+  fetchAtStart,
   fetchAwaitingEvents,
   fetchPendingEvents,
   retryPendingEvents,
@@ -107,6 +108,8 @@ const stageRuns = ref<StageRun[]>([]);
 const splitsByRun = ref<Record<string, StageSplit[]>>({});
 const pendingDetections = ref<DetectionEventRecord[]>([]);
 const awaitingDetections = ref<DetectionEventRecord[]>([]);
+/** Entries seen at a pre-start gate since their last run. */
+const atStartIds = ref<string[]>([]);
 /** Only what a marshal picked by hand; otherwise the suggestion applies. */
 const pickedEntryIds = ref<Record<string, string>>({});
 const flashingGateIds = ref<Record<string, boolean>>({});
@@ -405,6 +408,7 @@ const upNext = computed<UpNextRow[]>(() => {
   return [...queued, ...dueToStart.value].map((row) => ({
     starter: row.starter,
     slot: row.state === 'QUEUED' ? row.run : undefined,
+    atStart: atStartIds.value.includes(row.starter.entryId),
     unscrutineered: !row.run && unscrutineered(row.starter.entryId),
   }));
 });
@@ -552,13 +556,16 @@ async function onRetryPending() {
  */
 const gateFlow = computed(() => {
   const rank = (a: GateAssignment) =>
-    a.role === GateRole.STAGE_START || a.role === GateRole.STAGE_START_FINISH
-      ? -1
-      : a.role === GateRole.STAGE_FINISH
-        ? Number.MAX_SAFE_INTEGER
-        : a.role === GateRole.STAGE_SPLIT
-          ? (a.splitIndex ?? 0)
-          : Number.MAX_SAFE_INTEGER - 1;
+    a.role === GateRole.STAGE_PRE_START
+      ? -2
+      : a.role === GateRole.STAGE_START ||
+          a.role === GateRole.STAGE_START_FINISH
+        ? -1
+        : a.role === GateRole.STAGE_FINISH
+          ? Number.MAX_SAFE_INTEGER
+          : a.role === GateRole.STAGE_SPLIT
+            ? (a.splitIndex ?? 0)
+            : Number.MAX_SAFE_INTEGER - 1;
   return gateAssignments.value
     .filter((a) => a.stageId === props.stageId)
     .sort((a, b) => rank(a) - rank(b))
@@ -909,12 +916,14 @@ async function loadStage() {
     startOrder.value = null;
     stageRuns.value = [];
     splitsByRun.value = {};
+    atStartIds.value = [];
     return;
   }
   const [order, runs, splits] = await Promise.all([
     fetchStartOrder(props.stageId),
     fetchStageRuns(props.stageId),
     fetchSplitsForStage(props.stageId),
+    loadAtStart(),
   ]);
   startOrder.value = order;
   stageRuns.value = runs;
@@ -926,6 +935,27 @@ async function loadStage() {
 }
 
 watch(() => props.stageId, loadStage);
+
+/** Derived on the server; asked again whenever a pre-start detection, an
+ *  assigned passing or a run of this stage may have changed it. */
+async function loadAtStart() {
+  if (!props.stageId) return;
+  const stageId = props.stageId;
+  const ids = await fetchAtStart(stageId);
+  if (stageId === props.stageId) atStartIds.value = ids;
+}
+
+const preStartGateIds = computed(
+  () =>
+    new Set(
+      gateAssignments.value
+        .filter(
+          (a) =>
+            a.stageId === props.stageId && a.role === GateRole.STAGE_PRE_START,
+        )
+        .map((a) => a.gateId),
+    ),
+);
 
 /**
  * The stage a marshal most likely wants: running, else next up. A stage
@@ -979,16 +1009,26 @@ onMounted(async () => {
     ]);
   liveSource = openLiveStream(
     {
-      detection: (event) => flashGate(event.gateId),
+      detection: (event) => {
+        flashGate(event.gateId);
+        if (preStartGateIds.value.has(event.gateId)) void loadAtStart();
+      },
       gate: upsertGate,
-      'stage-run': upsertStageRun,
-      'stage-run-deleted': removeStageRun,
+      'stage-run': (run) => {
+        upsertStageRun(run);
+        if (run.stageId === props.stageId) void loadAtStart();
+      },
+      'stage-run-deleted': (run) => {
+        removeStageRun(run);
+        if (run.stageId === props.stageId) void loadAtStart();
+      },
       'stage-run-split': upsertSplit,
       'pending-detections': ({ pending }) => {
         pendingDetections.value = pending;
       },
       'awaiting-detections': ({ awaiting }) => {
         awaitingDetections.value = awaiting;
+        void loadAtStart();
       },
     },
     () => void loadLive(),

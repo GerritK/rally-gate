@@ -67,6 +67,7 @@ describe('start paths', () => {
       FINISH: GateRole.STAGE_FINISH,
       SPLIT: GateRole.STAGE_SPLIT,
       LOOP: GateRole.STAGE_START_FINISH,
+      PRE: GateRole.STAGE_PRE_START,
     };
     emitter = { emit: jest.fn() };
     const stagesService = {
@@ -97,6 +98,10 @@ describe('start paths', () => {
               ? { gateId: id, stageId: 'SS1', role: roles[id], splitIndex: 1 }
               : null,
           ),
+        findByStage: () =>
+          Promise.resolve(
+            Object.entries(roles).map(([gateId, role]) => ({ gateId, role })),
+          ),
       } as never,
       {
         findByTransponder: (_kind: TransponderKind, id: string) =>
@@ -118,8 +123,8 @@ describe('start paths', () => {
     base: Date,
     offsetMs: number,
     transponderId?: string,
+    eventId = `e${++seq}`,
   ): Promise<DetectionEventRecord> {
-    const eventId = `e${++seq}`;
     await events.handleMqttMessage({
       topic: `rally/gates/${gateId}/detections`,
       payload: Buffer.from(
@@ -464,6 +469,160 @@ describe('start paths', () => {
       await expect(runs.cancelCountdown(queued.id, null)).rejects.toThrow(
         ConflictException,
       );
+    });
+  });
+
+  describe('pre-start gate', () => {
+    // A tap may carry `timeUnknown`, so its gate timestamp is anything.
+    const tapClock = new Date('2000-01-01T00:00:00.000Z');
+
+    it('triggers the countdown from the server receive time, not the gate timestamp', async () => {
+      const before = Date.now();
+      await pass('PRE', tapClock, 0, '111');
+
+      const [run] = await allRuns();
+      expect(run.plannedStartTime!.getTime()).toBeGreaterThanOrEqual(
+        before + DEFAULT_COUNTDOWN_MS,
+      );
+      expect(run.plannedStartTime!.getTime()).toBeLessThanOrEqual(
+        Date.now() + DEFAULT_COUNTDOWN_MS,
+      );
+      const [change] = await dataSource.getRepository(ChangeRecord).find();
+      expect(change).toMatchObject({
+        action: ChangeAction.COUNTDOWN_STARTED,
+        deviceId: null,
+      });
+    });
+
+    it('queues taps like the button, in tap order', async () => {
+      await pass('PRE', tapClock, 0, '222');
+      await pass('PRE', tapClock, 0, '111');
+
+      const [first, second] = await allRuns();
+      expect(first.entryId).toBe('v2');
+      expect(
+        second.plannedStartTime!.getTime() - first.plannedStartTime!.getTime(),
+      ).toBe(DEFAULT_MIN_START_GAP_MS);
+    });
+
+    it('stores and ignores a tap for a car already queued or on stage', async () => {
+      await pass('PRE', tapClock, 0, '111');
+      const again = await pass('PRE', tapClock, 0, '111');
+      expect(again.processed).toBe(true);
+      expect(await allRuns()).toHaveLength(1);
+
+      const [run] = await allRuns();
+      await pass('START', run.plannedStartTime!, 0, '111');
+      await pass('PRE', tapClock, 0, '111');
+      expect(await allRuns()).toHaveLength(1);
+    });
+
+    it('ignores a tap for a car that finished a counted stage', async () => {
+      await pass('PRE', tapClock, 0, '111');
+      const [run] = await allRuns();
+      await pass('FINISH', run.plannedStartTime!, 60_000, '111');
+      await pass('PRE', tapClock, 0, '111');
+      expect(await allRuns()).toHaveLength(1);
+    });
+
+    it('makes one slot of a replayed detection', async () => {
+      await pass('PRE', tapClock, 0, '111', 'replayed');
+      await pass('PRE', tapClock, 0, '111', 'replayed');
+      expect(await allRuns()).toHaveLength(1);
+    });
+
+    it('makes every tap on a shakedown the next run', async () => {
+      stage.scoring = StageScoring.NONE;
+      await pass('PRE', tapClock, 0, '111');
+      const [first] = await allRuns();
+      await pass('FINISH', first.plannedStartTime!, 60_000, '111');
+      await pass('PRE', tapClock, 0, '111');
+
+      expect((await allRuns()).map((r) => r.run)).toEqual([1, 2]);
+    });
+
+    it('takes a beam passing as the trigger once a marshal assigns it', async () => {
+      const beam = await pass('PRE', new Date(Date.now() - 600_000), 0);
+      expect(beam.awaitingEntry).toBe(true);
+      expect(await allRuns()).toHaveLength(0);
+
+      const before = Date.now();
+      await events.assignEntry(beam.eventId, 'v1', 'device-1');
+      const [run] = await allRuns();
+      expect(run.plannedStartTime!.getTime()).toBeGreaterThanOrEqual(
+        before + DEFAULT_COUNTDOWN_MS,
+      );
+      const [change] = await dataSource
+        .getRepository(ChangeRecord)
+        .findBy({ action: ChangeAction.COUNTDOWN_STARTED });
+      expect(change.deviceId).toBe('device-1');
+    });
+
+    it('refuses to assign a beam passing to a car already queued, leaving it listed', async () => {
+      await pass('PRE', tapClock, 0, '111');
+      const beam = await pass('PRE', new Date(), 0);
+
+      await expect(
+        events.assignEntry(beam.eventId, 'v1', null),
+      ).rejects.toThrow(ConflictException);
+      const stored = await dataSource
+        .getRepository(DetectionEventRecord)
+        .findOneByOrFail({ eventId: beam.eventId });
+      expect(stored.awaitingEntry).toBe(true);
+    });
+
+    it('triggers nothing on a gate-start stage', async () => {
+      stage.startMode = StartMode.GATE;
+      await pass('PRE', tapClock, 0, '111');
+      expect(await allRuns()).toHaveLength(0);
+    });
+  });
+
+  describe('at the start', () => {
+    beforeEach(() => {
+      stage.startMode = StartMode.GATE;
+    });
+
+    it('marks a car from its pre-start detection until it starts', async () => {
+      expect(await events.entriesAtStart('SS1')).toEqual([]);
+      await pass('PRE', new Date(), 0, '111');
+      expect(await events.entriesAtStart('SS1')).toEqual(['v1']);
+
+      await pass('START', new Date(), 1_000, '111');
+      expect(await events.entriesAtStart('SS1')).toEqual([]);
+    });
+
+    it('counts an assigned beam passing', async () => {
+      const beam = await pass('PRE', new Date(), 0);
+      expect(await events.entriesAtStart('SS1')).toEqual([]);
+      await events.assignEntry(beam.eventId, 'v2', null);
+      expect(await events.entriesAtStart('SS1')).toEqual(['v2']);
+    });
+
+    it('ignores a detection from before the end of the last run on any stage', async () => {
+      await pass('PRE', new Date(), 0, '111');
+      // The same gate, reused: the tap was for the stage before.
+      await dataSource.getRepository(StageRun).save({
+        entryId: 'v1',
+        stageId: 'SS0',
+        attempt: 1,
+        run: 1,
+        startTime: new Date(Date.now() + 1_000),
+        finishTime: new Date(Date.now() + 60_000),
+      });
+      expect(await events.entriesAtStart('SS1')).toEqual([]);
+    });
+
+    it('is nobody on a stage without a pre-start gate', async () => {
+      await pass('PRE', new Date(), 0, '111');
+      delete roles.PRE;
+      expect(await events.entriesAtStart('SS1')).toEqual([]);
+    });
+
+    it('shows a car counting down by its slot, not at the start', async () => {
+      stage.startMode = StartMode.SLOT_MANUAL;
+      await pass('PRE', new Date(), 0, '111');
+      expect(await events.entriesAtStart('SS1')).toEqual([]);
     });
   });
 

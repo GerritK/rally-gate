@@ -121,6 +121,7 @@
     "upNext": "Up next",
     "firstToStart": "First to start",
     "notScrutineered": "Not scrutineered",
+    "atStart": "At the start",
     "startNow": "Start now",
     "then": "Then",
     "allStarted": "Everyone has started.",
@@ -160,7 +161,8 @@
     "start": "Start",
     "finish": "Finish",
     "startFinish": "Start/Finish",
-    "split": "Split {n}"
+    "split": "Split {n}",
+    "preStart": "Pre-start"
   },
   "marks": {
     "best": "Fastest",

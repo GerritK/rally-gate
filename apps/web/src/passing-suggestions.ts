@@ -104,7 +104,8 @@ export function suggestEntries(input: {
     );
     if (!gate || gate.stageId !== input.stageId) continue;
     const candidates =
-      gate.role === GateRole.STAGE_START
+      gate.role === GateRole.STAGE_START ||
+      gate.role === GateRole.STAGE_PRE_START
         ? due
         : gate.role === GateRole.STAGE_START_FINISH
           ? combined(ms(passing.timestampGate))

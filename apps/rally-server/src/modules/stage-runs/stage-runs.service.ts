@@ -292,6 +292,11 @@ export class StageRunsService {
     });
   }
 
+  /** Every attempt of these entries on any stage. */
+  findByEntries(entryIds: string[]): Promise<StageRun[]> {
+    return this.stageRuns.find({ where: { entryId: In(entryIds) } });
+  }
+
   /** A shakedown is run as often as a car likes; every run counts. */
   private async isShakedown(stageId: string): Promise<boolean> {
     const stage = await this.stagesService.findOne(stageId);
@@ -440,9 +445,25 @@ export class StageRunsService {
     stageId: string,
     by: string | null,
   ): Promise<StageRunWithStatus> {
-    const next = this.countdownQueue.then(() =>
-      this.queueSlot(entryId, stageId, by),
-    );
+    return this.enqueue(() =>
+      this.queueSlot(entryId, stageId, by, false),
+    ) as Promise<StageRunWithStatus>;
+  }
+
+  /**
+   * A pre-start gate's trigger: as the button, but null for a car already
+   * queued or on stage, stored and ignored, since a loop reads a car near it
+   * many times. Recorded with no device: the server acted.
+   */
+  triggerCountdown(
+    entryId: string,
+    stageId: string,
+  ): Promise<StageRunWithStatus | null> {
+    return this.enqueue(() => this.queueSlot(entryId, stageId, null, true));
+  }
+
+  private enqueue<T>(slot: () => Promise<T>): Promise<T> {
+    const next = this.countdownQueue.then(slot);
     this.countdownQueue = next.catch(() => undefined);
     return next;
   }
@@ -451,7 +472,8 @@ export class StageRunsService {
     entryId: string,
     stageId: string,
     by: string | null,
-  ): Promise<StageRunWithStatus> {
+    ignoreBusy: boolean,
+  ): Promise<StageRunWithStatus | null> {
     const stage = await this.stagesService.findOneOrFail(stageId);
     if (stage.status !== StageStatus.ACTIVE) {
       throw new ConflictException(
@@ -476,6 +498,12 @@ export class StageRunsService {
       (await this.findActive(entryId, stageId)) ??
       (shakedown ? null : await this.findFinished(entryId, stageId));
     if (busy) {
+      if (ignoreBusy) {
+        this.logger.log(
+          `Entry ${entryId} is already queued, on stage or finished on ${stageId}, ignoring its pre-start detection`,
+        );
+        return null;
+      }
       throw this.alreadyStarting(entryId, stageId);
     }
     const countdownMs = await this.settings.getNumber(
@@ -516,6 +544,7 @@ export class StageRunsService {
       );
     } catch (err) {
       if (isUniqueViolation(err)) {
+        if (ignoreBusy) return null;
         throw this.alreadyStarting(entryId, stageId);
       }
       throw err;

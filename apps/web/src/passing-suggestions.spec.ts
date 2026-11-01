@@ -56,6 +56,18 @@ test('start passings take the start list in order, each car once', () => {
   );
 });
 
+test('a pre-start passing takes the next car to start', () => {
+  assert.deepEqual(
+    suggest({
+      gates: [gate('P', GateRole.STAGE_PRE_START)],
+      passings: [beam('p1', 'P', 0)],
+      dueToStart: ['a', 'b'],
+      onStage: [car('z', -60)],
+    }),
+    { p1: 'a' },
+  );
+});
+
 test('finish passings take the cars on stage in expected arrival order', () => {
   assert.deepEqual(
     suggest({

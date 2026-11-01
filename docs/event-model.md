@@ -400,9 +400,10 @@ only while the stage is `NOT_STARTED` so a start never changes meaning mid-run:
 - `SLOT_MANUAL` — a countdown is triggered per car, by a marshal or a
   pre-start gate. For a casual meet without a timetable.
 
-Built: `GATE`, and `SLOT_MANUAL` with the Countdown button. The server
-refuses `SLOT_SCHEDULE` until its timetable is built, and the pre-start gate
-and start lights at a gate are not built either (`development-roadmap.md`).
+Built: `GATE`, and `SLOT_MANUAL` with the Countdown button and the
+pre-start gate. The server refuses `SLOT_SCHEDULE` until its timetable is
+built, and start lights at a gate are not built either
+(`development-roadmap.md`).
 
 A slot is a `StageRun` created by the trigger, `startTime` and
 `plannedStartTime` both the slot: no slot table and no server timer, and the
@@ -514,3 +515,17 @@ detections, never stored: from the car's latest pre-start detection after the
 end of its last run, until it starts. In `SLOT_MANUAL` the same detection also
 triggers the countdown. Any detection counts, NFC tap, loop or an assigned
 beam passing, so a loop at the line works as well as a tap.
+
+"Its last run" is on **any stage**, its end the finish, else the start: a
+pre-start gate reused on the next stage then never marks a car with the
+tap it made for the stage before. Times are the server's receive times,
+since a tap may carry `timeUnknown`. A car counting down shows its slot
+rather than the mark, so in `SLOT_MANUAL` the mark is only seen on a car
+whose trigger was ignored. The role is assignable in every start mode and
+next to any other gates; it times nothing.
+
+A beam passing there is an unassigned passing like any other, suggested for
+the next car to start. Assigning it to a car already queued or on stage
+answers 409 `entryAlreadyStarting` and leaves it listed, as the Countdown
+button does. A gate's trigger is in the change history with no device (the
+server); an assigned one with the marshal's.

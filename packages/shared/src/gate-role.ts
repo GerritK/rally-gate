@@ -7,4 +7,6 @@ export enum GateRole {
   STAGE_FINISH = 'stage_finish',
   /** One gate as both: a passing finishes the car's open run, else starts one. */
   STAGE_START_FINISH = 'stage_start_finish',
+  /** Marks a car at the start; on `SLOT_MANUAL` it also triggers the countdown. */
+  STAGE_PRE_START = 'stage_pre_start',
 }

@@ -335,6 +335,8 @@ export function gateRoleLabel(
       return t('gateRole.startFinish');
     case GateRole.STAGE_SPLIT:
       return t('gateRole.split', { n: assignment.splitIndex ?? '' });
+    case GateRole.STAGE_PRE_START:
+      return t('gateRole.preStart');
   }
 }
 

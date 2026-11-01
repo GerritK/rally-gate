@@ -121,6 +121,7 @@
     "upNext": "Als Nächstes",
     "firstToStart": "Startet zuerst",
     "notScrutineered": "Nicht abgenommen",
+    "atStart": "Am Start",
     "startNow": "Jetzt starten",
     "then": "Danach",
     "allStarted": "Alle sind gestartet.",
@@ -160,7 +161,8 @@
     "start": "Start",
     "finish": "Ziel",
     "startFinish": "Start/Ziel",
-    "split": "Zwischenzeit {n}"
+    "split": "Zwischenzeit {n}",
+    "preStart": "Vorstart"
   },
   "marks": {
     "best": "Schnellste",

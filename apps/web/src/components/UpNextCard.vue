@@ -25,6 +25,8 @@ export interface UpNextRow {
   starter: Starter;
   /** The car's slot run while it is queued. */
   slot?: StageRun;
+  /** Seen at a pre-start gate since its last run. */
+  atStart?: boolean;
   unscrutineered?: boolean;
 }
 
@@ -119,6 +121,13 @@ onUnmounted(() => cancelTonesExcept(new Set()));
           >
             {{ $t('live.notScrutineered') }}
           </v-chip>
+          <v-chip
+            v-if="rows[0].atStart"
+            color="success"
+            prepend-icon="mdi-flag-variant"
+          >
+            {{ $t('live.atStart') }}
+          </v-chip>
           <ClassChip
             v-if="rows[0].starter.mainClassName"
             :name="rows[0].starter.mainClassName"
@@ -177,6 +186,12 @@ onUnmounted(() => cancelTonesExcept(new Set()));
                 <StartNumber :number="row.starter.startNumber" />
               </span>
               <CrewName :crew="row.starter" class="rg-then-driver" />
+              <v-icon
+                v-if="row.atStart"
+                icon="mdi-flag-variant"
+                color="success"
+                :title="$t('live.atStart')"
+              />
               <ClassChip
                 v-if="row.starter.mainClassName"
                 :name="row.starter.mainClassName"

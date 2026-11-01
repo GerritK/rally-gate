@@ -53,7 +53,9 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
   the same place, and while the first car counts down its seconds, lights and
   Cancel there. Queued cars lead the list, each "Then" row with its slot time
   and Cancel, the others with a small Countdown. Fullscreen and Enable sound
-  sit in the card's header.
+  sit in the card's header. A car seen at a pre-start gate gets an "At the
+  start" chip (a flag icon in a "Then" row); a car not seen gets nothing, and
+  the order stays the start order.
 - **Overall and a stage's results are one page** (`ResultsView`), two
   URLs: track, class filter, card header, Print and "Print all" exist once.
   Only the table differs (`OverallRanking`, `StageRanking`), since the

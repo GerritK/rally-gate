@@ -106,7 +106,7 @@ One line each; the linked doc has the detail. History is in git.
      with countdown, sound and fullscreen, the jump-start mark and penalty.
      Done.
   2. `stage_pre_start`: at the start in every mode, the trigger in
-     `SLOT_MANUAL`.
+     `SLOT_MANUAL`. Done.
   3. `SLOT_SCHEDULE`: first start and interval, slots stored on freeze, New
      slot, Delay, slot times on the printed start list.
   4. Start lights at a gate: only the decision so far

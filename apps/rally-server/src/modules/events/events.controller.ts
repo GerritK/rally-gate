@@ -38,6 +38,12 @@ export class EventsController {
     return this.eventsService.findAwaitingEntry();
   }
 
+  /** Entry ids waiting at the start of the stage, from its pre-start gates. */
+  @Get('at-start')
+  findAtStart(@Query('stageId') stageId: string) {
+    return this.eventsService.entriesAtStart(stageId);
+  }
+
   @LockedWhen(RallyStatus.CLOSED)
   @Requires('assignPassing')
   @Post(':eventId/assign')

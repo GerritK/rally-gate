@@ -20,9 +20,10 @@ import {
   isSlotStart,
   SLOT_PASSING_AFTER_MS,
   StageStatus,
+  StartMode,
   TransponderKind,
 } from '@rally-gate/shared';
-import { In, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import { apiError } from '../../common/api-error';
 import { recordChange } from '../changes/record-change';
 import type { GateAssignment } from '../gates/gate-assignment.entity';
@@ -200,7 +201,8 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     }
     const gate = await this.gatesService.findOne(record.gateId);
     const applied =
-      gate && (await this.applyRules(gate, entryId, effectiveTime(record)));
+      gate &&
+      (await this.applyRules(gate, entryId, effectiveTime(record), { by }));
     if (!applied) {
       throw new ConflictException(
         apiError(
@@ -253,6 +255,42 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       );
       await this.emitAwaitingChanged();
     }
+  }
+
+  /**
+   * Who is waiting at the start of a stage (`docs/event-model.md` "Pre-start
+   * gate"): a pre-start detection received after the end of the car's last
+   * run on any stage, so a tap for the stage before at the same gate doesn't
+   * count, and until its next run starts. Server receive time, since a tap
+   * may carry `timeUnknown`.
+   */
+  async entriesAtStart(stageId: string): Promise<string[]> {
+    const gateIds = (await this.gateAssignmentsService.findByStage(stageId))
+      .filter((a) => a.role === GateRole.STAGE_PRE_START)
+      .map((a) => a.gateId);
+    if (gateIds.length === 0) return [];
+    const seenAt = new Map<string, number>();
+    for (const { entryId, timestampServer } of await this.events.find({
+      where: { gateId: In(gateIds), entryId: Not(IsNull()) },
+    })) {
+      const at = timestampServer.getTime();
+      seenAt.set(entryId!, Math.max(seenAt.get(entryId!) ?? 0, at));
+    }
+    if (seenAt.size === 0) return [];
+    const lastRunEnd = new Map<string, number>();
+    for (const run of await this.stageRunsService.findByEntries([
+      ...seenAt.keys(),
+    ])) {
+      // A queued slot's start is still ahead, so it ends "at the start" too.
+      const end = (run.finishTime ?? run.startTime).getTime();
+      lastRunEnd.set(
+        run.entryId,
+        Math.max(lastRunEnd.get(run.entryId) ?? 0, end),
+      );
+    }
+    return [...seenAt]
+      .filter(([entryId, at]) => at > (lastRunEnd.get(entryId) ?? 0))
+      .map(([entryId]) => entryId);
   }
 
   /** For a passing that was no car at all: a marshal, a dog, a double trigger. */
@@ -597,12 +635,14 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
    * Returns whether this passing changed anything. The live path ignores it
    * (repeats are expected there); a marshal's assignment must not. Null (also
    * falsy) is a finish or split for an entry with no run on the stage at all:
-   * its start may still be on its way.
+   * its start may still be on its way. `assigned` is a marshal's assignment
+   * of an unidentified passing, absent for a gate's own detection.
    */
   private async applyRules(
     gate: Gate,
     entryId: string,
     at: Date,
+    assigned?: { by: string | null },
   ): Promise<boolean | null> {
     const assignment = await this.gateAssignmentsService.findActiveForGate(
       gate.id,
@@ -643,6 +683,22 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       if (slotRole !== undefined) {
         return slotRole;
       }
+    }
+    if (assignment.role === GateRole.STAGE_PRE_START) {
+      // Elsewhere the detection itself is the "at the start" state. The slot
+      // is from now, never `at`: for an assigned beam passing the assignment
+      // is the trigger, so a late one never makes a slot in the past.
+      if (stage.startMode !== StartMode.SLOT_MANUAL) return true;
+      if (assigned) {
+        // A marshal hears that the car is already starting: 409.
+        await this.stageRunsService.startCountdown(
+          entryId,
+          stageId,
+          assigned.by,
+        );
+        return true;
+      }
+      return !!(await this.stageRunsService.triggerCountdown(entryId, stageId));
     }
     if (assignment.role === GateRole.STAGE_START) {
       const run = await this.stageRunsService.startRun(entryId, stageId, at);

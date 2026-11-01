@@ -65,8 +65,9 @@ the public page reads: `/auth/session`, `/version`, `/time`, GET
 | `/stage-runs/:id/cancel-countdown` | POST | deletes the slot run, recorded; 409 `countdownNotCancellable` once it has a start passing or a finish |
 | `/stage-runs/:id/dismiss-jump-start` | POST | sets `jumpStartDismissed`: the marshal gives no penalty, the mark stays. 409 `noJumpStart`. Needs `penalties` |
 | `/events` | GET | the 100 most recent detections; `?gateId=` for one gate's |
+| `/events/at-start?stageId=` | GET | entry ids waiting at the stage's start: a detection at one of its `stage_pre_start` gates after the car's last run on any stage (`event-model.md` "Pre-start gate"); empty without such a gate |
 | `/events/awaiting-entry` | GET | unassigned passings (no transponder, or one on several entries) at live gates, oldest first |
-| `/events/:eventId/assign` | POST `{ entryId }` | times the passing as that entry; 409 when the rules would do nothing (e.g. finish before start) |
+| `/events/:eventId/assign` | POST `{ entryId }` | times the passing as that entry; 409 when the rules would do nothing (e.g. finish before start); at a pre-start gate on `SLOT_MANUAL` it triggers the countdown, 409 `entryAlreadyStarting` for a car already queued or on stage |
 | `/events/:eventId/dismiss` | POST | the passing was no car |
 | `/events/pending` | GET, `/retry` POST | detections whose rules threw; retried every 30s, POST forces it and returns `{ recovered }` |
 | `/classification/overall` | GET | closed counted stages only (`Stage.scoring`), with notional times — see `event-model.md` |

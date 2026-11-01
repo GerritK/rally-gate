@@ -43,6 +43,11 @@ export function retryPendingEvents(): Promise<{ recovered: number }> {
   return postRequest('/events/pending/retry');
 }
 
+/** Entry ids waiting at the stage's start, from its pre-start gates. */
+export function fetchAtStart(stageId: string): Promise<string[]> {
+  return apiFetch(`/events/at-start?stageId=${encodeURIComponent(stageId)}`);
+}
+
 /** Passings a gate saw but couldn't identify, oldest first. */
 export function fetchAwaitingEvents(): Promise<DetectionEventRecord[]> {
   return apiFetch('/events/awaiting-entry');
