@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Starter } from '@rally-gate/shared';
-import { ref, watch } from 'vue';
+import { onUnmounted, ref, watch } from 'vue';
 import { serverOffsetMs } from '../api/time';
 import type { StageRun } from '../api/stage-runs';
 import {
@@ -70,6 +70,8 @@ watch(
   },
   { immediate: true },
 );
+// Off Live Timing a tone is for a car nobody is looking at.
+onUnmounted(() => cancelTonesExcept(new Set()));
 </script>
 
 <template>

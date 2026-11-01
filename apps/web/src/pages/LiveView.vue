@@ -615,6 +615,7 @@ async function onCountdown(entryId: string) {
 }
 
 async function onCancelCountdown(run: StageRun) {
+  if (startingEntryId.value) return;
   startingEntryId.value = run.id;
   try {
     await cancelCountdown(run.id);

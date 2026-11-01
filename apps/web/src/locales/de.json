@@ -616,7 +616,7 @@
     "lockedWhileClosed": "Die Rallye ist abgeschlossen, ihre Ergebnisse sind endgültig. Öffne sie in der Einrichtung wieder, um sie zu ändern.",
     "startRallyFirst": "{stage} zählt zur Gesamtwertung. Starte zuerst die Rallye in der Einrichtung.",
     "rallyStatusInvalid": "Der Rallye-Status hat sich inzwischen geändert. Lade die Seite neu.",
-    "carsOnStage": "Autos noch auf der WP: {count}. Beende oder annulliere zuerst ihre Läufe.",
+    "carsOnStage": "Autos noch auf der WP: {count}. Beende oder annulliere zuerst ihre Läufe, oder brich ihre Countdowns ab.",
     "loginRequired": "Melde dich zuerst an: Scanne den QR-Code deiner Einladung.",
     "roleNotAllowed": "Deine Anmeldung darf das nicht ändern.",
     "stageNotYours": "Deine Anmeldung darf nur die WPs deiner Einladung ändern.",

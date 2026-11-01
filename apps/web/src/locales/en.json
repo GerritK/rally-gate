@@ -616,7 +616,7 @@
     "lockedWhileClosed": "The rally is closed and its results are final. Reopen it in Setup to change them.",
     "startRallyFirst": "{stage} counts toward the overall. Start the rally in Setup first.",
     "rallyStatusInvalid": "The rally status has changed in the meantime. Reload the page.",
-    "carsOnStage": "Cars still on stage: {count}. Finish or void their runs first.",
+    "carsOnStage": "Cars still on stage: {count}. Finish or void their runs, or cancel their countdowns, first.",
     "loginRequired": "Log in first: scan the QR code from your invitation.",
     "roleNotAllowed": "Your login may not change this.",
     "stageNotYours": "Your login may only change the stages on your invitation.",

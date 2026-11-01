@@ -49,16 +49,11 @@ export function scheduleTones(key: string, slotMs: number, nowMs: number) {
   );
 }
 
-export function cancelTones(key: string): void {
-  for (const oscillator of scheduled.get(key) ?? []) {
-    oscillator.stop();
-  }
-  scheduled.delete(key);
-}
-
 /** Every key not in `keep`: slots cancelled or gone. */
 export function cancelTonesExcept(keep: Set<string>): void {
-  for (const key of [...scheduled.keys()]) {
-    if (!keep.has(key)) cancelTones(key);
+  for (const [key, oscillators] of scheduled) {
+    if (keep.has(key)) continue;
+    for (const oscillator of oscillators) oscillator.stop();
+    scheduled.delete(key);
   }
 }

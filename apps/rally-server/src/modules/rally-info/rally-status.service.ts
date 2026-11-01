@@ -52,7 +52,7 @@ export class RallyStatusService {
       throw new ConflictException(
         apiError(
           ApiErrorCode.CARS_ON_STAGE,
-          `${onStage} car(s) still on stage; finish or void them first`,
+          `${onStage} car(s) still on stage; finish, void or cancel them first`,
           { count: onStage },
         ),
       );

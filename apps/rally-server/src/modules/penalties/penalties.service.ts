@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import {
   ApiErrorCode,
   ChangeAction,
+  JUMP_START_PENALTY_TYPE_ID_KEY,
   StageStatus,
   type PenaltySnapshot,
 } from '@rally-gate/shared';
@@ -16,6 +17,7 @@ import { apiError } from '../../common/api-error';
 import { isUniqueViolation } from '../../common/db-errors';
 import { recordChange } from '../changes/record-change';
 import { EntriesService } from '../entries/entries.service';
+import { Setting } from '../settings/setting.entity';
 import { Stage } from '../stages/stage.entity';
 import { countsInOverall, StagesService } from '../stages/stages.service';
 import { CreatePenaltyDto, PenaltyTypeDto } from './dto';
@@ -65,10 +67,15 @@ export class PenaltiesService {
     return this.saveType(Object.assign(type, dto));
   }
 
-  /** Takes every penalty of the type with it. */
+  /** Takes every penalty of the type with it, and the jump-start setting
+   *  when it names this type: a jump start is then only marked. */
   async removeType(id: string): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       await manager.delete(Penalty, { typeId: id });
+      await manager.delete(Setting, {
+        key: JUMP_START_PENALTY_TYPE_ID_KEY,
+        value: id,
+      });
       const { affected } = await manager.delete(PenaltyType, id);
       if (!affected) {
         throw new NotFoundException(

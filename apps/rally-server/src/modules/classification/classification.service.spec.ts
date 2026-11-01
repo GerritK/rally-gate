@@ -540,6 +540,22 @@ describe('ClassificationService.getNonFinishers', () => {
     ]);
   });
 
+  it('reports a slot nobody drove as DNS, one driven and unfinished as DNF', async () => {
+    const slot = new Date('2026-11-01T10:00:00Z');
+    const runs = [
+      // Passed the start, never finished.
+      { entryId: 'v1', plannedStartTime: slot, startPassingAt: slot },
+      // Counted down, never came.
+      { entryId: 'v2', plannedStartTime: slot, startPassingAt: null },
+      { entryId: 'v3', finishTime: new Date() },
+    ];
+    const service = makeService({ status: StageStatus.CLOSED }, runs, entries);
+    expect(await service.getNonFinishers('WP1')).toEqual([
+      expect.objectContaining({ entryId: 'v1', outcome: 'DNF' }),
+      expect.objectContaining({ entryId: 'v2', outcome: 'DNS' }),
+    ]);
+  });
+
   it('lists a disqualified car that drove the stage as DSQ, even before it closes', async () => {
     const withDsq = [
       ...entries,
