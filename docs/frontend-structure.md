@@ -8,7 +8,7 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
 | Route | Nav | Contents |
 |---|---|---|
 | `/` | — | redirect to `/live` |
-| `/live/:stageId?` | Live Timing | the marshal view, laid out like the stage: the stage's gates with their health, Up next beside On stage (cars in expected arrival order, unidentified passings with a suggested entry), every entry in start order with run state, corrections, Enter time and Add penalties; Activate / Close, freeze and print the start list. No stage picks the active one, else the next |
+| `/live/:stageId?` | Live Timing | the marshal view, laid out like the stage: the stage's gates with their health, Up next beside On stage (Up next marks the cars at the start; on a slot stage it is the start card, see below; On stage in expected arrival order, unidentified passings with a suggested entry), every entry in start order with run state, corrections, Enter time and Add penalties; Activate / Close, freeze and print the start list. No stage picks the active one, else the next |
 | `/results/overall` | Results | podium, overall classification, each stage column the time driven, the fastest marked, the gap to it in the tooltip, its header linking to that stage's results, a Penalties column once anyone has one, filterable by class; Print / Print all open a PDF (every class's ranking on its own sheets) |
 | `/results/stages/:stageId` | Results | podium, stage classification with a column per split (the time and its rank, the fastest marked, the gap to it in the tooltip), DNF/DNS, filterable by class; Print / Print all open a PDF (every class's ranking on its own sheets) |
 | `/entries` | Entries | registration in a dialog, status, classes; per row the status's next step (Check in, Passed) and ⋮ for the rest (back a step, Withdraw, Disqualify, Reinstate); Check-in in the header; a row opens the entry |
@@ -18,10 +18,10 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
 | `/hardware/gates/:gateId` | Hardware | one gate: status, clock, address with a link to its gate-config, version, rename; its assignments on every stage; its last 100 detections, live, with clock correction and what became of each |
 | `/setup` | Setup | the event: rally details, file name, New / Open Event dialogs (standalone only); the rally status with what it locks, Start rally (behind the pre-start check), Close rally (confirmed, names the stages it closes), Reopen in ⋮ (confirmed); tiles to Stages, Classes, Start order, Scoring and Display. The app bar's cog links here |
 | `/setup/stages` | Setup | stage list, create |
-| `/setup/stages/:stageId` | Setup | edit stage (scoring included), its gate assignments (active state read-only) |
+| `/setup/stages/:stageId` | Setup | edit stage (scoring and start mode included, a timetable's first start and interval), its gate assignments (active state read-only) |
 | `/setup/classes` | Setup | entry classes table: add/rename/delete, main class or category, entry count. Assigned on Entries |
-| `/setup/start-order` | Setup | start order rules: grouping, key, direction. Later planned start times |
-| `/setup/scoring` | Setup | notional time penalty; the penalty catalogue: types with their tiers and how they count (per stage or per rally), add/edit/delete (deleting takes its penalties) |
+| `/setup/start-order` | Setup | start order rules: grouping, key, direction; countdown, jump-start tolerance, minimum gap between manual starts (`event-model.md` "Start slots") |
+| `/setup/scoring` | Setup | notional time penalty; the penalty for a jump start (a catalogue type, or none); the penalty catalogue: types with their tiers and how they count (per stage or per rally), add/edit/delete (deleting takes its penalties) |
 | `/setup/display` | Setup | Crew: name format and flags, with an example crew drawn with the unsaved settings; Results: podium. Switches, on screen only (printouts are plain PDFs) |
 | `/setup/access` | Setup | invitations (role, stages, code, devices; Print one or all as a PDF sheet with the QR code, Block in ⋮), the devices that logged in (Block), the organiser password. Organiser only (`auth.md`) |
 | `/public/:stageId?` | — | what anyone without a login sees, without the drawer: the stage track ending in Overall, the class filter; a stage's start list with each car's state and time (running ones ticking), then its results; or the overall, penalties as a sum. No print, no links to entries. No stage picks the active one. Every other page sends a browser without a login here |
@@ -35,6 +35,19 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
   Printing it is a PDF of the same rows (position, number, crew, car, class
   headers), like the results (`design-system.md` "Print"). Its rules are
   configured under Setup.
+- **On a slot stage Up next becomes the start card**, not a page of its own:
+  at a casual meet one laptop does everything, and a page of its own would
+  have the marshal switching pages for every car; at a formal one the tablet at the line
+  and the timing tent each show their own screen anyway. The card shows the
+  running countdown (seconds, the five start lights) and the queue with slot
+  times, with Countdown, Cancel, New slot and Delay on it. Fullscreen shows
+  only the card, big enough for a tablet at the line; it is its own
+  component so a screen device (`ideas/output-devices.md`) can reuse it
+  without buttons. Browsers play no sound before a tap on the page, and a
+  tap at the pre-start gate or a timetable is none, so the card says
+  "Enable sound" after every load until tapped; Countdown counts as the tap.
+  Jump starts are marked at the passing in Live Timing, where penalties are
+  given. The card's exact layout is designed when it is built.
 - **Overall and a stage's results are one page** (`ResultsView`), two
   URLs: track, class filter, card header, Print and "Print all" exist once.
   Only the table differs (`OverallRanking`, `StageRanking`), since the

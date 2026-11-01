@@ -57,8 +57,9 @@ stored.
 
 The entry is **pre-selected from the start order, never assigned
 automatically**: a wrong assignment is a wrong time nobody notices in the
-results. Passings are matched in time order. At a start gate the suggestion is
-the first car yet to start, so an early start doesn't skip the cars before it
+results. (A start passing on a slot stage is the exception, since it sets no
+time: "Start slots".) Passings are matched in time order. At a start gate the
+suggestion is the first car yet to start, so an early start doesn't skip the cars before it
 and a no-show stays suggested until it is withdrawn; at a
 split or finish gate it is the first car on stage in expected arrival order —
 most splits passed, then the earlier start (at a split, one without that split
@@ -84,8 +85,9 @@ car's start has to be assigned before its finish.
 
 ## StageRun
 
-One row per **attempt**. Created by a `stage_start` detection, finished by the
-matching `stage_finish`; `durationMs = finishTime - startTime`, and must be
+One row per **attempt**. Created by a `stage_start` detection (on a slot stage
+the start time is the slot instead, "Start slots"), finished by the matching
+`stage_finish`; `durationMs = finishTime - startTime`, and must be
 positive (classification sorts ascending, so a zero or negative time would win).
 
 ### Combined start/finish gate
@@ -354,8 +356,8 @@ What each one does (`isOutOfEvent`, `isScrutineered` in `packages/shared`):
 
 The official start list per stage: what the announcer reads out and what gets
 posted. Unassigned-passing suggestions and Live Timing's Up next follow it,
-and it will be the reference for planned start times and penalties for
-starting out of order.
+and it is the reference for a timetable's slots ("Start slots") and will be
+for penalties for starting out of order.
 
 **Computed**, per stage, from three event-wide settings that are independent of
 each other:
@@ -387,3 +389,99 @@ to fix a wrongly posted list: once a stage runs, its list is what starts are
 measured against. A crew registered after that is added at the end, ordered by
 start number. A time-based list that kept moving after it was announced would
 be a different list from the one posted.
+
+## Start slots
+
+**Not built yet.** How a car's start is timed is `Stage.startMode`, changeable
+only while the stage is `NOT_STARTED` so a start never changes meaning mid-run:
+
+- `GATE` — today's behaviour: the start passing is the start time.
+- `SLOT_SCHEDULE` — every car has a planned start from a timetable.
+- `SLOT_MANUAL` — a countdown is triggered per car, by a marshal or a
+  pre-start gate. For a casual meet without a timetable.
+
+### The slot is the start time
+
+In both slot modes a run's start time is its **slot** (`plannedStartTime`,
+server clock), as at a real rally: the clock runs from the slot whether the
+car leaves on green or stalls and leaves 20 s later. Gates sync to the server
+clock (`architecture.md` "Clock offset"), so finish minus slot is a duration
+like any other, and `finish > start` is checked as everywhere. The start
+passing stays stored, raw time untouched, beside the slot; a car without one
+is still timed from its slot.
+
+The start gate becomes a **jump-start detector**. A start passing earlier
+than slot − `jumpStartToleranceMs` (200 ms: chrony and the beam edge, not
+reaction time) is marked a jump start in Live Timing, which suggests the
+penalty type set as `jumpStartPenaltyTypeId` for the marshal to confirm or
+dismiss; with no type set it only marks. Never priced automatically: a wrong
+automatic penalty is a wrong result nobody notices.
+
+A start passing is **assigned automatically** to the car whose slot is
+nearest, within slot − 10 s to slot + 60 s, also from a light barrier. This
+is the one exception to "never assigned automatically" ("Unassigned
+passings"): the passing sets no time, only the jump-start mark the marshal
+confirms. Outside that window it stays unassigned as today.
+
+On a combined start/finish gate, passings before slot + `minDurationMs` are
+the start passing (checked for a jump start); the first one after is the
+finish.
+
+A slot nobody drove becomes DNS when the stage closes, like any missing run.
+
+### Countdown
+
+`countdownMs` (event-wide, default 10 s) is shown before every slot. The
+start lights are always the last 5 s, one light out per second, then green:
+the convention, and what a light at the gate shows later
+(`architecture.md` "No server → gate commands"). A tone at 10 s, every second
+of the lights, a long one on green.
+
+Countdowns run only on an active stage. A timetable activates nothing by
+itself: activation is a deliberate call about the gates.
+
+### Manual: `SLOT_MANUAL`
+
+A trigger sets the slot to **trigger time + `countdownMs`**, the trigger time
+being when the server received it, never the gate's timestamp (a tap may
+carry `timeUnknown`). Triggers are the Countdown button on the start card or a
+detection at a `stage_pre_start` gate; a light-barrier passing there needs a
+marshal to assign it first, and then the assignment is the trigger, so a late
+assignment never makes a slot in the past.
+
+- Slots queue: the next is at earliest the previous + `minStartGapMs`
+  (event-wide, default 30 s), since two cars can't start from one line.
+- Tap order is start order. The frozen start order is not checked.
+- Cancel deletes a slot until its car's first start passing, and is recorded
+  in the change history; then trigger again.
+- A trigger for a car that already has an open slot or is on stage is stored
+  and ignored: a loop reads a car near it many times.
+- On a shakedown every trigger is the car's next run.
+
+### Timetable: `SLOT_SCHEDULE`
+
+Per stage a first start (time only, the date from context) and an interval
+(default 60 s), one interval for everyone, no gaps between class blocks.
+Slot = first start + interval × position in the frozen start order.
+
+- Slots are computed and **stored when the start order freezes**, beside the
+  snapshot: a posted start list with times never moves silently. A withdrawn
+  car keeps its slot, leaving a gap; nobody moves up. A crew registered
+  later gets a slot after the last.
+- **New slot**: a car not ready goes after the last slot (last + interval),
+  never into a gap, which would give it a slot earlier than it could expect.
+- **Delay**: all slots not yet reached move back by a given time, also while
+  the stage runs, recorded in the change history. Never forward: a driver is
+  never due earlier than announced. A stage activated after its first slot
+  offers exactly this.
+- Not offered on a shakedown: a timetable for unlimited runs means nothing.
+- The slot times are on the printed start list.
+
+### Pre-start gate
+
+`stage_pre_start` marks a car **at the start** in every start mode: Up next
+shows who is waiting at the line and who is unknown. Derived from the
+detections, never stored: from the car's latest pre-start detection after the
+end of its last run, until it starts. In `SLOT_MANUAL` the same detection also
+triggers the countdown. Any detection counts, NFC tap, loop or an assigned
+beam passing, so a loop at the line works as well as a tap.

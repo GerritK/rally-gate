@@ -99,6 +99,20 @@ One line each; the linked doc has the detail. History is in git.
      power-on until the broker accepts the gate, "Shut down all gates" with
      its own pass, the same on `web.cpp`. Done.
 
+- **Start countdown** (`event-model.md` "Start slots"): the slot as start
+  time, a countdown with start lights, jump starts marked. Designed, in this
+  order, each its own commit:
+  1. Slot model, `SLOT_MANUAL` with the Countdown button, the start card
+     with countdown, sound and fullscreen, the jump-start mark and penalty.
+     Plan the card's layout first.
+  2. `stage_pre_start`: at the start in every mode, the trigger in
+     `SLOT_MANUAL`.
+  3. `SLOT_SCHEDULE`: first start and interval, slots stored on freeze, New
+     slot, Delay, slot times on the printed start list.
+  4. Start lights at a gate: only the decision so far
+     (`architecture.md` "No server → gate commands"), built once a light
+     exists.
+
 - **Class and category badges in rankings** ("2WD · Rookie") on Results
   and the PDFs: only the classes the current filter doesn't already imply
   (filtered to 2WD, a 2WD badge says nothing), and no column at all while
@@ -150,8 +164,8 @@ One line each; the linked doc has the detail. History is in git.
   LAN (only proven from a laptop and inside WSL so far), and two rally-servers on
   one network both claiming `rally-server.local`.
 - **Rally controls** — Parc Fermé, time control, service park, pre-start roles
-  (unused `GateRole` values today) and planned start times. All
-  undesigned; don't grow Setup UI for them speculatively. When checkpoint
+  (unused `GateRole` values today). All undesigned (planned start times
+  are designed: "Start countdown" under Next); don't grow Setup UI for them speculatively. When checkpoint
   interval times land, give them their own formatter rather than reusing
   `formatStageDuration` (see `packages/ui/src/format.ts`).
 - **Required passings at one gate** — a stage that loops past the same gate

@@ -143,3 +143,12 @@ all gates" is rally-server calling each online gate's gate-config
 "start" leaves a gate silently deaf mid-stage — drivers with no time — while a
 stray passing costs nothing: `applyRules` already stores it untimed, and recon
 passings double as a gate test.
+
+**One planned exception, for display only: start lights.** Not built, and
+the hardware is undecided. The server would publish a retained
+`rally/gates/<gateId>/countdown` with `{ goAt, startNumber }` to a stage's
+start gate, cleared on cancel, and the gate runs its lights against its own
+synced clock, so network jitter never shifts green. The reason for the rule
+doesn't apply: a lost message leaves the lights dark, but the start time is
+the slot on the server (`event-model.md` "Start slots"), so no time is lost.
+Nothing that times a car ever depends on a message to the gate.
