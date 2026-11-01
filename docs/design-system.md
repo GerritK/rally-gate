@@ -311,9 +311,11 @@ Same in both apps: dark and flat, the logo, then the context that matters,
 status on the right.
 
 - `apps/web`: the open event's name alone; the logo names the product (its
-  alt text is "Rally Gate"). Right: rally status chip (a link to Setup,
-  never the action itself), live chip, server clock with date, a cog
-  to Setup, separated by vertical dividers. On a phone the chips are icons
+  alt text is "Rally Gate"). Right: live chip, rally status chip (a link to
+  Setup, never the action itself), server clock with date, a cog to Setup,
+  separated by vertical dividers. The live chip leads because only pages
+  with a live stream show it: anything right of it would jump between
+  pages. On a phone the chips are icons
   (their label stays as `aria-label`), and the logo, the date and the cog
   go (the drawer has Setup, the favicon the logo), so the event name keeps
   some room.

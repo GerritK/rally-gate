@@ -113,6 +113,20 @@ onMounted(() => {
         </div>
       </v-app-bar-title>
       <template #append>
+        <!-- Left of the rally status: only pages with a live stream show it, so
+             the status, shown on every page, never moves. -->
+        <v-chip
+          v-if="liveStatus"
+          :color="LIVE_DISPLAY[liveStatus].color"
+          :prepend-icon="xs ? undefined : LIVE_DISPLAY[liveStatus].icon"
+          size="small"
+          variant="tonal"
+          :aria-label="t(LIVE_DISPLAY[liveStatus].label)"
+        >
+          <v-icon v-if="xs" :icon="LIVE_DISPLAY[liveStatus].icon" />
+          <template v-else>{{ t(LIVE_DISPLAY[liveStatus].label) }}</template>
+        </v-chip>
+        <v-divider v-if="liveStatus" vertical inset class="app-bar-divider" />
         <!-- Links to where it is changed; the change itself never sits in
              the app bar, where a stray tap on a tablet would end a rally. -->
         <v-chip
@@ -132,18 +146,6 @@ onMounted(() => {
           }}</template>
         </v-chip>
         <v-divider vertical inset class="app-bar-divider" />
-        <v-chip
-          v-if="liveStatus"
-          :color="LIVE_DISPLAY[liveStatus].color"
-          :prepend-icon="xs ? undefined : LIVE_DISPLAY[liveStatus].icon"
-          size="small"
-          variant="tonal"
-          :aria-label="t(LIVE_DISPLAY[liveStatus].label)"
-        >
-          <v-icon v-if="xs" :icon="LIVE_DISPLAY[liveStatus].icon" />
-          <template v-else>{{ t(LIVE_DISPLAY[liveStatus].label) }}</template>
-        </v-chip>
-        <v-divider v-if="liveStatus" vertical inset class="app-bar-divider" />
         <div v-tooltip:bottom="t('app.serverTime')" class="text-center">
           <div class="rg-timing app-bar-clock">
             {{
