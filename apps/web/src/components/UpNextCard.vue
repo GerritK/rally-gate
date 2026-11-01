@@ -230,7 +230,7 @@ onUnmounted(() => cancelTonesExcept(new Set()));
             <div
               v-for="row in rows.slice(1, 3)"
               :key="row.starter.entryId"
-              class="d-flex align-center ga-3"
+              class="d-flex flex-wrap align-center ga-3"
             >
               <span class="rg-then-number">
                 <StartNumber :number="row.starter.startNumber" />
@@ -242,57 +242,59 @@ onUnmounted(() => cancelTonesExcept(new Set()));
                 color="success"
                 :title="$t('live.atStart')"
               />
-              <ClassChip
-                v-if="row.starter.mainClassName"
-                :name="row.starter.mainClassName"
-                main
-                class="ms-auto"
-              />
-              <template v-if="row.slot">
-                <ClockTime :time="row.slot.startTime" />
+              <!-- On a narrow card this wraps below, still at the end. -->
+              <div class="d-flex align-center ga-2 ms-auto">
+                <ClassChip
+                  v-if="row.starter.mainClassName"
+                  :name="row.starter.mainClassName"
+                  main
+                />
+                <template v-if="row.slot">
+                  <ClockTime :time="row.slot.startTime" />
+                  <v-btn
+                    v-if="action === 'newSlot' && !readonly"
+                    icon="mdi-calendar-arrow-right"
+                    size="small"
+                    variant="text"
+                    :title="$t('timetable.newSlot')"
+                    :disabled="!!row.slot.startPassingAt"
+                    :loading="busyId === row.starter.entryId"
+                    @click="emit('newSlot', row.starter.entryId)"
+                  />
+                  <v-btn
+                    v-else-if="canCancel && !readonly"
+                    icon="mdi-close"
+                    size="small"
+                    variant="text"
+                    :title="$t('countdown.cancel')"
+                    :loading="busyId === row.slot.id"
+                    @click="emit('cancel', row.slot)"
+                  />
+                </template>
+                <ClockTime
+                  v-else-if="row.starter.slotTime"
+                  :time="row.starter.slotTime"
+                />
                 <v-btn
-                  v-if="action === 'newSlot' && !readonly"
+                  v-if="!row.slot && action === 'newSlot' && !readonly"
                   icon="mdi-calendar-arrow-right"
                   size="small"
                   variant="text"
                   :title="$t('timetable.newSlot')"
-                  :disabled="!!row.slot.startPassingAt"
                   :loading="busyId === row.starter.entryId"
                   @click="emit('newSlot', row.starter.entryId)"
                 />
                 <v-btn
-                  v-else-if="canCancel && !readonly"
-                  icon="mdi-close"
+                  v-else-if="!row.slot && action === 'countdown' && !readonly"
+                  icon="mdi-timer-play-outline"
                   size="small"
-                  variant="text"
-                  :title="$t('countdown.cancel')"
-                  :loading="busyId === row.slot.id"
-                  @click="emit('cancel', row.slot)"
+                  variant="tonal"
+                  color="primary"
+                  :title="$t('countdown.start')"
+                  :loading="busyId === row.starter.entryId"
+                  @click="onCountdown(row.starter.entryId)"
                 />
-              </template>
-              <ClockTime
-                v-else-if="row.starter.slotTime"
-                :time="row.starter.slotTime"
-              />
-              <v-btn
-                v-if="!row.slot && action === 'newSlot' && !readonly"
-                icon="mdi-calendar-arrow-right"
-                size="small"
-                variant="text"
-                :title="$t('timetable.newSlot')"
-                :loading="busyId === row.starter.entryId"
-                @click="emit('newSlot', row.starter.entryId)"
-              />
-              <v-btn
-                v-else-if="!row.slot && action === 'countdown' && !readonly"
-                icon="mdi-timer-play-outline"
-                size="small"
-                variant="tonal"
-                color="primary"
-                :title="$t('countdown.start')"
-                :loading="busyId === row.starter.entryId"
-                @click="onCountdown(row.starter.entryId)"
-              />
+              </div>
             </div>
           </div>
         </template>
@@ -315,7 +317,7 @@ onUnmounted(() => cancelTonesExcept(new Set()));
 /* Two columns where they fit, one on a narrow card. */
 .rg-then-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
   gap: 16px;
 }
 .rg-then-number {
