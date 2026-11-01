@@ -432,13 +432,19 @@ is why the tolerance is locked once the rally runs; the suggestion goes once a
 penalty of that type exists for the car on the stage, or the marshal dismissed
 it (`jumpStartDismissed`, in the change history).
 
-A start passing is **assigned automatically** to the car whose slot is
-nearest, within slot − 10 s to slot + 60 s, also from a light barrier. This
-is the one exception to "never assigned automatically" ("Unassigned
-passings"): the passing sets no time, only the jump-start mark the marshal
-confirms. Outside that window it stays unassigned as today. A transponder
-passing is checked against that car's slots only; outside its window it is
-stored untimed.
+A start passing is **assigned automatically** to a slot within slot − 10 s
+to slot + 60 s, also from a light barrier. This is the one exception to
+"never assigned automatically" ("Unassigned passings"): the passing sets no
+time, only the jump-start mark the marshal confirms. Outside that window it
+stays unassigned as today. A transponder passing is checked against that
+car's slots only; outside its window it is stored untimed.
+
+A light-barrier passing goes first to a slot that has begun (slot −
+tolerance) and has no start passing yet, the latest of them; only without
+one, to the nearest slot. A car that stalls and leaves 25 s late is nearer
+the next slot than its own, and would hand that car a false jump start.
+The latest, so a no-show doesn't take the next car's passing and shift
+every one after it. A passing given to a begun slot is never a jump start.
 
 On a combined start/finish gate, passings before slot + `minDurationMs` are
 the start passing (checked for a jump start); the first one after is the

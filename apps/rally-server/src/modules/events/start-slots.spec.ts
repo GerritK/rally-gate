@@ -320,20 +320,42 @@ describe('start paths', () => {
   });
 
   describe('light barrier at a slot stage start', () => {
-    it('assigns a beam passing to the nearest slot', async () => {
+    const passingOf = async (entryId: string) =>
+      (await allRuns()).find((r) => r.entryId === entryId)!.startPassingAt;
+
+    it('gives a stalled car its own late passing, not the next car a jump start', async () => {
+      const first = await runs.startCountdown('v1', 'SS1', null);
+      await runs.startCountdown('v2', 'SS1', null);
+
+      // v1 leaves 25 s late, 5 s before v2's slot.
+      const record = await pass('START', first.plannedStartTime!, 25_000);
+
+      expect(record.entryId).toBe('v1');
+      expect(await passingOf('v2')).toBeNull();
+    });
+
+    it('gives a passing after a no-show to the latest begun slot', async () => {
+      await runs.startCountdown('v1', 'SS1', null);
+      const second = await runs.startCountdown('v2', 'SS1', null);
+
+      // v1 never came; v2 leaves on time.
+      const record = await pass('START', second.plannedStartTime!, 300);
+
+      expect(record.entryId).toBe('v2');
+      expect(await passingOf('v1')).toBeNull();
+    });
+
+    it('falls back to the nearest slot, so a jump start is still caught', async () => {
       const first = await runs.startCountdown('v1', 'SS1', null);
       const second = await runs.startCountdown('v2', 'SS1', null);
+      await pass('START', first.plannedStartTime!, 100, '111');
 
       const record = await pass('START', second.plannedStartTime!, -2_000);
 
       expect(record.entryId).toBe('v2');
-      expect(record.awaitingEntry).toBe(false);
-      const byEntry = new Map((await allRuns()).map((r) => [r.entryId, r]));
-      expect(byEntry.get('v1')!.startPassingAt).toBeNull();
-      expect(byEntry.get('v2')!.startPassingAt).toEqual(
+      expect(await passingOf('v2')).toEqual(
         new Date(second.plannedStartTime!.getTime() - 2_000),
       );
-      expect(first.id).not.toBe(second.id);
     });
 
     it('leaves a beam passing outside every window for a marshal', async () => {

@@ -594,9 +594,9 @@ export class StageRunsService {
   }
 
   /**
-   * The non-voided slot run nearest to a start passing at `at`, within slot
-   * −10 s to slot + `afterMs`; any car's when `entryId` is absent (a light
-   * barrier). Automatic assignment rests on this (`docs/event-model.md`).
+   * The non-voided slot run a start passing at `at` belongs to, within slot
+   * −10 s to slot + `afterMs`: the car's nearest, or for a light barrier
+   * (`entryId` absent) any car's (`docs/event-model.md` "Start slots").
    */
   async findSlotNear(
     stageId: string,
@@ -604,21 +604,36 @@ export class StageRunsService {
     afterMs: number,
     entryId?: string,
   ): Promise<StageRun | null> {
-    const runs = await this.stageRuns.find({
-      where: {
-        stageId,
-        voided: false,
-        plannedStartTime: Not(IsNull()),
-        ...(entryId ? { entryId } : {}),
-      },
-    });
-    const distance = (run: StageRun) =>
-      Math.abs(at.getTime() - run.plannedStartTime!.getTime());
-    return (
-      runs
-        .filter((run) => isNearSlot(run.plannedStartTime!, at, afterMs))
-        .sort((a, b) => distance(a) - distance(b))[0] ?? null
-    );
+    const near = (
+      await this.stageRuns.find({
+        where: {
+          stageId,
+          voided: false,
+          plannedStartTime: Not(IsNull()),
+          ...(entryId ? { entryId } : {}),
+        },
+      })
+    ).filter((run) => isNearSlot(run.plannedStartTime!, at, afterMs));
+    const slotMs = (run: StageRun) => run.plannedStartTime!.getTime();
+    if (!entryId) {
+      // A car that stalls leaves closer to the next slot than to its own, so
+      // a begun slot still waiting for its passing comes first. The latest
+      // one: a no-show must not take the next car's passing, and so on down
+      // the queue. Never a jump start, being after its slot.
+      const toleranceMs = await this.settings.getNumber(
+        JUMP_START_TOLERANCE_MS_KEY,
+        DEFAULT_JUMP_START_TOLERANCE_MS,
+      );
+      const begun = near
+        .filter(
+          (run) =>
+            !run.startPassingAt && slotMs(run) - toleranceMs <= at.getTime(),
+        )
+        .sort((a, b) => slotMs(b) - slotMs(a))[0];
+      if (begun) return begun;
+    }
+    const distance = (run: StageRun) => Math.abs(at.getTime() - slotMs(run));
+    return near.sort((a, b) => distance(a) - distance(b))[0] ?? null;
   }
 
   /**
