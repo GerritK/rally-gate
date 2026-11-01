@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Starter } from '@rally-gate/shared';
+import { formatWholeSeconds } from '../format';
 import { onUnmounted, ref, watch } from 'vue';
 import { serverOffsetMs } from '../api/time';
 import type { StageRun } from '../api/stage-runs';
@@ -38,6 +39,11 @@ const props = defineProps<{
   canCancel?: boolean;
   /** Timetable: Delay in the header. */
   canDelay?: boolean;
+  countdownMs: number;
+  /** A slot stage: the start lights, grey until a countdown runs. */
+  lights?: boolean;
+  /** Timetable: Delay since the list was posted, noted under the title. */
+  delayMs?: number;
   /** An entry or run id whose request is in flight. */
   busyId?: string | null;
   readonly?: boolean;
@@ -86,7 +92,9 @@ onUnmounted(() => cancelTonesExcept(new Set()));
   <div ref="card" class="rg-up-next h-100">
     <v-card class="h-100">
       <v-card-item>
-        <v-card-title class="d-flex align-center ga-2">
+        <!-- Wraps instead of clipping: a title clips its overflow, which hid
+             Fullscreen behind Enable sound and Delay on a narrow card. -->
+        <v-card-title class="d-flex flex-wrap align-center ga-2 rg-card-head">
           {{ title }}
           <v-spacer />
           <v-btn
@@ -120,19 +128,23 @@ onUnmounted(() => cancelTonesExcept(new Set()));
             @click="toggleFullscreen"
           />
         </v-card-title>
+        <v-card-subtitle v-if="delayMs">
+          {{
+            $t('timetable.delayedBy', {
+              time: formatWholeSeconds(delayMs / 1000).replace(/^0/, ''),
+            })
+          }}
+        </v-card-subtitle>
       </v-card-item>
       <v-card-text v-if="rows.length > 0">
-        <div
-          v-if="rows[0].slot"
-          class="d-flex justify-center mb-4 rg-countdown"
-        >
-          <StartCountdown :slot="rows[0].slot.startTime" />
-        </div>
-        <div
-          v-else-if="rows[0].starter.slotTime"
-          class="d-flex justify-center mb-4 rg-countdown"
-        >
-          <ClockTime :time="rows[0].starter.slotTime" />
+        <!-- Always there on a slot stage, so the card doesn't grow when the
+             first countdown starts. -->
+        <div v-if="lights" class="d-flex justify-center mb-4 rg-countdown">
+          <StartCountdown
+            :slot="rows[0].slot?.startTime ?? rows[0].starter.slotTime"
+            :countdown-ms="countdownMs"
+            :idle="!rows[0].slot"
+          />
         </div>
         <div class="d-flex align-center ga-4">
           <div class="rg-next-number">
@@ -303,7 +315,7 @@ onUnmounted(() => cancelTonesExcept(new Set()));
 /* Two columns where they fit, one on a narrow card. */
 .rg-then-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 16px;
 }
 .rg-then-number {
@@ -314,6 +326,9 @@ onUnmounted(() => cancelTonesExcept(new Set()));
 }
 .rg-countdown {
   font-size: 1.25rem;
+}
+.rg-card-head {
+  white-space: normal;
 }
 
 /* Fullscreen at the line: everything scales from the root font size. */

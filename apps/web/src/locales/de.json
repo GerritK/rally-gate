@@ -285,7 +285,8 @@
     "notClassified": "Nicht gewertet: noch keine beendete WP, die zählt, zurückgezogen oder disqualifiziert",
     "provisional": "Vorläufig",
     "published": "Veröffentlicht {at}",
-    "printed": "Gedruckt {at}"
+    "printed": "Gedruckt {at}",
+    "slotMoved": "Fett mit Pfeil: nach dem Aushang verschoben"
   },
   "setup": {
     "back": "Zurück zur Einrichtung",
@@ -454,7 +455,6 @@
     "noAssignmentsAdd": "Noch keine Gates zugeordnet. Lege eine an mit + {action}.",
     "splitNumber": "Zwischenzeit-Nr.",
     "scoring": "Wertung",
-    "scoringHint": "Wird für sich gewertet, zählt nie zur Gesamtwertung.",
     "general": "Allgemein",
     "times": "Zeiten",
     "startMode": "Startart",
@@ -792,7 +792,8 @@
     "lights": "Startampel",
     "enableSound": "Ton einschalten",
     "fullscreen": "Vollbild",
-    "jumpStart": "Frühstart −{time}",
+    "jumpStart": "Frühstart",
+    "jumpStartEarly": "{time} vor dem Slot",
     "givePenalty": "Frühstart-Strafe geben",
     "dismissJumpStart": "Keine Strafe",
     "title": "Start-Countdown",
@@ -826,11 +827,18 @@
     "slotsPassedText": "Der erste Slot ist vorbei oder zu nah für einen Countdown. Den ganzen Zeitplan vor dem Aktivieren verzögern?",
     "delayAndActivate": "Verzögern und aktivieren",
     "activateWithoutDelay": "Ohne Verzögerung aktivieren",
-    "delayBy": "Verzögern um"
+    "delayBy": "Verzögern um",
+    "delayedBy": "Zeitplan um {time} verzögert",
+    "slotMoved": "Nach dem Aushang verschoben"
   },
   "startModeHint": {
     "GATE": "Die Startdurchfahrt ist die Startzeit.",
     "SLOT_SCHEDULE": "Slots aus erstem Start + Intervall. Der Slot ist die Startzeit, das Startgate erkennt nur Frühstarts.",
     "SLOT_MANUAL": "Ein Countdown pro Auto. Der Slot ist die Startzeit, das Startgate erkennt nur Frühstarts."
+  },
+  "stageScoringHint": {
+    "OVERALL": "Die Zeit zählt zur Gesamtwertung.",
+    "QUALIFYING": "Wird für sich gewertet, zählt nie zur Gesamtwertung. Kann die Startreihenfolge der ersten gewerteten WP bestimmen.",
+    "NONE": "Shakedown oder Training: so viele Läufe wie gewünscht, der schnellste wird gewertet. Zählt nie zur Gesamtwertung."
   }
 }

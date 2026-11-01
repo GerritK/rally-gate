@@ -285,7 +285,8 @@
     "notClassified": "Not classified: no completed stage that counts yet, withdrawn or disqualified",
     "provisional": "Provisional",
     "published": "Published {at}",
-    "printed": "Printed {at}"
+    "printed": "Printed {at}",
+    "slotMoved": "Bold with an arrow: moved after the list was posted"
   },
   "setup": {
     "back": "Back to Setup",
@@ -454,7 +455,6 @@
     "noAssignmentsAdd": "No gates assigned yet. Add one with + {action}.",
     "splitNumber": "Split #",
     "scoring": "Scoring",
-    "scoringHint": "Ranked on its own, never counts toward the overall.",
     "general": "General",
     "times": "Times",
     "startMode": "Start mode",
@@ -792,7 +792,8 @@
     "lights": "Start lights",
     "enableSound": "Enable sound",
     "fullscreen": "Fullscreen",
-    "jumpStart": "Jump start −{time}",
+    "jumpStart": "Jump start",
+    "jumpStartEarly": "{time} before the slot",
     "givePenalty": "Give jump-start penalty",
     "dismissJumpStart": "No penalty",
     "title": "Start countdown",
@@ -826,11 +827,18 @@
     "slotsPassedText": "The first slot is past, or too close for a countdown. Delay the whole timetable before activating?",
     "delayAndActivate": "Delay and activate",
     "activateWithoutDelay": "Activate without delay",
-    "delayBy": "Delay by"
+    "delayBy": "Delay by",
+    "delayedBy": "Timetable delayed by {time}",
+    "slotMoved": "Moved after the list was posted"
   },
   "startModeHint": {
     "GATE": "The start passing is the start time.",
     "SLOT_SCHEDULE": "Slots from first start + interval. The slot is the start time; the start gate only detects jump starts.",
     "SLOT_MANUAL": "A countdown per car. The slot is the start time; the start gate only detects jump starts."
+  },
+  "stageScoringHint": {
+    "OVERALL": "Its time counts toward the overall.",
+    "QUALIFYING": "Ranked on its own, never counts toward the overall. Can set the start order of the first counted stage.",
+    "NONE": "Shakedown or trial run: as many runs as a car likes, the fastest is ranked. Never counts toward the overall."
   }
 }

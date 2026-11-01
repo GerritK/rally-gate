@@ -3,6 +3,7 @@ import { describe, it, test } from 'node:test';
 import {
   catchUpDelayMinutes,
   countdownState,
+  isCountingDown,
   isQueued,
   jumpStartMs,
   toneTimes,
@@ -91,4 +92,10 @@ describe('catchUpDelayMinutes', () => {
     assert.equal(catchUpDelayMinutes(slot, slot + 50_001, 10_000), 2);
     assert.equal(catchUpDelayMinutes(slot, slot + 7 * 60_000, 10_000), 8);
   });
+});
+
+test('a timetable car waits until the countdown before its slot', () => {
+  assert.equal(isCountingDown(SLOT, SLOT - 10_001, 10_000), false);
+  assert.equal(isCountingDown(SLOT, SLOT - 10_000, 10_000), true);
+  assert.equal(isCountingDown(SLOT, SLOT + 1_000, 10_000), true);
 });

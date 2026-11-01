@@ -38,7 +38,7 @@ import { serverNow } from '../api/time';
 import { fetchSetting } from '../api/settings';
 import { fetchPenalties, type Penalty } from '../api/penalties';
 import { countingRun } from '../counting-run';
-import { catchUpDelayMinutes, isQueued } from '../countdown';
+import { catchUpDelayMinutes, isCountingDown, isQueued } from '../countdown';
 import FormDialog from '../components/FormDialog.vue';
 import { closeLiveStream, openLiveStream, upsert } from '../api/live';
 import { rallyName } from '../api/rally-info';
@@ -143,6 +143,8 @@ type RowState =
   | 'WAITING'
   | 'NEXT'
   | 'QUEUED'
+  /** A timetable slot not yet counting down: shown as waiting. */
+  | 'SLOTTED'
   | 'ON_STAGE'
   | 'FINISHED'
   | 'DNF'
@@ -187,6 +189,13 @@ const ROW_STATE_DISPLAY: Record<
     },
     color: 'info',
     icon: 'mdi-timer-sand',
+  },
+  SLOTTED: {
+    get label() {
+      return t('rowState.waiting');
+    },
+    color: 'timing-idle',
+    icon: 'mdi-clock-outline',
   },
   ON_STAGE: {
     get label() {
@@ -255,8 +264,15 @@ const rows = computed<Row[]>(() => {
       .sort((a, b) => a.attempt - b.attempt);
     const entry = entryById.value.get(starter.entryId);
     let state: RowState;
-    if (isQueued(run, serverNow.value)) state = 'QUEUED';
-    else if (run?.status === StageRunStatus.STARTED) state = 'ON_STAGE';
+    if (isQueued(run, serverNow.value)) {
+      state = isCountingDown(
+        new Date(run!.startTime).getTime(),
+        serverNow.value,
+        countdownMs.value,
+      )
+        ? 'QUEUED'
+        : 'SLOTTED';
+    } else if (run?.status === StageRunStatus.STARTED) state = 'ON_STAGE';
     else if (run?.status === StageRunStatus.FINISHED) state = 'FINISHED';
     else if (run?.status === StageRunStatus.CANCELLED) state = 'DNF';
     else if (run?.status === StageRunStatus.DID_NOT_START) state = 'DNS';
@@ -290,11 +306,12 @@ const rows = computed<Row[]>(() => {
   }));
 });
 
-/** Non-zero states only, NEXT counted as waiting. */
+/** Non-zero states only, NEXT and SLOTTED counted as waiting. */
 const stateCounts = computed(() => {
   const counts = new Map<RowState, number>();
   for (const row of rows.value) {
-    const state = row.state === 'NEXT' ? 'WAITING' : row.state;
+    const state =
+      row.state === 'NEXT' || row.state === 'SLOTTED' ? 'WAITING' : row.state;
     counts.set(state, (counts.get(state) ?? 0) + 1);
   }
   const order: RowState[] = [
@@ -409,11 +426,12 @@ const dueToStart = computed(() =>
 /** Counting down first, by slot, then the cars still to start. */
 const upNext = computed<UpNextRow[]>(() => {
   const queued = rows.value
-    .filter((row) => row.state === 'QUEUED')
+    .filter((row) => row.state === 'QUEUED' || row.state === 'SLOTTED')
     .sort((a, b) => a.run!.startTime.localeCompare(b.run!.startTime));
   return [...queued, ...dueToStart.value].map((row) => ({
     starter: row.starter,
-    slot: row.state === 'QUEUED' ? row.run : undefined,
+    slot:
+      row.state === 'QUEUED' || row.state === 'SLOTTED' ? row.run : undefined,
     atStart: atStartIds.value.includes(row.starter.entryId),
     unscrutineered: !row.run && unscrutineered(row.starter.entryId),
   }));
@@ -432,10 +450,6 @@ const upNextAction = computed(() => {
 
 const timetable = computed(
   () => stage.value?.startMode === StartMode.SLOT_SCHEDULE,
-);
-/** A timetable's frozen list: its slot times are posted with it. */
-const hasSlots = computed(
-  () => !!startOrder.value?.starters.some((s) => s.slotTime),
 );
 
 // ---- Unassigned passings, with a suggested entry -----------------------
@@ -980,6 +994,7 @@ function printStartList() {
         order.frozen ? frozenAt.value : null,
         rows.value,
         order.grouped,
+        order.delayMs,
       ),
     ],
     fileName: [rallyName.value, id, t('live.startList')]
@@ -1327,6 +1342,9 @@ onUnmounted(() => {
       :action="upNextAction"
       :can-cancel="!timetable && can('timeRun', stage.id)"
       :can-delay="timetable && can('timeRun', stage.id)"
+      :countdown-ms="countdownMs"
+      :lights="stage.startMode !== StartMode.GATE"
+      :delay-ms="startOrder?.delayMs"
       :busy-id="startingEntryId"
       @start-now="onStartNow"
       @countdown="onCountdown"
@@ -1461,7 +1479,6 @@ onUnmounted(() => {
       <thead>
         <tr>
           <th style="width: 56px">{{ $t('table.pos') }}</th>
-          <th v-if="hasSlots">{{ $t('timetable.slot') }}</th>
           <th style="width: 72px">#</th>
           <th>{{ $t('table.crew') }}</th>
           <th v-if="!startOrder.grouped">{{ $t('classes.class') }}</th>
@@ -1481,18 +1498,12 @@ onUnmounted(() => {
       <tbody>
         <template v-for="row in rows" :key="row.starter.entryId">
           <tr v-if="row.classHeader" class="rg-class-row">
-            <td :colspan="(shakedown ? 11 : 10) + (hasSlots ? 1 : 0)">
+            <td :colspan="shakedown ? 11 : 10">
               {{ row.classHeader }}
             </td>
           </tr>
           <tr :class="{ 'rg-next-row': row.state === 'NEXT' }">
             <td class="rg-timing">{{ row.starter.position }}</td>
-            <td v-if="hasSlots">
-              <ClockTime
-                v-if="row.starter.slotTime"
-                :time="row.starter.slotTime"
-              />
-            </td>
             <td>
               <StartNumber :number="row.starter.startNumber" />
             </td>
@@ -1541,11 +1552,27 @@ onUnmounted(() => {
               </span>
             </td>
             <td v-if="shakedown" class="rg-timing">{{ row.runCount }}</td>
-            <td class="rg-time">
+            <!-- On a slot stage the slot is the start time; before activation
+                 the posted one. -->
+            <td
+              class="rg-time text-no-wrap"
+              :class="{ 'font-weight-bold': row.starter.slotMoved }"
+            >
+              <v-icon
+                v-if="row.starter.slotMoved"
+                icon="mdi-calendar-arrow-right"
+                size="x-small"
+                class="mr-1"
+                v-tooltip:top="$t('timetable.slotMoved')"
+              />
               <ClockTime
                 v-if="row.run"
                 :time="row.run.startTime"
                 :manual="row.run.startManual"
+              />
+              <ClockTime
+                v-else-if="row.starter.slotTime"
+                :time="row.starter.slotTime"
               />
             </td>
             <td class="rg-timing rg-time text-no-wrap">
@@ -1559,8 +1586,11 @@ onUnmounted(() => {
               />
             </td>
             <td class="rg-timing rg-time">
+              <template
+                v-if="row.state === 'QUEUED' || row.state === 'SLOTTED'"
+              />
               <RunningTime
-                v-if="row.run?.status === StageRunStatus.STARTED"
+                v-else-if="row.run?.status === StageRunStatus.STARTED"
                 :start-time="row.run.startTime"
               />
               <template v-else-if="row.run">{{
@@ -1815,7 +1845,8 @@ onUnmounted(() => {
 /* Up next beside On stage; stacked below Vuetify's md breakpoint. */
 .rg-stage-flow {
   display: grid;
-  grid-template-columns: 1fr minmax(0, 2fr);
+  /* minmax(0, …): a plain 1fr grows with its content, and the cards jumped. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   gap: 16px;
 }
 @media (max-width: 959px) {

@@ -31,6 +31,8 @@ export interface Starter extends Crew {
    * once the stage is active, before that first start + interval × (position − 1).
    */
   slotTime: string | null;
+  /** Moved by New slot after the list was posted: out of sequence on it. */
+  slotMoved: boolean;
 }
 
 export interface StartOrder {
@@ -45,4 +47,6 @@ export interface StartOrder {
   /** Starters come in main-class blocks, so a page can show one per class. */
   grouped: boolean;
   starters: Starter[];
+  /** ms, timetable: how far Delay pushed the slots since the list was posted. */
+  delayMs: number;
 }

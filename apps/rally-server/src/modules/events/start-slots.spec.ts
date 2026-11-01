@@ -733,6 +733,21 @@ describe('start paths', () => {
       );
     });
 
+    it('reports New slot moves and the Delays since the list was posted', async () => {
+      const posted = new Date();
+      await runs.delaySlots('SS1', MIN, null);
+      await runs.newSlot('v2', 'SS1', null);
+      await runs.delaySlots('SS1', 2 * MIN, null);
+      const changed = await runs.slotChangesSince('SS1', posted);
+      expect([...changed.movedEntryIds]).toEqual(['v2']);
+      expect(changed.delayMs).toBe(3 * MIN);
+      const later = await runs.slotChangesSince(
+        'SS1',
+        new Date(Date.now() + 1_000),
+      );
+      expect(later).toEqual({ movedEntryIds: new Set(), delayMs: 0 });
+    });
+
     it('refuses New slot once the car has left on its slot', async () => {
       await pass('START', first, 300, '111');
       await expect(runs.newSlot('v1', 'SS1', null)).rejects.toMatchObject({

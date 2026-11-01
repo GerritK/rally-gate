@@ -14,6 +14,7 @@ import {
   formatDuration,
   formatGap,
   formatStamp,
+  formatWholeSeconds,
   TIMING_MARKS,
   ENTRY_STATUS_DISPLAY,
 } from './format';
@@ -207,20 +208,29 @@ export function startListPdf(
   published: string | null,
   rows: { starter: Starter; classHeader: string | null }[],
   grouped: boolean,
+  /** Timetable: Delay since the list was posted, noted once in the header. */
+  delayMs = 0,
 ): PdfSection {
-  // A timetable's frozen list carries its slot times.
+  // A timetable's frozen list carries its slot times: the start times.
   const slots = rows.some(({ starter }) => starter.slotTime);
+  const anyMoved = rows.some(({ starter }) => starter.slotMoved);
   const head = [
     t('table.pos'),
-    ...(slots ? [t('timetable.slot')] : []),
     '#',
     t('table.crew'),
     t('table.car'),
     ...(grouped ? [] : [t('classes.class')]),
+    ...(slots ? [t('gateRole.start')] : []),
   ];
   return {
     heading,
-    subtitle: published ? '' : t('pdf.provisional'),
+    subtitle: !published
+      ? t('pdf.provisional')
+      : delayMs
+        ? t('timetable.delayedBy', {
+            time: formatWholeSeconds(delayMs / 1000).replace(/^0/, ''),
+          })
+        : '',
     note: published ? t('pdf.published', { at: published }) : undefined,
     head,
     body: rows.flatMap(({ starter, classHeader }) => [
@@ -237,18 +247,24 @@ export function startListPdf(
         : []),
       [
         String(starter.position),
-        ...(slots
-          ? [time(formatClockTime(starter.slotTime ?? undefined))]
-          : []),
         String(starter.startNumber),
         crewCell(starter),
         carCell(starter),
         ...(grouped ? [] : [starter.mainClassName ?? '']),
+        ...(slots
+          ? [
+              time(
+                formatClockTime(starter.slotTime ?? undefined) +
+                  (starter.slotMoved ? ' →' : ''),
+                starter.slotMoved,
+              ),
+            ]
+          : []),
       ],
     ]),
     repeat: head.length,
-    rightFrom: head.length,
-    legend: '',
+    rightFrom: slots ? head.length - 1 : head.length,
+    legend: anyMoved ? t('pdf.slotMoved') : '',
   };
 }
 

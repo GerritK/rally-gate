@@ -272,7 +272,7 @@ onMounted(load);
               v-model="stage.scoring"
               :items="scoringOptions"
               :label="$t('stage.scoring')"
-              :hint="$t('stage.scoringHint')"
+              :hint="$t(`stageScoringHint.${stage.scoring}`)"
               persistent-hint
               :disabled="!stageEditable"
             />
@@ -280,15 +280,16 @@ onMounted(load);
         </div>
         <div class="rg-stage-fields">
           <div class="rg-section-title">{{ $t('stage.times') }}</div>
+          <v-select
+            v-model="stage.startMode"
+            :items="startModeOptions"
+            :label="$t('stage.startMode')"
+            :hint="$t(`startModeHint.${stage.startMode}`)"
+            persistent-hint
+            :disabled="!stageEditable"
+            class="rg-start-mode"
+          />
           <div class="rg-stage-row">
-            <v-select
-              v-model="stage.startMode"
-              :items="startModeOptions"
-              :label="$t('stage.startMode')"
-              :hint="$t(`startModeHint.${stage.startMode}`)"
-              persistent-hint
-              :disabled="!stageEditable"
-            />
             <template v-if="timetable">
               <v-text-field
                 v-model="firstStartText"
@@ -493,10 +494,14 @@ onMounted(load);
   gap: 16px 32px;
   align-items: start;
 }
-/* Times: a row of their own, fields side by side as they fit. */
+/* Times: the start mode with its long hint on a line of its own, the time
+   fields below side by side as they fit (four on a timetable). */
+.rg-start-mode {
+  max-width: 640px;
+}
 .rg-stage-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px 16px;
   align-items: start;
 }

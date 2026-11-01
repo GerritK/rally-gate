@@ -30,8 +30,13 @@ const earlyMs = computed(() => jumpStartMs(props.run, props.toleranceMs));
         prepend-icon="mdi-alert-octagon-outline"
         :append-icon="suggest ? 'mdi-menu-down' : undefined"
         class="ml-1"
+        v-tooltip:top="
+          $t('countdown.jumpStartEarly', {
+            time: formatStageDuration(earlyMs),
+          })
+        "
       >
-        {{ $t('countdown.jumpStart', { time: formatStageDuration(earlyMs) }) }}
+        {{ $t('countdown.jumpStart') }}
       </v-chip>
     </template>
     <v-list density="compact">

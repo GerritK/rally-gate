@@ -74,6 +74,9 @@ function makeService(
   const stageRunsService = {
     findByStage: jest.fn().mockResolvedValue(runs),
     createTimetableRuns: jest.fn().mockResolvedValue(undefined),
+    slotChangesSince: jest
+      .fn()
+      .mockResolvedValue({ movedEntryIds: new Set(), delayMs: 0 }),
   };
   const service = new StartOrderService(
     stagesService as unknown as StagesService,

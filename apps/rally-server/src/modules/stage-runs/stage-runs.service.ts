@@ -10,6 +10,7 @@ import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import {
   ApiErrorCode,
   ChangeAction,
+  type DelaySnapshot,
   COUNTDOWN_MS_KEY,
   DEFAULT_COUNTDOWN_MS,
   DEFAULT_JUMP_START_TOLERANCE_MS,
@@ -27,9 +28,18 @@ import {
   StartMode,
   type RunSnapshot,
 } from '@rally-gate/shared';
-import { In, IsNull, MoreThan, Not, Or, Repository } from 'typeorm';
+import {
+  In,
+  IsNull,
+  MoreThan,
+  MoreThanOrEqual,
+  Not,
+  Or,
+  Repository,
+} from 'typeorm';
 import { apiError } from '../../common/api-error';
 import { isUniqueViolation } from '../../common/db-errors';
+import { ChangeRecord } from '../changes/change-record.entity';
 import { recordChange, runSnapshot } from '../changes/record-change';
 import { SettingsService } from '../settings/settings.service';
 import { Stage } from '../stages/stage.entity';
@@ -840,6 +850,34 @@ export class StageRunsService {
       this.emitter.emit('stage-run.updated', await this.withStatus(run));
     }
     this.stagesService.changed(stageId);
+  }
+
+  /**
+   * What changed a timetable since its list was posted, read from the change
+   * history: the cars New slot moved, and the Delays added up. A Delay before
+   * that is in the posted times already.
+   */
+  async slotChangesSince(
+    stageId: string,
+    since: Date,
+  ): Promise<{ movedEntryIds: Set<string>; delayMs: number }> {
+    const changes = await this.stageRuns.manager.find(ChangeRecord, {
+      where: {
+        stageId,
+        action: In([ChangeAction.SLOT_MOVED, ChangeAction.SLOTS_DELAYED]),
+        at: MoreThanOrEqual(since),
+      },
+    });
+    let delayMs = 0;
+    const movedEntryIds = new Set<string>();
+    for (const change of changes) {
+      if (change.action === ChangeAction.SLOTS_DELAYED) {
+        delayMs += (change.after as DelaySnapshot).delayMs;
+      } else if (change.entryId) {
+        movedEntryIds.add(change.entryId);
+      }
+    }
+    return { movedEntryIds, delayMs };
   }
 
   private alreadyStarting(entryId: string, stageId: string) {

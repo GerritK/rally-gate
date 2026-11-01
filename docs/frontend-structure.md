@@ -39,7 +39,7 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
   at a casual meet one laptop does everything, and a page of its own would
   have the marshal switching pages for every car; at a formal one the tablet at the line
   and the timing tent each show their own screen anyway. The card shows the
-  running countdown (seconds, the five start lights) and the queue with slot
+  running countdown (the slot's clock time until `countdownMs` before it, then the seconds, on the five start lights, which run the last 5 s alone and stay there grey on a slot stage so the card never grows), a timetable's Delay once as a note, and the queue with slot
   times, with Countdown, Cancel, New slot and Delay on it. Fullscreen shows
   only the card, big enough for a tablet at the line; it is its own
   component so a screen device (`ideas/output-devices.md`) can reuse it
@@ -55,8 +55,11 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
   and Cancel, the others with a small Countdown. In `SLOT_SCHEDULE` New slot
   takes Countdown's and Cancel's places and Delay sits in the header; before
   activation the rows show their slot from the start list, no countdown.
-  Fullscreen and Enable sound sit in the card's header. Live Timing's and the
-  public start list show a Slot column once a timetable's list is frozen. A car seen at a pre-start gate gets an "At the
+  Fullscreen and Enable sound sit in the card's header. On a timetable a car is waiting, not counting down, until `countdownMs` before its slot.
+  Live Timing's Start column shows a timetable's slot (the slot is the start
+  time), its rows staying in start-order position; a slot moved by New slot is
+  bold with an icon, on the printed list bold with an arrow. The public start
+  list shows a Slot column once a timetable's list is frozen. A car seen at a pre-start gate gets an "At the
   start" chip (a flag icon in a "Then" row); a car not seen gets nothing, and
   the order stays the start order.
 - **Overall and a stage's results are one page** (`ResultsView`), two

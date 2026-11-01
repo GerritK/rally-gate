@@ -62,6 +62,19 @@ export function isQueued(run: SlotRun | undefined, nowMs: number): boolean {
   );
 }
 
+/**
+ * The countdown runs from `countdownMs` before the slot; until then a
+ * timetable car is still waiting. A manual slot is set that far ahead of the
+ * trigger, so it counts from the trigger.
+ */
+export function isCountingDown(
+  slotMs: number,
+  nowMs: number,
+  countdownMs: number,
+): boolean {
+  return nowMs >= slotMs - countdownMs;
+}
+
 interface PassingRun {
   plannedStartTime: string | null;
   startPassingAt: string | null;

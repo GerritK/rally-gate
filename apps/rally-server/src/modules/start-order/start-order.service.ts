@@ -63,6 +63,13 @@ export class StartOrderService {
     const ids = stage.startOrder ?? (await this.compute(stage, eligible));
     const ordered = withLateEntries(ids, entries);
     const slots = await this.slotTimes(stage, ordered);
+    const changed =
+      slots && stage.startOrderFrozenAt
+        ? await this.stageRunsService.slotChangesSince(
+            stageId,
+            stage.startOrderFrozenAt,
+          )
+        : null;
     return {
       stageId,
       frozen: stage.startOrder !== null,
@@ -78,7 +85,9 @@ export class StartOrderService {
         ...crewOf(entry),
         mainClassName: mainClassOf(entry)?.name ?? null,
         slotTime: slots?.get(entry.id)?.toISOString() ?? null,
+        slotMoved: !!changed?.movedEntryIds.has(entry.id),
       })),
+      delayMs: changed?.delayMs ?? 0,
     };
   }
 
