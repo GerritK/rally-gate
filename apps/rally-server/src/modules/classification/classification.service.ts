@@ -130,7 +130,7 @@ export class ClassificationService {
     // the notional's population, which a class ranking narrows — hence
     // notionals are computed per view, never stored on a run.
     //
-    // A withdrawn car is retired: not classified, so it collects no
+    // A withdrawn car is dnf: not classified, so it collects no
     // notionals for the stages it won't drive. Its real times stay in
     // `finished` and still anchor the others' notionals, so a withdrawal
     // never moves anyone else's total.
@@ -274,7 +274,7 @@ export class ClassificationService {
     const dnf = runs
       .filter(
         (run) =>
-          deriveStageRunStatus(run) === StageRunStatus.CANCELLED &&
+          deriveStageRunStatus(run) === StageRunStatus.DNF &&
           !disqualified.has(run.entryId),
       )
       .map((run) => toOutcome(run.entryId, 'DNF'));

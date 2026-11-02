@@ -83,15 +83,15 @@ describe('deriveStageRunStatus', () => {
     );
   });
 
-  it('is STARTED when unfinished and not retired', () => {
+  it('is STARTED when unfinished and not DNF', () => {
     expect(deriveStageRunStatus({ finishTime: undefined })).toBe(
       StageRunStatus.STARTED,
     );
   });
 
-  it('is CANCELLED when retired, a DNF', () => {
-    expect(deriveStageRunStatus({ finishTime: null, retired: true })).toBe(
-      StageRunStatus.CANCELLED,
+  it('is DNF when marked DNF', () => {
+    expect(deriveStageRunStatus({ finishTime: null, dnf: true })).toBe(
+      StageRunStatus.DNF,
     );
   });
 
@@ -283,7 +283,7 @@ describe('StageRunsService.correctRun', () => {
       null,
     );
 
-    expect(corrected.status).toBe(StageRunStatus.CANCELLED);
+    expect(corrected.status).toBe(StageRunStatus.DNF);
   });
 
   it('throws NotFoundException for a missing run', async () => {

@@ -38,7 +38,7 @@ export enum ApiErrorCode {
   RUN_NOT_FINISHABLE = 'runNotFinishable',
   RUN_STARTS_IN_FUTURE = 'runStartsInFuture',
   /** DNF only on an open run: not finished, voided or DNF already. */
-  RUN_NOT_RETIRABLE = 'runNotRetirable',
+  RUN_NOT_DNFABLE = 'runNotDnfable',
   /** DNF, DNS and their undo stop when the stage closes. */
   STAGE_ALREADY_CLOSED = 'stageAlreadyClosed',
   DNS_ON_SHAKEDOWN = 'dnsOnShakedown',

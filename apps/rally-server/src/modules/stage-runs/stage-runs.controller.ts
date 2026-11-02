@@ -200,8 +200,8 @@ export class StageRunsController {
   /** DNF on the stage, at once; 409 on a finished, voided or closed run. */
   @LockedWhen(RallyStatus.CLOSED)
   @Requires('correctRun')
-  @Post(':id/retire')
-  async retire(
+  @Post(':id/dnf')
+  async markDnf(
     @Param('id') id: string,
     @CurrentPrincipal() principal: Principal,
   ) {
@@ -210,14 +210,14 @@ export class StageRunsController {
       'correctRun',
       await this.stageRunsService.stageIdOf(id),
     );
-    return this.stageRunsService.retireRun(id, deviceOf(principal));
+    return this.stageRunsService.markDnf(id, deviceOf(principal));
   }
 
   /** Undoes a DNF until the stage closes. */
   @LockedWhen(RallyStatus.CLOSED)
   @Requires('correctRun')
-  @Post(':id/unretire')
-  async unretire(
+  @Post(':id/dnf/undo')
+  async undoDnf(
     @Param('id') id: string,
     @CurrentPrincipal() principal: Principal,
   ) {
@@ -226,7 +226,7 @@ export class StageRunsController {
       'correctRun',
       await this.stageRunsService.stageIdOf(id),
     );
-    return this.stageRunsService.unretireRun(id, deviceOf(principal));
+    return this.stageRunsService.undoDnf(id, deviceOf(principal));
   }
 
   @LockedWhen(RallyStatus.CLOSED)

@@ -149,10 +149,10 @@ function stageRow(
       label: t('runState.onStage'),
       color: runStatusColor(StageRunStatus.STARTED),
     };
-  } else if (run?.status === StageRunStatus.CANCELLED) {
+  } else if (run?.status === StageRunStatus.DNF) {
     state = {
       label: 'DNF',
-      color: runStatusColor(StageRunStatus.CANCELLED),
+      color: runStatusColor(StageRunStatus.DNF),
     };
   } else if (!run && dnsStageIds.value.includes(stage.id)) {
     state = { label: 'DNS', color: 'warning' };

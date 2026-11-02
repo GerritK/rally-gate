@@ -142,42 +142,42 @@ describe('DNF and DNS', () => {
   describe('DNF', () => {
     it('takes the car off stage at once, into the non-finishers', async () => {
       const run = await runs.startRun('v1', 'SS1', at(0));
-      const retired = await runs.retireRun(run.id, 'd1');
-      expect(retired.status).toBe(StageRunStatus.CANCELLED);
+      const dnf = await runs.markDnf(run.id, 'd1');
+      expect(dnf.status).toBe(StageRunStatus.DNF);
       expect(await outcomes()).toEqual([['v1', 'DNF']]);
-      expect(await changes(ChangeAction.RUN_RETIRED)).toHaveLength(1);
+      expect(await changes(ChangeAction.DNF_MARKED)).toHaveLength(1);
       expect(emitter.emit).toHaveBeenCalledWith(
         'stage-run.updated',
-        expect.objectContaining({ id: run.id, retired: true }),
+        expect.objectContaining({ id: run.id, dnf: true }),
       );
     });
 
     it('is undone while the stage runs, and the car is on stage again', async () => {
       const run = await runs.startRun('v1', 'SS1', at(0));
-      await runs.retireRun(run.id, null);
-      const back = await runs.unretireRun(run.id, null);
+      await runs.markDnf(run.id, null);
+      const back = await runs.undoDnf(run.id, null);
       expect(back.status).toBe(StageRunStatus.STARTED);
       expect(await outcomes()).toEqual([]);
-      expect(await changes(ChangeAction.RUN_UNRETIRED)).toHaveLength(1);
+      expect(await changes(ChangeAction.DNF_UNDONE)).toHaveLength(1);
     });
 
     it('refuses a finished run, and DNF or its undo once the stage closed', async () => {
       const finished = await runs.startRun('v1', 'SS1', at(0));
       await runs.finishRun('v1', 'SS1', at(60));
-      await expect(runs.retireRun(finished.id, null)).rejects.toMatchObject({
-        response: { code: 'runNotRetirable' },
+      await expect(runs.markDnf(finished.id, null)).rejects.toMatchObject({
+        response: { code: 'runNotDnfable' },
       });
       const open = await runs.startRun('v2', 'SS1', at(10));
-      await runs.retireRun(open.id, null);
+      await runs.markDnf(open.id, null);
       await stages.close('SS1');
-      await expect(runs.unretireRun(open.id, null)).rejects.toMatchObject({
+      await expect(runs.undoDnf(open.id, null)).rejects.toMatchObject({
         response: { code: 'stageAlreadyClosed' },
       });
     });
 
     it('stores a finish passing after it as evidence and times nothing', async () => {
       const run = await runs.startRun('v1', 'SS1', at(0));
-      await runs.retireRun(run.id, null);
+      await runs.markDnf(run.id, null);
       expect(await runs.finishRun('v1', 'SS1', at(60))).toBeNull();
       expect(
         await runs.recordSplit('v1', 'SS1', 'SPLIT', 1, at(30)),
@@ -185,12 +185,12 @@ describe('DNF and DNS', () => {
       // Not pending for a start still on its way: the car has its run.
       expect(await runs.hasRun('v1', 'SS1')).toBe(true);
       const [stored] = await runOf('v1');
-      expect(stored).toMatchObject({ retired: true, finishTime: null });
+      expect(stored).toMatchObject({ dnf: true, finishTime: null });
     });
 
     it('ignores a restart at the start gate on a counted stage', async () => {
       const run = await runs.startRun('v1', 'SS1', at(0));
-      await runs.retireRun(run.id, null);
+      await runs.markDnf(run.id, null);
       await runs.startRun('v1', 'SS1', at(90));
       expect(await runOf('v1')).toHaveLength(1);
     });
@@ -199,13 +199,13 @@ describe('DNF and DNS', () => {
       const run = await runs.startRun('v1', 'SS1', at(0));
       await runs.recordSplit('v1', 'SS1', 'SPLIT', 1, at(30));
       expect(await runs.findSplitsForStageAtIndex('SS1', 1)).toHaveLength(1);
-      await runs.retireRun(run.id, null);
+      await runs.markDnf(run.id, null);
       expect(await runs.findSplitsForStageAtIndex('SS1', 1)).toEqual([]);
     });
 
     it('is cleared by a finish typed in by correction', async () => {
       const run = await runs.startRun('v1', 'SS1', at(0));
-      await runs.retireRun(run.id, null);
+      await runs.markDnf(run.id, null);
       const corrected = await runs.correctRun(
         run.id,
         { finishTime: at(75).toISOString() },
@@ -213,7 +213,7 @@ describe('DNF and DNS', () => {
       );
       expect(corrected).toMatchObject({
         status: StageRunStatus.FINISHED,
-        retired: false,
+        dnf: false,
         durationMs: 75_000,
       });
     });
@@ -221,11 +221,11 @@ describe('DNF and DNS', () => {
     it('only ends the open run on a shakedown, so the car can start again', async () => {
       await addStage('SD9', { scoring: StageScoring.NONE });
       const first = await runs.startRun('v1', 'SD9', at(0));
-      await runs.retireRun(first.id, null);
+      await runs.markDnf(first.id, null);
       const second = await runs.startRun('v1', 'SD9', at(120));
       expect(second).toMatchObject({ run: 2, status: StageRunStatus.STARTED });
       // Undoing the first would make two open runs.
-      await expect(runs.unretireRun(first.id, null)).rejects.toMatchObject({
+      await expect(runs.undoDnf(first.id, null)).rejects.toMatchObject({
         response: { code: 'otherAttemptCounts' },
       });
     });
@@ -330,8 +330,8 @@ describe('DNF and DNS', () => {
       await runs.finishRun('v2', 'SS1', at(70));
       await stages.close('SS1');
       const [open] = await runOf('v1');
-      expect(open.retired).toBe(true);
-      expect((await runOf('v2'))[0].retired).toBe(false);
+      expect(open.dnf).toBe(true);
+      expect((await runOf('v2'))[0].dnf).toBe(false);
       // Withdrawn and disqualified cars are neither.
       expect(await dnsOf()).toEqual(['v3']);
       expect(await outcomes()).toEqual([
@@ -342,7 +342,7 @@ describe('DNF and DNS', () => {
         'stage-run.updated',
         expect.objectContaining({
           id: open.id,
-          status: StageRunStatus.CANCELLED,
+          status: StageRunStatus.DNF,
         }),
       );
     });
@@ -360,9 +360,9 @@ describe('DNF and DNS', () => {
       expect(await runOf('v1')).toEqual([]);
       expect((await runOf('v2'))[0]).toMatchObject({
         id: split.id,
-        retired: true,
+        dnf: true,
       });
-      expect((await runOf('v3'))[0].retired).toBe(true);
+      expect((await runOf('v3'))[0].dnf).toBe(true);
       expect(await dnsOf()).toEqual(['v1']);
       expect(emitter.emit).toHaveBeenCalledWith('stage-run.deleted', {
         id: untouched.id,
@@ -377,7 +377,7 @@ describe('DNF and DNS', () => {
       expect(await dnsOf('SD9')).toEqual([]);
       expect((await runOf('v1', 'SD9'))[0]).toMatchObject({
         id: run.id,
-        retired: true,
+        dnf: true,
       });
 
       await runs.markDns('v2', 'SS1', null);
@@ -391,7 +391,7 @@ describe('DNF and DNS', () => {
         { entryId: 'v1', stageId: 'SS1', startTime: at(0).toISOString() },
         null,
       );
-      expect(run.status).toBe(StageRunStatus.CANCELLED);
+      expect(run.status).toBe(StageRunStatus.DNF);
     });
 
     it('gives a crew registered after close no DNS, but still a notional time', async () => {

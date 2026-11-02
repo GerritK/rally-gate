@@ -7,9 +7,6 @@ import type { StageRun } from './stage-run.entity';
  */
 export function isUntouchedSlot(run: StageRun): boolean {
   return (
-    !!run.plannedStartTime &&
-    !run.startPassingAt &&
-    !run.finishTime &&
-    !run.retired
+    !!run.plannedStartTime && !run.startPassingAt && !run.finishTime && !run.dnf
   );
 }

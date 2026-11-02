@@ -130,12 +130,7 @@ describe('server-owned fields are not settable through the API', () => {
       'jumpStartDismissed',
     ],
     // DNF is its own endpoint, in the change history; a finish typed in clears it.
-    [
-      'StageRun.retired on correction',
-      CorrectStageRunDto,
-      { retired: true },
-      'retired',
-    ],
+    ['StageRun.dnf on correction', CorrectStageRunDto, { dnf: true }, 'dnf'],
     // The frozen start order is the published list; freezing writes it.
     [
       'Stage.startOrder on update',

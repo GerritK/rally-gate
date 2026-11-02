@@ -2,11 +2,11 @@ export enum StageRunStatus {
   STARTED = 'STARTED',
   FINISHED = 'FINISHED',
   /**
-   * DNF: a marshal marked the run retired, or the stage closed with it
-   * still open. Stored (`StageRun.retired`), never derived from the stage.
+   * DNF: a marshal marked the run DNF, or the stage closed with it
+   * still open. Stored (`StageRun.dnf`), never derived from the stage.
    * A DNS is not a run at all: it is a `DidNotStart` row.
    */
-  CANCELLED = 'CANCELLED',
+  DNF = 'DNF',
   /**
    * Struck out by a marshal — typically a red flag — so it counts for
    * nothing and frees the entry to run the stage again. The row is kept

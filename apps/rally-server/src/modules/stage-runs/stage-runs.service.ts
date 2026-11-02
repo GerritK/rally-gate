@@ -71,8 +71,7 @@ export type StageRunWithStatus = StageRun & { status: StageRunStatus };
 
 /** Status is derived, never stored — see the note on `StageRun`. */
 export function deriveStageRunStatus(
-  run: Pick<StageRun, 'finishTime'> &
-    Partial<Pick<StageRun, 'voided' | 'retired'>>,
+  run: Pick<StageRun, 'finishTime'> & Partial<Pick<StageRun, 'voided' | 'dnf'>>,
 ): StageRunStatus {
   // First: a voided run usually does have a finishTime, and FINISHED would
   // present a struck-out time as a result.
@@ -82,7 +81,7 @@ export function deriveStageRunStatus(
   if (run.finishTime) {
     return StageRunStatus.FINISHED;
   }
-  return run.retired ? StageRunStatus.CANCELLED : StageRunStatus.STARTED;
+  return run.dnf ? StageRunStatus.DNF : StageRunStatus.STARTED;
 }
 
 export const slotIntervalMs = (stage: Stage): number =>
@@ -295,7 +294,7 @@ export class StageRunsService {
    * The entry's in-progress attempt on this stage, if any. Voided runs are
    * excluded throughout: voiding is what releases an entry to run again, so
    * a voided row must stop counting as either "already running" or "already
-   * finished" everywhere the rule engine checks. A retired run is not in
+   * finished" everywhere the rule engine checks. A DNF run is not in
    * progress either: a gate finish or split after a DNF times nothing.
    */
   private findActive(
@@ -307,7 +306,7 @@ export class StageRunsService {
       stageId,
       finishTime: IsNull(),
       voided: false,
-      retired: false,
+      dnf: false,
     });
   }
 
@@ -338,7 +337,7 @@ export class StageRunsService {
         entryId,
         stageId,
         voided: false,
-        retired: true,
+        dnf: true,
       })
     );
   }
@@ -814,7 +813,7 @@ export class StageRunsService {
           where: {
             stageId,
             voided: false,
-            retired: false,
+            dnf: false,
             finishTime: IsNull(),
             startPassingAt: IsNull(),
             plannedStartTime: MoreThan(new Date(now)),
@@ -976,7 +975,7 @@ export class StageRunsService {
         where: {
           stageId,
           voided: false,
-          retired: false,
+          dnf: false,
           plannedStartTime: Not(IsNull()),
           ...(entryId ? { entryId } : {}),
         },
@@ -1125,7 +1124,7 @@ export class StageRunsService {
       // A finish typed in is the marshal's call, unlike a gate passing after
       // DNF. Cleared on a closed stage, the run is DNF again: closing left no
       // run open, and nothing could finish it now.
-      run.retired = !run.finishTime && (await this.isStageClosed(run.stageId));
+      run.dnf = !run.finishTime && (await this.isStageClosed(run.stageId));
     }
     // Checked against the merged result, not the patch: correcting only one
     // of the two still has to leave the pair ordered.
@@ -1170,7 +1169,7 @@ export class StageRunsService {
       finishManual: !!finishTime,
       durationMs: durationMs(startTime, finishTime),
       // On a closed stage nothing could finish it; closing left no run open.
-      retired: !finishTime && (await this.isStageClosed(input.stageId)),
+      dnf: !finishTime && (await this.isStageClosed(input.stageId)),
     });
     let saved: StageRun;
     try {
@@ -1205,13 +1204,13 @@ export class StageRunsService {
     if (
       run.voided ||
       run.finishTime ||
-      run.retired ||
+      run.dnf ||
       (await this.isStageClosed(run.stageId))
     ) {
       throw new ConflictException(
         apiError(
           ApiErrorCode.RUN_NOT_FINISHABLE,
-          `StageRun ${id} is ${run.voided ? 'voided' : run.finishTime ? 'already finished' : run.retired ? 'DNF' : 'on a closed stage'}`,
+          `StageRun ${id} is ${run.voided ? 'voided' : run.finishTime ? 'already finished' : run.dnf ? 'DNF' : 'on a closed stage'}`,
         ),
       );
     }
@@ -1300,21 +1299,21 @@ export class StageRunsService {
    * counting and a gate finish after it times nothing. On a shakedown it
    * only ends the open run, so the car can start again.
    */
-  async retireRun(id: string, by: string | null): Promise<StageRunWithStatus> {
+  async markDnf(id: string, by: string | null): Promise<StageRunWithStatus> {
     const run = await this.findOneOrFail(id);
     await this.assertStageOpen(run.stageId);
-    if (run.voided || run.finishTime || run.retired) {
+    if (run.voided || run.finishTime || run.dnf) {
       throw new ConflictException(
         apiError(
-          ApiErrorCode.RUN_NOT_RETIRABLE,
+          ApiErrorCode.RUN_NOT_DNFABLE,
           `StageRun ${id} is voided, finished or DNF already`,
         ),
       );
     }
     const before = runSnapshot(run);
-    run.retired = true;
+    run.dnf = true;
     const withStatus = await this.withStatus(
-      await this.saveRecorded(run, by, ChangeAction.RUN_RETIRED, before),
+      await this.saveRecorded(run, by, ChangeAction.DNF_MARKED, before),
     );
     this.emitter.emit('stage-run.updated', withStatus);
     return withStatus;
@@ -1322,13 +1321,10 @@ export class StageRunsService {
 
   /** Undoes a DNF while the stage runs. 409s like unvoid if the car has
    *  started another run since (a shakedown). */
-  async unretireRun(
-    id: string,
-    by: string | null,
-  ): Promise<StageRunWithStatus> {
+  async undoDnf(id: string, by: string | null): Promise<StageRunWithStatus> {
     const run = await this.findOneOrFail(id);
     await this.assertStageOpen(run.stageId);
-    if (!run.retired) {
+    if (!run.dnf) {
       return this.withStatus(run);
     }
     const open = run.voided
@@ -1344,9 +1340,9 @@ export class StageRunsService {
       );
     }
     const before = runSnapshot(run);
-    run.retired = false;
+    run.dnf = false;
     const withStatus = await this.withStatus(
-      await this.saveRecorded(run, by, ChangeAction.RUN_UNRETIRED, before),
+      await this.saveRecorded(run, by, ChangeAction.DNF_UNDONE, before),
     );
     this.emitter.emit('stage-run.updated', withStatus);
     return withStatus;
@@ -1564,7 +1560,7 @@ export class StageRunsService {
     // live split leaderboard.
     const runs = await this.findByStage(stageId);
     const activeRuns = runs.filter(
-      (run) => deriveStageRunStatus(run) !== StageRunStatus.CANCELLED,
+      (run) => deriveStageRunStatus(run) !== StageRunStatus.DNF,
     );
     if (activeRuns.length === 0) {
       return [];

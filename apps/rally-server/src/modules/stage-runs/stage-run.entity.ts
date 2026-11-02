@@ -1,8 +1,8 @@
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 /**
- * No `status` column — STARTED/FINISHED/CANCELLED is derived from
- * `finishTime`, `retired` and `voided`, see `deriveStageRunStatus` in
+ * No `status` column — STARTED/FINISHED/DNF is derived from
+ * `finishTime`, `dnf` and `voided`, see `deriveStageRunStatus` in
  * `stage-runs.service.ts`. Storing it separately would let it drift out of
  * sync with the timestamps it's supposed to summarize.
  *
@@ -30,12 +30,12 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
   where: '"voided" = false',
 })
 /**
- * At most one open run per entry+stage, a shakedown included. A retired
+ * At most one open run per entry+stage, a shakedown included. A DNF
  * run is closed: on a shakedown the car may start again after a DNF.
  */
 @Index(['entryId', 'stageId'], {
   unique: true,
-  where: '"voided" = false AND "retired" = false AND "finishTime" IS NULL',
+  where: '"voided" = false AND "dnf" = false AND "finishTime" IS NULL',
 })
 export class StageRun {
   @PrimaryGeneratedColumn('uuid')
@@ -75,7 +75,7 @@ export class StageRun {
    * finish after it times nothing; a finish typed in by correction clears it.
    */
   @Column({ default: false })
-  retired: boolean;
+  dnf: boolean;
 
   /**
    * Set by a marshal (Start now / Finish now / a correction) instead of a

@@ -170,15 +170,15 @@ export class StagesService {
     const wasActive = stage.status === StageStatus.ACTIVE;
     await this.gateAssignmentsService.deactivateForStage(id);
     stage.status = StageStatus.CLOSED;
-    const { saved, retired, unstarted, dns } =
+    const { saved, dnf, unstarted, dns } =
       await this.stages.manager.transaction((manager) =>
         writeClose(manager, stage),
       );
-    for (const run of retired) {
+    for (const run of dnf) {
       this.emitter.emit('stage-run.updated', {
         ...run,
-        retired: true,
-        status: StageRunStatus.CANCELLED,
+        dnf: true,
+        status: StageRunStatus.DNF,
       });
     }
     for (const run of unstarted) {

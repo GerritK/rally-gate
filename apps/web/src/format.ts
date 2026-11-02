@@ -98,7 +98,7 @@ export function runStatusColor(status: StageRunStatus): string {
       return 'success';
     case StageRunStatus.STARTED:
       return 'info';
-    case StageRunStatus.CANCELLED:
+    case StageRunStatus.DNF:
       return 'error';
     case StageRunStatus.VOIDED:
       // Neutral, not red: a voided run isn't a failure by the crew, it's a

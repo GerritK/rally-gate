@@ -515,14 +515,14 @@ describe('ClassificationService.getNonFinishers', () => {
   ];
 
   it('reports no one without a stored DNF or DNS, even with no runs yet', async () => {
-    const runs = [{ entryId: 'v1', finishTime: undefined, retired: false }];
+    const runs = [{ entryId: 'v1', finishTime: undefined, dnf: false }];
     const service = makeService({ status: StageStatus.ACTIVE }, runs, entries);
     expect(await service.getNonFinishers('WP1')).toEqual([]);
   });
 
-  it('lists a retired run as DNF and a DNS row as DNS at once, before the stage closes', async () => {
+  it('lists a DNF run as DNF and a DNS row as DNS at once, before the stage closes', async () => {
     const runs = [
-      { entryId: 'v1', finishTime: undefined, retired: true },
+      { entryId: 'v1', finishTime: undefined, dnf: true },
       { entryId: 'v3', finishTime: new Date() },
     ];
     const service = makeService({ status: StageStatus.ACTIVE }, runs, entries, [
@@ -544,13 +544,13 @@ describe('ClassificationService.getNonFinishers', () => {
         status: EntryStatus.DISQUALIFIED,
       },
     ];
-    const runs = [{ entryId: 'v4', finishTime: undefined, retired: true }];
+    const runs = [{ entryId: 'v4', finishTime: undefined, dnf: true }];
     const open = makeService({ status: StageStatus.ACTIVE }, runs, withDsq);
     expect(await open.getNonFinishers('WP1')).toEqual([
       expect.objectContaining({ entryId: 'v4', outcome: 'DSQ' }),
     ]);
 
-    // Its retired run is DSQ, not DNF; and a car out of the event since its
+    // Its DNF run is DSQ, not DNF; and a car out of the event since its
     // DNS row was written isn't a DNS.
     const closed = makeService(
       { status: StageStatus.CLOSED },

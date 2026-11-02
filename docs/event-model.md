@@ -131,8 +131,8 @@ Application-set `Date`s keep milliseconds on both drivers —
 `timestamp-precision.spec.ts` pins that against real sqlite.
 
 `status` is derived on read, never stored (`deriveStageRunStatus`): `FINISHED`
-once `finishTime` is set, otherwise `STARTED`, or `CANCELLED` (DNF) once
-`retired`; `VOIDED` if voided. Nothing in it depends on the stage: closing
+once `finishTime` is set, otherwise `STARTED`, or `DNF` once
+`dnf`; `VOIDED` if voided. Nothing in it depends on the stage: closing
 writes DNF and DNS ("DNF and DNS").
 
 `startManual`/`finishManual` record which ends a marshal set by hand: Start
@@ -171,14 +171,14 @@ organiser), are locked once the rally is closed, and end with the stage: a
 closed stage's DNF and DNS are final (`stageAlreadyClosed`). In the change
 history.
 
-**DNF** is `StageRun.retired` (`POST /stage-runs/:id/retire`, undone by
-`/unretire`), only on an open run. The run reads `CANCELLED`, leaves On stage
+**DNF** is `StageRun.dnf` (`POST /stage-runs/:id/dnf`, undone by
+`/dnf/undo`), only on an open run. The run reads `DNF`, leaves On stage
 and the live split ranking, and is listed among the stage's non-finishers at
 once; in the overall it costs the notional time like any missing finish. It
 still counts, so a counted stage refuses a restart. A finish passing after
 it is stored as evidence and times nothing; a finish entered by Correct
 clears it, being the marshal's explicit call. On a shakedown DNF only ends
-the open run: the car may start again (the open-run index skips retired
+the open run: the car may start again (the open-run index skips DNF
 runs), and undoing the old DNF then 409s like unvoid.
 
 **DNS** is a `DidNotStart` row `(entryId, stageId)` (`POST /stage-runs/dns`,
@@ -383,7 +383,7 @@ What each one does (`isOutOfEvent`, `isScrutineered` in `packages/shared`):
   `ClassificationService`). A stage it drove lists it among the
   non-finishers as **DSQ**, whether the stage still runs or not. Its runs
   stay stored; reinstating brings it back.
-- **Withdrawn** is retired: it won't drive again ("can't go on", "out of
+- **Withdrawn** is dnf: it won't drive again ("can't go on", "out of
   time"). It keeps the times it drove in each stage's results, but leaves
   the overall, listed below it as not classified, and collects no notional
   times. Its real times still anchor the others' notionals, so a withdrawal

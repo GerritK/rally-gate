@@ -20,7 +20,7 @@ export interface StageRun {
   /** Struck out by a marshal (red flag) — kept as evidence, counts for nothing. */
   voided: boolean;
   /** DNF on this stage: by a marshal, or the stage closed with it open. */
-  retired: boolean;
+  dnf: boolean;
   /** Hand-set (Start now / Finish now / a correction) rather than gate-timed. */
   startManual: boolean;
   finishManual: boolean;
@@ -118,13 +118,13 @@ export function unvoidStageRun(id: string): Promise<StageRun> {
 }
 
 /** DNF on the stage, at once. */
-export function retireStageRun(id: string): Promise<StageRun> {
-  return postRequest(`/stage-runs/${id}/retire`);
+export function markDnf(id: string): Promise<StageRun> {
+  return postRequest(`/stage-runs/${id}/dnf`);
 }
 
 /** Until the stage closes. */
-export function unretireStageRun(id: string): Promise<StageRun> {
-  return postRequest(`/stage-runs/${id}/unretire`);
+export function undoDnf(id: string): Promise<StageRun> {
+  return postRequest(`/stage-runs/${id}/dnf/undo`);
 }
 
 /** DNS rows, of one stage or all. */

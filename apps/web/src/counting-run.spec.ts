@@ -33,7 +33,7 @@ test('a DNF stays when it is all there is', () => {
   const dnf = {
     id: 'dnf',
     voided: false,
-    status: StageRunStatus.CANCELLED,
+    status: StageRunStatus.DNF,
     durationMs: null,
   };
   assert.equal(countingRun([dnf])?.id, 'dnf');

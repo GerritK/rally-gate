@@ -13,8 +13,8 @@ export enum ChangeAction {
   RUN_RESTORED = 'RUN_RESTORED',
   RUN_DELETED = 'RUN_DELETED',
   /** DNF on the stage, and its undo. */
-  RUN_RETIRED = 'RUN_RETIRED',
-  RUN_UNRETIRED = 'RUN_UNRETIRED',
+  DNF_MARKED = 'DNF_MARKED',
+  DNF_UNDONE = 'DNF_UNDONE',
   /** DNS on the stage, and its undo: no run, so no snapshot. */
   DNS_MARKED = 'DNS_MARKED',
   DNS_UNDONE = 'DNS_UNDONE',

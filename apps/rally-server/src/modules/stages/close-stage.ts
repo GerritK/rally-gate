@@ -20,7 +20,7 @@ export async function writeClose(manager: EntityManager, stage: Stage) {
     where: {
       stageId: stage.id,
       voided: false,
-      retired: false,
+      dnf: false,
       finishTime: IsNull(),
     },
   });
@@ -35,12 +35,12 @@ export async function writeClose(manager: EntityManager, stage: Stage) {
   const unstarted = open.filter(
     (run) => isUntouchedSlot(run) && !withSplits.has(run.id),
   );
-  const retired = open.filter((run) => !unstarted.includes(run));
-  if (retired.length > 0) {
+  const dnf = open.filter((run) => !unstarted.includes(run));
+  if (dnf.length > 0) {
     await manager.update(
       StageRun,
-      { id: In(retired.map((run) => run.id)) },
-      { retired: true },
+      { id: In(dnf.map((run) => run.id)) },
+      { dnf: true },
     );
   }
   if (unstarted.length > 0) {
@@ -61,5 +61,5 @@ export async function writeClose(manager: EntityManager, stage: Stage) {
       .map((entry) => ({ entryId: entry.id, stageId: stage.id }));
     if (dns.length > 0) await manager.insert(DidNotStart, dns);
   }
-  return { saved, retired, unstarted, dns };
+  return { saved, dnf, unstarted, dns };
 }

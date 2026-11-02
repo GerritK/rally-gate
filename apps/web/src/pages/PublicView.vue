@@ -73,11 +73,11 @@ const STATE_DISPLAY = {
     color: runStatusColor(StageRunStatus.FINISHED),
     icon: 'mdi-flag-checkered',
   },
-  [StageRunStatus.CANCELLED]: {
+  [StageRunStatus.DNF]: {
     get label() {
       return t('rowState.dnf');
     },
-    color: runStatusColor(StageRunStatus.CANCELLED),
+    color: runStatusColor(StageRunStatus.DNF),
     icon: 'mdi-close',
   },
   dns: {
@@ -105,7 +105,7 @@ const rows = computed(() =>
       ? 'waiting'
       : run?.status === StageRunStatus.STARTED ||
           run?.status === StageRunStatus.FINISHED ||
-          run?.status === StageRunStatus.CANCELLED
+          run?.status === StageRunStatus.DNF
         ? run.status
         : dnsIds.value.includes(starter.entryId)
           ? 'dns'

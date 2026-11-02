@@ -62,9 +62,9 @@ import {
   fetchStageRuns,
   fetchDns,
   markDns,
-  retireStageRun,
+  markDnf,
   undoDns,
-  unretireStageRun,
+  undoDnf,
   unvoidStageRun,
   voidStageRun,
   type StageRun,
@@ -225,7 +225,7 @@ const ROW_STATE_DISPLAY: Record<
     get label() {
       return t('rowState.dnf');
     },
-    color: runStatusColor(StageRunStatus.CANCELLED),
+    color: runStatusColor(StageRunStatus.DNF),
     icon: 'mdi-close',
   },
   DNS: {
@@ -284,7 +284,7 @@ const rows = computed<Row[]>(() => {
         : 'SLOTTED';
     } else if (run?.status === StageRunStatus.STARTED) state = 'ON_STAGE';
     else if (run?.status === StageRunStatus.FINISHED) state = 'FINISHED';
-    else if (run?.status === StageRunStatus.CANCELLED) state = 'DNF';
+    else if (run?.status === StageRunStatus.DNF) state = 'DNF';
     else if (entry && isOutOfEvent(entry.status)) state = 'OUT';
     else if (dnsIds.value.includes(starter.entryId)) state = 'DNS';
     else if (voidedRuns.length > 0 && !closed) state = 'RERUN';
@@ -860,7 +860,7 @@ function startNumberOf(entryId: string): number | undefined {
   return entryById.value.get(entryId)?.startNumber;
 }
 
-async function onRetire(run: StageRun) {
+async function onMarkDnf(run: StageRun) {
   const number = startNumberOf(run.entryId);
   if (
     !(await confirm({
@@ -870,11 +870,11 @@ async function onRetire(run: StageRun) {
     }))
   )
     return;
-  upsertStageRun(await retireStageRun(run.id));
+  upsertStageRun(await markDnf(run.id));
 }
 
-async function onUnretire(run: StageRun) {
-  upsertStageRun(await unretireStageRun(run.id));
+async function onUndoDnf(run: StageRun) {
+  upsertStageRun(await undoDnf(run.id));
 }
 
 function applyDns({ entryId, stageId, dns }: DidNotStart & { dns: boolean }) {
@@ -1562,7 +1562,7 @@ onUnmounted(() => {
                     <v-list-item
                       prepend-icon="mdi-close"
                       :title="$t('live.markDnf')"
-                      @click="onRetire(car.run)"
+                      @click="onMarkDnf(car.run)"
                     />
                   </v-list>
                 </v-menu>
@@ -1814,13 +1814,13 @@ onUnmounted(() => {
                     v-if="canDnfDns && row.state === 'ON_STAGE'"
                     prepend-icon="mdi-close"
                     :title="$t('live.markDnf')"
-                    @click="onRetire(row.run!)"
+                    @click="onMarkDnf(row.run!)"
                   />
                   <v-list-item
                     v-if="canDnfDns && row.state === 'DNF'"
                     prepend-icon="mdi-undo"
                     :title="$t('live.undoDnf')"
-                    @click="onUnretire(row.run!)"
+                    @click="onUndoDnf(row.run!)"
                   />
                   <v-list-item
                     v-if="can('voidRun')"
