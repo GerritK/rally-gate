@@ -468,6 +468,7 @@ onUnmounted(() => {
               <GateClockChips
                 :gate="gate"
                 :correction-threshold-ms="clockCorrectionThresholdMs"
+                combined
               />
             </td>
             <td class="text-no-wrap text-right rg-actions">
