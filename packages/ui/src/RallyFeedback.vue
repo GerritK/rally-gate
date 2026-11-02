@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { notice, pendingConfirm } from './feedback';
+import { notice, pendingConfirm, type Choice } from './feedback';
 
-function answer(ok: boolean) {
-  pendingConfirm.value?.resolve(ok);
+function answer(choice: Choice) {
+  pendingConfirm.value?.resolve(choice);
   pendingConfirm.value = null;
 }
 
@@ -15,7 +15,7 @@ function dismiss() {
   <v-dialog
     :model-value="!!pendingConfirm"
     max-width="480"
-    @update:model-value="answer(false)"
+    @update:model-value="answer(null)"
   >
     <v-card v-if="pendingConfirm">
       <v-card-title>{{ pendingConfirm.options.title }}</v-card-title>
@@ -24,12 +24,20 @@ function dismiss() {
       </v-card-text>
       <v-card-actions>
         <v-spacer />
-        <v-btn variant="text" @click="answer(false)">{{
+        <v-btn variant="text" @click="answer(null)">{{
           $t('ui.cancel')
         }}</v-btn>
         <v-btn
+          v-if="pendingConfirm.options.alternativeText"
+          variant="text"
+          color="error"
+          @click="answer('alternative')"
+        >
+          {{ pendingConfirm.options.alternativeText }}
+        </v-btn>
+        <v-btn
           :color="pendingConfirm.options.color ?? 'primary'"
-          @click="answer(true)"
+          @click="answer('confirm')"
         >
           {{ pendingConfirm.options.confirmText }}
         </v-btn>

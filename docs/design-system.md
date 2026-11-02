@@ -288,7 +288,8 @@ Values live in `theme.ts`. The rules:
   click undoes doesn't ask.
 - **One destructive entry per menu.** Variants of one intent (void a run,
   or delete it) are one entry whose dialog explains each and offers them as
-  its buttons, the one that keeps more as the primary: two red entries
+  its buttons, the one that keeps more as the primary (Live Timing's
+  "Remove attempt…": Void, or Delete for good): two red entries
   side by side, told apart only in their dialogs, get mixed up mid-event.
 - **Time-critical actions never ask:** Start now, Finish now. A dialog would
   add to the reaction time already in the hand time; a slip is fixed with
@@ -303,7 +304,8 @@ Values live in `theme.ts`. The rules:
   (see Editing).
 - **Shared dialogs wherever possible:** one confirmation dialog for both
   apps (`useConfirm()` from `packages/ui`, rendered by `RallyFeedback` once
-  in each `App.vue`), not a hand-built `v-dialog` per page.
+  in each `App.vue`; `useChoice()` adds the second variant as a red text
+  button), not a hand-built `v-dialog` per page.
 - **The confirm button names the action** ("Delete class", "Close stage"),
   never "OK". Cancel on the left, the action on the right.
 - **Errors don't get a dialog.** An error from a form shows inside it

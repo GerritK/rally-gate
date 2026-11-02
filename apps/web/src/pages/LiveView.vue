@@ -96,6 +96,7 @@ import {
   formatStageDuration,
   parseStageDuration,
   t,
+  useChoice,
   useConfirm,
 } from '@rally-gate/ui';
 import { carriersOf, suggestEntries } from '../passing-suggestions';
@@ -134,6 +135,7 @@ const retryingPending = ref(false);
 const activatingStage = ref(false);
 const closingStage = ref(false);
 const confirm = useConfirm();
+const choose = useChoice();
 const stagesLoaded = ref(false);
 const jumpStartToleranceMs = ref(DEFAULT_JUMP_START_TOLERANCE_MS);
 const jumpStartPenaltyTypeId = ref<string | null>(null);
@@ -815,20 +817,19 @@ const correctionDialog = ref<InstanceType<typeof RunCorrectionDialog> | null>(
 );
 const penaltyDialog = ref<InstanceType<typeof PenaltyDialog> | null>(null);
 
-async function onVoidRun(run: StageRun) {
-  if (
-    !(await confirm({
-      title: t('live.voidTitle', {
-        entry: entryName(entries.value, run.entryId),
-        attempt: run.attempt,
-      }),
-      text: t('live.voidText'),
-      confirmText: t('live.voidConfirm'),
-      color: 'error',
-    }))
-  )
-    return;
-  upsertStageRun(await voidStageRun(run.id));
+/** Void and delete in one dialog, void first: it keeps the evidence. */
+async function onRemoveRun(run: StageRun) {
+  const choice = await choose({
+    title: t('live.removeRunTitle', {
+      entry: entryName(entries.value, run.entryId),
+      attempt: run.attempt,
+    }),
+    text: t('live.removeRunText'),
+    confirmText: t('live.voidConfirm'),
+    alternativeText: t('live.deleteForGood'),
+  });
+  if (choice === 'confirm') upsertStageRun(await voidStageRun(run.id));
+  if (choice === 'alternative') await deleteRun(run);
 }
 
 /** The server's 409 names the attempt to void first; surfaced as-is. */
@@ -919,6 +920,10 @@ async function onDeleteRun(run: StageRun) {
     }))
   )
     return;
+  await deleteRun(run);
+}
+
+async function deleteRun(run: StageRun) {
   await deleteStageRun(run.id);
   stageRuns.value = stageRuns.value.filter((r) => r.id !== run.id);
   delete splitsByRun.value[run.id];
@@ -1820,15 +1825,9 @@ onUnmounted(() => {
                   <v-list-item
                     v-if="can('voidRun')"
                     prepend-icon="mdi-cancel"
-                    :title="$t('live.voidAttempt')"
-                    @click="onVoidRun(row.run!)"
-                  />
-                  <v-list-item
-                    v-if="can('voidRun')"
-                    prepend-icon="mdi-delete"
-                    :title="$t('live.deleteRun')"
+                    :title="$t('live.removeRun')"
                     base-color="error"
-                    @click="onDeleteRun(row.run!)"
+                    @click="onRemoveRun(row.run!)"
                   />
                 </v-list>
               </v-menu>

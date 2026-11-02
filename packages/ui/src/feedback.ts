@@ -8,7 +8,11 @@ export interface ConfirmOptions {
   confirmText: string;
   /** Red for a delete or an abort; orange otherwise. */
   color?: 'error' | 'primary' | 'success';
+  /** A second way to do it, as a red text button: the one that keeps less. */
+  alternativeText?: string;
 }
+
+export type Choice = 'confirm' | 'alternative' | null;
 
 export interface Notice {
   text: string;
@@ -18,16 +22,26 @@ export interface Notice {
 /** Module state: one dialog and one snackbar per app, both in `RallyFeedback`. */
 export const pendingConfirm = shallowRef<{
   options: ConfirmOptions;
-  resolve: (ok: boolean) => void;
+  resolve: (choice: Choice) => void;
 } | null>(null);
 export const notice = shallowRef<Notice | null>(null);
 
+function ask(options: ConfirmOptions) {
+  return new Promise<Choice>((resolve) => {
+    pendingConfirm.value?.resolve(null);
+    pendingConfirm.value = { options, resolve };
+  });
+}
+
 export function useConfirm() {
-  return (options: ConfirmOptions) =>
-    new Promise<boolean>((resolve) => {
-      pendingConfirm.value?.resolve(false);
-      pendingConfirm.value = { options, resolve };
-    });
+  return async (options: Omit<ConfirmOptions, 'alternativeText'>) =>
+    (await ask(options)) === 'confirm';
+}
+
+/** Two variants of one intent in one dialog (`docs/design-system.md` "Confirmations"). */
+export function useChoice() {
+  return (options: ConfirmOptions & { alternativeText: string }) =>
+    ask(options);
 }
 
 /** `error` for a failure reported as text, e.g. a command's output. */
