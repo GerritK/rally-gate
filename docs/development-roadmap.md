@@ -82,9 +82,6 @@ One line each; the linked doc has the detail. History is in git.
      bound anything once gate-config or gate-agent runs foreign code. Fix: a
      system user (`useradd --system --groups gpio,plugdev rally-gate`) as
      `User=` of both units, owning `/etc/rally-gate`.
-  2. *From the 11th open dashboard* the console shows `possible EventEmitter
-     memory leak detected` (EventEmitter2 allows 10 listeners per event).
-     Fix: `EventEmitterModule.forRoot({ maxListeners: 100 })`.
   3. *A correction across midnight is refused:* start 23:58, finish typed as
      00:03:10 lands on the start's day, before the start (entering the stage
      time works). Fix: in `combineDateAndTime` callers, add a day when the

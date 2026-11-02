@@ -23,7 +23,7 @@ import { EntriesModule } from './modules/entries/entries.module';
 
 @Module({
   imports: [
-    EventEmitterModule.forRoot(),
+    EventEmitterModule.forRoot({ maxListeners: 100 }),
     TypeOrmModule.forRoot(buildDatabaseConfig()),
     // First, so its guard answers 401 before RallyLockGuard answers 409.
     AuthModule,
