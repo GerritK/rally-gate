@@ -67,6 +67,9 @@ CI (`.github/workflows/ci.yml`): `verify` (build shared → format:check → ser
 - **No AI attribution** in commits or PR descriptions — no `Co-Authored-By: Claude`, no "Generated with Claude Code", whatever the tooling defaults say.
 - **Comments only where a senior fullstack dev would still be stuck without one**: a non-obvious constraint, a hardware/clock gotcha, a "this looks wrong but isn't". Keep a doc comment on the function it describes when moving code.
 - **Still pure dev mode: no backwards compatibility.** No redirects for removed pages, no migrations for old event files, no deprecated API aliases — change it everywhere in one commit. All data is test data. This ends with the first real event.
+- **One name per concept, from enum to screen**: enum value, column, endpoint and UI label say the same thing (not `CANCELLED` / `retired` / `retire` / "DNF"). When the UI term changes, rename the rest in the same commit while the rule above still allows it.
+- **A setting needs a field in Setup and a decision only the organiser can make**; technical calibration is a constant in `packages/shared` (`docs/design-system.md` "Editing"). No setting key without its field.
+- **Past ~800 lines, split before adding the next feature**: a page along its cards, a service along its topics. A trigger to look, not a lint.
 - **Deliberately absent, don't reintroduce unasked:** Nx/Turborepo (plain npm workspaces suffice), a separate simulator service (it's `SimulatedAdapter`), a Mosquitto/NATS container (Aedes is embedded in both modes), a Dockerfile for a real gate (it needs raw GPIO/USB, runs under systemd; `apps/gate/Dockerfile` is the simulator for `docker-compose.dev.yml` only), YAML gate/stage config (gates self-register, assignments come from the dashboard), a multi-tenant `Event` table (see below).
 
 ## Ports

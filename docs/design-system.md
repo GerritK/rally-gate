@@ -156,6 +156,10 @@ Values live in `theme.ts`. The rules:
   stripe on the left, lightly tinted, the fields neutral). A card that appears and disappears pushes everything
   below it around mid-event; tinting a whole card made its fields hard to
   read.
+- **One signal per question in a list row**; the parts behind it are on the
+  detail page. Two chips answering "is this gate's clock fine?" (measured
+  offset, chrony) make the marshal combine them in their head: the row
+  shows the worse of the two, the gate's page shows both.
 - **Counts, not filters**, for a status overview: "2 On stage · 3 Waiting"
   as chips. The table stays complete and in start order.
 - **The live connection** shows in the app bar: Live / Connecting / Offline,
@@ -201,6 +205,15 @@ Values live in `theme.ts`. The rules:
 - **After saving**, a dialog closes; a detail page stays open. Both confirm
   with a short snackbar.
 - **Keyboard:** Enter saves, Esc cancels (asking first if there are changes).
+- **A setting sits with its topic**, where an organiser would look for it,
+  not on the page of the feature that brought it in: everything about a
+  jump start (tolerance, penalty) on one card. A setting that doesn't fit
+  its page's name is on the wrong page.
+- **A setting is a decision the organiser makes, with a field in Setup.**
+  A technical calibration (clock tolerances, a beam's edge, when a clock
+  gets corrected) is a constant in `packages/shared`, not a setting: nobody
+  at a rally can judge it, and a key without a field is flexibility no one
+  can use.
 - **Every input field looks alike**, typed or picked: text fields,
   selects, comboboxes and autocompletes are all outlined and the same
   height (`comfortable`), set once in `packages/ui` `vuetify.ts`. Vuetify's
@@ -273,6 +286,10 @@ Values live in `theme.ts`. The rules:
   car leaves every result, the cars behind move up), Freeze or Activate with
   cars not yet scrutineered (named by number). A status change that one
   click undoes doesn't ask.
+- **One destructive entry per menu.** Variants of one intent (void a run,
+  or delete it) are one entry whose dialog explains each and offers them as
+  its buttons, the one that keeps more as the primary: two red entries
+  side by side, told apart only in their dialogs, get mixed up mid-event.
 - **Time-critical actions never ask:** Start now, Finish now. A dialog would
   add to the reaction time already in the hand time; a slip is fixed with
   Correct.

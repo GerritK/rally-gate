@@ -9,6 +9,10 @@
   rather than adding another install prompt.
 - **The laptop comes first.** Standalone is the primary mode
   (`deployment-modes.md`); a server on a Pi is supported, not prioritised.
+- **A small known bug isn't parked here.** What a few lines fix is fixed
+  when found; a timing error never waits in a list. Before every release
+  tag, go through Next and look for what has grown double or contradictory
+  since the last one.
 
 ## Built
 
