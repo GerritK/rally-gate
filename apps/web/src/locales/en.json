@@ -310,7 +310,8 @@
     "locationOptional": "Location (optional)",
     "stagesHint": "Create stages and assign gates to them.",
     "classesHint": "Main classes and categories results can be split by.",
-    "startOrderHint": "Who starts when on each stage.",
+    "start": "Start",
+    "startHint": "Start order, countdown and jump starts.",
     "scoring": "Scoring",
     "scoringHint": "Notional times for stages not finished, and the penalty catalogue.",
     "displayHint": "Crew names, flags and the podium.",
@@ -352,9 +353,7 @@
     "notionalTime": "notional time",
     "ruleOfThumb": "Rule of thumb: set it to roughly {oneStage}. The penalty only has to be big enough to outweigh the advantage a crew built on the stages it did finish — set it too low and a quick car can retire and still lead the rally.",
     "oneStage": "one stage duration",
-    "penaltyLabel": "Notional time penalty",
-    "jumpStartPenalty": "Penalty for a jump start",
-    "jumpStartNone": "None, only mark it"
+    "penaltyLabel": "Notional time penalty"
   },
   "penalties": {
     "penalties": "Penalties",
@@ -813,7 +812,7 @@
     "jumpStartEarly": "{time} before the slot",
     "givePenalty": "Give jump-start penalty",
     "dismissJumpStart": "No penalty",
-    "title": "Start countdown",
+    "title": "Start times & jump starts",
     "explain": "For stages that start by countdown (Setup → Stages → start mode).",
     "countdown": "Countdown",
     "countdownHint": "Shown before every start; the start lights are always its last 5 seconds.",
@@ -825,6 +824,9 @@
     "wholeRule": "A whole number, at least {min}",
     "seconds": "s",
     "milliseconds": "ms",
+    "jumpStartPenalty": "Penalty for a jump start",
+    "jumpStartNone": "None, only mark it",
+    "managePenalties": "Manage penalties",
     "saved": "Countdown settings saved"
   },
   "startMode": {

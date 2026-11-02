@@ -5,6 +5,7 @@ import {
   DEFAULT_COUNTDOWN_MS,
   DEFAULT_JUMP_START_TOLERANCE_MS,
   DEFAULT_MIN_START_GAP_MS,
+  JUMP_START_PENALTY_TYPE_ID_KEY,
   JUMP_START_TOLERANCE_MS_KEY,
   MIN_START_GAP_MS_KEY,
   START_ORDER_DIRECTION_KEY,
@@ -17,6 +18,7 @@ import {
 } from '@rally-gate/shared';
 import { computed, onMounted, ref } from 'vue';
 import { fetchSetting, saveSetting } from '../api/settings';
+import { fetchPenaltyTypes, type PenaltyType } from '../api/penalties';
 import { lockedWhen } from '../api/rally-info';
 import RallyLockAlert from '../components/RallyLockAlert.vue';
 import { useUnsavedChanges } from '../unsaved-changes';
@@ -55,12 +57,20 @@ const toleranceLocked = lockedWhen(RallyStatus.RUNNING, RallyStatus.CLOSED);
 const countdownS = ref(DEFAULT_COUNTDOWN_MS / 1000);
 const toleranceMs = ref(DEFAULT_JUMP_START_TOLERANCE_MS);
 const gapS = ref(DEFAULT_MIN_START_GAP_MS / 1000);
+const penaltyTypes = ref<PenaltyType[]>([]);
+/** '' is none: v-select can't offer null. A jump start is then only marked. */
+const jumpStartTypeId = ref('');
+const jumpStartItems = computed(() => [
+  { value: '', title: t('countdown.jumpStartNone') },
+  ...penaltyTypes.value.map((type) => ({ value: type.id, title: type.name })),
+]);
 const savingCountdown = ref(false);
 const countdownForm = ref<{ validate: () => Promise<{ valid: boolean }> }>();
 const { markSaved: markCountdownSaved } = useUnsavedChanges(() => [
   countdownS.value,
   toleranceMs.value,
   gapS.value,
+  jumpStartTypeId.value,
 ]);
 
 /** The start lights are always the countdown's last 5 s. */
@@ -82,6 +92,7 @@ async function onSaveCountdown() {
             saveSetting(JUMP_START_TOLERANCE_MS_KEY, String(toleranceMs.value)),
           ]),
       saveSetting(MIN_START_GAP_MS_KEY, String(gapS.value * 1000)),
+      saveSetting(JUMP_START_PENALTY_TYPE_ID_KEY, jumpStartTypeId.value),
     ]);
     markCountdownSaved();
     notify(t('countdown.saved'));
@@ -118,17 +129,24 @@ async function onSave() {
 }
 
 onMounted(async () => {
-  const [g, k, d, c, tol, gap] = await Promise.all([
+  const [g, k, d, c, tol, gap, types, jumpType] = await Promise.all([
     fetchSetting(START_ORDER_GROUPING_KEY),
     fetchSetting(START_ORDER_KEY_KEY),
     fetchSetting(START_ORDER_DIRECTION_KEY),
     fetchSetting(COUNTDOWN_MS_KEY),
     fetchSetting(JUMP_START_TOLERANCE_MS_KEY),
     fetchSetting(MIN_START_GAP_MS_KEY),
+    fetchPenaltyTypes(),
+    fetchSetting(JUMP_START_PENALTY_TYPE_ID_KEY),
   ]);
   if (c) countdownS.value = Number(c) / 1000;
   if (tol) toleranceMs.value = Number(tol);
   if (gap) gapS.value = Number(gap) / 1000;
+  penaltyTypes.value = types;
+  // A deleted type falls back to none rather than a dangling id.
+  jumpStartTypeId.value = types.some((type) => type.id === jumpType)
+    ? jumpType!
+    : '';
   markCountdownSaved();
   grouping.value = (g ?? grouping.value) as StartOrderGrouping;
   key.value = (k ?? key.value) as StartOrderKey;
@@ -254,6 +272,22 @@ onMounted(async () => {
           class="rg-timing"
           style="max-width: 420px"
         />
+        <div>
+          <v-select
+            v-model="jumpStartTypeId"
+            :items="jumpStartItems"
+            :label="$t('countdown.jumpStartPenalty')"
+            :disabled="countdownLocked"
+            hide-details
+            style="max-width: 420px"
+          />
+          <router-link
+            to="/setup/scoring"
+            class="rg-link text-body-2 d-inline-block mt-2"
+          >
+            {{ $t('countdown.managePenalties') }}
+          </router-link>
+        </div>
         <div>
           <v-btn
             v-if="can('setup')"

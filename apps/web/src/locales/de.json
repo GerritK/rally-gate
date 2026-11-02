@@ -310,7 +310,8 @@
     "locationOptional": "Ort (optional)",
     "stagesHint": "WPs anlegen und ihnen Gates zuordnen.",
     "classesHint": "Hauptklassen und Kategorien, nach denen Ergebnisse aufgeteilt werden können.",
-    "startOrderHint": "Wer auf jeder WP wann startet.",
+    "start": "Start",
+    "startHint": "Startreihenfolge, Countdown und Frühstarts.",
     "scoring": "Wertung",
     "scoringHint": "Ersatzzeiten für nicht beendete WPs und der Strafenkatalog.",
     "displayHint": "Teamnamen, Flaggen und das Podium.",
@@ -352,9 +353,7 @@
     "notionalTime": "Ersatzzeit",
     "ruleOfThumb": "Faustregel: ungefähr {oneStage}. Die Strafzeit muss nur den Vorsprung aufwiegen, den ein Team auf den beendeten WPs herausgefahren hat — ist sie zu niedrig, kann ein schnelles Auto ausfallen und trotzdem die Rallye anführen.",
     "oneStage": "die Dauer einer WP",
-    "penaltyLabel": "Strafzeit für Ersatzzeiten",
-    "jumpStartPenalty": "Strafe für einen Frühstart",
-    "jumpStartNone": "Keine, nur markieren"
+    "penaltyLabel": "Strafzeit für Ersatzzeiten"
   },
   "penalties": {
     "penalties": "Strafen",
@@ -813,7 +812,7 @@
     "jumpStartEarly": "{time} vor dem Slot",
     "givePenalty": "Frühstart-Strafe geben",
     "dismissJumpStart": "Keine Strafe",
-    "title": "Start-Countdown",
+    "title": "Startzeiten & Frühstart",
     "explain": "Für Prüfungen, die per Countdown starten (Einrichtung → Prüfungen → Startart).",
     "countdown": "Countdown",
     "countdownHint": "Läuft vor jedem Start; die Startampel sind immer die letzten 5 Sekunden.",
@@ -825,6 +824,9 @@
     "wholeRule": "Eine ganze Zahl, mindestens {min}",
     "seconds": "s",
     "milliseconds": "ms",
+    "jumpStartPenalty": "Strafe für einen Frühstart",
+    "jumpStartNone": "Keine, nur markieren",
+    "managePenalties": "Strafen verwalten",
     "saved": "Countdown-Einstellungen gespeichert"
   },
   "startMode": {

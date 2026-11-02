@@ -1382,8 +1382,8 @@ onUnmounted(() => {
             <strong>{{ $t('live.freezeWhenPosted') }}</strong>
           </template>
           <template #link>
-            <router-link to="/setup/start-order" class="rg-link"
-              >{{ $t('nav.setup') }} → {{ $t('startOrder.title') }}</router-link
+            <router-link to="/setup/start" class="rg-link"
+              >{{ $t('nav.setup') }} → {{ $t('setup.start') }}</router-link
             >
           </template>
         </i18n-t>

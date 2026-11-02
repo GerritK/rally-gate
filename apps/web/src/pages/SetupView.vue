@@ -344,11 +344,11 @@ onMounted(async () => {
     <v-col cols="12" sm="4">
       <v-card
         class="h-100"
-        to="/setup/start-order"
+        to="/setup/start"
         prepend-icon="mdi-sort-numeric-ascending"
       >
-        <v-card-title>{{ $t('startOrder.title') }}</v-card-title>
-        <v-card-text>{{ $t('setup.startOrderHint') }}</v-card-text>
+        <v-card-title>{{ $t('setup.start') }}</v-card-title>
+        <v-card-text>{{ $t('setup.startHint') }}</v-card-text>
       </v-card>
     </v-col>
     <v-col cols="12" sm="4">

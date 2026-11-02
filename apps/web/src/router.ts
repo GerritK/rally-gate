@@ -44,8 +44,8 @@ export const router = createRouter({
       component: () => import('./pages/SetupClassesView.vue'),
     },
     {
-      path: '/setup/start-order',
-      component: () => import('./pages/SetupStartOrderView.vue'),
+      path: '/setup/start',
+      component: () => import('./pages/SetupStartView.vue'),
     },
     {
       path: '/setup/scoring',
