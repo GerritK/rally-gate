@@ -14,6 +14,7 @@ import {
   type StageRun,
 } from '../api/stage-runs';
 import { combineDateAndTime, entryName, required } from '../format';
+import { finishAfter, startBefore } from '../midnight';
 import FormDialog from './FormDialog.vue';
 
 /**
@@ -90,9 +91,9 @@ function stageTimeRule(value: string) {
  * the field was changed. */
 function startIso(run: StageRun): string {
   const { start } = correction.value;
-  return start === formatClockTime(run.startTime)
-    ? run.startTime
-    : combineDateAndTime(run.startTime, start);
+  if (start === formatClockTime(run.startTime)) return run.startTime;
+  const typed = combineDateAndTime(run.startTime, start);
+  return run.finishTime ? startBefore(run.finishTime, typed) : typed;
 }
 
 /** The finish (correcting) or start (entering) a changed stage time gives,
@@ -130,7 +131,9 @@ async function onSave() {
       await createStageRun({
         entryId,
         stageId: props.stageId,
-        startTime: derivedIso.value ?? combineDateAndTime(finishTime, start),
+        startTime:
+          derivedIso.value ??
+          startBefore(finishTime, combineDateAndTime(finishTime, start)),
         finishTime,
       }),
     );
@@ -146,7 +149,10 @@ async function onSave() {
     patch.finishTime = derivedIso.value;
   } else if ((finish || '') !== formatClockTime(run.finishTime)) {
     patch.finishTime = finish
-      ? combineDateAndTime(run.finishTime ?? run.startTime, finish)
+      ? finishAfter(
+          startIso(run),
+          combineDateAndTime(run.finishTime ?? run.startTime, finish),
+        )
       : null;
   }
   if (Object.keys(patch).length === 0) return;

@@ -82,10 +82,6 @@ One line each; the linked doc has the detail. History is in git.
      bound anything once gate-config or gate-agent runs foreign code. Fix: a
      system user (`useradd --system --groups gpio,plugdev rally-gate`) as
      `User=` of both units, owning `/etc/rally-gate`.
-  3. *A correction across midnight is refused:* start 23:58, finish typed as
-     00:03:10 lands on the start's day, before the start (entering the stage
-     time works). Fix: in `combineDateAndTime` callers, add a day when the
-     finish isn't after the start; test in `format.spec.ts`.
 
 - **Class and category badges in rankings** ("2WD · Rookie") on Results
   and the PDFs: only the classes the current filter doesn't already imply
