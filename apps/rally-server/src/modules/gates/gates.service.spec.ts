@@ -1,9 +1,7 @@
-import { DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS } from '@rally-gate/shared';
 import { GatesService, measureClockOffsetMs } from './gates.service';
 
 function makeService(opts: {
   existingGate?: unknown;
-  clockCorrectionThresholdMs?: number;
   removeAllForGate?: () => Promise<void>;
   allGates?: unknown[];
   hasActiveStage?: boolean;
@@ -15,14 +13,6 @@ function makeService(opts: {
     delete: jest.fn().mockResolvedValue(undefined),
     find: jest.fn().mockResolvedValue(opts.allGates ?? []),
   };
-  const settingsService = {
-    getNumber: jest
-      .fn()
-      .mockResolvedValue(
-        opts.clockCorrectionThresholdMs ??
-          DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS,
-      ),
-  };
   const emitter = { emit: jest.fn() };
   const gateAssignmentsService = {
     removeAllForGate: jest
@@ -33,7 +23,6 @@ function makeService(opts: {
   return {
     service: new GatesService(
       gates as never,
-      settingsService as never,
       emitter as never,
       gateAssignmentsService as never,
       {
@@ -138,44 +127,32 @@ describe('GatesService.clockCorrectionMsFor', () => {
   const gateWith = (clockOffsetMs?: number | null) =>
     ({ id: 'GATE1', name: 'GATE1', clockOffsetMs }) as never;
 
-  it('applies an offset that clears the threshold', async () => {
+  it('applies an offset that clears the threshold', () => {
     const { service } = makeService({});
 
-    await expect(service.clockCorrectionMsFor(gateWith(4_000))).resolves.toBe(
-      4_000,
-    );
+    expect(service.clockCorrectionMsFor(gateWith(4_000))).toBe(4_000);
   });
 
-  it('applies a negative offset that clears the threshold', async () => {
+  it('applies a negative offset that clears the threshold', () => {
     const { service } = makeService({});
 
-    await expect(service.clockCorrectionMsFor(gateWith(-4_000))).resolves.toBe(
-      -4_000,
-    );
+    expect(service.clockCorrectionMsFor(gateWith(-4_000))).toBe(-4_000);
   });
 
-  it('ignores an offset inside the deadband', async () => {
+  it('ignores an offset inside the deadband', () => {
     // 40ms is indistinguishable from transit time in a one-way measurement,
     // so "correcting" it would inject network jitter into a clock that may
     // be perfectly synced.
     const { service } = makeService({});
 
-    await expect(service.clockCorrectionMsFor(gateWith(40))).resolves.toBe(0);
+    expect(service.clockCorrectionMsFor(gateWith(40))).toBe(0);
   });
 
-  it('never corrects a gate that has no measurement yet', async () => {
+  it('never corrects a gate that has no measurement yet', () => {
     const { service } = makeService({});
 
-    await expect(service.clockCorrectionMsFor(gateWith(null))).resolves.toBe(0);
-    await expect(
-      service.clockCorrectionMsFor(gateWith(undefined)),
-    ).resolves.toBe(0);
-  });
-
-  it('honours a site-tuned threshold from settings', async () => {
-    const { service } = makeService({ clockCorrectionThresholdMs: 25 });
-
-    await expect(service.clockCorrectionMsFor(gateWith(40))).resolves.toBe(40);
+    expect(service.clockCorrectionMsFor(gateWith(null))).toBe(0);
+    expect(service.clockCorrectionMsFor(gateWith(undefined))).toBe(0);
   });
 });
 

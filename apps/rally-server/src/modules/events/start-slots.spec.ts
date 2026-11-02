@@ -108,7 +108,7 @@ describe('start paths', () => {
       {
         findOne: (id: string) =>
           Promise.resolve(roles[id] ? { id, name: id } : null),
-        clockCorrectionMsFor: () => Promise.resolve(0),
+        clockCorrectionMsFor: () => 0,
       } as never,
       {
         findActiveForGate: (id: string) =>

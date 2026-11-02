@@ -14,7 +14,6 @@ import {
   type Gate,
 } from '../api/gates';
 import { closeLiveStream, openLiveStream, upsert } from '../api/live';
-import { fetchClockCorrectionThresholdMs } from '../api/settings';
 import { fetchStages, type Stage } from '../api/stages';
 import { fetchEntries, type Entry } from '../api/entries';
 import { serverNow } from '../api/time';
@@ -31,7 +30,6 @@ import {
   STAGE_STATUS_DISPLAY,
   entryName,
 } from '../format';
-import { DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS } from '@rally-gate/shared';
 import { useRouter } from 'vue-router';
 
 const props = defineProps<{ gateId: string }>();
@@ -79,7 +77,6 @@ const assignments = ref<GateAssignment[]>([]);
 const stages = ref<Stage[]>([]);
 const entries = ref<Entry[]>([]);
 const detections = ref<DetectionEventRecord[]>([]);
-const clockCorrectionThresholdMs = ref(DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS);
 
 let liveSource: EventSource | undefined;
 
@@ -148,7 +145,6 @@ watch(() => props.gateId, load);
 
 onMounted(async () => {
   void load();
-  clockCorrectionThresholdMs.value = await fetchClockCorrectionThresholdMs();
   liveSource = openLiveStream(
     {
       gate: (updated) => {
@@ -229,10 +225,7 @@ onUnmounted(() => {
 
             <dt>{{ $t('gate.clock') }}</dt>
             <dd>
-              <GateClockChips
-                :gate="gate"
-                :correction-threshold-ms="clockCorrectionThresholdMs"
-              />
+              <GateClockChips :gate="gate" />
             </dd>
 
             <dt>{{ $t('gateDetail.address') }}</dt>

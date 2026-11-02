@@ -530,7 +530,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     // disagreement. Correct onto server time here, at ingest, and keep both
     // halves — see "Clock offset" in docs/architecture.md.
     const clockCorrectionMs = gate
-      ? await this.gatesService.clockCorrectionMsFor(gate)
+      ? this.gatesService.clockCorrectionMsFor(gate)
       : 0;
     const timestampGate = new Date(detection.timestampGate);
 

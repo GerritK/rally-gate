@@ -83,7 +83,7 @@ the public page reads: `/auth/session`, `/version`, `/time`, GET
 | `/rally-info/start`, `/close`, `/reopen` | POST | `SETUP` → `RUNNING` → `CLOSED`, reopen back to `RUNNING`; 409 `rallyStatusInvalid` from any other status. Close 409s `carsOnStage` with `params.count`, else closes the running stages |
 | `/event` | GET, POST `{ name, date }`, `/open` POST `{ file }` | the open event file and the others in the folder, `switchable: false` when fixed by config. POST creates/opens by restarting the server (202, then poll GET); 409 while a stage is `ACTIVE` — see `deployment-modes.md` |
 | `/event/known-gates` | GET, `/:id` DELETE | gates this computer remembers across events (standalone only); DELETE forgets one, the open event keeps it |
-| `/settings/:key` | GET, PUT | `clockCorrectionThresholdMs`, `notionalPenaltyMs`, `startOrderGrouping`/`startOrderKey`/`startOrderDirection` (enums in `packages/shared/src/start-order.ts`; an unknown value reads as the default), `countdownMs`, `jumpStartToleranceMs` (locked once the rally runs), `minStartGapMs`, `jumpStartPenaltyTypeId` (empty: only mark) |
+| `/settings/:key` | GET, PUT | `notionalPenaltyMs`, `startOrderGrouping`/`startOrderKey`/`startOrderDirection` (enums in `packages/shared/src/start-order.ts`; an unknown value reads as the default), `countdownMs`, `jumpStartToleranceMs` (locked once the rally runs), `minStartGapMs`, `jumpStartPenaltyTypeId` (empty: only mark) |
 
 Every mutating endpoint binds a DTO class, and unknown fields are a 400 — see
 `apps/rally-server/CLAUDE.md` for which fields are deliberately absent.

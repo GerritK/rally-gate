@@ -1,4 +1,5 @@
 import {
+  CLOCK_CORRECTION_THRESHOLD_MS,
   GateRole,
   HEARTBEAT_ONLINE_THRESHOLD_MS,
   NTP_OFFSET_WARN_THRESHOLD_MS,
@@ -22,9 +23,7 @@ import { driverName } from './crew';
 /**
  * Where a clock offset stops looking like ordinary network transit and
  * starts looking like a real problem worth showing amber. Purely a display
- * threshold — the server has its own, higher one for deciding when to
- * actually correct, which this page reads from settings rather than
- * duplicating.
+ * threshold — the server corrects only from `CLOCK_CORRECTION_THRESHOLD_MS`.
  */
 export const CLOCK_OFFSET_WARN_THRESHOLD_MS = 250;
 
@@ -48,12 +47,9 @@ export function formatClockLag(offsetMs?: number | null): string {
 }
 
 /** A clock turning back for a gate behind, forward for one ahead. */
-export function clockLagIcon(
-  offsetMs: number | null | undefined,
-  correctionThresholdMs: number,
-): string {
+export function clockLagIcon(offsetMs: number | null | undefined): string {
   if (offsetMs === null || offsetMs === undefined) return 'mdi-clock-outline';
-  if (Math.abs(offsetMs) >= correctionThresholdMs) {
+  if (Math.abs(offsetMs) >= CLOCK_CORRECTION_THRESHOLD_MS) {
     return 'mdi-clock-alert-outline';
   }
   if (offsetMs === 0) return 'mdi-clock-check-outline';
@@ -70,26 +66,20 @@ export function ntpOffsetColor(gate: {
     : 'success';
 }
 
-export function clockOffsetColor(
-  offsetMs: number | null | undefined,
-  correctionThresholdMs: number,
-): string {
+export function clockOffsetColor(offsetMs: number | null | undefined): string {
   if (offsetMs === null || offsetMs === undefined) return 'timing-idle';
   const abs = Math.abs(offsetMs);
-  if (abs >= correctionThresholdMs) return 'error';
+  if (abs >= CLOCK_CORRECTION_THRESHOLD_MS) return 'error';
   return abs >= CLOCK_OFFSET_WARN_THRESHOLD_MS ? 'warning' : 'success';
 }
 
 /** Explains what the server is doing about this gate's offset, if anything. */
-export function clockOffsetHint(
-  offsetMs: number | null | undefined,
-  correctionThresholdMs: number,
-): string {
+export function clockOffsetHint(offsetMs: number | null | undefined): string {
   if (offsetMs === null || offsetMs === undefined) {
     return t('gate.clockNotReported');
   }
   const lag = formatClockLag(offsetMs);
-  return Math.abs(offsetMs) >= correctionThresholdMs
+  return Math.abs(offsetMs) >= CLOCK_CORRECTION_THRESHOLD_MS
     ? t('gate.clockCorrected', { lag })
     : t('gate.clockWithinTolerance', { lag });
 }

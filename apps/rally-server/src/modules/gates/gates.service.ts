@@ -8,8 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import {
   ApiErrorCode,
-  CLOCK_CORRECTION_THRESHOLD_KEY,
-  DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS,
+  CLOCK_CORRECTION_THRESHOLD_MS,
   DETECTION_TOPIC_PREFIX,
   GATE_ID_PATTERN,
   gateConfigUrl,
@@ -19,7 +18,6 @@ import {
 } from '@rally-gate/shared';
 import { Repository } from 'typeorm';
 import { apiError } from '../../common/api-error';
-import { SettingsService } from '../settings/settings.service';
 import { GateAssignmentsService } from './gate-assignments.service';
 import { GatePairingService } from './gate-pairing.service';
 import { Gate } from './gate.entity';
@@ -100,7 +98,6 @@ export class GatesService {
   constructor(
     @InjectRepository(Gate)
     private readonly gates: Repository<Gate>,
-    private readonly settingsService: SettingsService,
     private readonly emitter: EventEmitter2,
     private readonly gateAssignmentsService: GateAssignmentsService,
     private readonly pairing: GatePairingService,
@@ -203,19 +200,15 @@ export class GatesService {
   /**
    * How much to add to this gate's timestamps to bring them onto server
    * time. Zero unless the measured offset clears the threshold — see
-   * `DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS` for why a deadband rather than
+   * `CLOCK_CORRECTION_THRESHOLD_MS` for why a deadband rather than
    * always correcting.
    */
-  async clockCorrectionMsFor(gate: Gate): Promise<number> {
+  clockCorrectionMsFor(gate: Gate): number {
     const offsetMs = gate.clockOffsetMs;
     if (!offsetMs) {
       return 0;
     }
-    const thresholdMs = await this.settingsService.getNumber(
-      CLOCK_CORRECTION_THRESHOLD_KEY,
-      DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS,
-    );
-    return Math.abs(offsetMs) >= thresholdMs ? offsetMs : 0;
+    return Math.abs(offsetMs) >= CLOCK_CORRECTION_THRESHOLD_MS ? offsetMs : 0;
   }
 
   /**

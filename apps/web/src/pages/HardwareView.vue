@@ -28,11 +28,9 @@ import { fetchEntries, type Entry } from '../api/entries';
 import { fetchRecentEvents, type DetectionEventRecord } from '../api/events';
 import { closeLiveStream, openLiveStream, upsert } from '../api/live';
 import { serverNow } from '../api/time';
-import { fetchClockCorrectionThresholdMs } from '../api/settings';
 import { fetchStages, type Stage } from '../api/stages';
 import {
   ApiErrorCode,
-  DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS,
   StageStatus,
   type GatePairingState,
   type GatePowerOffResult,
@@ -69,7 +67,6 @@ const pairingLeft = computed(() =>
       )
     : null,
 );
-const clockCorrectionThresholdMs = ref(DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS);
 const gateDialogOpen = ref(false);
 const gateDraft = ref({ id: '', name: '' });
 const confirm = useConfirm();
@@ -246,15 +243,10 @@ async function onRejectGate(gateId: string) {
 }
 
 onMounted(async () => {
-  const [, eventInfo, thresholdMs] = await Promise.all([
-    refreshGates(),
-    fetchEventInfo(),
-    fetchClockCorrectionThresholdMs(),
-  ]);
+  const [, eventInfo] = await Promise.all([refreshGates(), fetchEventInfo()]);
   if (eventInfo.switchable) {
     knownGates.value = await fetchKnownGates();
   }
-  clockCorrectionThresholdMs.value = thresholdMs;
   gatesSource = openLiveStream(
     {
       gate: (gate) => upsert(gates.value, gate, 'id'),
@@ -465,11 +457,7 @@ onUnmounted(() => {
               <template v-else>-</template>
             </td>
             <td class="text-no-wrap">
-              <GateClockChips
-                :gate="gate"
-                :correction-threshold-ms="clockCorrectionThresholdMs"
-                combined
-              />
+              <GateClockChips :gate="gate" combined />
             </td>
             <td class="text-no-wrap text-right rg-actions">
               <v-btn

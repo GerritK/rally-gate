@@ -66,8 +66,8 @@ Two mechanisms with different jobs:
 **Deadband, not always-correct.** The measurement is one-way, so it is offset
 plus network latency and cannot separate the two; correcting below that would
 make a well-synced pair worse. `clockCorrectionMsFor` applies the offset only
-past `clockCorrectionThresholdMs` (default 1000ms), where the clock is
-unambiguously wrong. With chrony working it never fires.
+past `CLOCK_CORRECTION_THRESHOLD_MS` (1000ms, a constant in `shared`), where
+the clock is unambiguously wrong. With chrony working it never fires.
 
 **Correction happens at ingest, on the server**, never on the gate: the gate's
 clock never jumps mid-stage, it works before chrony's first sync, and

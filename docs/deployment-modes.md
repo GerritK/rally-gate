@@ -75,8 +75,9 @@ amplifier) with a reply the size of the request. A bind failure logs and
 continues: a gate without a time source still delivers detections, and the
 offset measurement shows the skew.
 
-Check it without a terminal: `Gate.clockOffsetMs` on the Hardware page should
-sit near zero. Reaching the 1000ms correction threshold means sync is broken.
+Check it without a terminal: the Hardware page's clock column should say
+"in sync". "Out of sync" means a gate reached the 1000ms correction threshold
+or chrony isn't syncing.
 
 ## One database = one event
 

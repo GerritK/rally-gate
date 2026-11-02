@@ -47,7 +47,7 @@ function makeService(opts: {
   });
   const gatesService = {
     findOne: jest.fn().mockResolvedValue('gate' in opts ? opts.gate : GATE),
-    clockCorrectionMsFor: jest.fn().mockResolvedValue(0),
+    clockCorrectionMsFor: jest.fn().mockReturnValue(0),
   } as unknown as GatesService;
   const findByTransponder = jest
     .fn()

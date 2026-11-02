@@ -2,8 +2,6 @@
 // server applies while one is unset — the web shows the same default until
 // the stored value loads. Display and start-order keys sit beside their enums.
 
-export const CLOCK_CORRECTION_THRESHOLD_KEY = 'clockCorrectionThresholdMs';
-
 /**
  * Below this, a measured gate clock offset is indistinguishable from network
  * transit time (the measurement is one-way), so correcting would inject
@@ -11,11 +9,10 @@ export const CLOCK_CORRECTION_THRESHOLD_KEY = 'clockCorrectionThresholdMs';
  * is unambiguously wrong — an unsynced Pi drifts seconds over an event, and
  * one booting from `fake-hwclock` with no RTC can be days out.
  *
- * A setting because the right value depends on the site's network: the floor
- * is however long a heartbeat takes to arrive, a property of the rally's
- * Wi-Fi, not of this code.
+ * A constant, not a setting: no organiser can judge it, and a heartbeat
+ * crossing even a poor rally Wi-Fi arrives well within it.
  */
-export const DEFAULT_CLOCK_CORRECTION_THRESHOLD_MS = 1_000;
+export const CLOCK_CORRECTION_THRESHOLD_MS = 1_000;
 
 export const NOTIONAL_PENALTY_MS_KEY = 'notionalPenaltyMs';
 
