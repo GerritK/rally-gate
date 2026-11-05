@@ -1,6 +1,11 @@
 import { ConflictException } from '@nestjs/common';
 import { EVENT_LISTENER_METADATA } from '@nestjs/event-emitter';
-import { GateRole, StageStatus, EntryStatus } from '@rally-gate/shared';
+import {
+  DETECTION_MAX_AGE_MS,
+  GateRole,
+  StageStatus,
+  EntryStatus,
+} from '@rally-gate/shared';
 import { GateAssignmentsService } from '../gates/gate-assignments.service';
 import { GatesService } from '../gates/gates.service';
 import { StageRunsService } from '../stage-runs/stage-runs.service';
@@ -12,6 +17,8 @@ import { withFakeTransaction } from '../../common/fake-transaction';
 
 const GATE = { id: 'G1', name: 'G1', clockOffsetMs: null };
 const ENTRY = { id: 'v1', transponderId: '1234567' };
+// Recent, so no detection is ignored as older than DETECTION_MAX_AGE_MS.
+const TIMED_AT = new Date(Date.now() - 60_000).toISOString();
 
 function makeService(opts: {
   gate?: unknown;
@@ -29,6 +36,7 @@ function makeService(opts: {
   stored?: unknown;
   alreadyStored?: boolean;
   insert?: jest.Mock;
+  clockCorrectionMs?: number;
 }) {
   const saved: DetectionEventRecord[] = [];
   const write = (r: DetectionEventRecord) => {
@@ -47,7 +55,9 @@ function makeService(opts: {
   });
   const gatesService = {
     findOne: jest.fn().mockResolvedValue('gate' in opts ? opts.gate : GATE),
-    clockCorrectionMsFor: jest.fn().mockReturnValue(0),
+    clockCorrectionMsFor: jest
+      .fn()
+      .mockReturnValue(opts.clockCorrectionMs ?? 0),
   } as unknown as GatesService;
   const findByTransponder = jest
     .fn()
@@ -120,7 +130,7 @@ function detection(overrides: Record<string, unknown> = {}) {
         eventId: 'e1',
         gateId: 'G1',
         transponderId: '1234567',
-        timestampGate: '2026-01-01T12:00:00.000Z',
+        timestampGate: TIMED_AT,
         source: 'test',
         ...overrides,
       }),
@@ -325,7 +335,7 @@ describe('EventsService redelivered detections', () => {
 
 describe('EventsService finish or split before its start', () => {
   // A start gate off Wi-Fi replays its starts on reconnect, after the finish.
-  const timedAt = new Date('2026-01-01T12:00:00.000Z');
+  const timedAt = new Date(TIMED_AT);
   const at = (role: GateRole) => ({ assignment: { stageId: 'SS1', role } });
 
   it('keeps a finish pending until its start is in, then times it', async () => {
@@ -630,6 +640,47 @@ describe('EventsService unidentified passings', () => {
       entryId: null,
       awaitingEntry: false,
     });
+  });
+});
+
+describe('EventsService detections from a previous event', () => {
+  const old = new Date(Date.now() - DETECTION_MAX_AGE_MS - 60_000);
+
+  it('acknowledges a detection older than 24 h without storing it', async () => {
+    // Returning normally PUBACKs it, so the gate drops it from its buffer.
+    const { service, saved } = makeService({});
+
+    await expect(
+      service.handleMqttMessage(
+        detection({ timestampGate: old.toISOString() }),
+      ),
+    ).resolves.not.toThrow();
+
+    expect(saved).toHaveLength(0);
+  });
+
+  it('stores an old detection whose time of day was unknown', async () => {
+    const { service, saved } = makeService({});
+
+    await service.handleMqttMessage(
+      detection({
+        timestampGate: old.toISOString(),
+        metadata: { timeUnknown: true },
+      }),
+    );
+
+    expect(saved.at(-1)).toMatchObject({ eventId: 'e1', processed: true });
+  });
+
+  it('judges age after the clock correction', async () => {
+    // The gate's clock is behind: corrected, the passing is recent.
+    const { service, saved } = makeService({ clockCorrectionMs: 2 * 60_000 });
+
+    await service.handleMqttMessage(
+      detection({ timestampGate: old.toISOString() }),
+    );
+
+    expect(saved.at(-1)).toMatchObject({ eventId: 'e1', processed: true });
   });
 });
 

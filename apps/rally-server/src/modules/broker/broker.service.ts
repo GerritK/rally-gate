@@ -62,6 +62,9 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
           gates.has(client) &&
           !packet.topic.startsWith(`${DETECTION_TOPIC_PREFIX}/${client.id}/`)
         ) {
+          // Aedes drops the connection without a word, which hid a gate
+          // publishing under an old Gate ID in a reconnect loop.
+          this.logger.warn(`${client.id} may not publish to ${packet.topic}`);
           return callback(
             new Error(`${client.id} may not publish to ${packet.topic}`),
           );

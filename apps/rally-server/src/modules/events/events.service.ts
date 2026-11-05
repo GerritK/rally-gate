@@ -13,6 +13,7 @@ import {
   ApiErrorCode,
   ChangeAction,
   DEFAULT_MIN_STAGE_DURATION_MS,
+  DETECTION_MAX_AGE_MS,
   DETECTION_TOPIC_PREFIX,
   DetectionEvent,
   GateRole,
@@ -484,6 +485,26 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     const gate = await this.gatesService.findOne(detection.gateId);
+    // Gate clocks are independent of each other and of the server's, so a
+    // duration built from two gates' raw timestamps carries their
+    // disagreement. Correct onto server time here, at ingest, and keep both
+    // halves — see "Clock offset" in docs/architecture.md.
+    // Also before judging age, so a gate whose clock is behind loses nothing.
+    const clockCorrectionMs = gate
+      ? this.gatesService.clockCorrectionMsFor(gate)
+      : 0;
+    const timestampGate = new Date(detection.timestampGate);
+    const effectiveMs = timestampGate.getTime() + clockCorrectionMs;
+    if (
+      !isTimeUnknown(rawPayload) &&
+      Date.now() - effectiveMs > DETECTION_MAX_AGE_MS
+    ) {
+      // Returning acknowledges it, so the gate drops it from its buffer.
+      this.logger.warn(
+        `Ignoring detection ${detection.eventId} from gate ${detection.gateId} at ${new Date(effectiveMs).toISOString()}: older than 24 h, from a previous event`,
+      );
+      return;
+    }
     if (!gate) {
       this.logger.warn(
         `Detection from unknown gate ${detection.gateId}, storing without processing`,
@@ -524,15 +545,6 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     const assignment = gate
       ? await this.gateAssignmentsService.findActiveForGate(gate.id)
       : null;
-
-    // Gate clocks are independent of each other and of the server's, so a
-    // duration built from two gates' raw timestamps carries their
-    // disagreement. Correct onto server time here, at ingest, and keep both
-    // halves — see "Clock offset" in docs/architecture.md.
-    const clockCorrectionMs = gate
-      ? this.gatesService.clockCorrectionMsFor(gate)
-      : 0;
-    const timestampGate = new Date(detection.timestampGate);
 
     const unidentified = !transponderId || shared;
     // The one automatic assignment: a start passing on a slot stage sets no
@@ -861,18 +873,23 @@ const passingSnapshot = (record: DetectionEventRecord) => ({
  * with `metadata.timeUnknown` has no age to judge and is never stale.
  */
 function isStaleDetection(record: DetectionEventRecord): boolean {
-  let metadata: { timeUnknown?: unknown } | undefined;
-  try {
-    ({ metadata } = JSON.parse(record.rawPayload) as {
-      metadata?: { timeUnknown?: unknown };
-    });
-  } catch {
-    // Stored only once parsed, so this is a hand-made record.
-  }
   return (
-    metadata?.timeUnknown !== true &&
+    !isTimeUnknown(record.rawPayload) &&
     Date.now() - effectiveTime(record).getTime() > PRE_START_TRIGGER_MAX_AGE_MS
   );
+}
+
+/** The ESP32 gate's flag for a passing timed after it lost the time of day. */
+function isTimeUnknown(rawPayload: string): boolean {
+  try {
+    const { metadata } = JSON.parse(rawPayload) as {
+      metadata?: { timeUnknown?: unknown };
+    };
+    return metadata?.timeUnknown === true;
+  } catch {
+    // Stored only once parsed, so this is a hand-made record.
+    return false;
+  }
 }
 
 function effectiveTime(record: DetectionEventRecord): Date {

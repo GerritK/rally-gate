@@ -21,6 +21,12 @@ The broker is unauthenticated, so ids and timestamps are bounds-checked on
 ingest and bad messages dropped with a warning: an unparseable timestamp would
 otherwise poison a duration silently.
 
+A detection whose corrected time is more than 24 h before now
+(`DETECTION_MAX_AGE_MS`) is acknowledged but not stored: a gate keeps what it
+couldn't deliver, and a buffer left from a previous event (an NFC check-in)
+must not reach the next event's database. One with `metadata.timeUnknown` has
+no age and is always stored.
+
 ## DetectionEventRecord (stored)
 
 Adds `transponderKind` (null along with `transponderId`), `entryId` (resolved

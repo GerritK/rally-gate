@@ -172,7 +172,7 @@ describe('start paths', () => {
     });
 
     it('starts at the start passing and finishes at the finish', async () => {
-      const t0 = new Date('2026-11-01T10:00:00.000Z');
+      const t0 = new Date(Date.now() - 600_000);
       await pass('START', t0, 0, '111');
       await pass('FINISH', t0, 90_123, '111');
 

@@ -24,3 +24,10 @@ export interface DetectionEvent {
   source: string;
   metadata?: Record<string, unknown>;
 }
+
+/**
+ * A detection older than this is ignored at ingest: a gate keeps detections
+ * it couldn't deliver, and one buffered at a previous event (an NFC tap
+ * checking in a car) must not reach the next event's database.
+ */
+export const DETECTION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
