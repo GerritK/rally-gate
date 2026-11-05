@@ -48,7 +48,7 @@ int64_t wallUs();
 void uplinkBegin();
 void uplinkTick(IPAddress server);
 bool uplinkConnected();
-bool bufferTap(const gate::Tap &tap);
+bool bufferDetection(const gate::Detection &d);
 int bufferedCount();
 
 // web.cpp

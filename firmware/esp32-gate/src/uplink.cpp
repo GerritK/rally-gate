@@ -1,6 +1,6 @@
 // Detections go to flash first and leave it only on PUBACK. esp-mqtt's outbox
-// is RAM, so it alone would lose every unacked tap on a power cut, and a
-// dropped tap is a driver with no time. Resending is safe: the server keys
+// is RAM, so it alone would lose every unacked detection on a power cut, and
+// a dropped detection is a driver with no time. Resending is safe: the server keys
 // detections on eventId and its rules ignore repeats (CLAUDE.md).
 #include <LittleFS.h>
 #include <esp_timer.h>
@@ -34,7 +34,7 @@ static QueueHandle_t acks;
 static InFlight inFlight[MAX_IN_FLIGHT];
 static uint32_t nextHeartbeatMs = 0;
 static uint32_t nextFlushMs = 0;
-static uint32_t tapSeq = 0;
+static uint32_t detectionSeq = 0;
 static int buffered = 0;
 
 // Runs on esp-mqtt's own task, so it only hands over; loop() does the work.
@@ -77,13 +77,13 @@ void uplinkBegin() {
 bool uplinkConnected() { return connected; }
 int bufferedCount() { return buffered; }
 
-bool bufferTap(const gate::Tap &tap) {
+bool bufferDetection(const gate::Detection &d) {
   if (LittleFS.totalBytes() - LittleFS.usedBytes() < MIN_FREE_BYTES) return false;
   char path[24];
-  snprintf(path, sizeof path, "/q/%08lx%06lx", (unsigned long)bootId, (unsigned long)tapSeq++);
+  snprintf(path, sizeof path, "/q/%08lx%06lx", (unsigned long)bootId, (unsigned long)detectionSeq++);
   File f = LittleFS.open(path, "w");
   if (!f) return false;
-  bool ok = f.write((const uint8_t *)&tap, sizeof tap) == sizeof tap;
+  bool ok = f.write((const uint8_t *)&d, sizeof d) == sizeof d;
   f.close();
   if (!ok) {
     LittleFS.remove(path);
@@ -127,32 +127,32 @@ static void flush() {
     InFlight *slot = freeSlot();
     if (!slot) break;
 
-    gate::Tap tap;
-    bool ok = f.read((uint8_t *)&tap, sizeof tap) == sizeof tap && tap.magic == gate::TAP_MAGIC;
+    gate::Detection d;
+    bool ok = f.read((uint8_t *)&d, sizeof d) == sizeof d && d.magic == gate::DETECTION_MAGIC;
     f.close();
     if (!ok) {
-      // Kept, not deleted: a tap from another firmware's layout is still evidence.
+      // Kept, not deleted: a detection from another firmware's layout is still evidence.
       Serial.printf("[uplink] unreadable %s\n", path.c_str());
       continue;
     }
 
     int64_t timeUs;
-    gate::TapTime t = gate::resolveTapTime(tap, bootId, clockSet(), wallUs(), esp_timer_get_time(), &timeUs);
-    if (t == gate::TapTime::NotYetSyncedWait) continue;
-    if (t == gate::TapTime::Known && tap.wallUs == 0) {
+    gate::DetectionTime t = gate::resolveDetectionTime(d, bootId, clockSet(), wallUs(), esp_timer_get_time(), &timeUs);
+    if (t == gate::DetectionTime::NotYetSyncedWait) continue;
+    if (t == gate::DetectionTime::Known && d.wallUs == 0) {
       // Pin the recovered time now: after a reboot the monotonic reference is gone.
-      tap.wallUs = timeUs;
+      d.wallUs = timeUs;
       File w = LittleFS.open(path, "w");
       if (w) {
-        w.write((const uint8_t *)&tap, sizeof tap);
+        w.write((const uint8_t *)&d, sizeof d);
         w.close();
       }
     }
 
     char json[320];
-    gate::detectionJson(tap, timeUs, t == gate::TapTime::Unknown, json, sizeof json);
+    gate::detectionJson(d, timeUs, t == gate::DetectionTime::Unknown, json, sizeof json);
     char topic[64];
-    snprintf(topic, sizeof topic, "rally/gates/%s/detections", tap.gateId);
+    snprintf(topic, sizeof topic, "rally/gates/%s/detections", d.gateId);
     int msgId = esp_mqtt_client_publish(client, topic, json, 0, 1, 0);
     if (msgId <= 0) break;
     slot->msgId = msgId;

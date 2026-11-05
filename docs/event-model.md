@@ -504,21 +504,21 @@ itself: activation is a deliberate call about the gates.
 ### Manual: `SLOT_MANUAL`
 
 A trigger sets the slot to **trigger time + `countdownMs`**, the trigger time
-being when the server received it, never the gate's timestamp (a tap may
+being when the server received it, never the gate's timestamp (a detection may
 carry `timeUnknown`). Triggers are the Countdown button on the start card or a
 detection at a `stage_pre_start` gate; a light-barrier passing there needs a
 marshal to assign it first, and then the assignment is the trigger, so a late
 assignment never makes a slot in the past.
 A gate's own detection triggers only while its effective time is at most
 `PRE_START_TRIGGER_MAX_AGE_MS` (30 s) before now: a gate that was offline
-replays its taps on reconnect, and a slot from now for a tap minutes old would
+replays its detections on reconnect, and a slot from now for one minutes old would
 be a phantom run on a shakedown. An older one only marks the car at the start;
 one retried by the sweep is judged against now too, since its slot would be
-from now. A tap with `timeUnknown` has no age and always triggers.
+from now. A detection with `timeUnknown` has no age and always triggers.
 
 - Slots queue: the next is at earliest the previous + `minStartGapMs`
   (event-wide, default 30 s), since two cars can't start from one line.
-- Tap order is start order. The frozen start order is not checked.
+- Trigger order is start order. The frozen start order is not checked.
 - Cancel deletes a slot until its car's first start passing; then trigger
   again.
 - A trigger for a car that already has an open slot or is on stage is stored
@@ -592,8 +592,8 @@ beam passing, so a loop at the line works as well as a tap.
 
 "Its last run" is on **any stage**, its end the finish, else the start: a
 pre-start gate reused on the next stage then never marks a car with the
-tap it made for the stage before. Times are the server's receive times,
-since a tap may carry `timeUnknown`. A car counting down shows its slot
+detection it made for the stage before. Times are the server's receive times,
+since a detection may carry `timeUnknown`. A car counting down shows its slot
 rather than the mark, so in `SLOT_MANUAL` the mark is only seen on a car
 whose trigger was ignored. In `SLOT_SCHEDULE` every car has a slot run
 long before it is due, so one still ahead whose car hasn't left doesn't

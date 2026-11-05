@@ -261,9 +261,9 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
   /**
    * Who is waiting at the start of a stage (`docs/event-model.md` "Pre-start
    * gate"): a pre-start detection received after the end of the car's last
-   * run on any stage, so a tap for the stage before at the same gate doesn't
-   * count, and until its next run starts. Server receive time, since a tap
-   * may carry `timeUnknown`.
+   * run on any stage, so a detection for the stage before at the same gate doesn't
+   * count, and until its next run starts. Server receive time, since a
+   * detection may carry `timeUnknown`.
    */
   async entriesAtStart(stageId: string): Promise<string[]> {
     const gateIds = (await this.gateAssignmentsService.findByStage(stageId))
@@ -624,7 +624,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
           record.entryId,
           effectiveTime(record),
           undefined,
-          isStaleTap(record),
+          isStaleDetection(record),
         );
         if (
           applied === null &&
@@ -857,10 +857,10 @@ const passingSnapshot = (record: DetectionEventRecord) => ({
 
 /**
  * Judged against now, not the receive time: the slot is from now, so a
- * detection retried by the sweep is as late as one replayed by its gate. A
- * tap with `metadata.timeUnknown` has no age to judge and is never stale.
+ * detection retried by the sweep is as late as one replayed by its gate. One
+ * with `metadata.timeUnknown` has no age to judge and is never stale.
  */
-function isStaleTap(record: DetectionEventRecord): boolean {
+function isStaleDetection(record: DetectionEventRecord): boolean {
   let metadata: { timeUnknown?: unknown } | undefined;
   try {
     ({ metadata } = JSON.parse(record.rawPayload) as {

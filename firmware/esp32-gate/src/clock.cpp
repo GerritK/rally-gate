@@ -71,8 +71,8 @@ static bool sample(IPAddress server, gate::NtpSample &out) {
 
 // The gate clock policy from docs/decoder-adapters.md, as chrony's `makestep`:
 // step only within the first three syncs, slew from then on. A step mid-event
-// lands in every tap across it. The threshold is 5ms rather than chrony's 1s:
-// a reset leaves the clock up to seconds off, and slewing 1s takes 6s of taps
+// lands in every detection across it. The threshold is 5ms rather than chrony's 1s:
+// a reset leaves the clock up to seconds off, and slewing 1s takes 6s of detections
 // with wrong times, while nothing depends on the clock yet.
 // Returns whether it stepped.
 static bool apply(int64_t offsetUs) {

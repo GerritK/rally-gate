@@ -4,7 +4,7 @@ A second kind of gate: an ESP32 with its own firmware instead of a Pi running
 `gate-agent` and `gate-config`. First target is an **NFC check-in gate**, where
 presence matters and milliseconds don't. Firmware in `firmware/esp32-gate`,
 runs on hardware: it joins Wi-Fi, finds the server, syncs its clock, and its
-taps reach rally-server and time a car like any gate's.
+detections reach rally-server and time a car like any gate's.
 
 ```bash
 cd firmware/esp32-gate
@@ -102,7 +102,7 @@ workspaces with its own CI build. What each part of the Pi stack becomes:
 | `GATE_ID` from the installer | derived from the MAC address, so nothing to enter |
 | mDNS `rally-server.local` | ESP-IDF mDNS component, still zero-config |
 | chrony against rally-server's SNTP (57432/udp) | own NTP client (`clock.cpp`), since lwIP's SNTP port is fixed at 123 at compile time — see "Clock" below |
-| QoS 1, persistent session | esp-mqtt QoS 1, but its outbox is RAM, so **every tap is written to flash first** (`/q` in LittleFS) and deleted only on PUBACK. Unacked taps are sent again on reconnect and after 30s, which the server's `eventId` dedup makes safe. Flash is the outbox, so no persistent session is needed |
+| QoS 1, persistent session | esp-mqtt QoS 1, but its outbox is RAM, so **every detection is written to flash first** (`/q` in LittleFS) and deleted only on PUBACK. Unacked detections are sent again on reconnect and after 30s, which the server's `eventId` dedup makes safe. Flash is the outbox, so no persistent session is needed |
 | `gate-config` on 57439 + hotspot fallback | SoftAP captive portal for Wi-Fi, and a small status page on **57439**, so the dashboard's gate link (`gateConfigUrl`) works unchanged |
 | `POST /api/power-off` | deep sleep, so "Shut down all gates" works for every gate. There is no SD card to protect, so it only saves the battery. The PN532 shares the 3V3 rail, so it gets its own `PowerDown` command first, with chip select held high through the sleep (floating, it wakes the reader). The reader board's power LED keeps drawing a few mA; only switching the reader's supply (a MOSFET on a GPIO) removes that |
 | `ntpSynced` / `ntpOffsetMs` | the RMS of the last 8 measured offsets, the figure chrony reports as "RMS offset" on a Pi |
@@ -164,7 +164,7 @@ only delays sending it.
 Best of 4 samples every 64s. Steps only within the first three syncs and
 slews after, as chrony's `makestep` (`decoder-adapters.md` clock policy), but
 from 5ms rather than 1s: a reset leaves the clock up to seconds off, and
-slewing that takes seconds of taps with wrong times.
+slewing that takes seconds of detections with wrong times.
 
 - **Rate:** like chrony it estimates the crystal's rate error (`ClockRate`,
   over a 15–30 minute window, since one Wi-Fi sample is off by about what
@@ -179,12 +179,12 @@ slewing that takes seconds of taps with wrong times.
 ### Time without an RTC
 
 Not needed for check-in. After Wi-Fi comes up, SNTP has the time within
-seconds. A tap **before** the first sync stores `esp_timer_get_time()`
+seconds. A detection **before** the first sync stores `esp_timer_get_time()`
 (monotonic µs since boot) and is converted once synced:
-`tapTime = now - (monoNow - monoTap)`. It waits in the flash buffer until then.
+`detectionTime = now - (monoNow - monoDetection)`. It waits in the flash buffer until then.
 
 The only lost time is a gate **rebooting before it ever synced**. There is no
-reference point left, so those taps are still sent, but flagged in
+reference point left, so those detections are still sent, but flagged in
 `metadata`: presence proven, time of day not. For check-in that is enough.
 
 The ESP32's built-in RTC is no substitute for a DS3231: it runs from an
@@ -197,7 +197,7 @@ off for a gate that runs long without network and reboots.
 |---|---|
 | firmware image (Wi-Fi, MQTT, mDNS, web server, PN532, plain status page) | 1.0 MB measured; OTA not in it yet |
 | two OTA app partitions, 3 MB each, **status page gzipped inside the image** | 6 MB |
-| NVS (Wi-Fi credentials) + LittleFS (detection buffer, ~200 B per tap) | rest |
+| NVS (Wi-Fi credentials) + LittleFS (detection buffer, ~200 B per detection) | rest |
 
 The page lives inside the firmware image so one OTA updates both, and there
 is never a page from a different firmware version. gate-config's Vuetify

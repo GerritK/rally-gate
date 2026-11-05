@@ -43,44 +43,44 @@ void test_uuid_v4_bits() {
   TEST_ASSERT_EQUAL_STRING("ffffffff-ffff-4fff-bfff-ffffffffffff", out);
 }
 
-Tap tapAt(int64_t wallUs, uint32_t bootId, int64_t monoUs) {
-  Tap t = {};
+Detection detectionAt(int64_t wallUs, uint32_t bootId, int64_t monoUs) {
+  Detection t = {};
   t.wallUs = wallUs;
   t.bootId = bootId;
   t.monoUs = monoUs;
   return t;
 }
 
-void test_tap_time_known_at_tap() {
+void test_detection_time_known_at_detection() {
   int64_t out = 0;
-  Tap t = tapAt(5000, 1, 10);
-  TEST_ASSERT_TRUE(resolveTapTime(t, 2, false, 0, 0, &out) == TapTime::Known);
+  Detection t = detectionAt(5000, 1, 10);
+  TEST_ASSERT_TRUE(resolveDetectionTime(t, 2, false, 0, 0, &out) == DetectionTime::Known);
   TEST_ASSERT_EQUAL_INT64(5000, out);
 }
 
-void test_tap_time_waits_for_sync() {
+void test_detection_time_waits_for_sync() {
   int64_t out = 0;
-  Tap t = tapAt(0, 1, 10);
-  TEST_ASSERT_TRUE(resolveTapTime(t, 1, false, 0, 0, &out) == TapTime::NotYetSyncedWait);
+  Detection t = detectionAt(0, 1, 10);
+  TEST_ASSERT_TRUE(resolveDetectionTime(t, 1, false, 0, 0, &out) == DetectionTime::NotYetSyncedWait);
 }
 
-void test_tap_time_from_monotonic_after_sync() {
+void test_detection_time_from_monotonic_after_sync() {
   int64_t out = 0;
-  Tap t = tapAt(0, 1, 2000000);  // tapped 2s after boot
-  // Synced; 8s after boot it is 1000s wall time, so the tap was 6s earlier.
-  TEST_ASSERT_TRUE(resolveTapTime(t, 1, true, 1000000000, 8000000, &out) == TapTime::Known);
+  Detection t = detectionAt(0, 1, 2000000);  // detected 2s after boot
+  // Synced; 8s after boot it is 1000s wall time, so the detection was 6s earlier.
+  TEST_ASSERT_TRUE(resolveDetectionTime(t, 1, true, 1000000000, 8000000, &out) == DetectionTime::Known);
   TEST_ASSERT_EQUAL_INT64(994000000, out);
 }
 
-void test_tap_time_unknown_across_reboot() {
+void test_detection_time_unknown_across_reboot() {
   int64_t out = 0;
-  Tap t = tapAt(0, 1, 2000000);
-  TEST_ASSERT_TRUE(resolveTapTime(t, 2, true, 1000000000, 8000000, &out) == TapTime::Unknown);
+  Detection t = detectionAt(0, 1, 2000000);
+  TEST_ASSERT_TRUE(resolveDetectionTime(t, 2, true, 1000000000, 8000000, &out) == DetectionTime::Unknown);
   TEST_ASSERT_EQUAL_INT64(1000000000, out);
 }
 
 void test_detection_json() {
-  Tap t = {};
+  Detection t = {};
   strcpy(t.gateId, "CLUB_CHECKIN");
   strcpy(t.eventId, "0f8fad5b-d9cb-469f-a165-70867728950e");
   strcpy(t.uid, "04A10BFF007C80");
@@ -247,10 +247,10 @@ int main() {
   RUN_TEST(test_iso_time);
   RUN_TEST(test_uid_hex);
   RUN_TEST(test_uuid_v4_bits);
-  RUN_TEST(test_tap_time_known_at_tap);
-  RUN_TEST(test_tap_time_waits_for_sync);
-  RUN_TEST(test_tap_time_from_monotonic_after_sync);
-  RUN_TEST(test_tap_time_unknown_across_reboot);
+  RUN_TEST(test_detection_time_known_at_detection);
+  RUN_TEST(test_detection_time_waits_for_sync);
+  RUN_TEST(test_detection_time_from_monotonic_after_sync);
+  RUN_TEST(test_detection_time_unknown_across_reboot);
   RUN_TEST(test_detection_json);
   RUN_TEST(test_valid_gate_id);
   RUN_TEST(test_json_escape);

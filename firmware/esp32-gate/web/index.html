@@ -345,7 +345,7 @@ $('gateIdInput').oninput = () => {
   // Capitals only (validGateId), so a typed small letter becomes one.
   $('gateIdInput').value = $('gateIdInput').value.toUpperCase();
   const changed = saved && $('gateIdInput').value !== saved.gateId;
-  if (changed) alert($('gateIdChanged'), 'warning', 'Changing the Gate ID makes this a different gate to the server. Its assignment and recorded taps stay with the old ID.', true);
+  if (changed) alert($('gateIdChanged'), 'warning', 'Changing the Gate ID makes this a different gate to the server. Its assignment and recorded detections stay with the old ID.', true);
   $('gateIdChanged').hidden = !changed;
 };
 

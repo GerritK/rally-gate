@@ -276,19 +276,19 @@ static void readerTick() {
   strlcpy(lastUid, hex, sizeof lastUid);
   lastUidMs = millis();
 
-  gate::Tap tap = {};
-  tap.magic = gate::TAP_MAGIC;
-  strlcpy(tap.gateId, settings.gateId.c_str(), sizeof tap.gateId);
+  gate::Detection d = {};
+  d.magic = gate::DETECTION_MAGIC;
+  strlcpy(d.gateId, settings.gateId.c_str(), sizeof d.gateId);
   uint8_t rnd[16];
   esp_fill_random(rnd, sizeof rnd);
-  gate::uuidV4(rnd, tap.eventId);
-  strlcpy(tap.uid, hex, sizeof tap.uid);
-  tap.wallUs = wall;
-  tap.bootId = bootId;
-  tap.monoUs = mono;
+  gate::uuidV4(rnd, d.eventId);
+  strlcpy(d.uid, hex, sizeof d.uid);
+  d.wallUs = wall;
+  d.bootId = bootId;
+  d.monoUs = mono;
 
-  // The beep promises the tap counted, so it comes only once the tap is in flash.
-  if (!bufferTap(tap)) {
+  // The beep promises the tap counted, so it comes only once the detection is in flash.
+  if (!bufferDetection(d)) {
     Serial.printf("[nfc] %s NOT stored\n", hex);
     beep(3, 80);
     return;
@@ -317,7 +317,7 @@ void setup() {
   play(buzzer_signals::powerOn, true);
   Serial.printf("[gate] %s %s boot %lu\n", settings.gateId.c_str(), FIRMWARE_VERSION, (unsigned long)bootId);
 
-  if (!LittleFS.begin(true)) Serial.println("[gate] LittleFS failed, taps can't be stored");
+  if (!LittleFS.begin(true)) Serial.println("[gate] LittleFS failed, detections can't be stored");
   uplinkBegin();
 
   WiFi.mode(WIFI_STA);

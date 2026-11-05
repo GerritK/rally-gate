@@ -185,7 +185,7 @@ Nothing is typed on a gate (`development-roadmap.md` "Zero-config gates").
   event switch too) closes pairing, and a waiting gate sends its key again
   once it reopens.
 - **A waiting gate stays refused**, so its detections stay on the gate and
-  arrive once it is approved: the ESP32 keeps its taps in flash, a Pi in
+  arrive once it is approved: the ESP32 keeps its detections in flash, a Pi in
   mqtt.js's in-memory queue (lost if gate-agent restarts before approval).
 - The broker lets a gate publish only under `rally/gates/<its id>/` and
   subscribe to nothing, and ignores a detection whose `gateId` isn't its

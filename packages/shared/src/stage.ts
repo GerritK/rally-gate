@@ -45,8 +45,8 @@ export const SLOT_PASSING_AFTER_MS = 60_000;
 
 /**
  * A pre-start detection older than this starts no countdown, only marks the
- * car at the start: a gate that was offline replays its taps on reconnect,
- * and a slot from now for a tap minutes old would be a phantom start.
+ * car at the start: a gate that was offline replays its detections on
+ * reconnect, and a slot from now for one minutes old would be a phantom start.
  */
 export const PRE_START_TRIGGER_MAX_AGE_MS = 30_000;
 
