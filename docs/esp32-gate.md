@@ -60,7 +60,8 @@ re-initialises it if it stops answering. Its RSTPDN pin isn't broken out on
 the V3 module and an ESP32 reset leaves it powered, so a reader that answers
 but no longer reads needs a power cycle.
 
-Buzzer on D1, LED on D2 (through a resistor), both to GND. The LED is lit
+Buzzer on D1 with a 10 kΩ pulldown, LED on D2 (through a resistor), both to
+GND. Without the pulldown the buzzer hisses while the pin floats. The LED is lit
 while the gate is connected to the server. One beep means the tap is
 stored, three mean it is **not** (buffer full or flash failed). The buzzer also
 plays the status sounds of the Pi gates (table in `decoder-adapters.md`,
