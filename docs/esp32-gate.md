@@ -102,7 +102,7 @@ workspaces with its own CI build. What each part of the Pi stack becomes:
 | `GATE_ID` from the installer | derived from the MAC address, so nothing to enter |
 | mDNS `rally-server.local` | ESP-IDF mDNS component, still zero-config |
 | chrony against rally-server's SNTP (57432/udp) | own NTP client (`clock.cpp`), since lwIP's SNTP port is fixed at 123 at compile time — see "Clock" below |
-| QoS 1, persistent session | esp-mqtt QoS 1, but its outbox is RAM, so **every detection is written to flash first** (`/q` in LittleFS) and deleted only on PUBACK. Unacked detections are sent again on reconnect and after 30s, which the server's `eventId` dedup makes safe. Flash is the outbox, so no persistent session is needed |
+| QoS 1, persistent session | esp-mqtt QoS 1, but its outbox is RAM, so **every detection is written to flash first** (`/q` in LittleFS) and deleted only on PUBACK, or when it can never be sent: recorded under another Gate ID (the broker takes a gate's publishes only under its own login id and drops the connection on any other, so one would block every detection behind it), unreadable (another firmware's layout), or cleared on the status page (Clear, or saving a new Gate ID; both ask first). The server ignores detections older than 24 h on its side. Unacked detections are sent again on reconnect and after 30s, which the server's `eventId` dedup makes safe. Flash is the outbox, so no persistent session is needed |
 | `gate-config` on 57439 + hotspot fallback | SoftAP captive portal for Wi-Fi, and a small status page on **57439**, so the dashboard's gate link (`gateConfigUrl`) works unchanged |
 | `POST /api/power-off` | deep sleep, so "Shut down all gates" works for every gate. There is no SD card to protect, so it only saves the battery. The PN532 shares the 3V3 rail, so it gets its own `PowerDown` command first, with chip select held high through the sleep (floating, it wakes the reader). The reader board's power LED keeps drawing a few mA; only switching the reader's supply (a MOSFET on a GPIO) removes that |
 | `ntpSynced` / `ntpOffsetMs` | the RMS of the last 8 measured offsets, the figure chrony reports as "RMS offset" on a Pi |
@@ -112,7 +112,7 @@ workspaces with its own CI build. What each part of the Pi stack becomes:
 
 The status page is its own small page rather than a port of gate-config:
 systemd, chrony and journalctl don't exist here. It shows server connection,
-clock, reader, buffer fill and the last tags read, and sets Wi-Fi, gate name,
+clock, reader, detections waiting to send (with Clear) and the last tags read, and sets Wi-Fi, gate name,
 server and the emergency Wi-Fi password. Reset Wi-Fi forgets the network, so
 the gate comes back up on its emergency Wi-Fi. Every change restarts the gate. It
 is plain HTML (`web/index.html`), English only, hand-styled after gate-config

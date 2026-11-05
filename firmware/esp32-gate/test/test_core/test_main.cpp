@@ -103,6 +103,18 @@ void test_valid_gate_id() {
   TEST_ASSERT_FALSE(validGateId("A+"));
 }
 
+void test_check_buffered() {
+  Detection d = {};
+  d.magic = DETECTION_MAGIC;
+  strcpy(d.gateId, "ESP32_A1B2C3");
+  TEST_ASSERT_TRUE(checkBuffered(d, sizeof d, "ESP32_A1B2C3") == Buffered::Send);
+  TEST_ASSERT_TRUE(checkBuffered(d, sizeof d, "START_WP1") == Buffered::ForeignGate);
+  TEST_ASSERT_TRUE(checkBuffered(d, sizeof d, "ESP32_A1B2") == Buffered::ForeignGate);
+  TEST_ASSERT_TRUE(checkBuffered(d, sizeof d - 1, "ESP32_A1B2C3") == Buffered::Unreadable);
+  d.magic = 0x52475430;  // a previous layout
+  TEST_ASSERT_TRUE(checkBuffered(d, sizeof d, "ESP32_A1B2C3") == Buffered::Unreadable);
+}
+
 void test_json_escape() {
   char out[32];
   jsonEscape("a\"b\\c\nd", out, sizeof out);
@@ -253,6 +265,7 @@ int main() {
   RUN_TEST(test_detection_time_unknown_across_reboot);
   RUN_TEST(test_detection_json);
   RUN_TEST(test_valid_gate_id);
+  RUN_TEST(test_check_buffered);
   RUN_TEST(test_json_escape);
   RUN_TEST(test_clock_rate_converges);
   RUN_TEST(test_clock_rate_outlier_cancels);

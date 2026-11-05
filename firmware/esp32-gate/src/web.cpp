@@ -127,6 +127,8 @@ static void handleSettings() {
   if (s.hotspotPass.length() < 8 || s.hotspotPass.length() > 63)
     return rejectField("hotspotPass", "8 to 63 characters.");
 
+  // The page asked first: under the new ID they could never be sent.
+  if (s.gateId != settings.gateId) clearBuffered();
   saveSettings(s);
   server.send(200, "text/plain", "Saved, restarting");
   restartSoon();
@@ -173,6 +175,11 @@ static void handleScan() {
   server.send(200, "application/json", json);
 }
 
+static void handleClearBuffered() {
+  int n = clearBuffered();
+  server.send(200, "text/plain", String("Cleared ") + n + (n == 1 ? " detection" : " detections"));
+}
+
 // "Shut down all gates" on the Hardware page. There is no SD card to protect,
 // so this only saves the battery.
 static void handlePowerOff() {
@@ -198,6 +205,7 @@ void webBegin() {
   server.on("/api/wifi/scan", HTTP_GET, handleScan);
   onChange("/api/wifi/reset", handleWifiReset);
   onChange("/api/power-off", handlePowerOff);
+  onChange("/api/buffered/clear", handleClearBuffered);
   server.onNotFound([] { server.send(404, "text/plain", "Not found"); });
   const char *headers[] = {"Cookie"};
   server.collectHeaders(headers, 1);

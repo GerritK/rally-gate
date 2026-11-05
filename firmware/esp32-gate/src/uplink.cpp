@@ -93,6 +93,25 @@ bool bufferDetection(const gate::Detection &d) {
   return true;
 }
 
+int clearBuffered() {
+  int n = 0;
+  for (;;) {
+    // Reopened each round: removing entries while a directory is being read skips some.
+    File dir = LittleFS.open("/q");
+    File f = dir.openNextFile();
+    if (!f) break;
+    String path = f.path();
+    f.close();
+    dir.close();
+    if (!LittleFS.remove(path)) break;
+    n++;
+  }
+  for (auto &s : inFlight) s.msgId = 0;
+  buffered = countBuffered();
+  Serial.printf("[uplink] cleared %d waiting detections\n", n);
+  return n;
+}
+
 static bool isInFlight(const char *path) {
   for (auto &s : inFlight)
     if (s.msgId && strcmp(s.path, path) == 0) return true;
@@ -127,12 +146,15 @@ static void flush() {
     InFlight *slot = freeSlot();
     if (!slot) break;
 
-    gate::Detection d;
-    bool ok = f.read((uint8_t *)&d, sizeof d) == sizeof d && d.magic == gate::DETECTION_MAGIC;
+    gate::Detection d = {};
+    size_t n = f.read((uint8_t *)&d, sizeof d);
     f.close();
-    if (!ok) {
-      // Kept, not deleted: a detection from another firmware's layout is still evidence.
-      Serial.printf("[uplink] unreadable %s\n", path.c_str());
+    gate::Buffered verdict = gate::checkBuffered(d, n, settings.gateId.c_str());
+    if (verdict != gate::Buffered::Send) {
+      // Either can never be accepted and would count as waiting forever.
+      if (verdict == gate::Buffered::Unreadable) Serial.printf("[uplink] deleted unreadable %s\n", path.c_str());
+      else Serial.printf("[uplink] deleted %s, recorded under Gate ID %.32s\n", path.c_str(), d.gateId);
+      if (LittleFS.remove(path)) buffered--;
       continue;
     }
 

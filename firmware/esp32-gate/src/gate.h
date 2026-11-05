@@ -50,6 +50,7 @@ void uplinkTick(IPAddress server);
 bool uplinkConnected();
 bool bufferDetection(const gate::Detection &d);
 int bufferedCount();
+int clearBuffered();  // deletes every waiting detection, returns how many
 
 // web.cpp
 void webBegin();

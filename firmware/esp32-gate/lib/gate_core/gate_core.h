@@ -175,6 +175,18 @@ struct Detection {
   int64_t monoUs;     // esp_timer_get_time() at detection
 };
 
+enum class Buffered { Send, Unreadable, ForeignGate };
+
+// Whether a detection read back from flash can still be sent. The broker lets
+// a gate publish only under its own login id and drops the whole connection
+// on any other topic, so one detection under an old Gate ID would block every
+// detection behind it, for good.
+inline Buffered checkBuffered(const Detection &d, size_t bytesRead, const char *gateId) {
+  if (bytesRead != sizeof d || d.magic != DETECTION_MAGIC) return Buffered::Unreadable;
+  if (strncmp(d.gateId, gateId, sizeof d.gateId) != 0) return Buffered::ForeignGate;
+  return Buffered::Send;
+}
+
 enum class DetectionTime { Known, NotYetSyncedWait, Unknown };
 
 // A detection before the first sync gets its time back from the monotonic
