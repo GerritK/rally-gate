@@ -12,6 +12,7 @@ import { fetchGates, type Gate } from '../api/gates';
 import { fetchStage, updateStage, type Stage } from '../api/stages';
 import FormDialog from '../components/FormDialog.vue';
 import StatusChip from '../components/StatusChip.vue';
+import TimeInput from '../components/TimeInput.vue';
 import { fetchRallyInfo } from '../api/rally-info';
 import {
   combineDateAndTime,
@@ -24,7 +25,6 @@ import {
   formatClockTime,
   formatStageDuration,
   notify,
-  openTimePicker,
   parseStageDuration,
   t,
 } from '@rally-gate/ui';
@@ -291,13 +291,9 @@ onMounted(load);
           />
           <div class="rg-stage-row">
             <template v-if="timetable">
-              <v-text-field
+              <TimeInput
                 v-model="firstStartText"
-                type="time"
-                step="1"
                 :label="$t('stage.firstStart')"
-                class="rg-timing"
-                append-inner-icon="mdi-clock-outline"
                 :hint="
                   stageEditable && stage.startOrderFrozenAt
                     ? $t('stage.timetableFrozen')
@@ -306,7 +302,6 @@ onMounted(load);
                 persistent-hint
                 :rules="[required]"
                 :disabled="timetableLocked"
-                @click:append-inner="openTimePicker"
               />
               <v-text-field
                 v-model="intervalText"

@@ -35,19 +35,6 @@
 }
 
 /*
- * Native <input type="time"> ships its own OS clock icon that doesn't match
- * this app's MDI iconset. Hide it and pair with an
- * append-inner-icon="mdi-clock-outline" + @click:append-inner="openTimePicker"
- * on the v-text-field instead — same native picker popup underneath (that
- * part can't be restyled further), just a consistent trigger icon.
- */
-input[type='time']::-webkit-calendar-picker-indicator {
-  opacity: 0;
-  width: 0;
-  margin: 0;
-}
-
-/*
  * Vuetify's $heading-font-family (theme.ts's `font-heading` variable) only
  * feeds its .text-h1–.text-h6 typography-scale classes internally — it
  * doesn't reach v-card-title/v-toolbar-title, which just inherit the body

@@ -423,6 +423,10 @@ writing UI, check this list:
 - `TableLegend`: see Tooltips, legends and links.
 - `RallyLockAlert`: above a page the rally status locks, the reason its
   controls are disabled.
+- `TimeInput`: every typed clock time, `HH:MM:SS` 24 h. Typing is lenient
+  (`140327`, `14.03`, `9:5:3`) for a fast correction; text that isn't a
+  time stays in error, unsaved. The clock icon opens a `v-time-picker`
+  with seconds; the icon is no tab stop.
 - `RunningTime`: a running stage time ticking in tenths, its own timer so
   only it re-renders.
 - Live Timing's own: `GateFlow` (the gate line), `RunCorrectionDialog`,

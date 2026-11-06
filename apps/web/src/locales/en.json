@@ -7,6 +7,8 @@
     "discardChanges": "Discard changes?",
     "couldNotSave": "Could not save",
     "required": "Required",
+    "invalidTime": "Not a time: HH:MM:SS, 24 h",
+    "pickTime": "Pick a time",
     "moreActions": "More actions",
     "leaveTitle": "Leave without saving?",
     "leaveText": "Your changes on this page are lost.",

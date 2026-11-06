@@ -5,7 +5,7 @@ import { t } from './i18n';
  * not one generic "format a duration" function:
  * - Clock time (start/finish/heartbeat instants): HH:MM:SS, 24h, seconds
  *   included — these are electronically-recorded instants the correction
- *   UI edits to the second (see openTimePicker), not a paper time-card
+ *   UI edits to the second (TimeInput in apps/web), not a paper time-card
  *   schedule where the minute is the actual granularity that matters.
  * - Special stage result (elapsed racing duration): HH:MM:SS.s or
  *   MM:SS.s. One decimal place (tenths), not raw millisecond precision.
@@ -17,7 +17,7 @@ import { t } from './i18n';
  */
 
 /** Clock time (start/finish/heartbeat instants): HH:MM:SS, 24h. Also the
- *  value of an `<input type="time" step="1">`; empty for no time. */
+ *  value of apps/web's TimeInput; empty for no time. */
 export function formatClockTime(iso?: string): string {
   if (!iso) return '';
   const d = new Date(iso);

@@ -3,7 +3,6 @@ import { computed, ref, watch } from 'vue';
 import {
   formatClockTime,
   formatStageDuration,
-  openTimePicker,
   parseStageDuration,
   t,
 } from '@rally-gate/ui';
@@ -16,6 +15,7 @@ import {
 import { combineDateAndTime, entryName, required } from '../format';
 import { finishAfter, startBefore } from '../midnight';
 import FormDialog from './FormDialog.vue';
+import TimeInput from './TimeInput.vue';
 
 /**
  * Corrects a run's times, or enters one for a car with no run — a missed
@@ -179,52 +179,36 @@ async function onSave() {
       }}
       {{ $t('correction.introManual') }}
     </p>
-    <v-text-field
+    <TimeInput
       v-if="enteringEntryId && derivedIso"
       :model-value="formatClockTime(derivedIso)"
-      type="time"
-      step="1"
       :label="$t('gateRole.start')"
-      class="rg-timing"
       :hint="$t('correction.setByStageTime')"
       persistent-hint
       disabled
     />
-    <v-text-field
+    <TimeInput
       v-else
       v-model="correction.start"
-      type="time"
-      step="1"
       :label="$t('gateRole.start')"
-      class="rg-timing"
-      append-inner-icon="mdi-clock-outline"
       :rules="enteringEntryId && stageTimeChanged ? [] : [required]"
-      @click:append-inner="openTimePicker"
     />
-    <v-text-field
+    <TimeInput
       v-if="!enteringEntryId && derivedIso"
       :model-value="formatClockTime(derivedIso)"
-      type="time"
-      step="1"
       :label="$t('gateRole.finish')"
-      class="rg-timing"
       :hint="$t('correction.setByStageTime')"
       persistent-hint
       disabled
     />
-    <v-text-field
+    <TimeInput
       v-else
       v-model="correction.finish"
-      type="time"
-      step="1"
       :label="$t('gateRole.finish')"
-      class="rg-timing"
       :hint="enteringEntryId ? '' : $t('correction.finishHint')"
       persistent-hint
       :clearable="!enteringEntryId"
       :rules="enteringEntryId ? [required] : []"
-      append-inner-icon="mdi-clock-outline"
-      @click:append-inner="openTimePicker"
     />
     <v-text-field
       v-model="correction.stageTime"

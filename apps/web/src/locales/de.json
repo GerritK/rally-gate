@@ -7,6 +7,8 @@
     "discardChanges": "Änderungen verwerfen?",
     "couldNotSave": "Speichern fehlgeschlagen",
     "required": "Pflichtfeld",
+    "invalidTime": "Keine Uhrzeit: HH:MM:SS, 24 h",
+    "pickTime": "Uhrzeit wählen",
     "moreActions": "Weitere Aktionen",
     "leaveTitle": "Ohne Speichern verlassen?",
     "leaveText": "Deine Änderungen auf dieser Seite gehen verloren.",
