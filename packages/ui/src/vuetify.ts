@@ -41,6 +41,13 @@ export function createRallyVuetify(i18n: RallyI18n) {
       VSelect: { variant: 'outlined', density: 'comfortable' },
       VCombobox: { variant: 'outlined', density: 'comfortable' },
       VAutocomplete: { variant: 'outlined', density: 'comfortable' },
+      // The calendar inside the field, where the time fields have their clock.
+      VDateInput: {
+        variant: 'outlined',
+        density: 'comfortable',
+        prependIcon: '',
+        appendInnerIcon: '$calendar',
+      },
     },
   });
 }

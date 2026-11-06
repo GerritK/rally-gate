@@ -330,6 +330,25 @@
     "opening": "Öffne {name}…",
     "serverNotBack": "Der Server ist nicht mit {file} zurückgekommen"
   },
+  "lobby": {
+    "title": "Veranstaltung wählen",
+    "hint": "Noch ist keine Veranstaltung geöffnet. Mit der letzten weitermachen, eine andere öffnen oder eine neue anlegen.",
+    "continue": "Weiter mit {name}",
+    "waitingTitle": "Noch keine Veranstaltung geöffnet",
+    "waitingText": "Die Veranstaltung wird gerade am Server gewählt. Diese Seite öffnet sie dann von selbst."
+  },
+  "events": {
+    "delete": "Veranstaltung löschen",
+    "deleteTitle": "{name} löschen?",
+    "deleteText": "Die Veranstaltungsdatei wird endgültig gelöscht, mit allen WPs, Nennungen und Zeiten darin. Wer sie behalten will, lädt sie vorher herunter.",
+    "deleted": "{name} gelöscht",
+    "download": "Herunterladen",
+    "import": "Importieren",
+    "imported": "{name} importiert",
+    "replaceTitle": "{name} gibt es schon. Ersetzen?",
+    "replaceText": "Die gleichnamige Veranstaltung in der Liste dieses Rechners wird endgültig gelöscht, mit allen WPs, Nennungen und Zeiten darin, und die importierte Datei tritt an ihre Stelle.",
+    "replace": "Veranstaltung ersetzen"
+  },
   "checkIn": {
     "title": "Check-in",
     "back": "Zurück zu den Nennungen",
@@ -633,6 +652,10 @@
     "eventFileNotFound": "Es gibt keine Veranstaltungsdatei {file}.",
     "eventFixedByConfig": "Die Veranstaltung dieses Servers ist durch seine Konfiguration festgelegt und lässt sich hier nicht wechseln.",
     "closeStageBeforeSwitch": "Eine WP ist aktiv. Schließe sie, bevor du die Veranstaltung wechselst.",
+    "eventIsOpen": "{file} ist die geöffnete Veranstaltung und kann nicht gelöscht oder ersetzt werden.",
+    "noEventOpen": "Noch ist keine Veranstaltung geöffnet. Sie wird gerade gewählt.",
+    "importTooLarge": "Die Datei ist größer als {maxMb} MB und kann keine Veranstaltungsdatei sein.",
+    "importNotAnEvent": "Das ist keine Rally-Gate-Veranstaltungsdatei.",
     "knownHardwareStandaloneOnly": "Bekannte Hardware wird nur im Standalone-Paket gespeichert.",
     "lockedWhileRunning": "Gesperrt, solange die Rallye läuft: Es würde schon gemessene Ergebnisse ändern.",
     "lockedWhileClosed": "Die Rallye ist abgeschlossen, ihre Ergebnisse sind endgültig. Öffne sie in der Einrichtung wieder, um sie zu ändern.",

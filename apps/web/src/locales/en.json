@@ -330,6 +330,25 @@
     "opening": "Opening {name}…",
     "serverNotBack": "The server did not come back with {file}"
   },
+  "lobby": {
+    "title": "Choose an event",
+    "hint": "No event is open yet. Continue with the last one, open another or create a new one.",
+    "continue": "Continue with {name}",
+    "waitingTitle": "No event open yet",
+    "waitingText": "The organiser is choosing the event on the server. This page opens it by itself."
+  },
+  "events": {
+    "delete": "Delete event",
+    "deleteTitle": "Delete {name}?",
+    "deleteText": "The event file is deleted for good, with every stage, entry and time in it. Download it first to keep a copy.",
+    "deleted": "{name} deleted",
+    "download": "Download",
+    "import": "Import",
+    "imported": "{name} imported",
+    "replaceTitle": "{name} already exists. Replace it?",
+    "replaceText": "The event of that name in this computer's list is deleted for good, with every stage, entry and time in it, and the imported file takes its place.",
+    "replace": "Replace event"
+  },
   "checkIn": {
     "title": "Check-in",
     "back": "Back to Entries",
@@ -633,6 +652,10 @@
     "eventFileNotFound": "There is no event file {file}.",
     "eventFixedByConfig": "This server's event is fixed by its configuration and can't be switched here.",
     "closeStageBeforeSwitch": "A stage is active. Close it before switching events.",
+    "eventIsOpen": "{file} is the open event and can't be deleted or replaced.",
+    "noEventOpen": "No event is open yet. The organiser is choosing one.",
+    "importTooLarge": "The file is larger than {maxMb} MB and can't be an event file.",
+    "importNotAnEvent": "This is not a Rally Gate event file.",
     "knownHardwareStandaloneOnly": "Known hardware is only kept in the standalone package.",
     "lockedWhileRunning": "Locked while the rally is running: it would change results already timed.",
     "lockedWhileClosed": "The rally is closed and its results are final. Reopen it in Setup to change them.",

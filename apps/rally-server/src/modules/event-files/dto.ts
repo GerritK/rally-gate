@@ -1,4 +1,11 @@
-import { IsNotEmpty, IsString, Matches, MaxLength } from 'class-validator';
+import {
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateEventDto {
   @IsString()
@@ -15,4 +22,17 @@ export class OpenEventDto {
   @IsString()
   @IsNotEmpty()
   file: string;
+}
+
+/** The body is the file itself (`application/octet-stream`). */
+export class ImportEventDto {
+  /** The uploaded file's own name; only its cleaned last segment is used. */
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  file: string;
+
+  @IsOptional()
+  @IsIn(['true'])
+  replace?: string;
 }

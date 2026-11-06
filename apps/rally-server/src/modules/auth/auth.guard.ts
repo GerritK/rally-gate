@@ -21,7 +21,7 @@ import { AuthService, type Principal } from './auth.service';
 export const DEVICE_COOKIE = 'rally_gate_device';
 
 const ROLES = 'roles';
-const PUBLIC = 'public';
+export const PUBLIC = 'public';
 const PRIVATE = 'private';
 
 /**
@@ -52,12 +52,31 @@ export const CurrentPrincipal = createParamDecorator(
 // Checked on the socket, never a header: anyone can send X-Forwarded-For.
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 
+/** The request comes from the server machine itself. */
+export const isLoopback = (req: Request) =>
+  LOOPBACK.has(req.socket.remoteAddress ?? '');
+
 export function cookieValue(req: Request, name: string): string | null {
   for (const part of (req.headers.cookie ?? '').split(';')) {
     const [key, ...value] = part.trim().split('=');
     if (key === name) return decodeURIComponent(value.join('='));
   }
   return null;
+}
+
+/**
+ * Without CORS a foreign page still gets a plain form POST through, and on
+ * the server machine that would be the organiser. Browsers always send
+ * Origin on a POST; curl and the seed script send none.
+ */
+export function assertSameOrigin(req: Request): void {
+  const origin = req.headers.origin;
+  const read = req.method === 'GET' || req.method === 'HEAD';
+  if (!read && origin && new URL(origin).host !== req.headers.host) {
+    throw new ForbiddenException(
+      apiError(ApiErrorCode.FOREIGN_ORIGIN, `Refused request from ${origin}`),
+    );
+  }
 }
 
 /**
@@ -78,15 +97,7 @@ export class AuthGuard implements CanActivate {
 
     const targets = [context.getHandler(), context.getClass()];
     const read = req.method === 'GET' || req.method === 'HEAD';
-    // Without CORS a foreign page still gets a plain form POST through, and
-    // on the server machine that would be the organiser. Browsers always
-    // send Origin on a POST; curl and the seed script send none.
-    const origin = req.headers.origin;
-    if (!read && origin && new URL(origin).host !== req.headers.host) {
-      throw new ForbiddenException(
-        apiError(ApiErrorCode.FOREIGN_ORIGIN, `Refused request from ${origin}`),
-      );
-    }
+    assertSameOrigin(req);
     if (this.reflector.getAllAndOverride<boolean>(PUBLIC, targets)) return true;
 
     const principal = req.principal;
@@ -115,7 +126,7 @@ export class AuthGuard implements CanActivate {
   }
 
   private async resolve(req: Request): Promise<Principal | null> {
-    if (LOOPBACK.has(req.socket.remoteAddress ?? '')) {
+    if (isLoopback(req)) {
       return { role: AccessRole.ORGANISER, device: null, invitation: null };
     }
     const token = cookieValue(req, DEVICE_COOKIE);

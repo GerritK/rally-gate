@@ -24,6 +24,9 @@ export interface AuthSession {
   stageIds: string[];
   /** Whether the organiser password is set, so a page can offer setting it. */
   passwordSet: boolean;
+  /** No event is open yet: the standalone package's first start, until the
+   *  organiser picks one (`docs/deployment-modes.md` "New / open event"). */
+  lobby: boolean;
 }
 
 export interface Invitation {

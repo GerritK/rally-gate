@@ -71,6 +71,8 @@ export const router = createRouter({
       },
     },
     { path: '/login', component: () => import('./pages/LoginView.vue') },
+    // No event open yet (`session.lobby`); every other page leads here then.
+    { path: '/lobby', component: () => import('./pages/LobbyView.vue') },
     // What an invitation's QR code opens.
     {
       path: '/join/:code',
@@ -112,7 +114,7 @@ export const router = createRouter({
 
 /** What a browser without a login may open; the rest sends it to the public page. */
 export const isPublicPath = (path: string) =>
-  ['public', 'login', 'join'].includes(path.split('/')[1]);
+  ['public', 'login', 'join', 'lobby'].includes(path.split('/')[1]);
 
 // Path only: a filter writing to the query (?classes=) is the same page, and
 // a dialog's "Stage added" lands after the navigation it triggered. The
@@ -124,6 +126,12 @@ router.beforeEach(async (to, from) => {
   if (!to.redirectedFrom || !session.value) {
     await fetchSession().catch(() => undefined);
   }
+  if (session.value?.lobby) {
+    // Login stays reachable: a remote organiser logs in with the password.
+    if (!['/lobby', '/login'].includes(to.path)) return '/lobby';
+    return;
+  }
+  if (to.path === '/lobby') return '/';
   if (session.value && !session.value.role && !isPublicPath(to.path)) {
     return { path: '/public', query: to.query };
   }

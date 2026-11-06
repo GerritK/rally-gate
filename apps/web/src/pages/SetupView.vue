@@ -7,7 +7,7 @@ import {
   createEvent,
   fetchEventInfo,
   openEvent,
-  waitForEvent,
+  switchEvent,
   type EventInfo,
 } from '../api/event';
 import { fetchEntries } from '../api/entries';
@@ -23,32 +23,21 @@ import {
 } from '../api/rally-info';
 import { fetchStages } from '../api/stages';
 import { serverNow } from '../api/time';
-import FormDialog from '../components/FormDialog.vue';
+import EventSwitchOverlay from '../components/EventSwitchOverlay.vue';
+import EventTable from '../components/EventTable.vue';
+import ImportEventButton from '../components/ImportEventButton.vue';
+import NewEventDialog from '../components/NewEventDialog.vue';
 import StatusChip from '../components/StatusChip.vue';
-import {
-  eventName,
-  isOnline,
-  isReady,
-  RALLY_STATUS_DISPLAY,
-  required,
-} from '../format';
+import { isOnline, isReady, RALLY_STATUS_DISPLAY } from '../format';
 import { preStartCheck, type CheckFinding } from '../pre-start-check';
 import { useUnsavedChanges } from '../unsaved-changes';
-import { currentLocale, notify, t, useConfirm } from '@rally-gate/ui';
-
-function today(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
+import { notify, t, useConfirm } from '@rally-gate/ui';
 
 const rallyInfo = ref<RallyInfo>({ name: '', date: '', location: '' });
 const saving = ref(false);
 const eventInfo = ref<EventInfo | null>(null);
 const newDialog = ref(false);
 const openDialog = ref(false);
-const newEvent = ref({ name: '', date: today() });
-const switchingTo = ref<string | null>(null);
 const { markSaved } = useUnsavedChanges(() => rallyInfo.value);
 const confirm = useConfirm();
 const { smAndDown } = useDisplay();
@@ -133,34 +122,20 @@ async function onSave() {
   }
 }
 
-/** Reloads the whole app afterwards: every page holds the old event's data. */
-async function switchEvent(request: () => Promise<{ file: string }>) {
-  const { file } = await request();
-  switchingTo.value = file;
-  try {
-    await waitForEvent(file);
-  } catch (err) {
-    switchingTo.value = null;
-    throw err;
-  }
-  location.reload();
-}
-
-function openNew() {
-  newEvent.value = { name: '', date: today() };
-  newDialog.value = true;
-}
-
 function onOpen(file: string) {
   openDialog.value = false;
   return switchEvent(() => openEvent(file));
+}
+
+async function loadEvents() {
+  eventInfo.value = await fetchEventInfo();
 }
 
 onMounted(async () => {
   const existing = await fetchRallyInfo();
   if (existing) rallyInfo.value = existing;
   markSaved();
-  eventInfo.value = await fetchEventInfo();
+  await loadEvents();
 });
 </script>
 
@@ -173,7 +148,7 @@ onMounted(async () => {
         {{ eventInfo.file }}
       </v-card-subtitle>
       <template v-if="eventInfo?.switchable && can('setup')" #append>
-        <v-btn variant="text" prepend-icon="mdi-plus" @click="openNew">
+        <v-btn variant="text" prepend-icon="mdi-plus" @click="newDialog = true">
           {{ $t('setup.newEvent') }}
         </v-btn>
         <v-btn
@@ -379,68 +354,28 @@ onMounted(async () => {
     </v-col>
   </v-row>
 
-  <FormDialog
+  <NewEventDialog
     v-model="newDialog"
-    :title="$t('setup.newEvent')"
-    :form="newEvent"
-    :save="() => switchEvent(() => createEvent(newEvent))"
-    :saved="$t('setup.eventCreated')"
-    :save-text="$t('setup.createAndOpen')"
-  >
-    <p class="text-body-2 text-medium-emphasis">
-      {{ $t('setup.newEventHint') }}
-    </p>
-    <v-text-field
-      v-model="newEvent.name"
-      :label="$t('setup.rallyName')"
-      :rules="[required]"
-      autofocus
-    />
-    <v-text-field
-      v-model="newEvent.date"
-      type="date"
-      :label="$t('setup.date')"
-      :rules="[required]"
-    />
-  </FormDialog>
+    :create="(input) => switchEvent(() => createEvent(input))"
+  />
 
   <v-dialog v-model="openDialog" max-width="600" :fullscreen="smAndDown">
     <v-card v-if="eventInfo">
-      <v-card-title>{{ $t('setup.openEvent') }}</v-card-title>
-      <v-card-subtitle>
-        {{ $t('setup.onThisComputer', { n: eventInfo.events.length }) }}
-      </v-card-subtitle>
-      <v-table density="comfortable">
-        <thead>
-          <tr>
-            <th>{{ $t('setup.event') }}</th>
-            <th>{{ $t('setup.lastChanged') }}</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="event in eventInfo.events" :key="event.file">
-            <td>{{ eventName(event.file) }}</td>
-            <td>
-              {{ new Date(event.modifiedAt).toLocaleString(currentLocale()) }}
-            </td>
-            <td class="text-right">
-              <v-chip v-if="event.file === eventInfo.file" size="small">
-                {{ $t('setup.isOpen') }}
-              </v-chip>
-              <v-btn
-                v-else
-                size="small"
-                variant="text"
-                prepend-icon="mdi-folder-open-outline"
-                @click="onOpen(event.file)"
-              >
-                {{ $t('setup.open') }}
-              </v-btn>
-            </td>
-          </tr>
-        </tbody>
-      </v-table>
+      <v-card-item>
+        <v-card-title>{{ $t('setup.openEvent') }}</v-card-title>
+        <v-card-subtitle>
+          {{ $t('setup.onThisComputer', { n: eventInfo.events.length }) }}
+        </v-card-subtitle>
+        <template #append>
+          <ImportEventButton variant="tonal" @imported="loadEvents" />
+        </template>
+      </v-card-item>
+      <EventTable
+        :events="eventInfo.events"
+        :open-file="eventInfo.file"
+        @open="onOpen"
+        @deleted="loadEvents"
+      />
       <v-card-actions>
         <v-spacer />
         <v-btn variant="text" @click="openDialog = false">
@@ -450,14 +385,5 @@ onMounted(async () => {
     </v-card>
   </v-dialog>
 
-  <v-overlay
-    :model-value="!!switchingTo"
-    persistent
-    class="align-center justify-center"
-  >
-    <v-card class="pa-6 d-flex align-center ga-4">
-      <v-progress-circular indeterminate color="primary" />
-      {{ $t('setup.opening', { name: switchingTo && eventName(switchingTo) }) }}
-    </v-card>
-  </v-overlay>
+  <EventSwitchOverlay />
 </template>

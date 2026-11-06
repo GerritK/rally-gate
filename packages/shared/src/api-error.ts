@@ -69,6 +69,11 @@ export enum ApiErrorCode {
   EVENT_FILE_NOT_FOUND = 'eventFileNotFound',
   EVENT_FIXED_BY_CONFIG = 'eventFixedByConfig',
   CLOSE_STAGE_BEFORE_SWITCH = 'closeStageBeforeSwitch',
+  EVENT_IS_OPEN = 'eventIsOpen',
+  NO_EVENT_OPEN = 'noEventOpen',
+  /** `params.maxMb`. */
+  IMPORT_TOO_LARGE = 'importTooLarge',
+  IMPORT_NOT_AN_EVENT = 'importNotAnEvent',
   KNOWN_HARDWARE_STANDALONE_ONLY = 'knownHardwareStandaloneOnly',
   LOCKED_WHILE_RUNNING = 'lockedWhileRunning',
   LOCKED_WHILE_CLOSED = 'lockedWhileClosed',

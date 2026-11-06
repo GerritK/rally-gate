@@ -288,7 +288,7 @@ export function gateStatusColor(gate: Gate, nowMs: number): string {
 
 /** An event file without its extension, as a marshal named it. */
 export function eventName(file: string): string {
-  return file.replace(/\.sqlite$/, '');
+  return file.replace(/\.rallygate$/, '');
 }
 
 /** `1:30` or `90` as whole seconds, as penalties are given; null otherwise. */

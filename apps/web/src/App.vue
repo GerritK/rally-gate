@@ -28,6 +28,8 @@ const { xs } = useDisplay();
 const route = useRoute();
 const router = useRouter();
 const loggedIn = computed(() => !!session.value?.role);
+/** The lobby has no event yet: no drawer, status or event name. */
+const inEvent = computed(() => loggedIn.value && !session.value?.lobby);
 /** By first path segment: sub-pages (/setup/stages, /hardware/gates/…,
  *  /results/stages/…) aren't nested routes, so the link's own active state
  *  misses them. */
@@ -76,9 +78,10 @@ watch(loggedIn, (now) => {
 
 // The file name is internal (`/event`), so only for a login.
 watch(
-  loggedIn,
+  inEvent,
   async (now) => {
-    if (now) fileName.value = eventName((await fetchEventInfo()).file);
+    const { file } = now ? await fetchEventInfo() : { file: null };
+    if (file) fileName.value = eventName(file);
   },
   { immediate: true },
 );
@@ -86,7 +89,8 @@ watch(
 onMounted(() => {
   void fetchServerVersion();
   syncServerClock().catch(() => undefined);
-  void loadDisplaySettings();
+  // The lobby has no settings; its switch reloads the app.
+  loadDisplaySettings().catch(() => undefined);
 });
 </script>
 
@@ -97,7 +101,7 @@ onMounted(() => {
          just the open event. -->
     <v-app-bar>
       <template #prepend>
-        <v-app-bar-nav-icon v-if="loggedIn" @click="drawer = !drawer" />
+        <v-app-bar-nav-icon v-if="inEvent" @click="drawer = !drawer" />
       </template>
       <v-app-bar-title>
         <div class="d-flex align-center ga-3">
@@ -129,23 +133,25 @@ onMounted(() => {
         <v-divider v-if="liveStatus" vertical inset class="app-bar-divider" />
         <!-- Links to where it is changed; the change itself never sits in
              the app bar, where a stray tap on a tablet would end a rally. -->
-        <v-chip
-          :to="loggedIn ? '/setup' : undefined"
-          :color="RALLY_STATUS_DISPLAY[rallyStatus].color"
-          :prepend-icon="
-            xs ? undefined : RALLY_STATUS_DISPLAY[rallyStatus].icon
-          "
-          size="small"
-          variant="tonal"
-          v-tooltip:bottom="t('rallyStatus.title')"
-          :aria-label="RALLY_STATUS_DISPLAY[rallyStatus].label"
-        >
-          <v-icon v-if="xs" :icon="RALLY_STATUS_DISPLAY[rallyStatus].icon" />
-          <template v-else>{{
-            RALLY_STATUS_DISPLAY[rallyStatus].label
-          }}</template>
-        </v-chip>
-        <v-divider vertical inset class="app-bar-divider" />
+        <template v-if="!session?.lobby">
+          <v-chip
+            :to="loggedIn ? '/setup' : undefined"
+            :color="RALLY_STATUS_DISPLAY[rallyStatus].color"
+            :prepend-icon="
+              xs ? undefined : RALLY_STATUS_DISPLAY[rallyStatus].icon
+            "
+            size="small"
+            variant="tonal"
+            v-tooltip:bottom="t('rallyStatus.title')"
+            :aria-label="RALLY_STATUS_DISPLAY[rallyStatus].label"
+          >
+            <v-icon v-if="xs" :icon="RALLY_STATUS_DISPLAY[rallyStatus].icon" />
+            <template v-else>{{
+              RALLY_STATUS_DISPLAY[rallyStatus].label
+            }}</template>
+          </v-chip>
+          <v-divider vertical inset class="app-bar-divider" />
+        </template>
         <div v-tooltip:bottom="t('app.serverTime')" class="text-center">
           <div class="rg-timing app-bar-clock">
             {{
@@ -176,7 +182,7 @@ onMounted(() => {
              in the app bar reads as a pressed button. -->
         <!-- On a phone the drawer's Setup entry is enough. -->
         <v-btn
-          v-if="loggedIn && !xs"
+          v-if="inEvent && !xs"
           to="/setup"
           :active="false"
           icon="mdi-cog-outline"
@@ -194,7 +200,7 @@ onMounted(() => {
         </v-btn>
       </template>
     </v-app-bar>
-    <v-navigation-drawer v-if="loggedIn" v-model="drawer">
+    <v-navigation-drawer v-if="inEvent" v-model="drawer">
       <v-list nav density="comfortable">
         <v-list-item
           v-for="item in NAV_ITEMS"

@@ -90,7 +90,9 @@ function supervise() {
       }
     });
   };
-  start(process.env);
+  // Only this first start asks for the lobby: a restart after a switch goes
+  // straight into the chosen event.
+  start({ ...process.env, LOBBY: '1' });
 
   // Ctrl+C in the console reaches the server as well; exit after it, with its code.
   process.on('SIGINT', () => {});

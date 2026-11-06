@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -8,7 +8,12 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { NextFunction, Request, Response } from 'express';
 import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
-import { RESTART_EXIT_CODE } from './modules/event-files/event-files';
+import {
+  eventName,
+  RESTART_EXIT_CODE,
+  startsInLobby,
+} from './modules/event-files/event-files';
+import { LobbyModule } from './modules/lobby/lobby.module';
 import { portClashHint } from './port-owner';
 import { ensureWindowsFirewall } from './windows-firewall';
 
@@ -23,7 +28,9 @@ async function bootstrap() {
   // Before any port is bound: the reservation it makes is refused for a port
   // in use. Waits on the UAC prompt only on the first start, never fails.
   await ensureWindowsFirewall();
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+  const lobby = startsInLobby();
+  const module = lobby ? LobbyModule : AppModule;
+  const app = await NestFactory.create<NestExpressApplication>(module, {
     // Open SSE streams would otherwise hold app.close() open forever.
     forceCloseConnections: true,
     logger:
@@ -60,7 +67,9 @@ async function bootstrap() {
       if (req.method !== 'GET' || req.path.startsWith('/api')) {
         return next();
       }
-      res.sendFile(join(WEB_DIST, 'index.html'));
+      // root: send refuses an absolute path with a dot folder in it, so a
+      // package unpacked under ~/.local would 404 on every deep link.
+      res.sendFile('index.html', { root: WEB_DIST });
     });
   }
 
@@ -75,8 +84,12 @@ async function bootstrap() {
   // Not through the logger: the standalone console runs at LOG_LEVEL=warn,
   // and this is the one line a marshal needs from it.
   console.log(`Dashboard: ${url}`);
-  if (process.env.DB_TYPE !== 'postgres') {
-    console.log(`Event file: ${String(app.get(DataSource).options.database)}`);
+  if (lobby) {
+    console.log('No event is open yet. Choose one in the browser.');
+  } else if (process.env.DB_TYPE !== 'postgres') {
+    // The name only: where the files live is nobody's business at a rally.
+    const file = basename(String(app.get(DataSource).options.database));
+    console.log(`Event: ${eventName(file)}`);
   }
   app.get(EventEmitter2).once('app.restart', () => {
     // A moment for the response to the switch request to reach the browser.

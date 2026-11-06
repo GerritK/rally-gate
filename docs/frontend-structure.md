@@ -16,7 +16,7 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
 | `/entries/:entryId` | Entries | one entry: crew with Edit, then the dialog's parts as cards (Crew, Car, Registration); Times per stage with position, gap and status, the overall standing; Penalties with what each costs and Add penalties. Result rows open it too |
 | `/hardware` | Hardware | gate roster: health, one clock chip saying in sync, imprecise or out of sync (the worse of measured offset and chrony, both values in its tooltip and on the gate's page), last read with the car it matched (gate and transponder tests before the rally), pairing, shut down all gates; a row opens the gate. Gates known to this computer: add to this event, forget (standalone only) |
 | `/hardware/gates/:gateId` | Hardware | one gate: status, clock, address with a link to its gate-config, version, rename; its assignments on every stage; its last 100 detections, live, with clock correction and what became of each |
-| `/setup` | Setup | the event: rally details, file name, New / Open Event dialogs (standalone only); the rally status with what it locks, Start rally (behind the pre-start check), Close rally (confirmed, names the stages it closes), Reopen in ⋮ (confirmed); tiles to Stages, Classes, Start, Scoring and Display. The app bar's cog links here |
+| `/setup` | Setup | the event: rally details, file name, New Event dialog, Import, Open Event dialog, the latter's table with Download and Delete (standalone only); the rally status with what it locks, Start rally (behind the pre-start check), Close rally (confirmed, names the stages it closes), Reopen in ⋮ (confirmed); tiles to Stages, Classes, Start, Scoring and Display. The app bar's cog links here |
 | `/setup/stages` | Setup | stage list, create |
 | `/setup/stages/:stageId` | Setup | edit stage (scoring and start mode included, a timetable's first start and interval), its gate assignments (active state read-only) |
 | `/setup/classes` | Setup | entry classes table: add/rename/delete, main class or category, entry count. Assigned on Entries |
@@ -27,6 +27,7 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
 | `/public/:stageId?` | — | what anyone without a login sees, without the drawer: the stage track ending in Overall, the class filter; a stage's start list with each car's state and time (running ones ticking), then its results; or the overall, penalties as a sum. No print, no links to entries. No stage picks the active one. Every other page sends a browser without a login here |
 | `/login` | — | who this browser is, Log out; an invitation code to type; the organiser password. `?setup=` from the server log sets the first one. The drawer's foot links here |
 | `/join/:code` | — | what an invitation's QR code opens: logs the device in, then Live Timing |
+| `/lobby` | — | the standalone package's start, while no event is open (`session.lobby`; every other page but `/login` leads here then, and here leads to `/` otherwise), without the drawer or rally status. The organiser: Continue with the last event, New event, Import, the folder's events with Open, Download and Delete, reloaded when the window regains focus; open goes to Live Timing, new to Setup. Everyone else: "no event open yet", polling `GET /api/event` until one is |
 
 ## Decisions
 
@@ -110,7 +111,10 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
   `design-system.md`; shared pure helpers: `src/format.ts`.
 - **New / Open Event live in Setup**, on the rally details card: the details
   are the event, and switching is a before-the-event action (refused while a
-  stage is active), so it has no nav entry. Known gates are on Hardware,
+  stage is active), so it has no nav entry. The lobby shares their parts
+  (`NewEventDialog`, `EventTable`, `ImportEventButton`, `EventSwitchOverlay`); a
+  switch from Setup goes straight into the event, the lobby is for starting
+  the package only. Known gates are on Hardware,
   where gates are looked for.
 - **Switching events reloads the whole app** rather than refetching: every
   page holds the old event's data, and there is no store to reset.

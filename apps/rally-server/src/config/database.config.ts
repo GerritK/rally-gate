@@ -22,11 +22,14 @@ export function buildDatabaseConfig(): TypeOrmModuleOptions {
   }
 
   const dir = eventsDir();
+  // Never null here: an empty folder boots the lobby (`startsInLobby`).
+  const file = dir && resolveEventFile(dir);
   return {
     type: 'better-sqlite3',
-    database: dir
-      ? join(dir, resolveEventFile(dir))
-      : (process.env.DB_PATH ?? 'rally-gate.sqlite'),
+    database:
+      dir && file
+        ? join(dir, file)
+        : (process.env.DB_PATH ?? 'rally-gate.sqlite'),
     autoLoadEntities: true,
     synchronize: true,
   };

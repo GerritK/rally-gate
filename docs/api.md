@@ -21,6 +21,10 @@ Changes are the organiser's unless `@Requires` on the route names a
 `PERMISSIONS` entry (`packages/shared/src/permissions.ts`, the table in
 `auth.md`). `PATCH /entries/:id` checks the change itself: other fields need
 `editEntry`, a status change what that step needs (`entryStatusPermission`).
+In the lobby (standalone, no event open yet) only `/version`, `/time`, the
+login routes and `/event` exist, `/event` for the organiser only; everyone
+else gets 503 `noEventOpen`, and `/auth/session` answers `lobby: true`.
+
 Any login may read, except the invitation and device lists and
 `/auth/server-urls` (organiser only, `@Private`). Without a login, only what
 the public page reads: `/auth/session`, `/version`, `/time`, GET
@@ -81,7 +85,10 @@ the public page reads: `/auth/session`, `/version`, `/time`, GET
 | `/classification/stages/:stageId/non-finishers` | GET | DNF (a DNF run) and DNS (a DNS row of a car still in the event), from stored data at any time; DSQ for a disqualified car that drove it. Disqualified cars are in no ranking (`event-model.md` "Entry status") |
 | `/rally-info` | GET, PUT | the event's name/details and its `status` (server-owned); singleton, since one database is one event |
 | `/rally-info/start`, `/close`, `/reopen` | POST | `SETUP` → `RUNNING` → `CLOSED`, reopen back to `RUNNING`; 409 `rallyStatusInvalid` from any other status. Close 409s `carsOnStage` with `params.count`, else closes the running stages |
-| `/event` | GET, POST `{ name, date }`, `/open` POST `{ file }` | the open event file and the others in the folder, `switchable: false` when fixed by config. POST creates/opens by restarting the server (202, then poll GET); 409 while a stage is `ACTIVE` — see `deployment-modes.md` |
+| `/event` | GET, POST `{ name, date }`, `/open` POST `{ file }` | the open event `file` (null in the lobby), `last` (what a restart opens), the folder's `events`; `switchable: false` when fixed by config. POST creates/opens by restarting the server (202, then poll GET); 409 while a stage is `ACTIVE` — see `deployment-modes.md` |
+| `/event/:file` | DELETE | deletes an event file of the folder with its side files, for good; 404 `eventFileNotFound` for any name not listed there, 409 `eventIsOpen` for the open one |
+| `/event/:file/download` | GET | the event file as an attachment, a consistent copy through SQLite's backup (the open event too); organiser only (`@Private`) |
+| `/event/import` | POST `?file=<name>&replace=true`, body the file (`application/octet-stream`) | `{ file }`: placed in the folder, not opened. 413 `importTooLarge` over 100 MB, 400 `importNotAnEvent` unless a Rally Gate SQLite file, 409 `eventFileExists` without `replace`, 409 `eventIsOpen` for the open event — see `deployment-modes.md` |
 | `/event/known-gates` | GET, `/:id` DELETE | gates this computer remembers across events (standalone only); DELETE forgets one, the open event keeps it |
 | `/settings/:key` | GET, PUT | `notionalPenaltyMs`, `startOrderGrouping`/`startOrderKey`/`startOrderDirection` (enums in `packages/shared/src/start-order.ts`; an unknown value reads as the default), `countdownMs`, `jumpStartToleranceMs` (locked once the rally runs), `minStartGapMs`, `jumpStartPenaltyTypeId` (empty: only mark) |
 

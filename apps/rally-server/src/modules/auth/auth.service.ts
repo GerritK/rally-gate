@@ -94,6 +94,7 @@ export class AuthService implements OnApplicationBootstrap {
       deviceNumber: principal?.device?.number ?? null,
       stageIds: principal?.invitation?.stageIds ?? [],
       passwordSet: passwordSet(),
+      lobby: false,
     };
   }
 

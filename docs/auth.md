@@ -123,6 +123,14 @@ A login is a **device with a role**, not a person with a password.
 - **From elsewhere** (headless, or a second laptop): one organiser password,
   hashed in `organiser.json` next to the event files, like `known-gates`
   (headless: `CONFIG_DIR`, a volume in `deploy/docker-compose.yml`).
+- **In the lobby** (standalone, before an event is open,
+  `deployment-modes.md` "New / open event") devices and invitations don't
+  exist yet: the organiser only, by this computer or by the password, kept in
+  memory under its own cookie (`rally_gate_lobby`) so the device cookie still
+  works once its event is open again. Everyone else gets 503 `noEventOpen`.
+- **A password login belongs to its event** (a `Device` in the event
+  database): after switching events, from Setup or the lobby, that device
+  logs in again. The server machine itself never needs to.
 - **First start:** while no password exists, the server logs a setup link as a
   terminal QR code (installer output, `journalctl`, `docker logs`); scan it,
   set the password on the phone.

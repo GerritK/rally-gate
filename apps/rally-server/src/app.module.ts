@@ -24,7 +24,9 @@ import { EntriesModule } from './modules/entries/entries.module';
 @Module({
   imports: [
     EventEmitterModule.forRoot({ maxListeners: 100 }),
-    TypeOrmModule.forRoot(buildDatabaseConfig()),
+    // Async, so the config is read when this module boots, not when main.ts
+    // imports it to choose between it and the lobby.
+    TypeOrmModule.forRootAsync({ useFactory: buildDatabaseConfig }),
     // First, so its guard answers 401 before RallyLockGuard answers 409.
     AuthModule,
     BrokerModule,

@@ -1,4 +1,10 @@
-import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import {
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 
 /**
@@ -9,11 +15,12 @@ import { join } from 'node:path';
  */
 export const RESTART_EXIT_CODE = 75;
 
-const EXTENSION = '.sqlite';
+const EXTENSION = '.rallygate';
 const POINTER = 'current.json';
-/** What the packages used before there was more than one event file, so an
- * existing install keeps opening its data. */
-const DEFAULT_FILE = `rally-gate${EXTENSION}`;
+/** Generous: a rally's file is a few MB. */
+export const IMPORT_MAX_BYTES = 100 * 1024 * 1024;
+/** SQLite's side files of an event file, deleted with it. */
+const SIDE_FILES = ['-wal', '-shm', '-journal'];
 
 export interface EventFile {
   file: string;
@@ -43,11 +50,22 @@ export function listEventFiles(dir: string): EventFile[] {
 }
 
 /**
+ * Whether to boot without an event, for the organiser to pick one: asked for
+ * by the launcher on the first start only (a restart into a switched event
+ * must not stop there), or nothing to open. Never with the event fixed by
+ * config.
+ */
+export function startsInLobby(): boolean {
+  const dir = eventsDir();
+  return !!dir && (process.env.LOBBY === '1' || !resolveEventFile(dir));
+}
+
+/**
  * The pointer's file if it still exists, else the most recently used one —
  * a deleted or hand-edited pointer must never stop the server from starting
- * mid-event.
+ * mid-event. Null for an empty folder.
  */
-export function resolveEventFile(dir: string): string {
+export function resolveEventFile(dir: string): string | null {
   try {
     const { file } = JSON.parse(readFileSync(join(dir, POINTER), 'utf8')) as {
       file?: unknown;
@@ -58,11 +76,18 @@ export function resolveEventFile(dir: string): string {
   } catch {
     // no or unreadable pointer
   }
-  return listEventFiles(dir)[0]?.file ?? DEFAULT_FILE;
+  return listEventFiles(dir)[0]?.file ?? null;
 }
 
 export function writeCurrentEventFile(dir: string, file: string): void {
   writeFileSync(join(dir, POINTER), JSON.stringify({ file }, null, 2));
+}
+
+/** `file` must have passed `isEventFile`. */
+export function deleteEventFile(dir: string, file: string): void {
+  for (const suffix of ['', ...SIDE_FILES]) {
+    rmSync(join(dir, file + suffix), { force: true });
+  }
 }
 
 /** Only a plain name listed in `dir` — never a path from a request. */
@@ -71,15 +96,37 @@ export function isEventFile(dir: string, file: string): boolean {
 }
 
 /**
- * `2026-10-12 Rallye Eifel.sqlite`. The date prefix sorts the folder and
+ * `2026-10-12 Rallye Eifel.rallygate`. The date prefix sorts the folder and
  * also keeps a name like `CON` from ever being a bare Windows device name.
  * Null when nothing usable is left of the name.
  */
 export function eventFileName(date: string, name: string): string | null {
-  const safe = name
-    // eslint-disable-next-line no-control-regex
-    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
-    .replace(/[. ]+$/, '')
-    .trim();
+  const safe = safeName(name);
   return safe ? `${date} ${safe}${EXTENSION}` : null;
+}
+
+/**
+ * An uploaded file's name as an event file in the folder: its last path
+ * segment, cleaned like a new event's, with our extension. Null when
+ * nothing usable is left.
+ */
+export function importFileName(uploaded: string): string | null {
+  const last = uploaded.split(/[\\/]/).pop() ?? '';
+  const safe = safeName(last.replace(/\.rallygate$/i, ''));
+  return safe ? `${safe}${EXTENSION}` : null;
+}
+
+/** The event name without the extension, as a marshal named it. */
+export function eventName(file: string): string {
+  return file.endsWith(EXTENSION) ? file.slice(0, -EXTENSION.length) : file;
+}
+
+function safeName(name: string): string {
+  return (
+    name
+      // eslint-disable-next-line no-control-regex
+      .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
+      .replace(/[. ]+$/, '')
+      .trim()
+  );
 }

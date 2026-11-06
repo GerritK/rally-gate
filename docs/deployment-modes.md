@@ -87,21 +87,54 @@ several events live in one server at once, which isn't the requirement.
 
 ### New / open event
 
-Setup's event card creates and opens events; the app bar always shows
-which one is open. Standalone only — with `DB_PATH` or Postgres the event is
-fixed and the buttons are hidden.
+The lobby (on starting the package) and Setup's event card create, open,
+delete, download and import events; the app bar always shows which one is open. Standalone only —
+with `DB_PATH` or Postgres the event is fixed and the buttons are hidden.
 
-- **An event is a `.sqlite` file in `EVENTS_DIR`**, and the event list is that
-  folder's contents — no register that could disagree with the files. Rename,
-  delete and back up in the file explorer.
+- **An event is a `.rallygate` file in `EVENTS_DIR`** (a SQLite database
+  under our own extension), and the event list is that folder's contents — no
+  register that could disagree with the files. The folder's path is shown
+  nowhere in the UI, and the console names only the event: staff move events
+  with Download and Import, not by hand in the folder.
+- **The lobby: starting the package asks which event.** `start.js` passes
+  `LOBBY=1` to its first start of the server only, which then boots
+  `LobbyModule` instead of `AppModule`: the dashboard and `/api/event`, no
+  database, no MQTT broker, no SNTP. The start page offers **Continue with**
+  the event `current.json` names, the folder's events (open, download,
+  delete), **New event** and **Import**; picking one is the usual switch (below). Only
+  the organiser gets it (this computer's browser, or the organiser password
+  from `organiser.json`, a login that lasts as long as the lobby); every other
+  browser waits on "no event open yet" and opens the event once there is one.
+  A gate's detections buffered meanwhile land in the event picked. No lobby
+  with `DB_PATH`, Postgres or `npm run dev:server`.
 - **New never clears anything**: it writes a new file,
-  `<date> <name>.sqlite`, fully built (schema and rally details) before
-  switching, so a failure leaves the server on the old event.
-- **`current.json`** in the folder names the open file. A server restart (or
-  crash mid-event) reopens it without asking. A missing or stale pointer falls
-  back to the most recently changed file, and an empty folder to
-  `rally-gate.sqlite` — the file the packages used before, so an existing
-  install keeps its data.
+  `<date> <name>.rallygate`, fully built (schema and rally details) before
+  switching, so a failure leaves the server on the old event. From the lobby
+  it holds only the rally details; the restart's `synchronize` adds the rest.
+- **`current.json`** in the folder names the open file. A restart after a
+  switch (or a crash mid-event, restarted by hand) reopens it without asking.
+  A missing or stale pointer falls back to the most recently changed file; an
+  empty folder starts the lobby with only New event.
+- **Delete is for good**, the file and its `-wal`/`-shm`/`-journal` side
+  files, after a confirmation. Never the open event: it has no button, and the
+  server refuses (409 `eventIsOpen`). Only names listed in the folder, never a
+  path from the request.
+- **Download** (organiser only) saves `<date> <name>.rallygate`, the open
+  event too: always through SQLite's backup API into a temp file, never a raw
+  copy of a file that may be mid-write or have a journal to roll back.
+- **Import** (organiser only) puts a `.rallygate` file into the folder,
+  listed but not opened (opening is a switch). Checked in a temp file before
+  it lands there: at most 100 MB (413 `importTooLarge`), a SQLite file with
+  Rally Gate's `rally_info` table (400 `importNotAnEvent`). Its name is the
+  upload's last segment, cleaned like a new event's. A name already in the
+  folder is 409 `eventFileExists`, and the dashboard asks before replacing it
+  (with its side files); the open event is never replaced (409
+  `eventIsOpen`).
+- **What travels with a file**: the event (stages, entries, times, gates, gate
+  assignments, device logins and invitations), but not what is kept per
+  computer — a gate's approval and key (`gate-keys.json`), the organiser
+  password (`organiser.json`) and the known hardware (`hardware.json`), so
+  gates are paired again on the other computer.
 - **Switching is a restart.** The DataSource is injected into every repository
   at boot and can't be swapped underneath them, so the server exits with code
   75 and `start.js`, which runs it as a child process, starts it again on the

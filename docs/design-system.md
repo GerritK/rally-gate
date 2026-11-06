@@ -431,6 +431,10 @@ writing UI, check this list:
   `JumpStartChip`.
 - `PassingBlock`: the oldest unidentified passing with its picker, Assign
   and ⋮, later ones as a count, "Dismiss all".
+- The event files' parts, on Setup and the lobby: `NewEventDialog`,
+  `EventTable` (Open, Download and Delete in ⋮, Delete behind a
+  confirmation; the open event only Download), `ImportEventButton` (asks
+  before replacing an event of that name), `EventSwitchOverlay`.
 - `FormDialog`: every add/edit dialog (see Editing): saves on Enter, keeps
   a server error inside, asks before discarding, fullscreen on phones. The
   page passes the draft and a `save` that throws. A long form goes wide
