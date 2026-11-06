@@ -23,7 +23,9 @@ export default defineConfig({
   },
   server: {
     port: 57440,
-    proxy: { '/api': 'http://localhost:57430' },
+    // Not the string shorthand: that sets changeOrigin, so Host becomes :57430
+    // while Origin stays :57440 and the auth guard refuses every write.
+    proxy: { '/api': { target: 'http://localhost:57430' } },
   },
   // @rally-gate/shared ships a CommonJS build and is a symlinked workspace
   // package, so Vite's dev server skips it during dependency pre-bundling
