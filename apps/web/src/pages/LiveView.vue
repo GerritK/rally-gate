@@ -4,138 +4,56 @@ import LoadError from '../components/LoadError.vue';
 import LiveRunTable from '../components/LiveRunTable.vue';
 import LiveStageHeader from '../components/LiveStageHeader.vue';
 import OnStageCard from '../components/OnStageCard.vue';
-import { buildRows, countStates, type Row } from '../live-rows';
-import {
-  ApiErrorCode,
-  COUNTDOWN_MS_KEY,
-  DEFAULT_COUNTDOWN_MS,
-  DEFAULT_JUMP_START_TOLERANCE_MS,
-  DEFAULT_MIN_STAGE_DURATION_MS,
-  GateRole,
-  isOutOfEvent,
-  isScrutineered,
-  JUMP_START_PENALTY_TYPE_ID_KEY,
-  JUMP_START_TOLERANCE_MS_KEY,
-  StageScoring,
-  StageStatus,
-  StartMode,
-  type DidNotStart,
-} from '@rally-gate/shared';
-import { computed, onUnmounted, ref, watch } from 'vue';
+import type { Row } from '../live-row-display';
+import { buildRows, countStates } from '../live-rows';
+import { GateRole, StageStatus, StartMode } from '@rally-gate/shared';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { ApiError } from '../api/client';
 import { can, session } from '../api/auth';
-import {
-  assignEntryToEvent,
-  dismissEvent,
-  fetchAtStart,
-  fetchAwaitingEvents,
-  fetchPendingEvents,
-  retryPendingEvents,
-  type DetectionEventRecord,
-} from '../api/events';
-import {
-  fetchGateAssignments,
-  type GateAssignment,
-} from '../api/gate-assignments';
-import { fetchGates, type Gate } from '../api/gates';
+import { type GateAssignment } from '../api/gate-assignments';
 import { serverNow } from '../api/time';
-import { fetchSetting } from '../api/settings';
-import { fetchPenalties, type Penalty } from '../api/penalties';
-import { catchUpDelayMinutes } from '../countdown';
 import FormDialog from '../components/FormDialog.vue';
-import { closeLiveStream, openLiveStream, upsert } from '../api/live';
-import { rallyName } from '../api/rally-info';
-import {
-  activateStage,
-  closeStage,
-  delaySlots,
-  fetchStages,
-  newSlot,
-  type Stage,
-} from '../api/stages';
-import {
-  cancelCountdown,
-  createStageRun,
-  deleteStageRun,
-  dismissJumpStart,
-  startCountdown,
-  fetchSplitsForStage,
-  finishStageRunNow,
-  fetchStageRuns,
-  fetchDns,
-  markDns,
-  markDnf,
-  undoDns,
-  undoDnf,
-  unvoidStageRun,
-  voidStageRun,
-  type StageRun,
-  type StageSplit,
-} from '../api/stage-runs';
-import {
-  fetchStartOrder,
-  freezeStartOrder,
-  unfreezeStartOrder,
-  type StartOrder,
-} from '../api/start-order';
-import { fetchEntries, type Entry } from '../api/entries';
+import type { Stage } from '../api/stages';
 import RunCorrectionDialog from '../components/RunCorrectionDialog.vue';
 import PenaltyDialog from '../components/PenaltyDialog.vue';
 import StagePicker from '../components/StagePicker.vue';
 import UpNextCard, { type UpNextRow } from '../components/UpNextCard.vue';
-import { driverName } from '../crew';
-import {
-  formatStageDuration,
-  parseStageDuration,
-  t,
-  useChoice,
-  useConfirm,
-} from '@rally-gate/ui';
-import { carriersOf, suggestEntries } from '../passing-suggestions';
-import { printPdf, startListPdf } from '../pdf';
-import { formatStamp, gateRoleLabel, entryName } from '../format';
+import { formatStageDuration, t } from '@rally-gate/ui';
+import { gateRoleLabel } from '../format';
+import { useLiveData } from '../live-data';
+import { usePassings } from '../live-passings';
+import { useRunActions } from '../live-run-actions';
+import { useStageLifecycle } from '../live-stage-lifecycle';
 
 const props = defineProps<{ stageId?: string }>();
 const router = useRouter();
 
-let liveSource: EventSource | undefined;
+const data = useLiveData(props);
+const {
+  stages,
+  entries,
+  gates,
+  gateAssignments,
+  startOrder,
+  stageRuns,
+  splitsByRun,
+  pendingDetections,
+  atStartIds,
+  dnsIds,
+  flashingGateIds,
+  jumpStartToleranceMs,
+  countdownMs,
+  stage,
+  entryById,
+  shakedown,
+  timetable,
+  unscrutineered,
+  stageTitle,
+  upsertStageRun,
+  loadPenalties,
+} = data;
 
-const stages = ref<Stage[]>([]);
-const entries = ref<Entry[]>([]);
-const gates = ref<Gate[]>([]);
-const gateAssignments = ref<GateAssignment[]>([]);
-const startOrder = ref<StartOrder | null>(null);
-const stageRuns = ref<StageRun[]>([]);
-const splitsByRun = ref<Record<string, StageSplit[]>>({});
-const pendingDetections = ref<DetectionEventRecord[]>([]);
-const awaitingDetections = ref<DetectionEventRecord[]>([]);
-/** Entries seen at a pre-start gate since their last run. */
-const atStartIds = ref<string[]>([]);
-/** Entries marked DNS on this stage. */
-const dnsIds = ref<string[]>([]);
-/** Only what a marshal picked by hand; otherwise the suggestion applies. */
-const pickedEntryIds = ref<Record<string, string>>({});
-const flashingGateIds = ref<Record<string, boolean>>({});
-const retryingPending = ref(false);
-const activatingStage = ref(false);
-const closingStage = ref(false);
-const confirm = useConfirm();
-const choose = useChoice();
-const jumpStartToleranceMs = ref(DEFAULT_JUMP_START_TOLERANCE_MS);
-const jumpStartPenaltyTypeId = ref<string | null>(null);
-/** Every penalty, to tell whether a jump start still awaits a ruling. */
-const penalties = ref<Penalty[]>([]);
-
-const FLASH_DURATION_MS = 600;
-
-const stage = computed(() => stages.value.find((s) => s.id === props.stageId));
-const entryById = computed(() => new Map(entries.value.map((v) => [v.id, v])));
-
-// ---- Rows: every entry in start order, with its run --------------------
-
-/** A shakedown is driven as often as a car likes; its fastest run counts. */
-const shakedown = computed(() => stage.value?.scoring === StageScoring.NONE);
+// ---- What the cards draw, derived from the data -------------------------
 
 const rows = computed(() =>
   buildRows({
@@ -146,12 +64,11 @@ const rows = computed(() =>
     stageStatus: stage.value?.status,
     now: serverNow.value,
     countdownMs: countdownMs.value,
+    noMainClass: t('live.noMainClass'),
   }),
 );
 
 const stateCounts = computed(() => countStates(rows.value));
-
-// ---- On stage: running cars in expected arrival order -------------------
 
 /** The stage's split points, from its gate plan. */
 const splitIndices = computed(() =>
@@ -250,135 +167,6 @@ const upNextAction = computed(() => {
   return 'startNow';
 });
 
-const timetable = computed(
-  () => stage.value?.startMode === StartMode.SLOT_SCHEDULE,
-);
-
-// ---- Unassigned passings, with a suggested entry -----------------------
-
-const entryOptions = computed(() =>
-  entries.value.map((v) => ({
-    id: v.id,
-    title: `#${v.startNumber} ${driverName(v)}`,
-  })),
-);
-
-function entryOptionsFor(event: DetectionEventRecord) {
-  const carriers = carriersOf(entries.value, event);
-  return carriers
-    ? entryOptions.value.filter((o) => carriers.has(o.id))
-    : entryOptions.value;
-}
-
-const suggestedEntryIds = computed(() =>
-  suggestEntries({
-    passings: awaitingDetections.value,
-    gates: gateAssignments.value,
-    stageId: props.stageId,
-    dueToStart: dueToStart.value.map((row) => row.starter.entryId),
-    onStage: onStage.value.map(({ row, run }) => ({
-      entryId: row.starter.entryId,
-      runId: run.id,
-      startTime: run.startTime,
-    })),
-    splitsByRun: splitsByRun.value,
-    entries: entries.value,
-    minDurationMs: stage.value?.minDurationMs ?? DEFAULT_MIN_STAGE_DURATION_MS,
-  }),
-);
-
-function entryFor(event: DetectionEventRecord): string | undefined {
-  return (
-    pickedEntryIds.value[event.eventId] ??
-    suggestedEntryIds.value[event.eventId]
-  );
-}
-
-/**
- * Passings are handled on their own stage's page, where the suggestions know
- * the start order. One at a gate no stage owns any more stays listed here so
- * it can still be dismissed.
- */
-const passingsByStage = computed(() => {
-  const stageOfGate = new Map(
-    gateAssignments.value
-      .filter((a) => a.active)
-      .map((a) => [a.gateId, a.stageId]),
-  );
-  const here: DetectionEventRecord[] = [];
-  const elsewhere = new Map<string, number>();
-  for (const event of awaitingDetections.value) {
-    const stageId = stageOfGate.get(event.gateId);
-    if (!stageId || stageId === props.stageId) here.push(event);
-    else elsewhere.set(stageId, (elsewhere.get(stageId) ?? 0) + 1);
-  }
-  // Oldest first: passings are assigned in time order, and so is the
-  // suggestion.
-  here.sort(
-    (a, b) =>
-      new Date(a.timestampGate).getTime() - new Date(b.timestampGate).getTime(),
-  );
-  return {
-    here,
-    elsewhere: [...elsewhere].map(([stageId, count]) => ({ stageId, count })),
-  };
-});
-
-/** Its role on this stage, so a marshal sees whether it was a start. */
-function gateRole(gateId: string): string | undefined {
-  return gateFlow.value.find((node) => node.gate.id === gateId)?.label;
-}
-
-function gateName(gateId: string): string {
-  return gates.value.find((g) => g.id === gateId)?.name ?? gateId;
-}
-
-/** The live stream refreshes the list for every marshal; this is just faster
- *  feedback for the one who clicked. */
-async function onAssign(event: DetectionEventRecord) {
-  const entryId = entryFor(event);
-  if (!entryId) return;
-  await assignEntryToEvent(event.eventId, entryId);
-  delete pickedEntryIds.value[event.eventId];
-  awaitingDetections.value = await fetchAwaitingEvents();
-}
-
-async function onDismiss(event: DetectionEventRecord) {
-  await dismissEvent(event.eventId);
-  awaitingDetections.value = await fetchAwaitingEvents();
-}
-
-async function onDismissAll(events: DetectionEventRecord[]) {
-  const n = events.length;
-  if (
-    !(await confirm({
-      title: t('live.dismissTitle', { n }, n),
-      text: t('live.dismissText', { n }, n),
-      confirmText: t('live.dismissConfirm', { n }),
-      color: 'error',
-    }))
-  )
-    return;
-  try {
-    for (const event of events) await dismissEvent(event.eventId);
-  } finally {
-    awaitingDetections.value = await fetchAwaitingEvents();
-  }
-}
-
-async function onRetryPending() {
-  if (retryingPending.value) return;
-  retryingPending.value = true;
-  try {
-    await retryPendingEvents();
-    pendingDetections.value = await fetchPendingEvents();
-  } finally {
-    retryingPending.value = false;
-  }
-}
-
-// ---- Gates ---------------------------------------------------------------
-
 /**
  * The stage's gates in the order a car meets them — start, splits by index,
  * finish — so "split 2 is offline" reads off its place on the line. All
@@ -407,175 +195,68 @@ const gateFlow = computed(() => {
     });
 });
 
-function flashGate(gateId: string) {
-  flashingGateIds.value[gateId] = true;
-  setTimeout(() => {
-    flashingGateIds.value[gateId] = false;
-  }, FLASH_DURATION_MS);
-}
+const correctionDialog = ref<InstanceType<typeof RunCorrectionDialog> | null>(
+  null,
+);
+const penaltyDialog = ref<InstanceType<typeof PenaltyDialog> | null>(null);
 
-function upsertGate(gate: Gate) {
-  upsert(gates.value, gate, 'id');
-  flashGate(gate.id);
-}
+const passings = usePassings(props, data, { dueToStart, onStage, gateFlow });
+const {
+  pickedEntryIds,
+  retryingPending,
+  passingsByStage,
+  entryOptionsFor,
+  entryFor,
+  gateRole,
+  gateName,
+  onAssign,
+  onDismiss,
+  onDismissAll,
+  onRetryPending,
+} = passings;
 
-// ---- Runs and corrections ------------------------------------------------
-
-function upsertStageRun(run: StageRun) {
-  if (run.stageId !== props.stageId) return;
-  upsert(stageRuns.value, run, 'id', { first: true });
-}
-
-function upsertSplit(split: StageSplit) {
-  const splits = splitsByRun.value[split.stageRunId] ?? [];
-  splitsByRun.value[split.stageRunId] = [
-    ...splits.filter((s) => s.id !== split.id),
-    split,
-  ].sort((a, b) => a.splitIndex - b.splitIndex);
-}
-
-const startingEntryId = ref<string | null>(null);
-const countdownMs = ref(DEFAULT_COUNTDOWN_MS);
-
-function removeStageRun({ id }: { id: string }) {
-  stageRuns.value = stageRuns.value.filter((r) => r.id !== id);
-  delete splitsByRun.value[id];
-}
-
-/** Queues the car's slot; the server's clock sets it, not this device's. */
-async function onCountdown(entryId: string) {
-  if (!props.stageId || startingEntryId.value) return;
-  startingEntryId.value = entryId;
-  try {
-    upsertStageRun(await startCountdown({ entryId, stageId: props.stageId }));
-  } finally {
-    startingEntryId.value = null;
-  }
-}
-
-/** After the last slot; the server knows the timetable's end. The start
- *  list's slot times follow through the live stream's `stage` event. */
-async function onNewSlot(entryId: string) {
-  if (!props.stageId || startingEntryId.value) return;
-  startingEntryId.value = entryId;
-  try {
-    upsertStageRun(await newSlot(props.stageId, entryId));
-  } finally {
-    startingEntryId.value = null;
-  }
-}
-
-/**
- * Delay, from the card or offered on activating a timetable stage whose
- * first slot has passed: then `activateAfter`, and the dialog also offers
- * activating without one.
- */
-/** Typed like every duration here ("2:00"). */
-const delayDialog = ref({ open: false, text: '', activateAfter: false });
-/** Whole seconds: tenths mean nothing in a timetable. */
-const delayMs = computed(() => {
-  const ms = parseStageDuration(delayDialog.value.text);
-  return ms === null ? null : Math.round(ms / 1000) * 1000 || null;
+const lifecycle = useStageLifecycle(props, data, {
+  rows,
+  unassignedHere: () => passingsByStage.value.here.length,
 });
+const {
+  delayDialog,
+  delayMs,
+  activatingStage,
+  closingStage,
+  startListStatus,
+  openDelay,
+  onDelay,
+  activateWithoutDelay,
+  onActivateStage,
+  onCloseStage,
+  onFreeze,
+  onUnfreeze,
+  printStartList,
+} = lifecycle;
 
-function openDelay() {
-  delayDialog.value = { open: true, text: '', activateAfter: false };
-}
-
-async function onDelay() {
-  if (!props.stageId) return;
-  await delaySlots(props.stageId, delayMs.value!);
-  // The stage and its slot times come back through the live stream.
-  if (delayDialog.value.activateAfter) await onActivateStage(false, true);
-}
-
-function activateWithoutDelay() {
-  delayDialog.value.open = false;
-  void onActivateStage(false, true);
-}
-
-async function onCancelCountdown(run: StageRun) {
-  if (startingEntryId.value) return;
-  startingEntryId.value = run.id;
-  try {
-    await cancelCountdown(run.id);
-    removeStageRun(run);
-  } finally {
-    startingEntryId.value = null;
-  }
-}
-
-/** Until it is given or dismissed, with a penalty type set for it. */
-function suggestsJumpPenalty(run: StageRun): boolean {
-  const typeId = jumpStartPenaltyTypeId.value;
-  return (
-    !!typeId &&
-    !run.jumpStartDismissed &&
-    can('penalties') &&
-    !penalties.value.some(
-      (p) =>
-        p.entryId === run.entryId &&
-        p.stageId === run.stageId &&
-        p.typeId === typeId,
-    )
-  );
-}
-
-function onJumpStartPenalty(run: StageRun) {
-  void penaltyDialog.value?.add(run.entryId, run.stageId, {
-    [jumpStartPenaltyTypeId.value!]: 1,
-  });
-}
-
-async function onDismissJumpStart(run: StageRun) {
-  upsertStageRun(await dismissJumpStart(run.id));
-}
-
-async function loadPenalties() {
-  penalties.value = can('penalties') ? await fetchPenalties() : [];
-}
-
-const finishingRunId = ref<string | null>(null);
-
-/** The fallback when the finish gate misses a car; no confirm, it'd cost time. */
-async function onFinishNow(run: StageRun) {
-  if (finishingRunId.value) return;
-  finishingRunId.value = run.id;
-  try {
-    upsertStageRun(await finishStageRunNow(run.id));
-  } finally {
-    finishingRunId.value = null;
-  }
-}
-
-/** On the list and allowed to start, but the scrutineers haven't passed
- *  it: shown where the start marshal looks, never a reason to hold it. */
-function unscrutineered(entryId: string): boolean {
-  const entry = entryById.value.get(entryId);
-  return (
-    !!entry && !isOutOfEvent(entry.status) && !isScrutineered(entry.status)
-  );
-}
-
-/** Freezing or activating with such cars on the list asks first, naming
- *  them: a desk that forgot a click is easier to fix before the start.
- *  `verb` is the confirm button's message key. */
-async function clearedToStart(verb: string): Promise<boolean> {
-  const pending = rows.value.filter(
-    (row) => !row.run && unscrutineered(row.starter.entryId),
-  );
-  if (pending.length === 0) return true;
-  const numbers = pending.map((row) => `#${row.starter.startNumber}`);
-  return confirm({
-    title: t('live.unscrutineeredTitle', { n: pending.length }, pending.length),
-    text: t(
-      'live.unscrutineeredText',
-      { numbers: numbers.join(', '), verb: t(verb) },
-      pending.length,
-    ),
-    confirmText: t(verb),
-  });
-}
+const actions = useRunActions(props, data, { penaltyDialog });
+const {
+  startingEntryId,
+  finishingRunId,
+  canDnfDns,
+  onCountdown,
+  onNewSlot,
+  onCancelCountdown,
+  suggestsJumpPenalty,
+  onJumpStartPenalty,
+  onDismissJumpStart,
+  onFinishNow,
+  onStartNow,
+  onRemoveRun,
+  onUnvoidRun,
+  canMarkDns,
+  onMarkDnf,
+  onUndoDnf,
+  onMarkDns,
+  onUndoDns,
+  onDeleteRun,
+} = actions;
 
 function canStart(row: Row): boolean {
   return (
@@ -585,345 +266,9 @@ function canStart(row: Row): boolean {
   );
 }
 
-/** The server stamps the start, so its clock counts, not this device's. */
-async function onStartNow(entryId: string) {
-  if (!props.stageId || startingEntryId.value) return;
-  startingEntryId.value = entryId;
-  try {
-    upsertStageRun(await createStageRun({ entryId, stageId: props.stageId }));
-  } finally {
-    startingEntryId.value = null;
-  }
-}
-
-const correctionDialog = ref<InstanceType<typeof RunCorrectionDialog> | null>(
-  null,
-);
-const penaltyDialog = ref<InstanceType<typeof PenaltyDialog> | null>(null);
-
-/** Void and delete in one dialog, void first: it keeps the evidence. */
-async function onRemoveRun(run: StageRun) {
-  const choice = await choose({
-    title: t('live.removeRunTitle', {
-      entry: entryName(entries.value, run.entryId),
-      attempt: run.attempt,
-    }),
-    text: t('live.removeRunText'),
-    confirmText: t('live.voidConfirm'),
-    alternativeText: t('live.deleteForGood'),
-  });
-  if (choice === 'confirm') upsertStageRun(await voidStageRun(run.id));
-  if (choice === 'alternative') await deleteRun(run);
-}
-
-/** The server's 409 names the attempt to void first; surfaced as-is. */
-async function onUnvoidRun(run: StageRun) {
-  upsertStageRun(await unvoidStageRun(run.id));
-}
-
-/** DNF, DNS and their undo: a marshal on a running stage. */
-const canDnfDns = computed(
-  () =>
-    stage.value?.status === StageStatus.ACTIVE &&
-    can('correctRun', stage.value.id),
-);
-
-/** Not on a shakedown, nor for a car out of the event: neither is a DNS. */
-function canMarkDns(entryId: string): boolean {
-  const entry = entryById.value.get(entryId);
-  return (
-    canDnfDns.value &&
-    !shakedown.value &&
-    !!entry &&
-    !isOutOfEvent(entry.status) &&
-    !dnsIds.value.includes(entryId)
-  );
-}
-
-function startNumberOf(entryId: string): number | undefined {
-  return entryById.value.get(entryId)?.startNumber;
-}
-
-async function onMarkDnf(run: StageRun) {
-  const number = startNumberOf(run.entryId);
-  if (
-    !(await confirm({
-      title: t('live.dnfTitle', { number }),
-      text: t('live.dnfText'),
-      confirmText: t('live.dnfConfirm', { number }),
-    }))
-  )
-    return;
-  upsertStageRun(await markDnf(run.id));
-}
-
-async function onUndoDnf(run: StageRun) {
-  upsertStageRun(await undoDnf(run.id));
-}
-
-function applyDns({ entryId, stageId, dns }: DidNotStart & { dns: boolean }) {
-  if (stageId !== props.stageId) return;
-  const others = dnsIds.value.filter((id) => id !== entryId);
-  dnsIds.value = dns ? [...others, entryId] : others;
-}
-
-/** A slot run it had goes through the live stream's `stage-run-deleted`. */
-async function onMarkDns(entryId: string) {
-  if (!props.stageId) return;
-  const number = startNumberOf(entryId);
-  if (
-    !(await confirm({
-      title: t('live.dnsTitle', { number }),
-      text: t('live.dnsText'),
-      confirmText: t('live.dnsConfirm', { number }),
-    }))
-  )
-    return;
-  const row = { entryId, stageId: props.stageId };
-  await markDns(row);
-  applyDns({ ...row, dns: true });
-}
-
-async function onUndoDns(entryId: string) {
-  if (!props.stageId) return;
-  const row = { entryId, stageId: props.stageId };
-  await undoDns(row);
-  applyDns({ ...row, dns: false });
-}
-
-async function onDeleteRun(run: StageRun) {
-  if (
-    !(await confirm({
-      title: t('live.deleteRunTitle', {
-        entry: entryName(entries.value, run.entryId),
-        attempt: run.attempt,
-      }),
-      text: t('live.deleteRunText'),
-      confirmText: t('live.deleteRun'),
-      color: 'error',
-    }))
-  )
-    return;
-  await deleteRun(run);
-}
-
-async function deleteRun(run: StageRun) {
-  await deleteStageRun(run.id);
-  stageRuns.value = stageRuns.value.filter((r) => r.id !== run.id);
-  delete splitsByRun.value[run.id];
-}
-
-// ---- Stage lifecycle and start list --------------------------------------
-
-const frozenAt = computed(() =>
-  startOrder.value?.frozenAt ? formatStamp(startOrder.value.frozenAt) : null,
-);
-
-const startListStatus = computed(() =>
-  !startOrder.value
-    ? ''
-    : startOrder.value.frozen
-      ? t('live.startListPublished', { at: frozenAt.value })
-      : t('live.startListProvisional'),
-);
-
-function stageTitle(stageId: string): string {
-  const s = stages.value.find((st) => st.id === stageId);
-  return s ? `${s.id} · ${s.name}` : stageId;
-}
-
-/**
- * Refetches every stage rather than patching just the one — a forced
- * activate can close another stage too (see `docs/architecture.md`).
- */
-async function refreshStages() {
-  [stages.value, gateAssignments.value] = await Promise.all([
-    fetchStages(),
-    fetchGateAssignments(),
-  ]);
-}
-
-async function reloadStage(stageId: string) {
-  await refreshStages();
-  if (stageId === props.stageId) {
-    startOrder.value = await fetchStartOrder(stageId);
-  }
-}
-
-async function onActivateStage(force = false, delayOffered = false) {
-  if (!props.stageId || activatingStage.value) return;
-  if (!force && !delayOffered && !(await clearedToStart('live.activate')))
-    return;
-  // Before activation the first start is the first slot, frozen list or not.
-  const firstSlot = stage.value?.firstStartTime;
-  const minutes =
-    timetable.value && firstSlot && !delayOffered
-      ? catchUpDelayMinutes(
-          new Date(firstSlot).getTime(),
-          serverNow.value,
-          countdownMs.value,
-        )
-      : null;
-  if (minutes) {
-    delayDialog.value = {
-      open: true,
-      text: formatStageDuration(minutes * 60_000),
-      activateAfter: true,
-    };
-    return;
-  }
-  activatingStage.value = true;
-  let conflictingStageIds: string[] | undefined;
-  try {
-    await activateStage(props.stageId, force);
-    await refreshStages();
-    startOrder.value = await fetchStartOrder(props.stageId);
-  } catch (err) {
-    conflictingStageIds =
-      err instanceof ApiError && err.code === ApiErrorCode.OTHER_STAGE_ACTIVE
-        ? (err.params.conflictingStageIds as string[])
-        : undefined;
-    if (!conflictingStageIds) throw err;
-  } finally {
-    activatingStage.value = false;
-  }
-  if (!conflictingStageIds) return;
-  if (
-    await confirm({
-      title: t('live.conflictTitle'),
-      text: t(
-        'live.conflictText',
-        { stages: conflictingStageIds.map(stageTitle).join(', ') },
-        conflictingStageIds.length,
-      ),
-      confirmText: t('live.activateAnyway'),
-      color: 'error',
-    })
-  )
-    await onActivateStage(true);
-}
-
-async function onCloseStage() {
-  if (!props.stageId || closingStage.value) return;
-  const unassigned = passingsByStage.value.here.length;
-  if (
-    !(await confirm({
-      title: t('live.closeTitle'),
-      text:
-        t('live.closeText') +
-        (unassigned > 0
-          ? `\n\n${t('live.closeUnassigned', { n: unassigned }, unassigned)}`
-          : ''),
-      confirmText: t('live.closeStage'),
-      color: 'error',
-    }))
-  )
-    return;
-  closingStage.value = true;
-  try {
-    await closeStage(props.stageId);
-    await refreshStages();
-    stageRuns.value = await fetchStageRuns(props.stageId);
-  } finally {
-    closingStage.value = false;
-  }
-}
-
-async function onFreeze() {
-  if (!props.stageId) return;
-  if (!(await clearedToStart('live.freeze'))) return;
-  startOrder.value = await freezeStartOrder(props.stageId);
-  stages.value = await fetchStages();
-}
-
-async function onUnfreeze() {
-  if (!props.stageId) return;
-  if (
-    !(await confirm({
-      title: t('live.unfreezeTitle'),
-      text: t('live.unfreezeText'),
-      confirmText: t('live.unfreeze'),
-    }))
-  )
-    return;
-  startOrder.value = await unfreezeStartOrder(props.stageId);
-  stages.value = await fetchStages();
-}
-
-function printStartList() {
-  const order = startOrder.value;
-  if (!stage.value || !order) return;
-  const { id, name } = stage.value;
-  void printPdf(async () => ({
-    sections: [
-      startListPdf(
-        `${t('live.startList')} — ${id} · ${name}`,
-        order.frozen ? frozenAt.value : null,
-        rows.value,
-        order.grouped,
-        order.delayMs,
-      ),
-    ],
-    fileName: [rallyName.value, id, t('live.startList')]
-      .filter(Boolean)
-      .join(' - '),
-  }));
-}
-
 function onSelectStage(stageId: string) {
   router.push(`/live/${stageId}`);
 }
-
-// ---- Loading -------------------------------------------------------------
-
-async function loadStage() {
-  if (!props.stageId) {
-    startOrder.value = null;
-    stageRuns.value = [];
-    splitsByRun.value = {};
-    atStartIds.value = [];
-    dnsIds.value = [];
-    return;
-  }
-  const [order, runs, splits, dns] = await Promise.all([
-    fetchStartOrder(props.stageId),
-    fetchStageRuns(props.stageId),
-    fetchSplitsForStage(props.stageId),
-    fetchDns(props.stageId),
-    loadAtStart(),
-  ]);
-  startOrder.value = order;
-  stageRuns.value = runs;
-  dnsIds.value = dns.map((row) => row.entryId);
-  const byRun: Record<string, StageSplit[]> = {};
-  for (const split of splits) {
-    (byRun[split.stageRunId] ??= []).push(split);
-  }
-  splitsByRun.value = byRun;
-}
-
-watch(() => props.stageId, loadStage);
-
-/** Derived on the server; asked again whenever a pre-start detection, an
- *  assigned passing or a run of this stage may have changed it. */
-async function loadAtStart() {
-  if (!props.stageId) return;
-  const stageId = props.stageId;
-  const ids = await fetchAtStart(stageId);
-  if (stageId === props.stageId) atStartIds.value = ids;
-}
-
-const preStartGateIds = computed(
-  () =>
-    new Set(
-      gateAssignments.value
-        .filter(
-          (a) =>
-            a.stageId === props.stageId && a.role === GateRole.STAGE_PRE_START,
-        )
-        .map((a) => a.gateId),
-    ),
-);
 
 /**
  * The stage a marshal most likely wants: running, else next up. A stage
@@ -942,76 +287,12 @@ function defaultStage(): Stage | undefined {
 }
 
 const load = useLoad(async () => {
-  // Stages, entries and assignments aren't pushed over SSE, so they're
-  // loaded here and refreshed explicitly when an action changes them.
-  [stages.value, entries.value, gateAssignments.value] = await Promise.all([
-    fetchStages(),
-    fetchEntries(),
-    fetchGateAssignments(),
-  ]);
+  await data.loadPlan();
   if (!props.stageId) {
     const fallback = defaultStage();
     if (fallback) router.replace(`/live/${fallback.id}`);
   }
-
-  // Loaded directly too, not only once the stream opens: a browser allows six
-  // connections per host, so with enough dashboard tabs open the stream can
-  // sit pending, and the page would stay empty. `onOpen` reloads after a
-  // reconnect, so a dropped connection doesn't leave the page quietly stale.
-  const loadLive = () =>
-    Promise.all([
-      fetchGates().then((g) => (gates.value = g)),
-      fetchPendingEvents().then((p) => (pendingDetections.value = p)),
-      fetchAwaitingEvents().then((a) => (awaitingDetections.value = a)),
-      fetchSetting(JUMP_START_TOLERANCE_MS_KEY).then(
-        (v) =>
-          (jumpStartToleranceMs.value =
-            Number(v) || DEFAULT_JUMP_START_TOLERANCE_MS),
-      ),
-      fetchSetting(COUNTDOWN_MS_KEY).then(
-        (v) => (countdownMs.value = Number(v) || DEFAULT_COUNTDOWN_MS),
-      ),
-      fetchSetting(JUMP_START_PENALTY_TYPE_ID_KEY).then(
-        (v) => (jumpStartPenaltyTypeId.value = v || null),
-      ),
-      loadPenalties(),
-      loadStage(),
-    ]);
-  // Once: Retry runs this again.
-  liveSource ??= openLiveStream(
-    {
-      detection: (event) => {
-        flashGate(event.gateId);
-        if (preStartGateIds.value.has(event.gateId)) return loadAtStart();
-      },
-      gate: upsertGate,
-      'stage-run': (run) => {
-        upsertStageRun(run);
-        if (run.stageId === props.stageId) return loadAtStart();
-      },
-      'stage-run-deleted': (run) => {
-        removeStageRun(run);
-        if (run.stageId === props.stageId) return loadAtStart();
-      },
-      'stage-run-split': upsertSplit,
-      dns: applyDns,
-      // Another screen moved a slot, delayed, froze or activated.
-      stage: ({ stageId }) => reloadStage(stageId),
-      'pending-detections': ({ pending }) => {
-        pendingDetections.value = pending;
-      },
-      'awaiting-detections': ({ awaiting }) => {
-        awaitingDetections.value = awaiting;
-        return loadAtStart();
-      },
-    },
-    loadLive,
-  );
-  await loadLive();
-});
-
-onUnmounted(() => {
-  if (liveSource) closeLiveStream(liveSource);
+  await data.connect();
 });
 </script>
 
