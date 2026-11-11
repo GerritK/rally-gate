@@ -1718,9 +1718,12 @@ onUnmounted(() => {
                 size="small"
                 variant="text"
                 prepend-icon="mdi-pencil"
+                class="rg-row-action"
                 @click="correctionDialog?.correct(row.run)"
               >
-                {{ $t('live.correct') }}
+                <span class="rg-row-action-label">{{
+                  $t('live.correct')
+                }}</span>
               </v-btn>
               <v-btn
                 v-if="
@@ -1736,17 +1739,18 @@ onUnmounted(() => {
                     : 'mdi-play'
                 "
                 :loading="startingEntryId === row.starter.entryId"
+                class="rg-row-action"
                 @click="
                   upNextAction === 'countdown'
                     ? onCountdown(row.starter.entryId)
                     : onStartNow(row.starter.entryId)
                 "
               >
-                {{
+                <span class="rg-row-action-label">{{
                   upNextAction === 'countdown'
                     ? $t('countdown.start')
                     : $t('live.startNow')
-                }}
+                }}</span>
               </v-btn>
               <v-menu
                 v-if="
@@ -1978,6 +1982,26 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* On a phone the row's action is its icon alone, so the crew's name fits
+   beside it; the label stays for a screen reader. Up next carries the same
+   action spelled out. */
+@media (max-width: 599px) {
+  .rg-row-action {
+    min-width: 0;
+    padding-inline: 10px;
+  }
+  .rg-row-action :deep(.v-btn__prepend) {
+    margin-inline: 0;
+  }
+  .rg-row-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
 .rg-class-row td {
   font-family: 'Barlow Condensed', sans-serif;
   font-weight: 600;
