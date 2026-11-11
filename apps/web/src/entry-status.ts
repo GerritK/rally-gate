@@ -156,7 +156,7 @@ export function toTransponderInput(
 
 /** Allowed, all of it — refusing would block the desk mid-swap — but worth
  *  saying. Per row: the transponder is also on another car, so its passings
- *  wait on Live Timing for a marshal to say which car it was. For the list:
+ *  wait on Live timing for a marshal to say which car it was. For the list:
  *  several of one kind, which a car physically carries one of. */
 export function transponderWarnings(
   entries: Entry[],

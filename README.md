@@ -17,7 +17,7 @@ the rally's own closed Wi-Fi.
 > on the version you started it with. Don't time a real event without a paper
 > backup.
 
-![Live Timing: who's up next, who's on stage, and every time as it comes in](docs/images/live.png)
+![Live timing: who's up next, who's on stage, and every time as it comes in](docs/images/live.png)
 
 ## How it works
 
@@ -45,7 +45,7 @@ flowchart LR
 - **Gates find the server by themselves** and take their time from it, so
   setting up on the day means switching things on — no IP addresses, no
   configuring gates per event.
-- **Marshals keep control.** Live Timing follows the stage in start order:
+- **Marshals keep control.** Live timing follows the stage in start order:
   who's up next, who's on stage, every passing. A marshal can start or finish
   a car by hand when a gate misses it (marked as hand-timed), correct a time
   or void a run for a re-run. Results update as times come in.
@@ -71,7 +71,7 @@ flowchart LR
   a car drives as often as it likes, its fastest run counting.
 - **Light barrier gates**: a Raspberry Pi with a light barrier on a GPIO pin.
   A light barrier can't tell cars apart, so a marshal confirms each passing's
-  car on Live Timing, which suggests it from the start order. Verified on a Pi
+  car on Live timing, which suggests it from the start order. Verified on a Pi
   with an Omron E3Z-T61.
 - **RC transponder gates** (RC3/RC4): a Raspberry Pi with an RTL-SDR and a
   loop, decoded by [OpenStint](https://github.com/zsellera/openstint). Each
@@ -193,7 +193,7 @@ network.
    accept each waiting gate; it remembers them across events), then check every gate is online and its clock
    is in sync.
 5. **Setup → Access** → print invitations for the marshals' devices.
-6. **Live Timing** → freeze and print a stage's start list when you post it,
+6. **Live timing** → freeze and print a stage's start list when you post it,
    activate the stage when it starts, close it when the last car is
    through.
 

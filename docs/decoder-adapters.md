@@ -24,7 +24,7 @@ ever sees a `DetectionEvent`.
 
 Times a passing but can't identify the car: detections carry no
 `transponderId`, and the server holds them as **unassigned passings** until a
-marshal picks the entry on Live Timing (see `event-model.md`).
+marshal picks the entry on Live timing (see `event-model.md`).
 
 Reads the pin through libgpiod's `gpiomon` (package `gpiod`, installed by the
 gate installer), not a native Node module, so nothing compiles on the Pi. The
@@ -144,7 +144,7 @@ quiet gate.
 
 A detection goes out once nothing still on its way could change its pairing:
 `2 × PAIR_WINDOW_MS` plus 1s for OpenStint's report lag after the timestamp.
-Live Timing shows such a gate's passings ~2s late; the times are unaffected.
+Live timing shows such a gate's passings ~2s late; the times are unaffected.
 
 | Setting | Default | |
 |---|---|---|

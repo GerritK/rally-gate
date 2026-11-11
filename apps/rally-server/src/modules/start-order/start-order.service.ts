@@ -57,7 +57,7 @@ export class StartOrderService {
     const stage = await this.stagesService.findOneOrFail(stageId);
     const entries = await this.entriesService.findAll();
     // A frozen list is the one posted and keeps every car it was posted
-    // with, so positions don't shift; Live Timing shows one that has since
+    // with, so positions don't shift; Live timing shows one that has since
     // withdrawn as out. Anything still computed leaves such a car out.
     const eligible = entries.filter((v) => !isOutOfEvent(v.status));
     const ids = stage.startOrder ?? (await this.compute(stage, eligible));

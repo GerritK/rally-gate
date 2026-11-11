@@ -8,7 +8,7 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
 | Route | Nav | Contents |
 |---|---|---|
 | `/` | — | redirect to `/live` |
-| `/live/:stageId?` | Live Timing | the marshal view, laid out like the stage: gates, Up next beside On stage, the start list with every run, corrections, penalties, DNF/DNS, Activate / Close (decisions below). No stage picks the active one, else the next |
+| `/live/:stageId?` | Live timing | the marshal view, laid out like the stage: gates, Up next beside On stage, the start list with every run, corrections, penalties, DNF/DNS, Activate / Close (decisions below). No stage picks the active one, else the next |
 | `/results/overall` | Results | podium, overall classification, each stage column the time driven, the fastest marked, the gap to it in the tooltip, its header linking to that stage's results, a Penalties column once anyone has one, filterable by class; Print / Print all open a PDF (Print all: every class's ranking on its own sheets) |
 | `/results/stages/:stageId` | Results | podium, stage classification with a column per split (the time and its rank, the fastest marked, the gap to it in the tooltip), DNF/DNS; class filter and printing as on Overall |
 | `/entries` | Entries | registration in a dialog, status, classes; per row the status's next step (Check in, Passed) and ⋮ for the rest (back a step, Withdraw, Disqualify, Reinstate); Check-in in the header; a row opens the entry |
@@ -26,12 +26,12 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
 | `/setup/access` | Setup | invitations (role, stages, code, devices; Print one or all as a PDF sheet with the QR code, Block in ⋮), the devices that logged in (Block), the organiser password. Organiser only (`auth.md`) |
 | `/public/:stageId?` | — | what anyone without a login sees, without the drawer: the stage track ending in Overall, the class filter; a stage's start list with each car's state and time (running ones ticking), then its results; or the overall, penalties as a sum. No print, no links to entries. No stage picks the active one. Every other page sends a browser without a login here |
 | `/login` | — | who this browser is, Log out; an invitation code to type; the organiser password. `?setup=` from the server log sets the first one. The drawer's foot links here |
-| `/join/:code` | — | what an invitation's QR code opens: logs the device in, then Live Timing |
-| `/lobby` | — | the standalone package's start, while no event is open (`session.lobby`; every other page but `/login` leads here then, and here leads to `/` otherwise), without the drawer or rally status. The organiser: Continue with the last event, New event, Import, the folder's events with Open, Download and Delete, reloaded when the window regains focus; open goes to Live Timing, new to Setup. Everyone else: "no event open yet", polling `GET /api/event` until one is |
+| `/join/:code` | — | what an invitation's QR code opens: logs the device in, then Live timing |
+| `/lobby` | — | the standalone package's start, while no event is open (`session.lobby`; every other page but `/login` leads here then, and here leads to `/` otherwise), without the drawer or rally status. The organiser: Continue with the last event, New event, Import, the folder's events with Open, Download and Delete, reloaded when the window regains focus; open goes to Live timing, new to Setup. Everyone else: "no event open yet", polling `GET /api/event` until one is |
 
 ## Decisions
 
-- **The start list is Live Timing's backbone**, not a page of its own: one row
+- **The start list is Live timing's backbone**, not a page of its own: one row
   per entry in start order, runs merged in, main classes as header rows.
   Printed as a PDF (`design-system.md` "Print"). Its rules are configured
   under Setup.
@@ -66,7 +66,7 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
   takes Countdown's and Cancel's places and Delay sits in the header; before
   activation the rows show their slot from the start list, no countdown.
   Fullscreen and Enable sound sit in the card's header. On a timetable a car is waiting, not counting down, until `countdownMs` before its slot.
-  Live Timing's Start column shows a timetable's slot (the slot is the start
+  Live timing's Start column shows a timetable's slot (the slot is the start
   time), its rows staying in start-order position; a slot moved by New slot is
   bold with an icon, on the printed list bold with an arrow. The public start
   list shows a Slot column once a timetable's list is frozen. A car seen at a pre-start gate gets an "At the
@@ -80,12 +80,12 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
   the page's own stream (`liveStatus` in `api/live.ts`), never a second
   connection. The rally status rides on that stream too; a page without
   one refetches it on navigation.
-- **Live Timing loads its data directly, not only when the live stream opens**:
+- **Live timing loads its data directly, not only when the live stream opens**:
   with enough tabs open the stream sits pending (six connections per host,
   `api.md` "Live").
 - **Splits are columns of the stage classification**, not a ranking of their
   own: Results is read after the stage, so a car still on stage has no row.
-  Mid-stage, Live Timing's On stage card shows each car's split against the
+  Mid-stage, Live timing's On stage card shows each car's split against the
   best. A DNF's splits no longer count towards a split's rank or best, from
   the moment it is marked.
 - **Gate assignments live under their stage**; the gate-centric view of "what
@@ -93,9 +93,9 @@ only (`auth.md` "Who sees what"), who may change what is `auth.md` too.
   assignments read-only, linking to each stage.
 - **Raw detections are on the gate's page**, filtered server-side
   (`GET /events?gateId=`): the unfiltered list is the last 100 of every gate,
-  where a quiet gate's passings would scroll out. Live Timing has none: a
+  where a quiet gate's passings would scroll out. Live timing has none: a
   marshal there needs runs and unassigned passings, not the feed behind them.
-- **Activation is on Live Timing and per stage** — it is an operational
+- **Activation is on Live timing and per stage** — it is an operational
   mid-event action, like Close. There is no deactivate button; gates turn off by
   closing the stage.
 - **Hardware and Entries are top-level**, not under Setup, because both are

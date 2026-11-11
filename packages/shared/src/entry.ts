@@ -2,7 +2,7 @@
  * An entry's way through the event: registered, then checked in at the desk,
  * then passed by the scrutineers, or out of it. Only out of the event has a
  * hard effect (no start list, no run, see `isOutOfEvent`); a car not yet
- * scrutineered still starts, and Live Timing says so.
+ * scrutineered still starts, and Live timing says so.
  */
 export enum EntryStatus {
   REGISTERED = 'REGISTERED',

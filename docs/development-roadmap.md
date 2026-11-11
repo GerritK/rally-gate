@@ -54,7 +54,7 @@ One line each; the linked doc has the detail. History is in git.
   gate-config pages opened from the dashboard with a signed pass, also on
   the ESP32 (`auth.md`). No TLS: the operating rule "participants never on
   the timing Wi-Fi" covers it.
-- **Dashboard:** Live Timing (the marshal view), Results with podium,
+- **Dashboard:** Live timing (the marshal view), Results with podium,
   Entries with check-in, Hardware, Setup (`frontend-structure.md`).
 - **Printing:** start lists and results as PDFs (`design-system.md` "Print").
 - **Crews:** names and flags in the event's format, entry pages
@@ -150,7 +150,7 @@ One line each; the linked doc has the detail. History is in git.
   takes the first. Needs a minimum pass interval like the combined gate's
   `minDurationMs` — a transponder reads a passing several times, and a double
   read counted as a lap finishes the car early, i.e. wins it the stage. A
-  missed read leaves the car short a lap with no finish coming, so Live Timing
+  missed read leaves the car short a lap with no finish coming, so Live timing
   shows "lap 2/3" and a marshal can add the missing one. One gate counts
   passings, it can't see a cut; that takes a second gate on the loop.
   The minimum interval is per entry, not per identifier: a car carrying two

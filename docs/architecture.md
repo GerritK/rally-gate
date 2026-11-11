@@ -16,7 +16,7 @@ mode has nothing external to install.
   gate behind one still needs pairing.
 - Online/offline is `now - lastHeartbeatAt > 30s`
   (`HEARTBEAT_ONLINE_THRESHOLD_MS`). *Ready* is online and chrony not reported
-  unsynced; Live Timing shows each gate of the selected stage on a line in
+  unsynced; Live timing shows each gate of the selected stage on a line in
   course order with its state.
 - **No decoder status in the heartbeat.** `BeamAdapter` and `OpenStintAdapter`
   exit the process when their decoder process (gpiomon, openstint_rtlsdr) dies,

@@ -74,7 +74,7 @@ login's. Not logged in, every page
 but `/public`, `/login` and `/join` sends the browser to `/public`, which
 has no drawer and a Log in button in the app bar; the server refuses those
 reads too (`api.md`). It reloads the session on every navigation and after any 401/403, so a
-blocked device falls back at once. A stage marshal's Live Timing opens on
+blocked device falls back at once. A stage marshal's Live timing opens on
 its own stage.
 
 ## People: invitations, not accounts

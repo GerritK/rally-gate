@@ -72,14 +72,14 @@ most splits passed, then the earlier start (at a split, one without that split
 yet). An overtake is just a suggestion the marshal
 corrects.
 
-Live Timing lists only the passings at the selected stage's gates, since
+Live timing lists only the passings at the selected stage's gates, since
 only there do suggestions know the start order; passings on another active
 stage show as a link to it.
 
 **Closing a stage that ran discards its unassigned passings** (`stage.closed`
 → `EventsService`): they can't be assigned to a closed stage any more, and
 once a gate is reused, by a forced activation for instance, they would be
-read as the new stage's passings. The records stay as evidence. Live Timing's
+read as the new stage's passings. The records stay as evidence. Live timing's
 close confirmation counts them, since each may be a car without a time. A
 passing at a gate no stage owns (one left from before this) stays listed
 wherever it is viewed, so it can still be dismissed.
@@ -116,7 +116,7 @@ Correct. A separate role was chosen over assigning one gate twice, which
 would break "exactly one active assignment per gate" that the rule engine
 and the activation conflict check rely on.
 
-Live Timing suggests a combined gate's beam passing for the car longest on
+Live timing suggests a combined gate's beam passing for the car longest on
 stage past the minimum, else the next car to start. A passing within the
 minimum of a car's start gets no suggestion: it is that car breaking the beam
 again, typically pulling away slowly enough to outlast the gate's
@@ -144,7 +144,7 @@ writes DNF and DNS ("DNF and DNS").
 `startManual`/`finishManual` record which ends a marshal set by hand: Start
 now, Finish now (both stamped with the server clock) or a correction. A hand
 time carries the marshal's reaction time, and a protest turns on exactly
-which times were hand-set, so Live Timing marks them. Assigning an
+which times were hand-set, so Live timing marks them. Assigning an
 unassigned passing doesn't set them: the time is still the gate's. Clearing a
 finish clears its flag.
 
@@ -169,7 +169,7 @@ run the car actually drove is a call the marshal makes explicitly.
 Both are per stage and stored, so a result never derives them. Withdrawn is
 a different thing: the car is out of the rally (an entry status, set at the
 desk); DNF and DNS say what happened on one stage. A marshal sets either at
-once in Live Timing, which is why neither waits for the stage to close: a
+once in Live timing, which is why neither waits for the stage to close: a
 broken-down car otherwise stayed "On stage", and an absent one stayed
 suggested in Up next and on the start card. Both and their undo take the
 correction permission (a stage marshal on their own stages, the
@@ -285,7 +285,7 @@ run with `run = attempt`; a start while its run is open is refused as a
 duplicate, and one from before its last finish is a late passing, ignored, so
 runs never overlap. Every non-voided run counts: the results rank each car's
 fastest finished run with its splits and show how many it drove (`runs`), so
-a car with one finished run is never DNF. Live Timing and Up next suggest the
+a car with one finished run is never DNF. Live timing and Up next suggest the
 car off stage with the fewest runs, then start order; the entry page lists
 every run. A combined gate has no lockout after a finish beyond the beam's
 own: a car rolling back through starts a phantom run, harmless since only
@@ -375,12 +375,12 @@ Registered.
 What each one does (`isOutOfEvent`, `isScrutineered` in `packages/shared`):
 
 - **Not yet scrutineered** (Registered, Checked in) still starts. A forgotten
-  click at the desk must not cost a crew its start; Live Timing marks such a
+  click at the desk must not cost a crew its start; Live timing marks such a
   car on the start list and in Up next, and Freeze and Activate name them
   and ask first.
 - **Withdrawn or disqualified** gets no place on a start list still
   computed. A frozen list keeps it, since a posted list's positions must not
-  shift; Live Timing shows it as out. A gate's passing for it is stored as
+  shift; Live timing shows it as out. A gate's passing for it is stored as
   evidence but times nothing (`EventsService.applyRules`), and a manual
   start is a 409. Neither is a DNS.
 - **Disqualified** also leaves every result: stage, split and overall
@@ -401,7 +401,7 @@ What each one does (`isOutOfEvent`, `isScrutineered` in `packages/shared`):
 ## Start order
 
 The official start list per stage: what the announcer reads out and what gets
-posted. Unassigned-passing suggestions and Live Timing's Up next follow it,
+posted. Unassigned-passing suggestions and Live timing's Up next follow it,
 and it is the reference for a timetable's slots ("Start slots") and will be
 for penalties for starting out of order.
 
@@ -464,7 +464,7 @@ is still timed from its slot.
 
 The start gate becomes a **jump-start detector**. A start passing earlier
 than slot − `jumpStartToleranceMs` (200 ms: chrony and the beam edge, not
-reaction time) is marked a jump start in Live Timing, which suggests the
+reaction time) is marked a jump start in Live timing, which suggests the
 penalty type set as `jumpStartPenaltyTypeId` for the marshal to confirm or
 dismiss; with no type set it only marks. Never priced automatically: a wrong
 automatic penalty is a wrong result nobody notices. The earliest start passing
@@ -558,7 +558,7 @@ has nothing to discard. Both fields are locked while the list is frozen
 (`timetableFrozen`): unfreeze, edit, freeze again, so a posted time never
 moves silently. Activation turns every slot into a slot run, exactly as a
 countdown makes one, so timing from the slot, jump starts, DNS, the one
-open run per entry+stage and Live Timing's queue work unchanged. Runs on a
+open run per entry+stage and Live timing's queue work unchanged. Runs on a
 stage that hasn't run would have shown as started on every results page.
 
 - A car already out of the event at activation gets no run and leaves its

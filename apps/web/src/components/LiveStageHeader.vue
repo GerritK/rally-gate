@@ -7,7 +7,7 @@ import type { StartOrder } from '../api/start-order';
 import { ROW_STATE_DISPLAY, type RowState } from '../live-rows';
 import GateFlow from './GateFlow.vue';
 
-/** Live Timing's stage card: its lifecycle buttons, the counts per state
+/** Live timing's stage card: its lifecycle buttons, the counts per state
  *  and the gate line. */
 defineProps<{
   stage: Stage;

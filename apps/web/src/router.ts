@@ -60,7 +60,7 @@ export const router = createRouter({
       component: () => import('./pages/PublicView.vue'),
       props: true,
       meta: { live: true },
-      // Like Live Timing: no stage picks the running one. Before the page
+      // Like Live timing: no stage picks the running one. Before the page
       // mounts, so it loads once; Overall picked on the page stays Overall.
       beforeEnter: async (to) => {
         if (to.params.stageId) return;

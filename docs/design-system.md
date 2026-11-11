@@ -16,7 +16,7 @@ most of what follows.
   pure white text, brighter borders) isn't built; add it as a second theme
   plus a switcher when it's needed.
 - **Readable at arm's length.** The one value a marshal acts on gets real
-  size: the next car's start number on Live Timing is 3.5rem. Don't shrink
+  size: the next car's start number on Live timing is 3.5rem. Don't shrink
   it to fit more on screen.
 - **Nothing jumps mid-event.** A card that only sometimes has content stays
   in place and shows a short note when empty ("No car on stage.") instead of
@@ -89,6 +89,11 @@ Values live in `theme.ts`. The rules:
 
 ## Type
 
+- **Sentence case for every text**, a button, a title, a column or a chip
+  alike: "Add entry", "Stage details", "In sync". Capitals only for the
+  first word, names (Rally Gate, a page referred to in a sentence: "in
+  Setup", "on Live timing") and abbreviations (DNS, ID). A fragment set
+  into a sentence stays lower case ("best", "attempt 2").
 - **Headings are real headings**, for a screen reader's jump list: every
   card title is an `<h2>` (set once in `vuetify.ts`), a `.rg-section-title`
   an `<h3>`, and `App.vue` carries the page's name as a hidden `<h1>`. A
@@ -102,7 +107,7 @@ Values live in `theme.ts`. The rules:
   `.rg-section-title` (`utilities.css`): the card title's font a size down,
   so the title still leads, and from the second section on a rule above
   it. Not `text-overline`, which is too faint to divide a form; that stays
-  for a small label inside a block (Live Timing's "Then"). Sections set
+  for a small label inside a block (Live timing's "Then"). Sections set
   side by side share one rule above their row.
 - **Crew names** follow the event's name format (Setup → Display) everywhere
   (`personName` in `src/crew.ts`) and are lettered like a rally car's side
@@ -126,7 +131,7 @@ Values live in `theme.ts`. The rules:
   Timing's Up next / On stage grid (1fr 2fr, stacked below 960px) is the
   pattern.
 - **Every flexible grid track is `minmax(0, …)`**, the stacked one-column
-  variant too. A bare `1fr` grows with its content: Live Timing's stacked
+  variant too. A bare `1fr` grows with its content: Live timing's stacked
   cards once made the whole page 700px wide on a phone.
 - **Vuetify's breakpoints only**: `@media (max-width: 599px)` (below `sm`)
   or `959px` (below `md`) in CSS, `useDisplay()` in a script. No other
@@ -139,7 +144,7 @@ Values live in `theme.ts`. The rules:
   portrait tablet. A table they work in mid-event pins its action column
   to the right edge (`.rg-actions` in `utilities.css`, on its `<th>` and
   `<td>`), and leaves out a column the row's own page shows (Entries'
-  transponder below `md`). Below `sm` Live Timing's row action is its icon
+  transponder below `md`). Below `sm` Live timing's row action is its icon
   alone, so the crew's name fits beside it; Up next has the same action
   spelled out. The app bar's buttons stay reachable on a
   phone: below `sm` its chips are icons and the date goes.
@@ -161,7 +166,7 @@ Values live in `theme.ts`. The rules:
 ## Status
 
 - **A status is a chip:** colour, icon and label together. One mapping per
-  concept, reused wherever that status shows: Live Timing's row states
+  concept, reused wherever that status shows: Live timing's row states
   (`ROW_STATE_DISPLAY`) drive the table, the On stage card and the counters
   in the stage header.
 - **Something waiting on a marshal shows where it happened**, not in a card
@@ -314,7 +319,7 @@ Values live in `theme.ts`. The rules:
   click undoes doesn't ask.
 - **One destructive entry per menu.** Variants of one intent (void a run,
   or delete it) are one entry whose dialog explains each and offers them as
-  its buttons, the one that keeps more as the primary (Live Timing's
+  its buttons, the one that keeps more as the primary (Live timing's
   "Remove attempt…": Void, or Delete for good): two red entries
   side by side, told apart only in their dialogs, get mixed up mid-event.
 - **Time-critical actions never ask:** Start now, Finish now. A dialog would
@@ -434,7 +439,7 @@ writing UI, check this list:
 - `StagePicker`: the rally as a track of stages (closed ✓, running ●,
   upcoming ○), a ring on the one shown, a click switches; labelled by stage
   id, the name in the tooltip. On Results it ends in **Overall** (`overall`
-  prop). Live Timing and Results.
+  prop). Live timing and Results.
 - `ClassPicker`: assigning classes on Entries, main class first and
   exclusive.
 - `ClassFilter`: the Results filter, one main class and any categories,
@@ -462,11 +467,11 @@ writing UI, check this list:
   with seconds; the icon is no tab stop.
 - `RunningTime`: a running stage time ticking in tenths, its own timer so
   only it re-renders.
-- Live Timing's cards: `LiveStageHeader`, `UpNextCard`, `OnStageCard`,
+- Live timing's cards: `LiveStageHeader`, `UpNextCard`, `OnStageCard`,
   `LiveRunTable`. `LiveView` holds the state and the actions and hands
   each card its part; what a row is and which state it is in is
   `live-rows.ts`.
-- Live Timing's own: `GateFlow` (the gate line), `RunCorrectionDialog`,
+- Live timing's own: `GateFlow` (the gate line), `RunCorrectionDialog`,
   `PenaltyDialog` (also on the entry page), `UpNextCard` (with
   `StartCountdown`, the lights and seconds on their own 100 ms timer),
   `JumpStartChip`.
