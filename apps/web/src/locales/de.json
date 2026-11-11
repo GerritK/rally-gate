@@ -256,6 +256,7 @@
     "dismissAll": "Alle {n} verwerfen"
   },
   "table": {
+    "actions": "Aktionen",
     "pos": "Pos.",
     "crew": "Team",
     "car": "Auto",
@@ -803,6 +804,7 @@
     "joining": "Anmeldung läuft…"
   },
   "changes": {
+    "show": "Diese Änderung anzeigen",
     "title": "Verlauf",
     "hint": "Jede Änderung von Hand an den Ergebnissen dieses Autos, neueste zuerst.",
     "when": "Wann",

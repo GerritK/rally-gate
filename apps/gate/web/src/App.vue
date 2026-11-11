@@ -569,28 +569,31 @@ onUnmounted(() => {
         </v-card>
 
         <v-card class="mb-6">
-          <v-card-title class="d-flex align-center">
-            {{ t('gateConfig.network') }}
-            <v-spacer />
-            <v-chip
-              v-if="wifiConnection"
-              :color="onHotspot ? 'warning' : 'success'"
-              :prepend-icon="onHotspot ? 'mdi-access-point' : 'mdi-wifi'"
-              size="small"
-              variant="flat"
-            >
-              {{ onHotspot ? t('gateConfig.ownHotspot') : wifiConnection }}
-            </v-chip>
-            <v-chip
-              v-else
-              color="error"
-              prepend-icon="mdi-wifi-off"
-              size="small"
-              variant="flat"
-            >
-              {{ t('gateConfig.noWifi') }}
-            </v-chip>
-          </v-card-title>
+          <v-card-item>
+            <v-card-title>{{ t('gateConfig.network') }}</v-card-title>
+            <template #append>
+              <div class="d-flex flex-wrap justify-end ga-2">
+                <v-chip
+                  v-if="wifiConnection"
+                  :color="onHotspot ? 'warning' : 'success'"
+                  :prepend-icon="onHotspot ? 'mdi-access-point' : 'mdi-wifi'"
+                  size="small"
+                  variant="flat"
+                >
+                  {{ onHotspot ? t('gateConfig.ownHotspot') : wifiConnection }}
+                </v-chip>
+                <v-chip
+                  v-else
+                  color="error"
+                  prepend-icon="mdi-wifi-off"
+                  size="small"
+                  variant="flat"
+                >
+                  {{ t('gateConfig.noWifi') }}
+                </v-chip>
+              </div>
+            </template>
+          </v-card-item>
           <v-card-text>
             <v-alert
               v-if="network && !network.available"

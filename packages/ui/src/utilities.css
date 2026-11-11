@@ -47,6 +47,10 @@
   font-family: 'Barlow Condensed', sans-serif;
   font-weight: 600;
 }
+/* A card title is an <h2> (vuetify.ts); without the browser's heading margin. */
+.v-card-title {
+  margin: 0;
+}
 
 /*
  * A record's facts in a card: a <dl>, label left in medium emphasis, value
@@ -80,6 +84,7 @@
 }
 
 .rg-section-title {
+  margin: 0;
   font-family: 'Barlow Condensed', sans-serif;
   font-weight: 600;
   font-size: 1.1rem;
@@ -172,4 +177,18 @@
  */
 .bg-error {
   --v-theme-error: var(--v-theme-error-fill);
+}
+
+/*
+ * The link in a row that opens its detail page (`RowLink`): looks like the
+ * content it wraps, shows only when the keyboard reaches it.
+ */
+.rg-row-link {
+  color: inherit;
+  text-decoration: none;
+  border-radius: 4px;
+}
+.rg-row-link:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-on-surface));
+  outline-offset: 2px;
 }

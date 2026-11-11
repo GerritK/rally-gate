@@ -256,6 +256,7 @@
     "dismissAll": "Dismiss all {n}"
   },
   "table": {
+    "actions": "Actions",
     "pos": "Pos",
     "crew": "Crew",
     "car": "Car",
@@ -803,6 +804,7 @@
     "joining": "Logging in…"
   },
   "changes": {
+    "show": "Show this change",
     "title": "History",
     "hint": "Every hand-made change to this car's results, newest first.",
     "when": "When",

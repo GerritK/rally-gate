@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RowLink from '../components/RowLink.vue';
 import { useLoad } from '../load';
 import EmptyRow from '../components/EmptyRow.vue';
 import LoadError from '../components/LoadError.vue';
@@ -277,40 +278,42 @@ onUnmounted(() => {
 <template>
   <LoadError :load="load" />
   <v-card class="mb-6">
-    <v-card-title class="d-flex align-center">
-      {{ $t('hardware.gates') }}
-      <v-spacer />
-      <v-btn
-        v-if="can('setup')"
-        v-tooltip:bottom="
-          pairingLeft !== null ? $t('hardware.pairingExtend') : ''
-        "
-        variant="tonal"
-        :color="pairing?.open ? 'info' : undefined"
-        prepend-icon="mdi-link-variant"
-        class="mr-2"
-        @click="onOpenPairing"
-      >
-        <template v-if="pairingLeft !== null">
-          {{ $t('hardware.pairingActive') }}
-          <span class="rg-timing ml-2">
-            {{ formatWholeSeconds(pairingLeft) }}
-          </span>
-        </template>
-        <template v-else-if="pairing?.open">
-          {{ $t('hardware.pairingActive') }}
-        </template>
-        <template v-else>{{ $t('hardware.pairGates') }}</template>
-      </v-btn>
-      <v-btn
-        v-if="can('setup')"
-        variant="tonal"
-        prepend-icon="mdi-plus"
-        @click="openGateDialog"
-      >
-        {{ $t('hardware.addGate') }}
-      </v-btn>
-    </v-card-title>
+    <v-card-item>
+      <v-card-title>{{ $t('hardware.gates') }}</v-card-title>
+      <template #append>
+        <div class="d-flex flex-wrap justify-end ga-2">
+          <v-btn
+            v-if="can('setup')"
+            v-tooltip:bottom="
+              pairingLeft !== null ? $t('hardware.pairingExtend') : ''
+            "
+            variant="tonal"
+            :color="pairing?.open ? 'info' : undefined"
+            prepend-icon="mdi-link-variant"
+            @click="onOpenPairing"
+          >
+            <template v-if="pairingLeft !== null">
+              {{ $t('hardware.pairingActive') }}
+              <span class="rg-timing ml-2">
+                {{ formatWholeSeconds(pairingLeft) }}
+              </span>
+            </template>
+            <template v-else-if="pairing?.open">
+              {{ $t('hardware.pairingActive') }}
+            </template>
+            <template v-else>{{ $t('hardware.pairGates') }}</template>
+          </v-btn>
+          <v-btn
+            v-if="can('setup')"
+            variant="tonal"
+            prepend-icon="mdi-plus"
+            @click="openGateDialog"
+          >
+            {{ $t('hardware.addGate') }}
+          </v-btn>
+        </div>
+      </template>
+    </v-card-item>
     <v-card-text>
       <v-alert v-if="pairing?.open" type="info" variant="tonal" class="mb-4">
         {{
@@ -335,7 +338,9 @@ onUnmounted(() => {
             <th>{{ $t('hardware.status') }}</th>
             <th>{{ $t('hardware.lastRead') }}</th>
             <th>{{ $t('gate.clock') }}</th>
-            <th width="1%" class="rg-actions"></th>
+            <th width="1%" class="rg-actions">
+              <span class="d-sr-only">{{ $t('table.actions') }}</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -409,7 +414,11 @@ onUnmounted(() => {
             @click="router.push(`/hardware/gates/${gate.id}`)"
           >
             <td class="text-no-wrap">
-              <div>{{ gate.name }}</div>
+              <div>
+                <RowLink :to="`/hardware/gates/${gate.id}`">{{
+                  gate.name
+                }}</RowLink>
+              </div>
               <div
                 v-if="gate.name !== gate.id"
                 class="text-caption text-medium-emphasis"
@@ -558,7 +567,9 @@ onUnmounted(() => {
         <tr>
           <th>{{ $t('stages.id') }}</th>
           <th>{{ $t('stages.name') }}</th>
-          <th v-if="can('setup')" width="1%"></th>
+          <th v-if="can('setup')" width="1%">
+            <span class="d-sr-only">{{ $t('table.actions') }}</span>
+          </th>
         </tr>
       </thead>
       <tbody>

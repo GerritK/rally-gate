@@ -33,7 +33,9 @@ async function onDelete(file: string) {
       <tr>
         <th>{{ $t('setup.event') }}</th>
         <th>{{ $t('setup.lastChanged') }}</th>
-        <th width="1%"></th>
+        <th width="1%">
+          <span class="d-sr-only">{{ $t('table.actions') }}</span>
+        </th>
       </tr>
     </thead>
     <tbody>

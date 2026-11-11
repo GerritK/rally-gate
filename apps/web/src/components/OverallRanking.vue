@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RowLink from './RowLink.vue';
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
@@ -106,7 +107,7 @@ const runningStages = computed(() =>
         )
       }}
     </v-alert>
-    <ResultsPodium :placings="placings" />
+    <ResultsPodium :placings="placings" :public-view="publicView" />
     <v-table density="comfortable">
       <thead>
         <tr>
@@ -143,7 +144,12 @@ const runningStages = computed(() =>
           @click="publicView || router.push(`/entries/${placing.entryId}`)"
         >
           <td>{{ placing.position }}</td>
-          <td><StartNumber :number="placing.startNumber" /></td>
+          <td>
+            <RowLink
+              :to="publicView ? undefined : `/entries/${placing.entryId}`"
+              ><StartNumber :number="placing.startNumber"
+            /></RowLink>
+          </td>
           <td><CrewName :crew="placing" /></td>
           <td><CarName :car="placing" /></td>
           <td
@@ -241,7 +247,11 @@ const runningStages = computed(() =>
             class="cursor-pointer"
             @click="router.push(`/entries/${entry.id}`)"
           >
-            <td><StartNumber :number="entry.startNumber" /></td>
+            <td>
+              <RowLink :to="`/entries/${entry.id}`"
+                ><StartNumber :number="entry.startNumber"
+              /></RowLink>
+            </td>
             <td><CrewName :crew="entry" /></td>
             <td><CarName :car="entry" /></td>
             <td>

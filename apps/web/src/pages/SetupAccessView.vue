@@ -143,22 +143,24 @@ const load = useLoad(async () => {
 
   <template v-else>
     <v-card class="mb-4">
-      <v-card-title class="d-flex align-center">
-        {{ $t('access.invitations') }}
-        <v-spacer />
-        <v-btn
-          variant="tonal"
-          prepend-icon="mdi-printer-outline"
-          class="mr-2"
-          :disabled="!invitations.some((i) => !i.blocked)"
-          @click="print(invitations)"
-        >
-          {{ $t('access.printAll') }}
-        </v-btn>
-        <v-btn color="primary" prepend-icon="mdi-plus" @click="openDialog">
-          {{ $t('access.add') }}
-        </v-btn>
-      </v-card-title>
+      <v-card-item>
+        <v-card-title>{{ $t('access.invitations') }}</v-card-title>
+        <template #append>
+          <div class="d-flex flex-wrap justify-end ga-2">
+            <v-btn
+              variant="tonal"
+              prepend-icon="mdi-printer-outline"
+              :disabled="!invitations.some((i) => !i.blocked)"
+              @click="print(invitations)"
+            >
+              {{ $t('access.printAll') }}
+            </v-btn>
+            <v-btn color="primary" prepend-icon="mdi-plus" @click="openDialog">
+              {{ $t('access.add') }}
+            </v-btn>
+          </div>
+        </template>
+      </v-card-item>
       <v-card-text>
         <p class="mb-4">{{ $t('access.explain') }}</p>
         <v-select
@@ -178,8 +180,12 @@ const load = useLoad(async () => {
               <th>{{ $t('access.role') }}</th>
               <th>{{ $t('access.code') }}</th>
               <th>{{ $t('access.devices') }}</th>
-              <th></th>
-              <th width="1%"></th>
+              <th>
+                <span class="d-sr-only">{{ $t('table.actions') }}</span>
+              </th>
+              <th width="1%">
+                <span class="d-sr-only">{{ $t('table.actions') }}</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -270,8 +276,12 @@ const load = useLoad(async () => {
             <tr>
               <th>{{ $t('access.label') }}</th>
               <th>{{ $t('access.since') }}</th>
-              <th></th>
-              <th width="1%"></th>
+              <th>
+                <span class="d-sr-only">{{ $t('table.actions') }}</span>
+              </th>
+              <th width="1%">
+                <span class="d-sr-only">{{ $t('table.actions') }}</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -319,28 +329,31 @@ const load = useLoad(async () => {
     </v-card>
 
     <v-card>
-      <v-card-title class="d-flex align-center">
-        {{ $t('access.password') }}
-        <v-chip
-          size="small"
-          class="ml-3"
-          :color="session?.passwordSet ? 'success' : undefined"
-        >
-          {{
-            session?.passwordSet
-              ? $t('access.passwordIsSet')
-              : $t('access.passwordNotSet')
-          }}
-        </v-chip>
-        <v-spacer />
-        <v-btn variant="tonal" prepend-icon="mdi-key" @click="openPassword">
-          {{
-            session?.passwordSet
-              ? $t('access.changePassword')
-              : $t('access.setPassword')
-          }}
-        </v-btn>
-      </v-card-title>
+      <v-card-item>
+        <v-card-title>{{ $t('access.password') }}</v-card-title>
+        <template #append>
+          <div class="d-flex flex-wrap align-center justify-end ga-2">
+            <v-chip
+              size="small"
+              :color="session?.passwordSet ? 'success' : undefined"
+            >
+              {{
+                session?.passwordSet
+                  ? $t('access.passwordIsSet')
+                  : $t('access.passwordNotSet')
+              }}
+            </v-chip>
+
+            <v-btn variant="tonal" prepend-icon="mdi-key" @click="openPassword">
+              {{
+                session?.passwordSet
+                  ? $t('access.changePassword')
+                  : $t('access.setPassword')
+              }}
+            </v-btn>
+          </div>
+        </template>
+      </v-card-item>
       <v-card-text>{{ $t('access.passwordExplain') }}</v-card-text>
     </v-card>
   </template>

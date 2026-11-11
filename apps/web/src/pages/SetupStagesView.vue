@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RowLink from '../components/RowLink.vue';
 import { useLoad } from '../load';
 import EmptyRow from '../components/EmptyRow.vue';
 import LoadError from '../components/LoadError.vue';
@@ -73,18 +74,21 @@ const load = useLoad(refresh);
 
   <LoadError :load="load" />
   <v-card>
-    <v-card-title class="d-flex align-center">
-      {{ $t('stages.title') }}
-      <v-spacer />
-      <v-btn
-        v-if="can('setup')"
-        color="primary"
-        prepend-icon="mdi-plus"
-        @click="openCreate"
-      >
-        {{ $t('stages.add') }}
-      </v-btn>
-    </v-card-title>
+    <v-card-item>
+      <v-card-title>{{ $t('stages.title') }}</v-card-title>
+      <template #append>
+        <div class="d-flex flex-wrap justify-end ga-2">
+          <v-btn
+            v-if="can('setup')"
+            color="primary"
+            prepend-icon="mdi-plus"
+            @click="openCreate"
+          >
+            {{ $t('stages.add') }}
+          </v-btn>
+        </div>
+      </template>
+    </v-card-item>
     <v-card-text>
       <v-table density="comfortable" hover>
         <thead>
@@ -93,7 +97,9 @@ const load = useLoad(refresh);
             <th>{{ $t('stages.id') }}</th>
             <th>{{ $t('stages.name') }}</th>
             <th>{{ $t('table.status') }}</th>
-            <th width="1%"></th>
+            <th width="1%">
+              <span class="d-sr-only">{{ $t('table.actions') }}</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -104,7 +110,11 @@ const load = useLoad(refresh);
             @click="router.push(`/setup/stages/${stage.id}`)"
           >
             <td>{{ stage.stageNumber }}</td>
-            <td>{{ stage.id }}</td>
+            <td>
+              <RowLink :to="`/setup/stages/${stage.id}`">{{
+                stage.id
+              }}</RowLink>
+            </td>
             <td>
               {{ stage.name }}
               <span

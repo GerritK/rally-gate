@@ -1605,7 +1605,9 @@ onUnmounted(() => {
             {{ $t('gateRole.finish') }}<span class="rg-time-mark" />
           </th>
           <th class="rg-time">{{ $t('table.time') }}</th>
-          <th class="rg-actions"></th>
+          <th class="rg-actions">
+            <span class="d-sr-only">{{ $t('table.actions') }}</span>
+          </th>
         </tr>
       </thead>
       <tbody>

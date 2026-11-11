@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RowLink from '../components/RowLink.vue';
 import { useLoad } from '../load';
 import LoadError from '../components/LoadError.vue';
 import { can } from '../api/auth';
@@ -277,8 +278,10 @@ onUnmounted(() => {
               @click="router.push(`/setup/stages/${assignment.stageId}`)"
             >
               <td>
-                {{ assignment.stageId }}
-                <template v-if="stage">· {{ stage.name }}</template>
+                <RowLink :to="`/setup/stages/${assignment.stageId}`">
+                  {{ assignment.stageId }}
+                  <template v-if="stage">· {{ stage.name }}</template>
+                </RowLink>
               </td>
               <td>{{ gateRoleLabel(assignment) }}</td>
               <td>

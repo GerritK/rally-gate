@@ -33,6 +33,8 @@ export function createRallyVuetify(i18n: RallyI18n) {
     defaults: {
       VAppBar: { flat: true, border: 'b' },
       VCard: { rounded: 'lg', flat: true, border: true },
+      // A real heading, so a screen reader can jump from card to card.
+      VCardTitle: { tag: 'h2' },
       VBtn: { rounded: 'md', variant: 'flat' },
       // v-card-actions turns its buttons to text; a dialog's main action is
       // filled like everywhere else, Cancel says `variant="text"` itself.

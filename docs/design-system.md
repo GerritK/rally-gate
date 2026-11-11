@@ -89,6 +89,11 @@ Values live in `theme.ts`. The rules:
 
 ## Type
 
+- **Headings are real headings**, for a screen reader's jump list: every
+  card title is an `<h2>` (set once in `vuetify.ts`), a `.rg-section-title`
+  an `<h3>`, and `App.vue` carries the page's name as a hidden `<h1>`. A
+  card's buttons therefore go in `v-card-item`'s `#append`, never inside
+  the title.
 - **Barlow** for body text, **Barlow Condensed** for headings, card and
   toolbar titles (set in `utilities.css`, since Vuetify's heading font only
   reaches its `text-h*` classes).
@@ -256,6 +261,9 @@ Values live in `theme.ts`. The rules:
   way.
 - **A row with a detail page opens it on click**, so it needs no Edit
   button and the direct action stays free for the real one.
+  What identifies the row (start number, stage id, gate name) is also a
+  real link (`RowLink`), invisible until the keyboard reaches it: a click
+  handler on a `<tr>` exists for a pointer only.
 - **Add sits top right in the table card's title** (`#append`): visible
   without scrolling to the end of 80 entries, never moving as rows are
   added, and clearly tied to the list it fills.
@@ -436,6 +444,7 @@ writing UI, check this list:
 - `StatusChip` (any `*_DISPLAY` map), `ClockTime` (a time with its hand-set
   mark), `ManualMark`, `GateOnlineChip`, `GateVersion`, `GateClockChips`.
 - `TableLegend`: see Tooltips, legends and links.
+- `RowLink`: see Tables.
 - `LoadedPage`, `LoadError`, `EmptyRow`: a page's first load and its
   table's empty row (see Tables), with `useLoad()`.
 - `RallyLockAlert`: above a page the rally status locks, the reason its

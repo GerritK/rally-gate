@@ -108,7 +108,7 @@ async function onSave() {
     />
     <div class="rg-columns">
       <section>
-        <div class="rg-section-title">{{ $t('entry.driver') }}</div>
+        <h3 class="rg-section-title">{{ $t('entry.driver') }}</h3>
         <div class="rg-pair">
           <v-text-field
             v-model="draft.driverFirstName"
@@ -123,9 +123,9 @@ async function onSave() {
         <FlagPicker v-model="draft.driverFlag" />
       </section>
       <section>
-        <div class="rg-section-title">
+        <h3 class="rg-section-title">
           {{ $t('entryForm.coDriverOptional') }}
-        </div>
+        </h3>
         <div class="rg-pair">
           <v-text-field
             v-model="draft.coDriverFirstName"
@@ -141,7 +141,7 @@ async function onSave() {
     </div>
     <div class="rg-columns">
       <section>
-        <div class="rg-section-title">{{ $t('entry.car') }}</div>
+        <h3 class="rg-section-title">{{ $t('entry.car') }}</h3>
         <v-combobox
           v-model="draft.body"
           :items="bodies"
@@ -156,7 +156,7 @@ async function onSave() {
         />
       </section>
       <section>
-        <div class="rg-section-title">{{ $t('entryForm.registration') }}</div>
+        <h3 class="rg-section-title">{{ $t('entryForm.registration') }}</h3>
         <TransponderFields
           v-model="draft.transponders"
           :entries="entries"

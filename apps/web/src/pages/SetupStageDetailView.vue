@@ -249,7 +249,7 @@ watch(() => props.stageId, load.reload);
         >
           <div class="rg-stage-sections">
             <div class="rg-stage-fields">
-              <div class="rg-section-title">{{ $t('stage.general') }}</div>
+              <h3 class="rg-section-title">{{ $t('stage.general') }}</h3>
               <div class="d-flex ga-3">
                 <v-text-field
                   v-model.number="stage.stageNumber"
@@ -269,7 +269,7 @@ watch(() => props.stageId, load.reload);
               </div>
             </div>
             <div class="rg-stage-fields">
-              <div class="rg-section-title">{{ $t('stage.scoring') }}</div>
+              <h3 class="rg-section-title">{{ $t('stage.scoring') }}</h3>
               <v-select
                 v-model="stage.scoring"
                 :items="scoringOptions"
@@ -281,7 +281,7 @@ watch(() => props.stageId, load.reload);
             </div>
           </div>
           <div class="rg-stage-fields">
-            <div class="rg-section-title">{{ $t('stage.times') }}</div>
+            <h3 class="rg-section-title">{{ $t('stage.times') }}</h3>
             <v-select
               v-model="stage.startMode"
               :items="startModeOptions"
@@ -358,18 +358,21 @@ watch(() => props.stageId, load.reload);
     </v-card>
 
     <v-card>
-      <v-card-title class="d-flex align-center">
-        {{ $t('stage.assignments') }}
-        <v-spacer />
-        <v-btn
-          v-if="stageEditable && can('setup')"
-          variant="tonal"
-          prepend-icon="mdi-plus"
-          @click="openAssignmentDialog"
-        >
-          {{ $t('stage.addAssignment') }}
-        </v-btn>
-      </v-card-title>
+      <v-card-item>
+        <v-card-title>{{ $t('stage.assignments') }}</v-card-title>
+        <template #append>
+          <div class="d-flex flex-wrap justify-end ga-2">
+            <v-btn
+              v-if="stageEditable && can('setup')"
+              variant="tonal"
+              prepend-icon="mdi-plus"
+              @click="openAssignmentDialog"
+            >
+              {{ $t('stage.addAssignment') }}
+            </v-btn>
+          </div>
+        </template>
+      </v-card-item>
       <v-card-text>
         <v-alert
           v-if="stage && !stageEditable"
@@ -389,7 +392,9 @@ watch(() => props.stageId, load.reload);
               <th>{{ $t('stage.gate') }}</th>
               <th>{{ $t('stage.role') }}</th>
               <th>{{ $t('stage.active') }}</th>
-              <th width="1%"></th>
+              <th width="1%">
+                <span class="d-sr-only">{{ $t('table.actions') }}</span>
+              </th>
             </tr>
           </thead>
           <tbody>

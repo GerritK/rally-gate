@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RowLink from '../components/RowLink.vue';
 import { useLoad } from '../load';
 import EmptyRow from '../components/EmptyRow.vue';
 import LoadError from '../components/LoadError.vue';
@@ -39,28 +40,29 @@ const load = useLoad(refresh);
 <template>
   <LoadError :load="load" />
   <v-card>
-    <v-card-title class="d-flex align-center">
-      {{ $t('nav.entries') }}
-      <v-spacer />
-      <div class="d-flex flex-wrap justify-end ga-2">
-        <v-btn
-          v-if="can('editEntry')"
-          variant="tonal"
-          prepend-icon="mdi-clipboard-check-outline"
-          to="/entries/check-in"
-        >
-          {{ $t('checkIn.title') }}
-        </v-btn>
-        <v-btn
-          v-if="can('editEntry')"
-          color="primary"
-          prepend-icon="mdi-plus"
-          @click="dialogOpen = true"
-        >
-          {{ $t('entries.add') }}
-        </v-btn>
-      </div>
-    </v-card-title>
+    <v-card-item>
+      <v-card-title>{{ $t('nav.entries') }}</v-card-title>
+      <template #append>
+        <div class="d-flex flex-wrap justify-end ga-2">
+          <v-btn
+            v-if="can('editEntry')"
+            variant="tonal"
+            prepend-icon="mdi-clipboard-check-outline"
+            to="/entries/check-in"
+          >
+            {{ $t('checkIn.title') }}
+          </v-btn>
+          <v-btn
+            v-if="can('editEntry')"
+            color="primary"
+            prepend-icon="mdi-plus"
+            @click="dialogOpen = true"
+          >
+            {{ $t('entries.add') }}
+          </v-btn>
+        </div>
+      </template>
+    </v-card-item>
     <v-card-text>
       <v-table density="comfortable">
         <thead>
@@ -75,7 +77,9 @@ const load = useLoad(refresh);
             </th>
             <th v-if="classes.length > 0">{{ $t('classes.classes') }}</th>
             <th>{{ $t('table.status') }}</th>
-            <th width="1%" class="rg-actions"></th>
+            <th width="1%" class="rg-actions">
+              <span class="d-sr-only">{{ $t('table.actions') }}</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -85,7 +89,11 @@ const load = useLoad(refresh);
             class="cursor-pointer"
             @click="router.push(`/entries/${entry.id}`)"
           >
-            <td><StartNumber :number="entry.startNumber" /></td>
+            <td>
+              <RowLink :to="`/entries/${entry.id}`"
+                ><StartNumber :number="entry.startNumber"
+              /></RowLink>
+            </td>
             <td><CrewName :crew="entry" /></td>
             <td>{{ entry.body ?? '-' }}</td>
             <td class="rg-timing d-none d-md-table-cell">
