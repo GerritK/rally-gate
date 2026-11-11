@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { useLoad } from '../load';
+import LoadedPage from '../components/LoadedPage.vue';
 import { can } from '../api/auth';
 import { RallyStatus, StageStatus } from '@rally-gate/shared';
-import { onMounted, ref } from 'vue';
+import { ref } from 'vue';
 import { useDisplay } from 'vuetify';
 import {
   createEvent,
@@ -131,7 +133,7 @@ async function loadEvents() {
   eventInfo.value = await fetchEventInfo();
 }
 
-onMounted(async () => {
+const load = useLoad(async () => {
   const existing = await fetchRallyInfo();
   if (existing) rallyInfo.value = existing;
   markSaved();
@@ -140,256 +142,262 @@ onMounted(async () => {
 </script>
 
 <template>
-  <v-card class="mb-6">
-    <v-card-item>
-      <v-card-title>{{ $t('setup.event') }}</v-card-title>
-      <v-card-subtitle v-if="eventInfo">
-        <v-icon icon="mdi-file-outline" size="small" />
-        {{ eventInfo.file }}
-      </v-card-subtitle>
-      <template v-if="eventInfo?.switchable && can('setup')" #append>
-        <v-btn variant="text" prepend-icon="mdi-plus" @click="newDialog = true">
-          {{ $t('setup.newEvent') }}
-        </v-btn>
-        <v-btn
-          variant="text"
-          prepend-icon="mdi-folder-open-outline"
-          @click="openDialog = true"
-        >
-          {{ $t('setup.openEvent') }}
-        </v-btn>
-      </template>
-    </v-card-item>
-    <v-card-text>
-      <v-form
-        :readonly="!can('setup')"
-        class="d-flex flex-wrap align-center ga-3"
-        @submit.prevent="onSave"
-      >
-        <v-text-field
-          v-model="rallyInfo.name"
-          :label="$t('setup.rallyName')"
-          density="comfortable"
-          hide-details
-          style="min-width: 260px"
-        />
-        <v-text-field
-          v-model="rallyInfo.date"
-          :label="$t('setup.dateOptional')"
-          density="comfortable"
-          hide-details
-          style="min-width: 180px"
-        />
-        <v-text-field
-          v-model="rallyInfo.location"
-          :label="$t('setup.locationOptional')"
-          density="comfortable"
-          hide-details
-          style="min-width: 220px"
-        />
-        <v-btn
-          v-if="can('setup')"
-          type="submit"
-          color="primary"
-          :loading="saving"
-          prepend-icon="mdi-content-save"
-        >
-          {{ $t('common.save') }}
-        </v-btn>
-      </v-form>
-    </v-card-text>
-  </v-card>
-
-  <v-card class="mb-6">
-    <v-card-item>
-      <v-card-title>{{ $t('rally.title') }}</v-card-title>
-      <template #append>
-        <StatusChip :display="RALLY_STATUS_DISPLAY[rallyStatus]" />
-        <v-menu v-if="rallyStatus === RallyStatus.CLOSED && can('setup')">
-          <template #activator="{ props: menu }">
-            <v-btn
-              v-bind="menu"
-              icon="mdi-dots-vertical"
-              variant="text"
-              size="small"
-              class="ml-2"
-              :aria-label="$t('common.moreActions')"
-            />
-          </template>
-          <v-list density="compact">
-            <v-list-item
-              prepend-icon="mdi-lock-open-variant-outline"
-              :title="$t('rally.reopen')"
-              @click="onReopen"
-            />
-          </v-list>
-        </v-menu>
-      </template>
-    </v-card-item>
-    <v-card-text class="d-flex flex-wrap align-center ga-4">
-      <span class="flex-1-1">{{ $t(`rally.hint.${rallyStatus}`) }}</span>
-      <v-btn
-        v-if="rallyStatus === RallyStatus.SETUP && can('setup')"
-        color="success"
-        variant="outlined"
-        prepend-icon="mdi-play"
-        @click="onStart"
-      >
-        {{ $t('rally.start') }}
-      </v-btn>
-      <v-btn
-        v-else-if="rallyStatus === RallyStatus.RUNNING && can('setup')"
-        color="error"
-        variant="outlined"
-        prepend-icon="mdi-flag-checkered"
-        :loading="changing"
-        @click="onClose"
-      >
-        {{ $t('rally.close') }}
-      </v-btn>
-    </v-card-text>
-  </v-card>
-
-  <v-dialog
-    :model-value="!!findings"
-    max-width="600"
-    :aria-label="$t('rally.checkTitle')"
-    :fullscreen="smAndDown"
-    @update:model-value="findings = null"
-  >
-    <v-card v-if="findings" :title="$t('rally.checkTitle')">
-      <v-card-text>
-        <p v-if="findings.length === 0">{{ $t('rally.checkClean') }}</p>
-        <v-alert
-          v-for="f in findings"
-          :key="f.key + JSON.stringify(f.params)"
-          :type="f.error ? 'error' : 'warning'"
-          variant="tonal"
-          density="compact"
-          class="mb-2"
-        >
-          {{ $t(`rally.check.${f.key}`, f.params) }}
-        </v-alert>
-        <p class="text-body-2 text-medium-emphasis mt-4">
-          {{ $t('rally.startText') }}
-        </p>
-      </v-card-text>
-      <v-card-actions>
-        <v-spacer />
-        <v-btn variant="text" @click="findings = null">
-          {{ $t('common.cancel') }}
-        </v-btn>
-        <v-btn
-          color="success"
-          variant="flat"
-          :loading="changing"
-          :disabled="findings.some((f) => f.error)"
-          @click="changeStatus('start', 'rally.startedNotice')"
-        >
-          {{
-            findings.length > 0 && !findings.some((f) => f.error)
-              ? $t('rally.startAnyway')
-              : $t('rally.start')
-          }}
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
-
-  <v-row>
-    <v-col cols="12" sm="4">
-      <v-card
-        class="h-100"
-        to="/setup/stages"
-        prepend-icon="mdi-flag-checkered"
-      >
-        <v-card-title>{{ $t('stages.title') }}</v-card-title>
-        <v-card-text>{{ $t('setup.stagesHint') }}</v-card-text>
-      </v-card>
-    </v-col>
-    <v-col cols="12" sm="4">
-      <v-card
-        class="h-100"
-        to="/setup/classes"
-        prepend-icon="mdi-shape-outline"
-      >
-        <v-card-title>{{ $t('classes.classes') }}</v-card-title>
-        <v-card-text>{{ $t('setup.classesHint') }}</v-card-text>
-      </v-card>
-    </v-col>
-    <v-col cols="12" sm="4">
-      <v-card
-        class="h-100"
-        to="/setup/start"
-        prepend-icon="mdi-sort-numeric-ascending"
-      >
-        <v-card-title>{{ $t('setup.start') }}</v-card-title>
-        <v-card-text>{{ $t('setup.startHint') }}</v-card-text>
-      </v-card>
-    </v-col>
-    <v-col cols="12" sm="4">
-      <v-card
-        class="h-100"
-        to="/setup/scoring"
-        prepend-icon="mdi-calculator-variant-outline"
-      >
-        <v-card-title>{{ $t('setup.scoring') }}</v-card-title>
-        <v-card-text>{{ $t('setup.scoringHint') }}</v-card-text>
-      </v-card>
-    </v-col>
-    <v-col cols="12" sm="4">
-      <v-card
-        class="h-100"
-        to="/setup/display"
-        prepend-icon="mdi-palette-outline"
-      >
-        <v-card-title>{{ $t('displaySetup.title') }}</v-card-title>
-        <v-card-text>{{ $t('setup.displayHint') }}</v-card-text>
-      </v-card>
-    </v-col>
-    <v-col v-if="can('setup')" cols="12" sm="4">
-      <v-card class="h-100" to="/setup/access" prepend-icon="mdi-key-chain">
-        <v-card-title>{{ $t('access.title') }}</v-card-title>
-        <v-card-text>{{ $t('access.hint') }}</v-card-text>
-      </v-card>
-    </v-col>
-  </v-row>
-
-  <NewEventDialog
-    v-model="newDialog"
-    :create="(input) => switchEvent(() => createEvent(input))"
-  />
-
-  <v-dialog
-    v-model="openDialog"
-    max-width="600"
-    :fullscreen="smAndDown"
-    :aria-label="$t('setup.openEvent')"
-  >
-    <v-card v-if="eventInfo">
+  <LoadedPage :load="load">
+    <v-card class="mb-6">
       <v-card-item>
-        <v-card-title>{{ $t('setup.openEvent') }}</v-card-title>
-        <v-card-subtitle>
-          {{ $t('setup.onThisComputer', { n: eventInfo.events.length }) }}
+        <v-card-title>{{ $t('setup.event') }}</v-card-title>
+        <v-card-subtitle v-if="eventInfo">
+          <v-icon icon="mdi-file-outline" size="small" />
+          {{ eventInfo.file }}
         </v-card-subtitle>
-        <template #append>
-          <ImportEventButton variant="tonal" @imported="loadEvents" />
+        <template v-if="eventInfo?.switchable && can('setup')" #append>
+          <v-btn
+            variant="text"
+            prepend-icon="mdi-plus"
+            @click="newDialog = true"
+          >
+            {{ $t('setup.newEvent') }}
+          </v-btn>
+          <v-btn
+            variant="text"
+            prepend-icon="mdi-folder-open-outline"
+            @click="openDialog = true"
+          >
+            {{ $t('setup.openEvent') }}
+          </v-btn>
         </template>
       </v-card-item>
-      <EventTable
-        :events="eventInfo.events"
-        :open-file="eventInfo.file"
-        @open="onOpen"
-        @deleted="loadEvents"
-      />
-      <v-card-actions>
-        <v-spacer />
-        <v-btn variant="text" @click="openDialog = false">
-          {{ $t('common.close') }}
-        </v-btn>
-      </v-card-actions>
+      <v-card-text>
+        <v-form
+          :readonly="!can('setup')"
+          class="d-flex flex-wrap align-center ga-3"
+          @submit.prevent="onSave"
+        >
+          <v-text-field
+            v-model="rallyInfo.name"
+            :label="$t('setup.rallyName')"
+            density="comfortable"
+            hide-details
+            style="min-width: 260px"
+          />
+          <v-text-field
+            v-model="rallyInfo.date"
+            :label="$t('setup.dateOptional')"
+            density="comfortable"
+            hide-details
+            style="min-width: 180px"
+          />
+          <v-text-field
+            v-model="rallyInfo.location"
+            :label="$t('setup.locationOptional')"
+            density="comfortable"
+            hide-details
+            style="min-width: 220px"
+          />
+          <v-btn
+            v-if="can('setup')"
+            type="submit"
+            color="primary"
+            :loading="saving"
+            prepend-icon="mdi-content-save"
+          >
+            {{ $t('common.save') }}
+          </v-btn>
+        </v-form>
+      </v-card-text>
     </v-card>
-  </v-dialog>
 
-  <EventSwitchOverlay />
+    <v-card class="mb-6">
+      <v-card-item>
+        <v-card-title>{{ $t('rally.title') }}</v-card-title>
+        <template #append>
+          <StatusChip :display="RALLY_STATUS_DISPLAY[rallyStatus]" />
+          <v-menu v-if="rallyStatus === RallyStatus.CLOSED && can('setup')">
+            <template #activator="{ props: menu }">
+              <v-btn
+                v-bind="menu"
+                icon="mdi-dots-vertical"
+                variant="text"
+                size="small"
+                class="ml-2"
+                :aria-label="$t('common.moreActions')"
+              />
+            </template>
+            <v-list density="compact">
+              <v-list-item
+                prepend-icon="mdi-lock-open-variant-outline"
+                :title="$t('rally.reopen')"
+                @click="onReopen"
+              />
+            </v-list>
+          </v-menu>
+        </template>
+      </v-card-item>
+      <v-card-text class="d-flex flex-wrap align-center ga-4">
+        <span class="flex-1-1">{{ $t(`rally.hint.${rallyStatus}`) }}</span>
+        <v-btn
+          v-if="rallyStatus === RallyStatus.SETUP && can('setup')"
+          color="success"
+          variant="outlined"
+          prepend-icon="mdi-play"
+          @click="onStart"
+        >
+          {{ $t('rally.start') }}
+        </v-btn>
+        <v-btn
+          v-else-if="rallyStatus === RallyStatus.RUNNING && can('setup')"
+          color="error"
+          variant="outlined"
+          prepend-icon="mdi-flag-checkered"
+          :loading="changing"
+          @click="onClose"
+        >
+          {{ $t('rally.close') }}
+        </v-btn>
+      </v-card-text>
+    </v-card>
+
+    <v-dialog
+      :model-value="!!findings"
+      max-width="600"
+      :aria-label="$t('rally.checkTitle')"
+      :fullscreen="smAndDown"
+      @update:model-value="findings = null"
+    >
+      <v-card v-if="findings" :title="$t('rally.checkTitle')">
+        <v-card-text>
+          <p v-if="findings.length === 0">{{ $t('rally.checkClean') }}</p>
+          <v-alert
+            v-for="f in findings"
+            :key="f.key + JSON.stringify(f.params)"
+            :type="f.error ? 'error' : 'warning'"
+            variant="tonal"
+            density="compact"
+            class="mb-2"
+          >
+            {{ $t(`rally.check.${f.key}`, f.params) }}
+          </v-alert>
+          <p class="text-body-2 text-medium-emphasis mt-4">
+            {{ $t('rally.startText') }}
+          </p>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="findings = null">
+            {{ $t('common.cancel') }}
+          </v-btn>
+          <v-btn
+            color="success"
+            variant="flat"
+            :loading="changing"
+            :disabled="findings.some((f) => f.error)"
+            @click="changeStatus('start', 'rally.startedNotice')"
+          >
+            {{
+              findings.length > 0 && !findings.some((f) => f.error)
+                ? $t('rally.startAnyway')
+                : $t('rally.start')
+            }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-row>
+      <v-col cols="12" sm="4">
+        <v-card
+          class="h-100"
+          to="/setup/stages"
+          prepend-icon="mdi-flag-checkered"
+        >
+          <v-card-title>{{ $t('stages.title') }}</v-card-title>
+          <v-card-text>{{ $t('setup.stagesHint') }}</v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="4">
+        <v-card
+          class="h-100"
+          to="/setup/classes"
+          prepend-icon="mdi-shape-outline"
+        >
+          <v-card-title>{{ $t('classes.classes') }}</v-card-title>
+          <v-card-text>{{ $t('setup.classesHint') }}</v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="4">
+        <v-card
+          class="h-100"
+          to="/setup/start"
+          prepend-icon="mdi-sort-numeric-ascending"
+        >
+          <v-card-title>{{ $t('setup.start') }}</v-card-title>
+          <v-card-text>{{ $t('setup.startHint') }}</v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="4">
+        <v-card
+          class="h-100"
+          to="/setup/scoring"
+          prepend-icon="mdi-calculator-variant-outline"
+        >
+          <v-card-title>{{ $t('setup.scoring') }}</v-card-title>
+          <v-card-text>{{ $t('setup.scoringHint') }}</v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="4">
+        <v-card
+          class="h-100"
+          to="/setup/display"
+          prepend-icon="mdi-palette-outline"
+        >
+          <v-card-title>{{ $t('displaySetup.title') }}</v-card-title>
+          <v-card-text>{{ $t('setup.displayHint') }}</v-card-text>
+        </v-card>
+      </v-col>
+      <v-col v-if="can('setup')" cols="12" sm="4">
+        <v-card class="h-100" to="/setup/access" prepend-icon="mdi-key-chain">
+          <v-card-title>{{ $t('access.title') }}</v-card-title>
+          <v-card-text>{{ $t('access.hint') }}</v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <NewEventDialog
+      v-model="newDialog"
+      :create="(input) => switchEvent(() => createEvent(input))"
+    />
+
+    <v-dialog
+      v-model="openDialog"
+      max-width="600"
+      :fullscreen="smAndDown"
+      :aria-label="$t('setup.openEvent')"
+    >
+      <v-card v-if="eventInfo">
+        <v-card-item>
+          <v-card-title>{{ $t('setup.openEvent') }}</v-card-title>
+          <v-card-subtitle>
+            {{ $t('setup.onThisComputer', { n: eventInfo.events.length }) }}
+          </v-card-subtitle>
+          <template #append>
+            <ImportEventButton variant="tonal" @imported="loadEvents" />
+          </template>
+        </v-card-item>
+        <EventTable
+          :events="eventInfo.events"
+          :open-file="eventInfo.file"
+          @open="onOpen"
+          @deleted="loadEvents"
+        />
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="openDialog = false">
+            {{ $t('common.close') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <EventSwitchOverlay />
+  </LoadedPage>
 </template>

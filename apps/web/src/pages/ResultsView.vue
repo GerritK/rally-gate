@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useLoad } from '../load';
-import LoadError from '../components/LoadError.vue';
+import LoadedPage from '../components/LoadedPage.vue';
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
@@ -147,53 +147,51 @@ function onStageChange(stageId: string) {
     <ClassFilter v-model="selectedClassIds" :classes="classes" />
   </div>
 
-  <LoadError :load="load" />
-  <v-card v-if="load.state === 'loading'">
-    <v-card-text class="rg-empty">{{ $t('common.loading') }}</v-card-text>
-  </v-card>
-  <v-card v-else-if="current">
-    <v-card-item>
-      <v-card-title>{{ heading }}</v-card-title>
-      <v-card-subtitle>
-        {{ classFilterLabel(classes, current.classIds) }}
-      </v-card-subtitle>
-      <template #append>
-        <div class="d-flex flex-wrap justify-end ga-2">
-          <v-btn
-            v-if="classes.length > 0"
-            v-tooltip:top="$t('results.printAllHint')"
-            variant="tonal"
-            prepend-icon="mdi-file-document-multiple"
-            :loading="printing"
-            @click="print(true)"
-          >
-            {{ $t('results.printAll') }}
-          </v-btn>
-          <v-btn
-            v-tooltip:top="$t('results.printHint')"
-            variant="tonal"
-            prepend-icon="mdi-printer"
-            :loading="printing"
-            @click="print(false)"
-          >
-            {{ $t('results.print') }}
-          </v-btn>
-        </div>
-      </template>
-    </v-card-item>
-    <v-card-text>
-      <StageRanking
-        v-if="current.stage"
-        :stage="stage"
-        :results="current.stage"
-      />
-      <OverallRanking
-        v-else
-        :placings="current.overall ?? []"
-        :class-ids="current.classIds"
-        :stages="stages"
-        :entries="entries"
-      />
-    </v-card-text>
-  </v-card>
+  <LoadedPage :load="load">
+    <v-card v-if="current">
+      <v-card-item>
+        <v-card-title>{{ heading }}</v-card-title>
+        <v-card-subtitle>
+          {{ classFilterLabel(classes, current.classIds) }}
+        </v-card-subtitle>
+        <template #append>
+          <div class="d-flex flex-wrap justify-end ga-2">
+            <v-btn
+              v-if="classes.length > 0"
+              v-tooltip:top="$t('results.printAllHint')"
+              variant="tonal"
+              prepend-icon="mdi-file-document-multiple"
+              :loading="printing"
+              @click="print(true)"
+            >
+              {{ $t('results.printAll') }}
+            </v-btn>
+            <v-btn
+              v-tooltip:top="$t('results.printHint')"
+              variant="tonal"
+              prepend-icon="mdi-printer"
+              :loading="printing"
+              @click="print(false)"
+            >
+              {{ $t('results.print') }}
+            </v-btn>
+          </div>
+        </template>
+      </v-card-item>
+      <v-card-text>
+        <StageRanking
+          v-if="current.stage"
+          :stage="stage"
+          :results="current.stage"
+        />
+        <OverallRanking
+          v-else
+          :placings="current.overall ?? []"
+          :class-ids="current.classIds"
+          :stages="stages"
+          :entries="entries"
+        />
+      </v-card-text>
+    </v-card>
+  </LoadedPage>
 </template>

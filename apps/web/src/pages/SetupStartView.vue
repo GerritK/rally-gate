@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useLoad } from '../load';
+import LoadedPage from '../components/LoadedPage.vue';
 import { can } from '../api/auth';
 import {
   COUNTDOWN_MS_KEY,
@@ -16,7 +18,7 @@ import {
   StartOrderKey,
   RallyStatus,
 } from '@rally-gate/shared';
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { fetchSetting, saveSetting } from '../api/settings';
 import { fetchPenaltyTypes, type PenaltyType } from '../api/penalties';
 import { lockedWhen } from '../api/rally-info';
@@ -128,7 +130,7 @@ async function onSave() {
   }
 }
 
-onMounted(async () => {
+const load = useLoad(async () => {
   const [g, k, d, c, tol, gap, types, jumpType] = await Promise.all([
     fetchSetting(START_ORDER_GROUPING_KEY),
     fetchSetting(START_ORDER_KEY_KEY),
@@ -159,148 +161,149 @@ onMounted(async () => {
   <v-btn variant="text" prepend-icon="mdi-arrow-left" to="/setup" class="mb-4">
     {{ $t('setup.back') }}
   </v-btn>
-
-  <RallyLockAlert :when="[RallyStatus.RUNNING, RallyStatus.CLOSED]" />
-  <v-card>
-    <v-card-title>{{ $t('startOrder.title') }}</v-card-title>
-    <v-card-text>
-      <v-alert type="info" variant="tonal" density="comfortable" class="mb-4">
-        <i18n-t keypath="startOrder.explain" scope="global">
-          <template #frozen>
-            <strong>{{ $t('startOrder.frozen') }}</strong>
-          </template>
-        </i18n-t>
-      </v-alert>
-      <v-form
-        :readonly="!can('setup')"
-        class="d-flex flex-column ga-4"
-        @submit.prevent="onSave"
-      >
-        <v-select
-          v-model="grouping"
-          :items="groupingOptions"
-          :disabled="locked"
-          :label="$t('startOrder.grouping')"
-          :hint="$t('startOrder.groupingHint')"
-          persistent-hint
-          style="max-width: 420px"
-        />
-        <v-select
-          v-model="key"
-          :items="keyOptions"
-          :disabled="locked"
-          :label="$t('startOrder.orderWithin')"
-          :hint="
-            key === StartOrderKey.OVERALL_TIME
-              ? $t('startOrder.orderWithinHint')
-              : key === StartOrderKey.LAST_STAGE_TIME
-                ? $t('startOrder.orderWithinFallback')
-                : undefined
-          "
-          persistent-hint
-          style="max-width: 420px"
-        />
-        <v-select
-          v-model="direction"
-          :items="directionOptions"
-          :label="$t('startOrder.direction')"
-          :disabled="locked || key === StartOrderKey.START_NUMBER"
-          style="max-width: 420px"
-        />
-        <div class="d-flex align-center ga-3">
-          <v-btn
-            v-if="can('setup')"
-            type="submit"
-            color="primary"
-            :loading="saving"
-            :disabled="locked"
-            prepend-icon="mdi-content-save"
-          >
-            {{ $t('common.save') }}
-          </v-btn>
-        </div>
-      </v-form>
-    </v-card-text>
-  </v-card>
-
-  <v-card class="mt-4">
-    <v-card-title>{{ $t('countdown.title') }}</v-card-title>
-    <v-card-subtitle>{{ $t('countdown.explain') }}</v-card-subtitle>
-    <v-card-text>
-      <v-form
-        ref="countdownForm"
-        :readonly="!can('setup')"
-        class="d-flex flex-column ga-4"
-        @submit.prevent="onSaveCountdown"
-      >
-        <v-text-field
-          v-model.number="countdownS"
-          type="number"
-          min="5"
-          :suffix="$t('countdown.seconds')"
-          :label="$t('countdown.countdown')"
-          :hint="$t('countdown.countdownHint')"
-          persistent-hint
-          :rules="[countdownRule]"
-          :disabled="countdownLocked"
-          class="rg-timing"
-          style="max-width: 420px"
-        />
-        <v-text-field
-          v-model.number="toleranceMs"
-          type="number"
-          min="0"
-          :suffix="$t('countdown.milliseconds')"
-          :label="$t('countdown.tolerance')"
-          :hint="$t('countdown.toleranceHint')"
-          persistent-hint
-          :rules="[wholeRule(0)]"
-          :disabled="toleranceLocked"
-          class="rg-timing"
-          style="max-width: 420px"
-        />
-        <v-text-field
-          v-model.number="gapS"
-          type="number"
-          min="1"
-          :suffix="$t('countdown.seconds')"
-          :label="$t('countdown.gap')"
-          :hint="$t('countdown.gapHint')"
-          persistent-hint
-          :rules="[wholeRule(1)]"
-          :disabled="countdownLocked"
-          class="rg-timing"
-          style="max-width: 420px"
-        />
-        <div>
+  <LoadedPage :load="load">
+    <RallyLockAlert :when="[RallyStatus.RUNNING, RallyStatus.CLOSED]" />
+    <v-card>
+      <v-card-title>{{ $t('startOrder.title') }}</v-card-title>
+      <v-card-text>
+        <v-alert type="info" variant="tonal" density="comfortable" class="mb-4">
+          <i18n-t keypath="startOrder.explain" scope="global">
+            <template #frozen>
+              <strong>{{ $t('startOrder.frozen') }}</strong>
+            </template>
+          </i18n-t>
+        </v-alert>
+        <v-form
+          :readonly="!can('setup')"
+          class="d-flex flex-column ga-4"
+          @submit.prevent="onSave"
+        >
           <v-select
-            v-model="jumpStartTypeId"
-            :items="jumpStartItems"
-            :label="$t('countdown.jumpStartPenalty')"
-            :disabled="countdownLocked"
-            hide-details
+            v-model="grouping"
+            :items="groupingOptions"
+            :disabled="locked"
+            :label="$t('startOrder.grouping')"
+            :hint="$t('startOrder.groupingHint')"
+            persistent-hint
             style="max-width: 420px"
           />
-          <router-link
-            to="/setup/scoring"
-            class="rg-link text-body-2 d-inline-block mt-2"
-          >
-            {{ $t('countdown.managePenalties') }}
-          </router-link>
-        </div>
-        <div>
-          <v-btn
-            v-if="can('setup')"
-            type="submit"
-            color="primary"
-            :loading="savingCountdown"
+          <v-select
+            v-model="key"
+            :items="keyOptions"
+            :disabled="locked"
+            :label="$t('startOrder.orderWithin')"
+            :hint="
+              key === StartOrderKey.OVERALL_TIME
+                ? $t('startOrder.orderWithinHint')
+                : key === StartOrderKey.LAST_STAGE_TIME
+                  ? $t('startOrder.orderWithinFallback')
+                  : undefined
+            "
+            persistent-hint
+            style="max-width: 420px"
+          />
+          <v-select
+            v-model="direction"
+            :items="directionOptions"
+            :label="$t('startOrder.direction')"
+            :disabled="locked || key === StartOrderKey.START_NUMBER"
+            style="max-width: 420px"
+          />
+          <div class="d-flex align-center ga-3">
+            <v-btn
+              v-if="can('setup')"
+              type="submit"
+              color="primary"
+              :loading="saving"
+              :disabled="locked"
+              prepend-icon="mdi-content-save"
+            >
+              {{ $t('common.save') }}
+            </v-btn>
+          </div>
+        </v-form>
+      </v-card-text>
+    </v-card>
+
+    <v-card class="mt-4">
+      <v-card-title>{{ $t('countdown.title') }}</v-card-title>
+      <v-card-subtitle>{{ $t('countdown.explain') }}</v-card-subtitle>
+      <v-card-text>
+        <v-form
+          ref="countdownForm"
+          :readonly="!can('setup')"
+          class="d-flex flex-column ga-4"
+          @submit.prevent="onSaveCountdown"
+        >
+          <v-text-field
+            v-model.number="countdownS"
+            type="number"
+            min="5"
+            :suffix="$t('countdown.seconds')"
+            :label="$t('countdown.countdown')"
+            :hint="$t('countdown.countdownHint')"
+            persistent-hint
+            :rules="[countdownRule]"
             :disabled="countdownLocked"
-            prepend-icon="mdi-content-save"
-          >
-            {{ $t('common.save') }}
-          </v-btn>
-        </div>
-      </v-form>
-    </v-card-text>
-  </v-card>
+            class="rg-timing"
+            style="max-width: 420px"
+          />
+          <v-text-field
+            v-model.number="toleranceMs"
+            type="number"
+            min="0"
+            :suffix="$t('countdown.milliseconds')"
+            :label="$t('countdown.tolerance')"
+            :hint="$t('countdown.toleranceHint')"
+            persistent-hint
+            :rules="[wholeRule(0)]"
+            :disabled="toleranceLocked"
+            class="rg-timing"
+            style="max-width: 420px"
+          />
+          <v-text-field
+            v-model.number="gapS"
+            type="number"
+            min="1"
+            :suffix="$t('countdown.seconds')"
+            :label="$t('countdown.gap')"
+            :hint="$t('countdown.gapHint')"
+            persistent-hint
+            :rules="[wholeRule(1)]"
+            :disabled="countdownLocked"
+            class="rg-timing"
+            style="max-width: 420px"
+          />
+          <div>
+            <v-select
+              v-model="jumpStartTypeId"
+              :items="jumpStartItems"
+              :label="$t('countdown.jumpStartPenalty')"
+              :disabled="countdownLocked"
+              hide-details
+              style="max-width: 420px"
+            />
+            <router-link
+              to="/setup/scoring"
+              class="rg-link text-body-2 d-inline-block mt-2"
+            >
+              {{ $t('countdown.managePenalties') }}
+            </router-link>
+          </div>
+          <div>
+            <v-btn
+              v-if="can('setup')"
+              type="submit"
+              color="primary"
+              :loading="savingCountdown"
+              :disabled="countdownLocked"
+              prepend-icon="mdi-content-save"
+            >
+              {{ $t('common.save') }}
+            </v-btn>
+          </div>
+        </v-form>
+      </v-card-text>
+    </v-card>
+  </LoadedPage>
 </template>

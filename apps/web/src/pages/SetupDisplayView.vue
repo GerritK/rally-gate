@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useLoad } from '../load';
+import LoadedPage from '../components/LoadedPage.vue';
 import { can } from '../api/auth';
 import {
   FLAGS_SHOWN_KEY,
@@ -8,7 +10,7 @@ import {
   type Crew,
 } from '@rally-gate/shared';
 import { notify, t } from '@rally-gate/ui';
-import { onMounted, provide, reactive, ref } from 'vue';
+import { provide, reactive, ref } from 'vue';
 import { saveSetting } from '../api/settings';
 import { DISPLAY, display, loadDisplaySettings } from '../crew';
 import { useUnsavedChanges } from '../unsaved-changes';
@@ -56,7 +58,7 @@ async function onSave() {
   }
 }
 
-onMounted(async () => {
+const load = useLoad(async () => {
   await loadDisplaySettings();
   Object.assign(form, display);
   markSaved();
@@ -67,66 +69,67 @@ onMounted(async () => {
   <v-btn variant="text" prepend-icon="mdi-arrow-left" to="/setup" class="mb-4">
     {{ $t('setup.back') }}
   </v-btn>
-
-  <v-card>
-    <v-card-title>{{ $t('displaySetup.title') }}</v-card-title>
-    <v-card-text>
-      <v-form
-        :readonly="!can('setup')"
-        class="rg-display-form"
-        @submit.prevent="onSave"
-      >
-        <div class="rg-section-title">{{ $t('table.crew') }}</div>
-        <div class="rg-display-crew">
-          <div class="rg-display-fields">
-            <v-select
-              v-model="form.nameFormat"
-              :items="NAME_FORMATS"
-              :label="$t('displaySetup.nameFormat')"
-              hide-details
-            />
-            <v-switch
-              v-model="form.flags"
-              :label="$t('displaySetup.flags')"
-              color="secondary"
-              persistent-hint
-              :hint="$t('displaySetup.flagsHint')"
-            />
-          </div>
-          <div>
-            <div class="text-caption text-medium-emphasis mb-1">
-              {{ $t('displaySetup.example') }}
+  <LoadedPage :load="load">
+    <v-card>
+      <v-card-title>{{ $t('displaySetup.title') }}</v-card-title>
+      <v-card-text>
+        <v-form
+          :readonly="!can('setup')"
+          class="rg-display-form"
+          @submit.prevent="onSave"
+        >
+          <div class="rg-section-title">{{ $t('table.crew') }}</div>
+          <div class="rg-display-crew">
+            <div class="rg-display-fields">
+              <v-select
+                v-model="form.nameFormat"
+                :items="NAME_FORMATS"
+                :label="$t('displaySetup.nameFormat')"
+                hide-details
+              />
+              <v-switch
+                v-model="form.flags"
+                :label="$t('displaySetup.flags')"
+                color="secondary"
+                persistent-hint
+                :hint="$t('displaySetup.flagsHint')"
+              />
             </div>
-            <v-sheet border rounded class="d-flex align-center ga-3 pa-3">
-              <StartNumber :number="7" />
-              <CrewName :crew="EXAMPLE" />
-            </v-sheet>
+            <div>
+              <div class="text-caption text-medium-emphasis mb-1">
+                {{ $t('displaySetup.example') }}
+              </div>
+              <v-sheet border rounded class="d-flex align-center ga-3 pa-3">
+                <StartNumber :number="7" />
+                <CrewName :crew="EXAMPLE" />
+              </v-sheet>
+            </div>
           </div>
-        </div>
 
-        <div class="rg-section-title">{{ $t('nav.results') }}</div>
-        <v-switch
-          v-model="form.podium"
-          :label="$t('displaySetup.podium')"
-          color="secondary"
-          persistent-hint
-          :hint="$t('displaySetup.podiumHint')"
-          class="rg-display-fields"
-        />
-        <div>
-          <v-btn
-            v-if="can('setup')"
-            type="submit"
-            color="primary"
-            :loading="saving"
-            prepend-icon="mdi-content-save"
-          >
-            {{ $t('common.save') }}
-          </v-btn>
-        </div>
-      </v-form>
-    </v-card-text>
-  </v-card>
+          <div class="rg-section-title">{{ $t('nav.results') }}</div>
+          <v-switch
+            v-model="form.podium"
+            :label="$t('displaySetup.podium')"
+            color="secondary"
+            persistent-hint
+            :hint="$t('displaySetup.podiumHint')"
+            class="rg-display-fields"
+          />
+          <div>
+            <v-btn
+              v-if="can('setup')"
+              type="submit"
+              color="primary"
+              :loading="saving"
+              prepend-icon="mdi-content-save"
+            >
+              {{ $t('common.save') }}
+            </v-btn>
+          </div>
+        </v-form>
+      </v-card-text>
+    </v-card>
+  </LoadedPage>
 </template>
 
 <style scoped>

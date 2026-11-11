@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useLoad } from '../load';
+import LoadError from '../components/LoadError.vue';
 import {
   ApiErrorCode,
   COUNTDOWN_MS_KEY,
@@ -17,7 +19,7 @@ import {
   type DidNotStart,
   type Starter,
 } from '@rally-gate/shared';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { ApiError } from '../api/client';
 import { can, session } from '../api/auth';
@@ -113,7 +115,7 @@ import {
 const props = defineProps<{ stageId?: string }>();
 const router = useRouter();
 
-let liveSource: EventSource;
+let liveSource: EventSource | undefined;
 
 const stages = ref<Stage[]>([]);
 const entries = ref<Entry[]>([]);
@@ -136,7 +138,6 @@ const activatingStage = ref(false);
 const closingStage = ref(false);
 const confirm = useConfirm();
 const choose = useChoice();
-const stagesLoaded = ref(false);
 const jumpStartToleranceMs = ref(DEFAULT_JUMP_START_TOLERANCE_MS);
 const jumpStartPenaltyTypeId = ref<string | null>(null);
 /** Every penalty, to tell whether a jump start still awaits a ruling. */
@@ -1157,7 +1158,7 @@ function defaultStage(): Stage | undefined {
   );
 }
 
-onMounted(async () => {
+const load = useLoad(async () => {
   // Stages, entries and assignments aren't pushed over SSE, so they're
   // loaded here and refreshed explicitly when an action changes them.
   [stages.value, entries.value, gateAssignments.value] = await Promise.all([
@@ -1165,7 +1166,6 @@ onMounted(async () => {
     fetchEntries(),
     fetchGateAssignments(),
   ]);
-  stagesLoaded.value = true;
   if (!props.stageId) {
     const fallback = defaultStage();
     if (fallback) router.replace(`/live/${fallback.id}`);
@@ -1194,7 +1194,8 @@ onMounted(async () => {
       loadPenalties(),
       loadStage(),
     ]);
-  liveSource = openLiveStream(
+  // Once: Retry runs this again.
+  liveSource ??= openLiveStream(
     {
       detection: (event) => {
         flashGate(event.gateId);
@@ -1223,7 +1224,7 @@ onMounted(async () => {
     },
     () => void loadLive(),
   );
-  void loadLive();
+  await loadLive();
 });
 
 onUnmounted(() => {
@@ -1281,8 +1282,13 @@ onUnmounted(() => {
     @update:model-value="onSelectStage"
   />
 
+  <LoadError :load="load" />
+  <v-card v-if="load.state === 'loading' && !stage">
+    <v-card-text class="rg-empty">{{ $t('common.loading') }}</v-card-text>
+  </v-card>
+
   <v-alert
-    v-if="stagesLoaded && stages.length === 0"
+    v-if="load.state === 'ready' && stages.length === 0"
     type="info"
     variant="tonal"
     density="comfortable"
