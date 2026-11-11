@@ -253,6 +253,7 @@ onMounted(async () => {
   <v-dialog
     :model-value="!!findings"
     max-width="600"
+    :aria-label="$t('rally.checkTitle')"
     :fullscreen="smAndDown"
     @update:model-value="findings = null"
   >
@@ -359,7 +360,12 @@ onMounted(async () => {
     :create="(input) => switchEvent(() => createEvent(input))"
   />
 
-  <v-dialog v-model="openDialog" max-width="600" :fullscreen="smAndDown">
+  <v-dialog
+    v-model="openDialog"
+    max-width="600"
+    :fullscreen="smAndDown"
+    :aria-label="$t('setup.openEvent')"
+  >
     <v-card v-if="eventInfo">
       <v-card-item>
         <v-card-title>{{ $t('setup.openEvent') }}</v-card-title>

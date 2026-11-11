@@ -1,6 +1,7 @@
 {
   "ui": {
     "language": "Sprache",
+    "close": "Schließen",
     "cancel": "Abbrechen",
     "somethingWentWrong": "Etwas ist schiefgelaufen",
     "justNow": "gerade eben",

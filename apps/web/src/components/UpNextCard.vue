@@ -130,7 +130,8 @@ onUnmounted(() => cancelTonesExcept(new Set()));
             icon="mdi-fullscreen"
             size="small"
             variant="text"
-            :title="$t('countdown.fullscreen')"
+            v-tooltip:top="$t('countdown.fullscreen')"
+            :aria-label="$t('countdown.fullscreen')"
             @click="toggleFullscreen"
           />
         </v-card-title>
@@ -265,7 +266,8 @@ onUnmounted(() => cancelTonesExcept(new Set()));
                 v-if="row.atStart"
                 icon="mdi-flag-variant"
                 color="success"
-                :title="$t('live.atStart')"
+                v-tooltip:top="$t('live.atStart')"
+                :aria-label="$t('live.atStart')"
               />
               <!-- On a narrow card this wraps below, still at the end. -->
               <div class="d-flex align-center ga-2 ms-auto">
@@ -281,7 +283,8 @@ onUnmounted(() => cancelTonesExcept(new Set()));
                     icon="mdi-calendar-arrow-right"
                     size="small"
                     variant="text"
-                    :title="$t('timetable.newSlot')"
+                    v-tooltip:top="$t('timetable.newSlot')"
+                    :aria-label="$t('timetable.newSlot')"
                     :disabled="!!row.slot.startPassingAt"
                     :loading="busyId === row.starter.entryId"
                     @click="emit('newSlot', row.starter.entryId)"
@@ -291,7 +294,8 @@ onUnmounted(() => cancelTonesExcept(new Set()));
                     icon="mdi-close"
                     size="small"
                     variant="text"
-                    :title="$t('countdown.cancel')"
+                    v-tooltip:top="$t('countdown.cancel')"
+                    :aria-label="$t('countdown.cancel')"
                     :loading="busyId === row.slot.id"
                     @click="emit('cancel', row.slot)"
                   />
@@ -305,7 +309,8 @@ onUnmounted(() => cancelTonesExcept(new Set()));
                   icon="mdi-calendar-arrow-right"
                   size="small"
                   variant="text"
-                  :title="$t('timetable.newSlot')"
+                  v-tooltip:top="$t('timetable.newSlot')"
+                  :aria-label="$t('timetable.newSlot')"
                   :loading="busyId === row.starter.entryId"
                   @click="emit('newSlot', row.starter.entryId)"
                 />
@@ -315,7 +320,8 @@ onUnmounted(() => cancelTonesExcept(new Set()));
                   size="small"
                   variant="tonal"
                   color="primary"
-                  :title="$t('countdown.start')"
+                  v-tooltip:top="$t('countdown.start')"
+                  :aria-label="$t('countdown.start')"
                   :loading="busyId === row.starter.entryId"
                   @click="onCountdown(row.starter.entryId)"
                 />

@@ -70,6 +70,7 @@
     "clockCorrected": "This gate's clock is {lag}. The server corrects its times automatically — check the gate's clock."
   },
   "nav": {
+    "menu": "Menu",
     "live": "Live Timing",
     "results": "Results",
     "entries": "Entries",

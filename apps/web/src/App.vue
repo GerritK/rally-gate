@@ -101,7 +101,12 @@ onMounted(() => {
          just the open event. -->
     <v-app-bar>
       <template #prepend>
-        <v-app-bar-nav-icon v-if="inEvent" @click="drawer = !drawer" />
+        <v-app-bar-nav-icon
+          v-if="inEvent"
+          :aria-label="t('nav.menu')"
+          :aria-expanded="drawer"
+          @click="drawer = !drawer"
+        />
       </template>
       <v-app-bar-title>
         <div class="d-flex align-center ga-3">
@@ -125,10 +130,11 @@ onMounted(() => {
           :prepend-icon="xs ? undefined : LIVE_DISPLAY[liveStatus].icon"
           size="small"
           variant="tonal"
-          :aria-label="t(LIVE_DISPLAY[liveStatus].label)"
         >
           <v-icon v-if="xs" :icon="LIVE_DISPLAY[liveStatus].icon" />
-          <template v-else>{{ t(LIVE_DISPLAY[liveStatus].label) }}</template>
+          <span :class="{ 'd-sr-only': xs }">{{
+            t(LIVE_DISPLAY[liveStatus].label)
+          }}</span>
         </v-chip>
         <v-divider v-if="liveStatus" vertical inset class="app-bar-divider" />
         <!-- Links to where it is changed; the change itself never sits in
@@ -143,12 +149,11 @@ onMounted(() => {
             size="small"
             variant="tonal"
             v-tooltip:bottom="t('rallyStatus.title')"
-            :aria-label="RALLY_STATUS_DISPLAY[rallyStatus].label"
           >
             <v-icon v-if="xs" :icon="RALLY_STATUS_DISPLAY[rallyStatus].icon" />
-            <template v-else>{{
+            <span :class="{ 'd-sr-only': xs }">{{
               RALLY_STATUS_DISPLAY[rallyStatus].label
-            }}</template>
+            }}</span>
           </v-chip>
           <v-divider vertical inset class="app-bar-divider" />
         </template>
@@ -231,7 +236,7 @@ onMounted(() => {
             :title="t('app.support')"
           />
         </v-list>
-        <div class="text-center text-disabled pa-3" style="font-size: 0.7rem">
+        <div class="text-center text-medium-emphasis pa-3 app-version">
           {{ t('app.version', { version: serverVersion }) }}
         </div>
       </template>
@@ -253,6 +258,9 @@ onMounted(() => {
   .app-bar-divider {
     margin-inline: 4px;
   }
+}
+.app-version {
+  font-size: 0.7rem;
 }
 .app-bar-label {
   line-height: 1.1;
