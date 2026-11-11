@@ -139,7 +139,9 @@ Values live in `theme.ts`. The rules:
   portrait tablet. A table they work in mid-event pins its action column
   to the right edge (`.rg-actions` in `utilities.css`, on its `<th>` and
   `<td>`), and leaves out a column the row's own page shows (Entries'
-  transponder below `md`). The app bar's buttons stay reachable on a
+  transponder below `md`). Below `sm` Live Timing's row action is its icon
+  alone, so the crew's name fits beside it; Up next has the same action
+  spelled out. The app bar's buttons stay reachable on a
   phone: below `sm` its chips are icons and the date goes.
 - **A card header wraps, never squeezes its title**: below about 10rem of
   title the `#append` buttons drop under it (`utilities.css`, for every
