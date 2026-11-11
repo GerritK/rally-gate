@@ -246,7 +246,7 @@ const load = useLoad(refresh);
         persistent-hint
         clearable
         autofocus
-        class="rg-checkin-search"
+        class="rg-field-narrow"
         @keydown.enter="pickFirst"
       />
     </v-card-text>
@@ -295,11 +295,10 @@ const load = useLoad(refresh);
         <template #prepend>
           <StartNumber
             :number="selected.startNumber"
-            class="me-4"
-            style="font-size: 2.5rem"
+            class="me-4 rg-checkin-number"
           />
         </template>
-        <CrewName :crew="selected" style="font-size: 1.5rem" />
+        <CrewName :crew="selected" class="rg-checkin-crew" />
       </v-card-item>
       <v-card-text>
         <dl class="rg-facts">
@@ -373,8 +372,12 @@ const load = useLoad(refresh);
 </template>
 
 <style scoped>
-.rg-checkin-search {
-  max-width: 420px;
+/* The car on the desk, read at a glance before anything is clicked. */
+.rg-checkin-number {
+  font-size: 2.5rem;
+}
+.rg-checkin-crew {
+  font-size: 1.5rem;
 }
 .rg-checkin-transponder {
   max-width: 560px;

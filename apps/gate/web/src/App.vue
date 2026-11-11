@@ -488,7 +488,7 @@ onUnmounted(() => {
     </v-app-bar>
 
     <v-main>
-      <v-container class="py-6" style="max-width: 720px">
+      <v-container class="py-6 rg-gate-config-page">
         <v-alert
           v-if="locked"
           type="info"
@@ -807,6 +807,10 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* One column of cards, read on a phone held at a gate. */
+.rg-gate-config-page {
+  max-width: 720px;
+}
 /* Two lines inside the default 64px bar, so the tighter leading is needed. The
    gate id is the part that must stay readable when the status chip squeezes the
    title on a phone, so the label is what gets truncated. */
