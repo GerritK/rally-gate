@@ -164,3 +164,12 @@
   right: 0;
   background-color: rgb(var(--v-theme-surface));
 }
+
+/*
+ * A filled red surface carries white text, which `error` is too light for
+ * (it is tuned as text on the dark surface). Swapping the variable, not the
+ * background: Vuetify's own .bg-error rule is !important inside a layer.
+ */
+.bg-error {
+  --v-theme-error: var(--v-theme-error-fill);
+}
