@@ -55,6 +55,12 @@ Values live in `theme.ts`. The rules:
   (`timing-best`/`timing-personal`) get a second cue too.
 - **Semantic colours over hex:** `timing-*` and `flag-*` in the theme, so
   components say what they mean ("timing-idle"), not what they look like.
+- **Every colour reads at 4.5:1 where it is used**: as text on the surface,
+  in a tonal chip, and as a fill under its `on-*` colour. `error` is tuned
+  as text on dark and too light under white, so a filled red surface
+  (error snackbar, a dialog's red button) draws in `error-fill`
+  (`utilities.css` swaps it in for every `.bg-error`; nothing to do per
+  call site). Check a new or changed colour in all three places.
 - **Borders** use the theme's `border-color` at full opacity. That's why
   `utilities.css` sets `v-divider` to it: the divider otherwise draws in the
   text colour and came out solid white.
@@ -334,7 +340,8 @@ status on the right.
   separated by vertical dividers. The live chip leads because only pages
   with a live stream show it: anything right of it would jump between
   pages. On a phone the chips are icons
-  (their label stays as `aria-label`), and the logo, the date and the cog
+  (their label stays for screen readers, `d-sr-only`: an `aria-label`
+  on a chip that is no link is ignored), and the logo, the date and the cog
   go (the drawer has Setup, the favicon the logo), so the event name keeps
   some room.
 - `gate-config`: "Gate Config" small above the gate's name. That line names

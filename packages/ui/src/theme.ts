@@ -32,14 +32,17 @@ export const rallyGateDark: ThemeDefinition = {
     success: '#2ED573',
     warning: '#FFC300',
     error: '#FF3B30',
+    // Behind white text (snackbar, filled button): `error` is tuned to be
+    // read as text on the dark surface and is too light for that.
+    'error-fill': '#E32116',
     info: '#38BDF8',
 
     // Timing semantics (motorsport convention)
-    'timing-best': '#A855F7', // fastest time overall
+    'timing-best': '#B56EF8', // fastest time overall
     'timing-personal': '#2ED573', // personal best
     'timing-slower': '#FFC300', // slower than reference
     'timing-penalty': '#FF3B30', // penalty seconds / missed gate
-    'timing-idle': '#6B7686', // no time / DNS
+    'timing-idle': '#89919E', // no time / DNS
 
     // Podium trophies
     'podium-gold': '#F5C542',
@@ -50,7 +53,7 @@ export const rallyGateDark: ThemeDefinition = {
     'flag-green': '#00E05A',
     'flag-yellow': '#FFC300',
     'flag-red': '#FF3B30',
-    'flag-blue': '#2979FF',
+    'flag-blue': '#498DFF',
 
     // Text
     'on-background': '#E6EAF0',
