@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RowLink from './RowLink.vue';
 import type { Placing } from '@rally-gate/shared';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
@@ -11,6 +12,8 @@ import StartNumber from './StartNumber.vue';
 const props = defineProps<{
   /** Ranked, as the table below shows it; only the first three are used. */
   placings: Placing[];
+  /** No entry pages for a spectator. */
+  publicView?: boolean;
 }>();
 const router = useRouter();
 
@@ -33,8 +36,12 @@ const steps = computed(() =>
         v-for="step in steps"
         :key="step.place"
         class="rg-podium-place"
-        :class="{ 'cursor-pointer': step.placing }"
-        @click="step.placing && router.push(`/entries/${step.placing.entryId}`)"
+        :class="{ 'cursor-pointer': step.placing && !publicView }"
+        @click="
+          step.placing &&
+          !publicView &&
+          router.push(`/entries/${step.placing.entryId}`)
+        "
       >
         <template v-if="step.placing">
           <v-icon
@@ -42,10 +49,14 @@ const steps = computed(() =>
             :color="step.color"
             :size="step.place === 1 ? 56 : 40"
           />
-          <StartNumber
-            :number="step.placing.startNumber"
-            class="rg-podium-number"
-          />
+          <RowLink
+            :to="publicView ? undefined : `/entries/${step.placing.entryId}`"
+          >
+            <StartNumber
+              :number="step.placing.startNumber"
+              class="rg-podium-number"
+            />
+          </RowLink>
           <CrewName :crew="step.placing" class="rg-podium-crew" />
           <CarName
             :car="step.placing"

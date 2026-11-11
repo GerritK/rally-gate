@@ -34,6 +34,11 @@ const inEvent = computed(() => loggedIn.value && !session.value?.lobby);
  *  /results/stages/…) aren't nested routes, so the link's own active state
  *  misses them. */
 const section = (path: string) => path.split('/')[1];
+/** The page's heading for a screen reader; on screen the drawer names it. */
+const pageName = computed(() => {
+  const item = NAV_ITEMS.find((i) => section(i.to) === section(route.path));
+  return item ? t(item.label) : 'Rally Gate';
+});
 /** For an event whose rally details were never filled in. */
 const fileName = ref('');
 
@@ -243,6 +248,7 @@ onMounted(() => {
     </v-navigation-drawer>
     <v-main>
       <v-container fluid class="py-6">
+        <h1 class="d-sr-only">{{ pageName }}</h1>
         <router-view />
       </v-container>
     </v-main>

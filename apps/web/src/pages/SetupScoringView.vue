@@ -210,18 +210,21 @@ const load = useLoad(async () => {
     </v-card>
 
     <v-card class="mt-4">
-      <v-card-title class="d-flex align-center">
-        {{ $t('penalties.catalogue') }}
-        <v-spacer />
-        <v-btn
-          v-if="can('setup')"
-          variant="tonal"
-          prepend-icon="mdi-plus"
-          @click="openDialog(null)"
-        >
-          {{ $t('penalties.addType') }}
-        </v-btn>
-      </v-card-title>
+      <v-card-item>
+        <v-card-title>{{ $t('penalties.catalogue') }}</v-card-title>
+        <template #append>
+          <div class="d-flex flex-wrap justify-end ga-2">
+            <v-btn
+              v-if="can('setup')"
+              variant="tonal"
+              prepend-icon="mdi-plus"
+              @click="openDialog(null)"
+            >
+              {{ $t('penalties.addType') }}
+            </v-btn>
+          </div>
+        </template>
+      </v-card-item>
       <v-card-text>
         <p class="mb-4">{{ $t('penalties.explain') }}</p>
         <v-table density="comfortable">
@@ -230,7 +233,9 @@ const load = useLoad(async () => {
               <th>{{ $t('stages.name') }}</th>
               <th>{{ $t('penalties.price') }}</th>
               <th>{{ $t('penalties.counted') }}</th>
-              <th width="1%"></th>
+              <th width="1%">
+                <span class="d-sr-only">{{ $t('table.actions') }}</span>
+              </th>
             </tr>
           </thead>
           <tbody>

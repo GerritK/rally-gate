@@ -78,7 +78,7 @@ const load = useLoad(async () => {
           class="rg-display-form"
           @submit.prevent="onSave"
         >
-          <div class="rg-section-title">{{ $t('table.crew') }}</div>
+          <h3 class="rg-section-title">{{ $t('table.crew') }}</h3>
           <div class="rg-display-crew">
             <div class="rg-display-fields">
               <v-select
@@ -106,7 +106,7 @@ const load = useLoad(async () => {
             </div>
           </div>
 
-          <div class="rg-section-title">{{ $t('nav.results') }}</div>
+          <h3 class="rg-section-title">{{ $t('nav.results') }}</h3>
           <v-switch
             v-model="form.podium"
             :label="$t('displaySetup.podium')"

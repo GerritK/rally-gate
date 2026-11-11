@@ -96,19 +96,22 @@ const load = useLoad(refresh);
   <LoadError :load="load" />
   <RallyLockAlert :when="[RallyStatus.RUNNING, RallyStatus.CLOSED]" />
   <v-card>
-    <v-card-title class="d-flex align-center">
-      {{ $t('classes.classes') }}
-      <v-spacer />
-      <v-btn
-        v-if="can('setup')"
-        variant="tonal"
-        prepend-icon="mdi-plus"
-        :disabled="addLocked"
-        @click="openDialog(null)"
-      >
-        {{ $t('classes.add') }}
-      </v-btn>
-    </v-card-title>
+    <v-card-item>
+      <v-card-title>{{ $t('classes.classes') }}</v-card-title>
+      <template #append>
+        <div class="d-flex flex-wrap justify-end ga-2">
+          <v-btn
+            v-if="can('setup')"
+            variant="tonal"
+            prepend-icon="mdi-plus"
+            :disabled="addLocked"
+            @click="openDialog(null)"
+          >
+            {{ $t('classes.add') }}
+          </v-btn>
+        </div>
+      </template>
+    </v-card-item>
     <v-card-text>
       <p class="mb-4">
         <i18n-t keypath="classes.explain" scope="global">
@@ -126,7 +129,9 @@ const load = useLoad(refresh);
             <th>{{ $t('stages.name') }}</th>
             <th>{{ $t('transponder.kind') }}</th>
             <th>{{ $t('nav.entries') }}</th>
-            <th v-if="can('setup')" width="1%"></th>
+            <th v-if="can('setup')" width="1%">
+              <span class="d-sr-only">{{ $t('table.actions') }}</span>
+            </th>
           </tr>
         </thead>
         <tbody>

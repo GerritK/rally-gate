@@ -62,6 +62,7 @@ defineEmits<{
           item-title="title"
           item-value="id"
           :placeholder="$t('passing.pickEntry')"
+          :aria-label="$t('passing.pickEntry')"
           density="compact"
           variant="outlined"
           hide-details

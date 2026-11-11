@@ -45,7 +45,13 @@ async function close() {
 }
 
 async function submit(event: SubmitEventPromise) {
-  if (saving.value || !(await event).valid) return;
+  if (saving.value) return;
+  const { valid, errors } = await event;
+  if (!valid) {
+    // Enter from another field: the keyboard goes to what needs fixing.
+    document.getElementById(String(errors[0]?.id))?.focus();
+    return;
+  }
   saving.value = true;
   error.value = '';
   try {

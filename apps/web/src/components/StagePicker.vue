@@ -109,12 +109,13 @@ const display = (stage: Stage) => STAGE_STATUS_DISPLAY[stage.status];
   color: inherit;
   cursor: pointer;
 }
-.rg-stage-node:hover .rg-stage-dot,
-.rg-stage-node:focus-visible .rg-stage-dot {
+.rg-stage-node:hover .rg-stage-dot {
   box-shadow: 0 0 0 2px rgba(var(--v-theme-on-surface), 0.3);
 }
 .rg-stage-node:focus-visible {
-  outline: none;
+  outline: 2px solid rgb(var(--v-theme-on-surface));
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 /* Neutral ring, not orange: orange is the page's one main action. */
 .rg-stage-node--selected .rg-stage-dot {

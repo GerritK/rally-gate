@@ -597,7 +597,9 @@ const load = useLoad(refresh);
             <th>{{ $t('penalties.count') }}</th>
             <th>{{ $t('penalties.note') }}</th>
             <th class="rg-time">{{ $t('penalties.price') }}</th>
-            <th width="1%"></th>
+            <th width="1%">
+              <span class="d-sr-only">{{ $t('table.actions') }}</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -669,7 +671,9 @@ const load = useLoad(refresh);
             <th>{{ $t('changes.what') }}</th>
             <th>{{ $t('entryDetail.stage') }}</th>
             <th>{{ $t('changes.by') }}</th>
-            <th width="1%"></th>
+            <th width="1%">
+              <span class="d-sr-only">{{ $t('table.actions') }}</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -683,7 +687,15 @@ const load = useLoad(refresh);
             <td>{{ $t(`changes.actions.${change.action}`) }}</td>
             <td>{{ change.stageId ?? '' }}</td>
             <td>{{ changedBy(change) }}</td>
-            <td><v-icon icon="mdi-chevron-right" size="small" /></td>
+            <td>
+              <v-btn
+                icon="mdi-chevron-right"
+                size="small"
+                variant="text"
+                :aria-label="$t('changes.show')"
+                @click.stop="shownChange = change"
+              />
+            </td>
           </tr>
           <tr v-if="changes.length === 0">
             <td colspan="5" class="rg-empty">{{ $t('changes.empty') }}</td>
@@ -717,7 +729,9 @@ const load = useLoad(refresh);
           <v-table density="compact" class="mt-4">
             <thead>
               <tr>
-                <th></th>
+                <th>
+                  <span class="d-sr-only">{{ $t('table.actions') }}</span>
+                </th>
                 <th v-if="shownChange.before">{{ $t('changes.before') }}</th>
                 <th v-if="shownChange.after">{{ $t('changes.after') }}</th>
               </tr>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RowLink from './RowLink.vue';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import type { StageResults } from '../api/classification';
@@ -73,7 +74,10 @@ const legendMarks = computed<TimingMark[]>(() =>
     >
       {{ $t('results.notStartedYet') }}
     </v-alert>
-    <ResultsPodium :placings="results.classification" />
+    <ResultsPodium
+      :placings="results.classification"
+      :public-view="publicView"
+    />
     <v-table density="comfortable">
       <thead>
         <tr>
@@ -101,7 +105,12 @@ const legendMarks = computed<TimingMark[]>(() =>
           @click="publicView || router.push(`/entries/${placing.entryId}`)"
         >
           <td>{{ placing.position }}</td>
-          <td><StartNumber :number="placing.startNumber" /></td>
+          <td>
+            <RowLink
+              :to="publicView ? undefined : `/entries/${placing.entryId}`"
+              ><StartNumber :number="placing.startNumber"
+            /></RowLink>
+          </td>
           <td><CrewName :crew="placing" /></td>
           <td><CarName :car="placing" /></td>
           <td
@@ -173,7 +182,11 @@ const legendMarks = computed<TimingMark[]>(() =>
           :class="{ 'cursor-pointer': !publicView }"
           @click="publicView || router.push(`/entries/${row.entryId}`)"
         >
-          <td><StartNumber :number="row.startNumber" /></td>
+          <td>
+            <RowLink :to="publicView ? undefined : `/entries/${row.entryId}`"
+              ><StartNumber :number="row.startNumber"
+            /></RowLink>
+          </td>
           <td><CrewName :crew="row" /></td>
           <td><CarName :car="row" /></td>
           <td>
