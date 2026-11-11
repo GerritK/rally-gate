@@ -329,7 +329,7 @@ const load = useLoad(async () => {
     </v-card>
 
     <v-card>
-      <v-card-item>
+      <v-card-item class="rg-password-head">
         <v-card-title>{{ $t('access.password') }}</v-card-title>
         <template #append>
           <div class="d-flex flex-wrap align-center justify-end ga-2">
@@ -411,3 +411,14 @@ const load = useLoad(async () => {
     />
   </FormDialog>
 </template>
+
+<style scoped>
+/* On a phone the status and its button always drop under the title, centred
+   as one pair. */
+@media (max-width: 599px) {
+  .rg-password-head :deep(.v-card-item__append) {
+    flex-basis: 100%;
+    justify-content: center;
+  }
+}
+</style>
