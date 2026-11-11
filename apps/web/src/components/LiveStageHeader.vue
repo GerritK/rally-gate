@@ -4,7 +4,8 @@ import { can } from '../api/auth';
 import type { Gate } from '../api/gates';
 import type { Stage } from '../api/stages';
 import type { StartOrder } from '../api/start-order';
-import { ROW_STATE_DISPLAY, type RowState } from '../live-rows';
+import { ROW_STATE_DISPLAY } from '../live-row-display';
+import type { RowState } from '../live-rows';
 import GateFlow from './GateFlow.vue';
 
 /** Live timing's stage card: its lifecycle buttons, the counts per state

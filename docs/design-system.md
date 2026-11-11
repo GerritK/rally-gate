@@ -468,9 +468,11 @@ writing UI, check this list:
 - `RunningTime`: a running stage time ticking in tenths, its own timer so
   only it re-renders.
 - Live timing's cards: `LiveStageHeader`, `UpNextCard`, `OnStageCard`,
-  `LiveRunTable`. `LiveView` holds the state and the actions and hands
-  each card its part; what a row is and which state it is in is
-  `live-rows.ts`.
+  `LiveRunTable`. `LiveView` only wires them: the state and the live
+  stream are `live-data.ts`, the actions `live-run-actions.ts`,
+  `live-stage-lifecycle.ts` and `live-passings.ts`, each taking that data.
+  What a row is and which state it is in is `live-rows.ts`, free of Vue
+  and tested; its labels and colours are `live-row-display.ts`.
 - Live timing's own: `GateFlow` (the gate line), `RunCorrectionDialog`,
   `PenaltyDialog` (also on the entry page), `UpNextCard` (with
   `StartCountdown`, the lights and seconds on their own 100 ms timer),
