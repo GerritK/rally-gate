@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useLoad } from '../load';
+import LoadError from '../components/LoadError.vue';
 import { can } from '../api/auth';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { formatClockTime, formatRelativeTime } from '@rally-gate/ui';
@@ -72,7 +74,6 @@ function detectionState(event: DetectionEventRecord) {
 }
 
 const gate = ref<Gate | null>(null);
-const loaded = ref(false);
 const assignments = ref<GateAssignment[]>([]);
 const stages = ref<Stage[]>([]);
 const entries = ref<Entry[]>([]);
@@ -123,8 +124,7 @@ async function refreshDetections() {
   detections.value = await fetchRecentEvents(props.gateId);
 }
 
-async function load() {
-  loaded.value = false;
+async function loadGate() {
   [
     gate.value,
     assignments.value,
@@ -138,13 +138,12 @@ async function load() {
     fetchEntries(),
     fetchRecentEvents(props.gateId),
   ]);
-  loaded.value = true;
 }
 
-watch(() => props.gateId, load);
+const load = useLoad(loadGate);
+watch(() => props.gateId, load.reload);
 
-onMounted(async () => {
-  void load();
+onMounted(() => {
   liveSource = openLiveStream(
     {
       gate: (updated) => {
@@ -176,7 +175,8 @@ onUnmounted(() => {
     {{ $t('gateDetail.back') }}
   </v-btn>
 
-  <v-alert v-if="loaded && !gate" type="info" variant="tonal">
+  <LoadError :load="load" />
+  <v-alert v-if="load.state === 'ready' && !gate" type="info" variant="tonal">
     {{ $t('gateDetail.notFound', { id: gateId }) }}
   </v-alert>
 

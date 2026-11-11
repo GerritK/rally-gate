@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { useLoad } from '../load';
+import LoadError from '../components/LoadError.vue';
+import { computed, ref } from 'vue';
 import {
   StageRunStatus,
   StageScoring,
@@ -74,7 +76,6 @@ const changes = ref<ChangeView[]>([]);
 /** The change whose before and after are open in the dialog. */
 const shownChange = ref<ChangeView | null>(null);
 const { smAndDown } = useDisplay();
-const loaded = ref(false);
 const dialogOpen = ref(false);
 const penaltyDialog = ref<InstanceType<typeof PenaltyDialog> | null>(null);
 const confirm = useConfirm();
@@ -331,10 +332,9 @@ async function refresh() {
       ),
     ),
   );
-  loaded.value = true;
 }
 
-onMounted(refresh);
+const load = useLoad(refresh);
 </script>
 
 <template>
@@ -347,7 +347,8 @@ onMounted(refresh);
     {{ $t('checkIn.back') }}
   </v-btn>
 
-  <v-alert v-if="loaded && !entry" type="info" variant="tonal">
+  <LoadError :load="load" />
+  <v-alert v-if="load.state === 'ready' && !entry" type="info" variant="tonal">
     {{ $t('entryDetail.notFound') }}
   </v-alert>
 

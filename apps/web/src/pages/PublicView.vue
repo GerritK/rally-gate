@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useLoad } from '../load';
+import LoadedPage from '../components/LoadedPage.vue';
 import { countingRun } from '../counting-run';
 import { isQueued } from '../countdown';
 import { serverNow } from '../api/time';
@@ -136,10 +138,15 @@ async function refresh() {
 
 watch(() => [props.stageId, route.query.classes], refresh);
 
-onMounted(async () => {
+// Loaded directly too, not only once the stream opens: a stream that never
+// connects would leave the page empty without a word.
+const load = useLoad(async () => {
   classes.value = await fetchEntryClasses();
-  // Small data: any change refetches the view rather than patching it. The
-  // first load is `onOpen`'s.
+  await refresh();
+});
+
+onMounted(() => {
+  // Small data: any change refetches the view rather than patching it.
   liveSource = openLiveStream(
     {
       'stage-run': () => void refresh(),
@@ -171,80 +178,82 @@ const go = (stageId?: string) =>
     <ClassFilter v-model="selectedClassIds" :classes="classes" />
   </div>
 
-  <template v-if="stageId">
-    <v-card v-if="stage && startOrder" class="mb-6">
+  <LoadedPage :load="load">
+    <template v-if="stageId">
+      <v-card v-if="stage && startOrder" class="mb-6">
+        <v-card-item>
+          <v-card-title>
+            {{ $t('live.startList') }} — {{ stage.id }} · {{ stage.name }}
+          </v-card-title>
+        </v-card-item>
+        <v-card-text>
+          <v-table density="comfortable">
+            <thead>
+              <tr>
+                <th style="width: 56px">{{ $t('table.pos') }}</th>
+                <th v-if="hasSlots">{{ $t('timetable.slot') }}</th>
+                <th style="width: 72px">#</th>
+                <th>{{ $t('table.crew') }}</th>
+                <th>{{ $t('table.car') }}</th>
+                <th>{{ $t('table.status') }}</th>
+                <th class="rg-time">{{ $t('table.time') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in rows" :key="row.starter.entryId">
+                <td>{{ row.starter.position }}</td>
+                <td v-if="hasSlots">
+                  <ClockTime
+                    v-if="row.starter.slotTime"
+                    :time="row.starter.slotTime"
+                  />
+                </td>
+                <td><StartNumber :number="row.starter.startNumber" /></td>
+                <td><CrewName :crew="row.starter" /></td>
+                <td><CarName :car="row.starter" /></td>
+                <td><StatusChip :display="row.display" /></td>
+                <td class="rg-timing rg-time">
+                  <RunningTime
+                    v-if="row.run?.status === StageRunStatus.STARTED"
+                    :start-time="row.run.startTime"
+                  />
+                  <template v-else-if="row.run">{{
+                    formatDuration(row.run.durationMs)
+                  }}</template>
+                </td>
+              </tr>
+            </tbody>
+          </v-table>
+        </v-card-text>
+      </v-card>
+      <v-card v-if="stageResults">
+        <v-card-item>
+          <v-card-title>{{ $t('results.stageTitle') }}</v-card-title>
+          <v-card-subtitle>
+            {{ classFilterLabel(classes, selectedClassIds) }}
+          </v-card-subtitle>
+        </v-card-item>
+        <v-card-text>
+          <StageRanking :stage="stage" :results="stageResults" public-view />
+        </v-card-text>
+      </v-card>
+    </template>
+    <v-card v-else-if="overall">
       <v-card-item>
-        <v-card-title>
-          {{ $t('live.startList') }} — {{ stage.id }} · {{ stage.name }}
-        </v-card-title>
-      </v-card-item>
-      <v-card-text>
-        <v-table density="comfortable">
-          <thead>
-            <tr>
-              <th style="width: 56px">{{ $t('table.pos') }}</th>
-              <th v-if="hasSlots">{{ $t('timetable.slot') }}</th>
-              <th style="width: 72px">#</th>
-              <th>{{ $t('table.crew') }}</th>
-              <th>{{ $t('table.car') }}</th>
-              <th>{{ $t('table.status') }}</th>
-              <th class="rg-time">{{ $t('table.time') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in rows" :key="row.starter.entryId">
-              <td>{{ row.starter.position }}</td>
-              <td v-if="hasSlots">
-                <ClockTime
-                  v-if="row.starter.slotTime"
-                  :time="row.starter.slotTime"
-                />
-              </td>
-              <td><StartNumber :number="row.starter.startNumber" /></td>
-              <td><CrewName :crew="row.starter" /></td>
-              <td><CarName :car="row.starter" /></td>
-              <td><StatusChip :display="row.display" /></td>
-              <td class="rg-timing rg-time">
-                <RunningTime
-                  v-if="row.run?.status === StageRunStatus.STARTED"
-                  :start-time="row.run.startTime"
-                />
-                <template v-else-if="row.run">{{
-                  formatDuration(row.run.durationMs)
-                }}</template>
-              </td>
-            </tr>
-          </tbody>
-        </v-table>
-      </v-card-text>
-    </v-card>
-    <v-card v-if="stageResults">
-      <v-card-item>
-        <v-card-title>{{ $t('results.stageTitle') }}</v-card-title>
+        <v-card-title>{{ $t('results.overallTitle') }}</v-card-title>
         <v-card-subtitle>
           {{ classFilterLabel(classes, selectedClassIds) }}
         </v-card-subtitle>
       </v-card-item>
       <v-card-text>
-        <StageRanking :stage="stage" :results="stageResults" public-view />
+        <OverallRanking
+          :placings="overall"
+          :class-ids="selectedClassIds"
+          :stages="stages"
+          :entries="[]"
+          public-view
+        />
       </v-card-text>
     </v-card>
-  </template>
-  <v-card v-else-if="overall">
-    <v-card-item>
-      <v-card-title>{{ $t('results.overallTitle') }}</v-card-title>
-      <v-card-subtitle>
-        {{ classFilterLabel(classes, selectedClassIds) }}
-      </v-card-subtitle>
-    </v-card-item>
-    <v-card-text>
-      <OverallRanking
-        :placings="overall"
-        :class-ids="selectedClassIds"
-        :stages="stages"
-        :entries="[]"
-        public-view
-      />
-    </v-card-text>
-  </v-card>
+  </LoadedPage>
 </template>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useLoad } from '../load';
 import EmptyRow from '../components/EmptyRow.vue';
-import LoadError from '../components/LoadError.vue';
+import LoadedPage from '../components/LoadedPage.vue';
 import { can } from '../api/auth';
 import {
   DEFAULT_NOTIONAL_PENALTY_MS,
@@ -159,205 +159,209 @@ const load = useLoad(async () => {
   <v-btn variant="text" prepend-icon="mdi-arrow-left" to="/setup" class="mb-4">
     {{ $t('setup.back') }}
   </v-btn>
-
-  <LoadError :load="load" />
-  <RallyLockAlert :when="[RallyStatus.CLOSED]" />
-  <v-card>
-    <v-card-title>{{ $t('scoring.title') }}</v-card-title>
-    <v-card-text>
-      <v-alert type="info" variant="tonal" density="comfortable" class="mb-4">
-        <i18n-t keypath="scoring.explain" tag="p" scope="global">
-          <template #notionalTime>
-            <strong>{{ $t('scoring.notionalTime') }}</strong>
-          </template>
-        </i18n-t>
-        <i18n-t
-          keypath="scoring.ruleOfThumb"
-          tag="p"
-          scope="global"
-          class="mt-2"
+  <LoadedPage :load="load">
+    <RallyLockAlert :when="[RallyStatus.CLOSED]" />
+    <v-card>
+      <v-card-title>{{ $t('scoring.title') }}</v-card-title>
+      <v-card-text>
+        <v-alert type="info" variant="tonal" density="comfortable" class="mb-4">
+          <i18n-t keypath="scoring.explain" tag="p" scope="global">
+            <template #notionalTime>
+              <strong>{{ $t('scoring.notionalTime') }}</strong>
+            </template>
+          </i18n-t>
+          <i18n-t
+            keypath="scoring.ruleOfThumb"
+            tag="p"
+            scope="global"
+            class="mt-2"
+          >
+            <template #oneStage>
+              <strong>{{ $t('scoring.oneStage') }}</strong>
+            </template>
+          </i18n-t>
+        </v-alert>
+        <v-form
+          :readonly="!can('setup')"
+          class="d-flex flex-wrap align-center ga-3"
+          @submit.prevent="onSavePenalty"
         >
-          <template #oneStage>
-            <strong>{{ $t('scoring.oneStage') }}</strong>
-          </template>
-        </i18n-t>
-      </v-alert>
-      <v-form
-        :readonly="!can('setup')"
-        class="d-flex flex-wrap align-center ga-3"
-        @submit.prevent="onSavePenalty"
-      >
-        <v-text-field
-          v-model="notionalPenalty"
-          :label="$t('scoring.penaltyLabel')"
-          :rules="[wholeSeconds]"
-          placeholder="2:00"
-          density="comfortable"
-          hide-details="auto"
-          style="max-width: 260px"
-        />
+          <v-text-field
+            v-model="notionalPenalty"
+            :label="$t('scoring.penaltyLabel')"
+            :rules="[wholeSeconds]"
+            placeholder="2:00"
+            density="comfortable"
+            hide-details="auto"
+            style="max-width: 260px"
+          />
+          <v-btn
+            v-if="can('setup')"
+            type="submit"
+            color="primary"
+            :loading="savingPenalty"
+            :disabled="locked"
+            prepend-icon="mdi-content-save"
+          >
+            {{ $t('common.save') }}
+          </v-btn>
+        </v-form>
+      </v-card-text>
+    </v-card>
+
+    <v-card class="mt-4">
+      <v-card-title class="d-flex align-center">
+        {{ $t('penalties.catalogue') }}
+        <v-spacer />
         <v-btn
           v-if="can('setup')"
-          type="submit"
-          color="primary"
-          :loading="savingPenalty"
-          :disabled="locked"
-          prepend-icon="mdi-content-save"
+          variant="tonal"
+          prepend-icon="mdi-plus"
+          @click="openDialog(null)"
         >
-          {{ $t('common.save') }}
+          {{ $t('penalties.addType') }}
         </v-btn>
-      </v-form>
-    </v-card-text>
-  </v-card>
-
-  <v-card class="mt-4">
-    <v-card-title class="d-flex align-center">
-      {{ $t('penalties.catalogue') }}
-      <v-spacer />
-      <v-btn
-        v-if="can('setup')"
-        variant="tonal"
-        prepend-icon="mdi-plus"
-        @click="openDialog(null)"
-      >
-        {{ $t('penalties.addType') }}
-      </v-btn>
-    </v-card-title>
-    <v-card-text>
-      <p class="mb-4">{{ $t('penalties.explain') }}</p>
-      <v-table density="comfortable">
-        <thead>
-          <tr>
-            <th>{{ $t('stages.name') }}</th>
-            <th>{{ $t('penalties.price') }}</th>
-            <th>{{ $t('penalties.counted') }}</th>
-            <th width="1%"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="type in types" :key="type.id">
-            <td>
-              {{ type.name }}
-              <v-chip
-                v-if="type.id === jumpStartTypeId"
-                to="/setup/start"
-                size="small"
-                prepend-icon="mdi-alert-octagon-outline"
-                class="ml-2"
-              >
-                {{ $t('countdown.jumpStart') }}
-              </v-chip>
-            </td>
-            <td>{{ formatTiers(type.tiers) }}</td>
-            <!-- Only tiers count offences; a flat price has nothing to count. -->
-            <td>
+      </v-card-title>
+      <v-card-text>
+        <p class="mb-4">{{ $t('penalties.explain') }}</p>
+        <v-table density="comfortable">
+          <thead>
+            <tr>
+              <th>{{ $t('stages.name') }}</th>
+              <th>{{ $t('penalties.price') }}</th>
+              <th>{{ $t('penalties.counted') }}</th>
+              <th width="1%"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="type in types" :key="type.id">
+              <td>
+                {{ type.name }}
+                <v-chip
+                  v-if="type.id === jumpStartTypeId"
+                  to="/setup/start"
+                  size="small"
+                  prepend-icon="mdi-alert-octagon-outline"
+                  class="ml-2"
+                >
+                  {{ $t('countdown.jumpStart') }}
+                </v-chip>
+              </td>
+              <td>{{ formatTiers(type.tiers) }}</td>
+              <!-- Only tiers count offences; a flat price has nothing to count. -->
+              <td>
+                {{
+                  type.tiers.length > 1
+                    ? $t(scopeItems.find((s) => s.value === type.scope)!.key)
+                    : '-'
+                }}
+              </td>
+              <td class="text-no-wrap">
+                <v-btn
+                  v-if="can('setup')"
+                  size="small"
+                  variant="text"
+                  prepend-icon="mdi-pencil"
+                  :disabled="locked"
+                  @click="openDialog(type)"
+                >
+                  {{ $t('common.edit') }}
+                </v-btn>
+                <v-menu v-if="can('setup')">
+                  <template #activator="{ props: menu }">
+                    <v-btn
+                      v-bind="menu"
+                      icon="mdi-dots-vertical"
+                      :disabled="locked"
+                      size="small"
+                      variant="text"
+                      :aria-label="$t('common.moreFor', { name: type.name })"
+                    />
+                  </template>
+                  <v-list density="compact">
+                    <v-list-item
+                      prepend-icon="mdi-delete-outline"
+                      :title="$t('common.delete')"
+                      base-color="error"
+                      @click="onDeleteType(type)"
+                    />
+                  </v-list>
+                </v-menu>
+              </td>
+            </tr>
+            <EmptyRow :load="load" :empty="types.length === 0" :colspan="4">
               {{
-                type.tiers.length > 1
-                  ? $t(scopeItems.find((s) => s.value === type.scope)!.key)
-                  : '-'
+                $t('penalties.emptyCatalogue', {
+                  action: $t('penalties.addType'),
+                })
               }}
-            </td>
-            <td class="text-no-wrap">
-              <v-btn
-                v-if="can('setup')"
-                size="small"
-                variant="text"
-                prepend-icon="mdi-pencil"
-                :disabled="locked"
-                @click="openDialog(type)"
-              >
-                {{ $t('common.edit') }}
-              </v-btn>
-              <v-menu v-if="can('setup')">
-                <template #activator="{ props: menu }">
-                  <v-btn
-                    v-bind="menu"
-                    icon="mdi-dots-vertical"
-                    :disabled="locked"
-                    size="small"
-                    variant="text"
-                    :aria-label="$t('common.moreFor', { name: type.name })"
-                  />
-                </template>
-                <v-list density="compact">
-                  <v-list-item
-                    prepend-icon="mdi-delete-outline"
-                    :title="$t('common.delete')"
-                    base-color="error"
-                    @click="onDeleteType(type)"
-                  />
-                </v-list>
-              </v-menu>
-            </td>
-          </tr>
-          <EmptyRow :load="load" :empty="types.length === 0" :colspan="4">
-            {{
-              $t('penalties.emptyCatalogue', {
-                action: $t('penalties.addType'),
-              })
-            }}
-          </EmptyRow>
-        </tbody>
-      </v-table>
-    </v-card-text>
-  </v-card>
+            </EmptyRow>
+          </tbody>
+        </v-table>
+      </v-card-text>
+    </v-card>
 
-  <FormDialog
-    v-model="dialogOpen"
-    :title="
-      editing
-        ? $t('penalties.editTitle', { name: editing.name })
-        : $t('penalties.addType')
-    "
-    :form="draft"
-    :save="onSaveType"
-    :saved="$t('penalties.typeSaved')"
-    :save-text="editing ? $t('common.save') : $t('penalties.addType')"
-  >
-    <v-text-field
-      v-model="draft.name"
-      :label="$t('stages.name')"
-      :rules="[required]"
-      autofocus
-    />
-    <div v-for="(tier, index) in draft.tiers" :key="index" class="d-flex ga-3">
+    <FormDialog
+      v-model="dialogOpen"
+      :title="
+        editing
+          ? $t('penalties.editTitle', { name: editing.name })
+          : $t('penalties.addType')
+      "
+      :form="draft"
+      :save="onSaveType"
+      :saved="$t('penalties.typeSaved')"
+      :save-text="editing ? $t('common.save') : $t('penalties.addType')"
+    >
       <v-text-field
-        v-model.number="tier.fromCount"
-        class="flex-1-1-0"
-        type="number"
-        min="1"
-        step="1"
-        :label="$t('penalties.fromOffence')"
-        :rules="[positive]"
-        :disabled="index === 0"
+        v-model="draft.name"
+        :label="$t('stages.name')"
+        :rules="[required]"
+        autofocus
       />
-      <v-text-field
-        v-model="tier.seconds"
-        class="flex-1-1-0"
-        :label="$t('penalties.time')"
-        :rules="[wholeSeconds]"
-        placeholder="0:30"
+      <div
+        v-for="(tier, index) in draft.tiers"
+        :key="index"
+        class="d-flex ga-3"
+      >
+        <v-text-field
+          v-model.number="tier.fromCount"
+          class="flex-1-1-0"
+          type="number"
+          min="1"
+          step="1"
+          :label="$t('penalties.fromOffence')"
+          :rules="[positive]"
+          :disabled="index === 0"
+        />
+        <v-text-field
+          v-model="tier.seconds"
+          class="flex-1-1-0"
+          :label="$t('penalties.time')"
+          :rules="[wholeSeconds]"
+          placeholder="0:30"
+        />
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          :disabled="index === 0"
+          :aria-label="$t('penalties.removeTier')"
+          @click="draft.tiers.splice(index, 1)"
+        />
+      </div>
+      <div>
+        <v-btn variant="text" prepend-icon="mdi-plus" @click="addTier">
+          {{ $t('penalties.addTier') }}
+        </v-btn>
+      </div>
+      <v-select
+        v-if="draft.tiers.length > 1"
+        v-model="draft.scope"
+        :items="scopeItems.map((s) => ({ value: s.value, title: $t(s.key) }))"
+        :label="$t('penalties.counted')"
+        :hint="$t('penalties.countedHint')"
+        persistent-hint
       />
-      <v-btn
-        icon="mdi-close"
-        variant="text"
-        :disabled="index === 0"
-        :aria-label="$t('penalties.removeTier')"
-        @click="draft.tiers.splice(index, 1)"
-      />
-    </div>
-    <div>
-      <v-btn variant="text" prepend-icon="mdi-plus" @click="addTier">
-        {{ $t('penalties.addTier') }}
-      </v-btn>
-    </div>
-    <v-select
-      v-if="draft.tiers.length > 1"
-      v-model="draft.scope"
-      :items="scopeItems.map((s) => ({ value: s.value, title: $t(s.key) }))"
-      :label="$t('penalties.counted')"
-      :hint="$t('penalties.countedHint')"
-      persistent-hint
-    />
-  </FormDialog>
+    </FormDialog>
+  </LoadedPage>
 </template>

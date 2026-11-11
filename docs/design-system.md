@@ -272,6 +272,9 @@ Values live in `theme.ts`. The rules:
     "Loading…" (`EmptyRow`), and when it fails a `LoadError` above the page
     says why and offers Retry now. "No entries yet" on a server that didn't
     answer sends an organiser retyping 80 entries.
+    A page of forms or cards shows nothing but "Loading…" until then
+    (`LoadedPage`): a form with defaults in it looks like the stored
+    settings, and Save would write them over the real ones.
 
 ## Confirmations
 
@@ -433,8 +436,8 @@ writing UI, check this list:
 - `StatusChip` (any `*_DISPLAY` map), `ClockTime` (a time with its hand-set
   mark), `ManualMark`, `GateOnlineChip`, `GateVersion`, `GateClockChips`.
 - `TableLegend`: see Tooltips, legends and links.
-- `LoadError`, `EmptyRow`: a page's first load and its table's empty row
-  (see Tables), with `useLoad()`.
+- `LoadedPage`, `LoadError`, `EmptyRow`: a page's first load and its
+  table's empty row (see Tables), with `useLoad()`.
 - `RallyLockAlert`: above a page the rally status locks, the reason its
   controls are disabled.
 - `TimeInput`: every typed clock time, `HH:MM:SS` 24 h. Typing is lenient
