@@ -16,7 +16,7 @@ Run from this directory. The repo root must have built `packages/shared` first
 ```bash
 npm run start:dev    # watch mode on 57430 (or `npm run dev:server` from the root)
 npm test             # jest, all *.spec.ts under src/
-npx jest gates.service   # one file, substring match on path
+npm test -- gates.service   # one file, substring match on path (a bare `npx jest` fails)
 npm run lint         # eslint --fix, includes prettier — run before finishing a change
 npm run lint:check   # what CI runs (--fix in CI would repair the tree and report success)
 npm run build        # nest build
@@ -29,6 +29,6 @@ npm run build        # nest build
 - [docs/api.md](../../docs/api.md) — endpoint summary
 - [docs/event-model.md](../../docs/event-model.md) — `StageRun`/`StageSplit`
   shapes, voiding and re-runs, notional times
-- [CLAUDE.md](../../CLAUDE.md) — the traps that have actually bitten here:
+- [CLAUDE.md](CLAUDE.md) — the traps that have actually bitten here:
   nullable TypeORM columns, driver-specific column types, and why a `@Body()`
   must be a decorated DTO class

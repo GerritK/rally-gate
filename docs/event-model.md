@@ -7,7 +7,7 @@ Published by `gate-agent` to `rally/gates/<gateId>/detections`, defined in
 
 ```ts
 interface DetectionEvent {
-  eventId: string;         // ULID, generated on the gate — the idempotency key
+  eventId: string;         // generated on the gate (ULID on a Pi, UUID on an ESP32) — the idempotency key
   gateId: string;
   transponderId?: string;  // absent when the gate can't identify the car
   transponderKind?: TransponderKind;  // 'RC' | 'NFC'; absent means RC
@@ -17,9 +17,10 @@ interface DetectionEvent {
 }
 ```
 
-The broker is unauthenticated, so ids and timestamps are bounds-checked on
-ingest and bad messages dropped with a warning: an unparseable timestamp would
-otherwise poison a duration silently.
+A paired gate's payload is still not trusted (`auth.md` "Gates" only says who
+sent it): ids and timestamps are bounds-checked on ingest and bad messages
+dropped with a warning, since an unparseable timestamp would otherwise poison
+a duration silently.
 
 A detection whose corrected time is more than 24 h before now
 (`DETECTION_MAX_AGE_MS`) is acknowledged but not stored: a gate keeps what it

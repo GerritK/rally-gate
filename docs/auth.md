@@ -121,7 +121,7 @@ A login is a **device with a role**, not a person with a password.
   address, never a header) the browser is always the organiser. That covers
   the standalone laptop with no password at all.
 - **From elsewhere** (headless, or a second laptop): one organiser password,
-  hashed in `organiser.json` next to the event files, like `known-gates`
+  hashed in `organiser.json` next to the event files, like `hardware.json`
   (headless: `CONFIG_DIR`, a volume in `deploy/docker-compose.yml`).
 - **In the lobby** (standalone, before an event is open,
   `deployment-modes.md` "New / open event") devices and invitations don't

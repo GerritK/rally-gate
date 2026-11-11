@@ -12,7 +12,8 @@ npm run dev      # Vite on 57440, talking to the API on 57430
 npm run build    # vue-tsc + vite build
 ```
 
-No test suite. `vue-tsc` during `npm run build` is the only thing that
+`npm test` runs the plain `.ts` modules' specs on `node --test`; there are no
+component tests. `vue-tsc` during `npm run build` is the only thing that
 typechecks this app, so a frontend type error surfaces there or in CI and
 nowhere else.
 

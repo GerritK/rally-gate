@@ -14,7 +14,7 @@ simulator. Nothing past gate-agent changes per adapter, since the server only
 ever sees a `DetectionEvent`.
 
 - `simulated` — fires detections on an interval (`SIMULATE_INTERVAL_MS`) for the
-  configured `TRANSPONDERS`. `src/simulate-cli.ts` fires one-offs, `--beam` for
+  configured `TRANSPONDERS`. `src/agent/simulate-cli.ts` fires one-offs, `--beam` for
   one without a transponder.
 - `beam` — a light barrier, below.
 - `openstint` — a transponder loop on an RTL-SDR, below.
@@ -198,9 +198,11 @@ one SDR. The gate user joins `plugdev` (SDR) and `users` (`/var/lib/openstint`).
 
 ## OpenStint OPN and AMB ids
 
-Transponder kinds and matching: `event-model.md` "Transponders". Still open:
-OpenStint's `OPN`/`AMB` are two ID namespaces within RC, so either two kinds
-or a prefixed identifier, settled with the adapter.
+Transponder kinds and matching: `event-model.md` "Transponders". Not settled:
+OpenStint's `OPN`/`AMB` are two ID namespaces within RC, and the adapter
+publishes the id alone as kind `RC`, so an OPN and an AMB transponder with the
+same number read as one. The fix is either two kinds or a prefixed identifier;
+it waits for a field where both namespaces meet.
 
 ## Gate system clock policy
 

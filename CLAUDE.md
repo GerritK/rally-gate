@@ -28,6 +28,8 @@ The "why" lives in `docs/` — read the relevant one first:
 - `openwrt-guest-access.md` — the public page from an OpenWRT guest network: firewall, NAT, `rally.lan` via mDNS
 - `development-roadmap.md` — standing rules, built, next, deliberately deferred (check before starting new work)
 
+`docs/guide/` is the other kind: the handbook for organisers and marshals (`docs/README.md` indexes both). Plain language, the screens' own labels, no code or file names. **A change to a label or a flow it describes changes the guide in the same commit** — grep it for the old label.
+
 ## Commands
 
 npm workspaces (`apps/*`, `packages/*`). **Build `shared` first** — the other workspaces import its compiled output, not its source.

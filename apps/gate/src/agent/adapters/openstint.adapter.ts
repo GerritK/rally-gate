@@ -120,7 +120,7 @@ function writeStatus(line: string): void {
  * `P <timestamp_ms> <OPN|AMB> <id> <rssi> <hits> <pass_duration_us> <mer> [...]`.
  * Fields are positional and upstream reserves the right to append more, so
  * only a minimum length is checked. OPN and AMB ids are separate namespaces;
- * see "Multiple IDs per vehicle" in docs/decoder-adapters.md.
+ * see "OpenStint OPN and AMB ids" in docs/decoder-adapters.md.
  */
 export function parsePassing(line: string): Passing | null {
   const parts = line.trim().split(/\s+/);

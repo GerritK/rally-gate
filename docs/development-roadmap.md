@@ -204,9 +204,8 @@ One line each; the linked doc has the detail. History is in git.
   creation; the app bar shows the rally name, so it rarely matters. If built:
   an explicit action, never on saving the details (that would restart the
   server over a typo); the open file is locked on Windows.
-- **NFC stop control for beam-only finishes** — once the ESP32 check-in
-  gate runs on hardware. The driver taps the entry's NFC sticker at an ESP32
-  gate at the stop control, where cars halt well past the flying finish, so
+- **NFC stop control for beam-only finishes** — the driver taps the entry's
+  NFC sticker at an ESP32 gate at the stop control, where cars halt well past the flying finish, so
   the tap names the car instead of a marshal. A new role: on a
   `stage_finish` gate a tap would finish the run with the tap's own time.
   Never "tap takes the oldest open passing": a phantom passing or a missed

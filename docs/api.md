@@ -117,7 +117,7 @@ Without a login the stream carries `stage-run`, `stage-run-deleted`, `stage-run-
 only: passings, transponders and gates are internal.
 
 A gate's own configuration is not here: gate-config (`apps/gate`) serves it on the gate
-itself, port 57439 (`/api/config`, `/api/status`, `/api/decoder`, `/api/network`,
+itself, port 57439 (`/api/config`, `/api/fields`, `/api/status`, `/api/decoder`, `/api/network`,
 `/api/network/reset`, `/api/power-off`) — see `gate-config-ui.md`. On the rally Wi-Fi every
 change there needs a session opened with `?t=<pass>`, else 403 `{ error: "locked" }`
 (`auth.md` "gate-config").

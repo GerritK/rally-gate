@@ -83,7 +83,8 @@ flowchart LR
   known Wi-Fi opens its own hotspot so you can reach that page.
 - Penalties from a catalogue (flat or tiered, per stage or for the rally)
   or as free text, added to the overall.
-- Creating and switching events from the dashboard.
+- Events as files: starting Rally Gate asks which one to continue, open or
+  create; download, import and delete them from the dashboard.
 - **Logins by role**: the organiser on the server laptop or with a password,
   staff (timing, stage marshals, check-in) joining by a printed QR code. Anyone
   without a login sees a public page with start lists and results. Gates are
@@ -120,82 +121,40 @@ What comes when: [docs/development-roadmap.md](docs/development-roadmap.md).
   its password can read the timing traffic (see
   [docs/auth.md](docs/auth.md#participants-on-the-timing-wi-fi)).
 
-## Installation
+## Getting started
 
-### Server on a laptop
+The **[guide](docs/guide/README.md)** walks through all of it in plain
+language: [installing the server](docs/guide/install.md),
+[building and connecting gates](docs/guide/gates.md),
+[running an event](docs/guide/running-an-event.md), a page
+[for marshals](docs/guide/marshals.md) and
+[what to do when something goes wrong](docs/guide/troubleshooting.md).
 
-The standalone package needs nothing else installed: unzip it and
-double-click **Rally Gate** (`Rally Gate.exe` on Windows, `Rally Gate.command`
-on macOS, `rally-gate.sh` on Linux). A console window opens — closing it stops
-the server — and the dashboard opens in your browser at
-`http://localhost:57430`. Event files are kept in `Documents/Rally Gate`.
+In short:
 
-On first start Windows asks once for permission to open the firewall for the
-gates. The package isn't code-signed yet, so Windows SmartScreen and macOS warn
-the first time (on macOS: right-click → Open).
+1. **Server on a laptop:** download the package from
+   [Releases](https://github.com/GerritK/rally-gate/releases), unzip it and
+   double-click **Rally Gate**. Nothing else to install. The dashboard opens
+   in your browser and asks which event to open or create.
+2. **Each gate** (a Raspberry Pi with Raspberry Pi OS Lite):
 
-Download it from [Releases](https://github.com/GerritK/rally-gate/releases),
-or build it yourself (Node.js 24):
+   ```bash
+   curl -fsSL https://github.com/GerritK/rally-gate/releases/latest/download/install-gate-pi.sh | bash
+   ```
 
-```bash
-npm ci
-npm run build:shared
-npm run build --workspace=@rally-gate/rally-server --workspace=@rally-gate/web
-node scripts/package-standalone.js   # -> dist-standalone/
-```
+   It asks for a gate name and nothing about the rally: gates find the server
+   by themselves. An ESP32 NFC gate is flashed from the browser at
+   [gerritk.github.io/rally-gate](https://gerritk.github.io/rally-gate/).
+3. **On the dashboard:** set up stages and assign gates, register the cars,
+   pair the gates, print invitations for the marshals, then activate a stage
+   and watch the times come in.
 
-### Server on a Raspberry Pi
-
-On a fresh Raspberry Pi OS Lite:
+A server on a Raspberry Pi instead of a laptop (Docker and PostgreSQL, one
+event per Pi):
 
 ```bash
 curl -fsSL https://github.com/GerritK/rally-gate/releases/latest/download/install-server-pi.sh | bash
 ```
-
-Runs the server with Docker and PostgreSQL. The dashboard is at
-`http://rally-server.local:57430`. In this mode the Pi keeps one event;
-creating and switching events from the dashboard is standalone-only for now.
-
-### Gates
-
-On each gate's Raspberry Pi:
-
-```bash
-curl -fsSL https://github.com/GerritK/rally-gate/releases/latest/download/install-gate-pi.sh | bash
-```
-
-It asks for a **gate ID** — pick one prefixed with your club's short code,
-like `CLUB_START_WP1`, so gates never clash if clubs share hardware — plus a
-hotspot password and whether an RTC module is fitted. Nothing about the rally:
-the server address defaults to `rally-server.local`, which the server
-announces on the network itself, so press Enter there. Re-run the same command
-to update a gate to the latest release; it offers the current settings as
-defaults.
-
-Everything else is set on the gate's own config page at
-`http://<gate-name>.local:57439`: the sensor, Wi-Fi networks, and a status
-panel. Only where the network blocks discovery (some access points do) does a
-gate need the server's IP address entered there.
-
-An **ESP32 NFC gate** (XIAO ESP32-S3 with a PN532) needs no installer: plug
-it in by USB-C and flash it from Chrome or Edge at
-[gerritk.github.io/rally-gate](https://gerritk.github.io/rally-gate/). It then
-raises the Wi-Fi `rally-gate-…` (password `rally-gate`) to set the rally
-network.
-
-### On the day
-
-1. Start the server and join the rally Wi-Fi with every gate.
-2. **Setup** → create the event, then the stages; assign gates as start,
-   finish or split. Set how start lists are ordered.
-3. **Entries** → register the cars.
-4. **Hardware** → pair gates this server hasn't seen yet (open pairing,
-   accept each waiting gate; it remembers them across events), then check every gate is online and its clock
-   is in sync.
-5. **Setup → Access** → print invitations for the marshals' devices.
-6. **Live timing** → freeze and print a stage's start list when you post it,
-   activate the stage when it starts, close it when the last car is
-   through.
 
 ## For developers
 
@@ -226,19 +185,22 @@ npm run dev:web              # dashboard on :57440
 `docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml up`
 runs the headless stack with simulated gates.
 
+The standalone package is built with Node.js 24:
+
+```bash
+npm ci
+npm run build:shared
+npm run build --workspace=@rally-gate/rally-server --workspace=@rally-gate/web
+node scripts/package-standalone.js   # -> dist-standalone/
+```
+
 `npm run screenshots` regenerates the images in `docs/images/` from a
 throwaway demo event (after building shared, rally-server and web). It needs
 Playwright's Chromium (`npx playwright install chromium`), or set
 `SCREENSHOT_CHANNEL=msedge` or `chrome` to use an installed browser.
 
-Before changing an area, read its note in `docs/` — much of the "why" lives
-there: [architecture](docs/architecture.md), [event model](docs/event-model.md),
-[API](docs/api.md), [deployment modes](docs/deployment-modes.md),
-[decoder adapters](docs/decoder-adapters.md),
-[frontend](docs/frontend-structure.md), [design system](docs/design-system.md),
-[gate config](docs/gate-config-ui.md), [access](docs/auth.md),
-[ESP32 gate](docs/esp32-gate.md),
-[guest Wi-Fi on OpenWRT](docs/openwrt-guest-access.md),
-[roadmap](docs/development-roadmap.md). [CLAUDE.md](CLAUDE.md) has the
-commands, checks CI runs, and the codebase's standing rules. The original
-vision document is in [ideas/](ideas/RC_Rally_Timing_Project_Documentation.md).
+Before changing an area, read its design note — much of the "why" lives
+there. [docs/README.md](docs/README.md) lists them all.
+[CLAUDE.md](CLAUDE.md) has the commands, the checks CI runs, and the
+codebase's standing rules. The original vision document is in
+[ideas/](ideas/RC_Rally_Timing_Project_Documentation.md).
