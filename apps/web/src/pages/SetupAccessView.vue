@@ -170,8 +170,7 @@ const load = useLoad(async () => {
           :label="$t('access.serverUrl')"
           :hint="$t('access.serverUrlHint')"
           persistent-hint
-          class="mb-4"
-          style="max-width: 24rem"
+          class="mb-4 rg-field-narrow"
         />
         <v-table v-key-scroll density="comfortable">
           <thead>

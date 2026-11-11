@@ -178,21 +178,21 @@ const load = useLoad(async () => {
             :label="$t('setup.rallyName')"
             density="comfortable"
             hide-details
-            style="min-width: 260px"
+            class="rg-field-min"
           />
           <v-text-field
             v-model="rallyInfo.date"
             :label="$t('setup.dateOptional')"
             density="comfortable"
             hide-details
-            style="min-width: 180px"
+            class="rg-field-min"
           />
           <v-text-field
             v-model="rallyInfo.location"
             :label="$t('setup.locationOptional')"
             density="comfortable"
             hide-details
-            style="min-width: 220px"
+            class="rg-field-min"
           />
           <v-btn
             v-if="can('setup')"

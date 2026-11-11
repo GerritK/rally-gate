@@ -240,6 +240,11 @@ Values live in `theme.ts`. The rules:
   own default for the pickers is filled and a size taller, which reads as a
   different kind of field beside a text field. A field that sits in a row
   of buttons may go `compact` (the passing's entry picker).
+- **A field is as wide as what goes into it**, not as its card, from
+  three steps in `utilities.css`: `.rg-field-short` (a number, a time),
+  `.rg-field-medium` (a duration), `.rg-field-narrow` (a lone select or
+  text field on a settings card). `.rg-field-min` keeps a field in a
+  wrapping row from being squeezed. No `style="max-width: …"` on a field.
 - **Refused or just unusual.** A value the server refuses is an
   `error-messages` and Save won't help. One that is allowed but worth a
   second look (a transponder already on another car) is a `messages` with

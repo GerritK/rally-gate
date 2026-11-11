@@ -258,7 +258,7 @@ watch(() => props.stageId, load.reload);
                   :label="$t('stages.number')"
                   hide-details
                   :disabled="!stageEditable"
-                  style="max-width: 110px"
+                  class="rg-field-short"
                 />
                 <v-text-field
                   v-model="stage.name"

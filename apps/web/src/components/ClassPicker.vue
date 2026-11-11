@@ -43,7 +43,7 @@ const selected = computed({
     clearable
     :density="density ?? 'comfortable'"
     hide-details
-    style="min-width: 220px"
+    class="rg-field-min"
   >
     <template #selection="{ item }">
       <ClassChip :name="item.name" :main="item.main" class="me-1" />
