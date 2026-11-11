@@ -63,56 +63,54 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <v-row justify="center">
-    <v-col cols="12" md="10" lg="8">
-      <v-alert
-        v-if="!session?.role"
-        type="info"
-        variant="tonal"
-        icon="mdi-timer-sand"
-        :title="$t('lobby.waitingTitle')"
-        :text="$t('lobby.waitingText')"
-      />
+  <div class="rg-lobby">
+    <v-alert
+      v-if="!session?.role"
+      type="info"
+      variant="tonal"
+      icon="mdi-timer-sand"
+      :title="$t('lobby.waitingTitle')"
+      :text="$t('lobby.waitingText')"
+    />
 
-      <v-card v-else-if="info">
-        <v-card-item>
-          <v-card-title>{{ $t('lobby.title') }}</v-card-title>
-          <template #append>
-            <div class="d-flex flex-wrap align-center ga-2">
-              <ImportEventButton variant="tonal" @imported="load" />
-              <v-btn
-                variant="tonal"
-                prepend-icon="mdi-plus"
-                @click="newDialog = true"
-              >
-                {{ $t('setup.newEvent') }}
-              </v-btn>
-            </div>
-          </template>
-        </v-card-item>
-        <v-card-text>
-          <p :class="{ 'mb-4': info.last }">{{ $t('lobby.hint') }}</p>
-          <v-btn
-            v-if="info.last"
-            color="primary"
-            size="large"
-            prepend-icon="mdi-play"
-            block
-            @click="onOpen(info.last)"
-          >
-            {{ $t('lobby.continue', { name: eventName(info.last) }) }}
-          </v-btn>
-        </v-card-text>
-        <EventTable
-          v-if="info.events.length > 0"
-          :events="info.events"
-          :open-file="null"
-          @open="onOpen"
-          @deleted="load"
-        />
-      </v-card>
-    </v-col>
-  </v-row>
+    <v-card v-else-if="info">
+      <v-card-item>
+        <v-card-title>{{ $t('lobby.title') }}</v-card-title>
+        <template #append>
+          <div class="d-flex flex-wrap align-center ga-2">
+            <ImportEventButton variant="tonal" @imported="load" />
+            <v-btn
+              variant="tonal"
+              prepend-icon="mdi-plus"
+              @click="newDialog = true"
+            >
+              {{ $t('setup.newEvent') }}
+            </v-btn>
+          </div>
+        </template>
+      </v-card-item>
+      <v-card-text>
+        <p :class="{ 'mb-4': info.last }">{{ $t('lobby.hint') }}</p>
+        <v-btn
+          v-if="info.last"
+          color="primary"
+          size="large"
+          prepend-icon="mdi-play"
+          block
+          @click="onOpen(info.last)"
+        >
+          {{ $t('lobby.continue', { name: eventName(info.last) }) }}
+        </v-btn>
+      </v-card-text>
+      <EventTable
+        v-if="info.events.length > 0"
+        :events="info.events"
+        :open-file="null"
+        @open="onOpen"
+        @deleted="load"
+      />
+    </v-card>
+  </div>
 
   <NewEventDialog
     v-model="newDialog"
@@ -120,3 +118,10 @@ onUnmounted(() => {
   />
   <EventSwitchOverlay />
 </template>
+
+<style scoped>
+.rg-lobby {
+  max-width: 960px;
+  margin-inline: auto;
+}
+</style>

@@ -469,7 +469,7 @@ const load = useLoad(refresh);
           }}
         </div>
       </v-card-text>
-      <v-table density="comfortable">
+      <v-table v-key-scroll density="comfortable">
         <thead>
           <tr>
             <th>{{ $t('entryDetail.stage') }}</th>
@@ -589,7 +589,7 @@ const load = useLoad(refresh);
           </v-btn>
         </template>
       </v-card-item>
-      <v-table density="comfortable">
+      <v-table v-key-scroll density="comfortable">
         <thead>
           <tr>
             <th>{{ $t('entryDetail.stage') }}</th>
@@ -664,7 +664,7 @@ const load = useLoad(refresh);
       </v-card-item>
       <!-- Before and after only in the dialog: two runs' times side by
            side in every row was unreadable. -->
-      <v-table density="comfortable" hover>
+      <v-table v-key-scroll density="comfortable" hover>
         <thead>
           <tr>
             <th>{{ $t('changes.when') }}</th>
@@ -726,7 +726,7 @@ const load = useLoad(refresh);
             <dt>{{ $t('changes.by') }}</dt>
             <dd>{{ changedBy(shownChange) }}</dd>
           </dl>
-          <v-table density="compact" class="mt-4">
+          <v-table v-key-scroll density="compact" class="mt-4">
             <thead>
               <tr>
                 <th>

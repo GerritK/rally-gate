@@ -303,64 +303,36 @@ const load = useLoad(async () => {
       </v-card>
     </v-dialog>
 
-    <v-row>
-      <v-col cols="12" sm="4">
-        <v-card
-          class="h-100"
-          to="/setup/stages"
-          prepend-icon="mdi-flag-checkered"
-        >
-          <v-card-title>{{ $t('stages.title') }}</v-card-title>
-          <v-card-text>{{ $t('setup.stagesHint') }}</v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="12" sm="4">
-        <v-card
-          class="h-100"
-          to="/setup/classes"
-          prepend-icon="mdi-shape-outline"
-        >
-          <v-card-title>{{ $t('classes.classes') }}</v-card-title>
-          <v-card-text>{{ $t('setup.classesHint') }}</v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="12" sm="4">
-        <v-card
-          class="h-100"
-          to="/setup/start"
-          prepend-icon="mdi-sort-numeric-ascending"
-        >
-          <v-card-title>{{ $t('setup.start') }}</v-card-title>
-          <v-card-text>{{ $t('setup.startHint') }}</v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="12" sm="4">
-        <v-card
-          class="h-100"
-          to="/setup/scoring"
-          prepend-icon="mdi-calculator-variant-outline"
-        >
-          <v-card-title>{{ $t('setup.scoring') }}</v-card-title>
-          <v-card-text>{{ $t('setup.scoringHint') }}</v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="12" sm="4">
-        <v-card
-          class="h-100"
-          to="/setup/display"
-          prepend-icon="mdi-palette-outline"
-        >
-          <v-card-title>{{ $t('displaySetup.title') }}</v-card-title>
-          <v-card-text>{{ $t('setup.displayHint') }}</v-card-text>
-        </v-card>
-      </v-col>
-      <v-col v-if="can('setup')" cols="12" sm="4">
-        <v-card class="h-100" to="/setup/access" prepend-icon="mdi-key-chain">
-          <v-card-title>{{ $t('access.title') }}</v-card-title>
-          <v-card-text>{{ $t('access.hint') }}</v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
+    <div class="rg-setup-tiles">
+      <v-card to="/setup/stages" prepend-icon="mdi-flag-checkered">
+        <v-card-title>{{ $t('stages.title') }}</v-card-title>
+        <v-card-text>{{ $t('setup.stagesHint') }}</v-card-text>
+      </v-card>
+      <v-card to="/setup/classes" prepend-icon="mdi-shape-outline">
+        <v-card-title>{{ $t('classes.classes') }}</v-card-title>
+        <v-card-text>{{ $t('setup.classesHint') }}</v-card-text>
+      </v-card>
+      <v-card to="/setup/start" prepend-icon="mdi-sort-numeric-ascending">
+        <v-card-title>{{ $t('setup.start') }}</v-card-title>
+        <v-card-text>{{ $t('setup.startHint') }}</v-card-text>
+      </v-card>
+      <v-card to="/setup/scoring" prepend-icon="mdi-calculator-variant-outline">
+        <v-card-title>{{ $t('setup.scoring') }}</v-card-title>
+        <v-card-text>{{ $t('setup.scoringHint') }}</v-card-text>
+      </v-card>
+      <v-card to="/setup/display" prepend-icon="mdi-palette-outline">
+        <v-card-title>{{ $t('displaySetup.title') }}</v-card-title>
+        <v-card-text>{{ $t('setup.displayHint') }}</v-card-text>
+      </v-card>
+      <v-card
+        v-if="can('setup')"
+        to="/setup/access"
+        prepend-icon="mdi-key-chain"
+      >
+        <v-card-title>{{ $t('access.title') }}</v-card-title>
+        <v-card-text>{{ $t('access.hint') }}</v-card-text>
+      </v-card>
+    </div>
 
     <NewEventDialog
       v-model="newDialog"
@@ -401,3 +373,18 @@ const load = useLoad(async () => {
     <EventSwitchOverlay />
   </LoadedPage>
 </template>
+
+<style scoped>
+/* Tiles of equal height, 16px apart like every card (v-row's gutters
+   don't add up to that). */
+.rg-setup-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 599px) {
+  .rg-setup-tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+</style>

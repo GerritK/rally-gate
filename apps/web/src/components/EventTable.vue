@@ -28,7 +28,7 @@ async function onDelete(file: string) {
 </script>
 
 <template>
-  <v-table density="comfortable">
+  <v-table v-key-scroll density="comfortable">
     <thead>
       <tr>
         <th>{{ $t('setup.event') }}</th>

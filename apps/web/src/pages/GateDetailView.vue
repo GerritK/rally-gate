@@ -262,7 +262,7 @@ onUnmounted(() => {
         <v-card-subtitle>{{
           $t('gateDetail.assignmentsHint')
         }}</v-card-subtitle>
-        <v-table density="comfortable" hover>
+        <v-table v-key-scroll density="comfortable" hover>
           <thead>
             <tr>
               <th>{{ $t('entryDetail.stage') }}</th>
@@ -306,7 +306,7 @@ onUnmounted(() => {
       <v-card-subtitle>
         {{ $t('gateDetail.detectionsHint', { n: detections.length }) }}
       </v-card-subtitle>
-      <v-table density="compact">
+      <v-table v-key-scroll density="compact">
         <thead>
           <tr>
             <th class="rg-time">{{ $t('gateDetail.gateTime') }}</th>

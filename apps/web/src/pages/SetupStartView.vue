@@ -185,7 +185,7 @@ const load = useLoad(async () => {
             :label="$t('startOrder.grouping')"
             :hint="$t('startOrder.groupingHint')"
             persistent-hint
-            style="max-width: 420px"
+            class="rg-field-narrow"
           />
           <v-select
             v-model="key"
@@ -200,14 +200,14 @@ const load = useLoad(async () => {
                   : undefined
             "
             persistent-hint
-            style="max-width: 420px"
+            class="rg-field-narrow"
           />
           <v-select
             v-model="direction"
             :items="directionOptions"
             :label="$t('startOrder.direction')"
             :disabled="locked || key === StartOrderKey.START_NUMBER"
-            style="max-width: 420px"
+            class="rg-field-narrow"
           />
           <div class="d-flex align-center ga-3">
             <v-btn
@@ -245,8 +245,7 @@ const load = useLoad(async () => {
             persistent-hint
             :rules="[countdownRule]"
             :disabled="countdownLocked"
-            class="rg-timing"
-            style="max-width: 420px"
+            class="rg-timing rg-field-narrow"
           />
           <v-text-field
             v-model.number="toleranceMs"
@@ -258,8 +257,7 @@ const load = useLoad(async () => {
             persistent-hint
             :rules="[wholeRule(0)]"
             :disabled="toleranceLocked"
-            class="rg-timing"
-            style="max-width: 420px"
+            class="rg-timing rg-field-narrow"
           />
           <v-text-field
             v-model.number="gapS"
@@ -271,8 +269,7 @@ const load = useLoad(async () => {
             persistent-hint
             :rules="[wholeRule(1)]"
             :disabled="countdownLocked"
-            class="rg-timing"
-            style="max-width: 420px"
+            class="rg-timing rg-field-narrow"
           />
           <div>
             <v-select
@@ -281,7 +278,7 @@ const load = useLoad(async () => {
               :label="$t('countdown.jumpStartPenalty')"
               :disabled="countdownLocked"
               hide-details
-              style="max-width: 420px"
+              class="rg-field-narrow"
             />
             <router-link
               to="/setup/scoring"

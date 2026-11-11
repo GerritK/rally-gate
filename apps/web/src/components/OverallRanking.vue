@@ -108,7 +108,7 @@ const runningStages = computed(() =>
       }}
     </v-alert>
     <ResultsPodium :placings="placings" :public-view="publicView" />
-    <v-table density="comfortable">
+    <v-table v-key-scroll density="comfortable">
       <thead>
         <tr>
           <th>{{ $t('table.pos') }}</th>
@@ -231,7 +231,7 @@ const runningStages = computed(() =>
       <div class="text-caption text-medium-emphasis mb-2">
         {{ $t('results.notClassifiedHint') }}
       </div>
-      <v-table density="comfortable">
+      <v-table v-key-scroll density="comfortable">
         <thead>
           <tr>
             <th>#</th>

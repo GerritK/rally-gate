@@ -123,7 +123,7 @@ const load = useLoad(refresh);
           </template>
         </i18n-t>
       </p>
-      <v-table density="comfortable">
+      <v-table v-key-scroll density="comfortable">
         <thead>
           <tr>
             <th>{{ $t('stages.name') }}</th>

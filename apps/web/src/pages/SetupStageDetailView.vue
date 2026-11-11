@@ -386,7 +386,7 @@ watch(() => props.stageId, load.reload);
             })
           }}
         </v-alert>
-        <v-table density="comfortable">
+        <v-table v-key-scroll density="comfortable">
           <thead>
             <tr>
               <th>{{ $t('stage.gate') }}</th>

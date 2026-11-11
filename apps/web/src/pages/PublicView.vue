@@ -149,13 +149,13 @@ onMounted(() => {
   // Small data: any change refetches the view rather than patching it.
   liveSource = openLiveStream(
     {
-      'stage-run': () => void refresh(),
-      'stage-run-deleted': () => void refresh(),
-      'stage-run-split': () => void refresh(),
-      dns: () => void refresh(),
-      stage: () => void refresh(),
+      'stage-run': refresh,
+      'stage-run-deleted': refresh,
+      'stage-run-split': refresh,
+      dns: refresh,
+      stage: refresh,
     },
-    () => void refresh(),
+    refresh,
   );
 });
 
@@ -187,12 +187,12 @@ const go = (stageId?: string) =>
           </v-card-title>
         </v-card-item>
         <v-card-text>
-          <v-table density="comfortable">
+          <v-table v-key-scroll density="comfortable">
             <thead>
               <tr>
-                <th style="width: 56px">{{ $t('table.pos') }}</th>
+                <th width="56">{{ $t('table.pos') }}</th>
                 <th v-if="hasSlots">{{ $t('timetable.slot') }}</th>
-                <th style="width: 72px">#</th>
+                <th width="72">#</th>
                 <th>{{ $t('table.crew') }}</th>
                 <th>{{ $t('table.car') }}</th>
                 <th>{{ $t('table.status') }}</th>
