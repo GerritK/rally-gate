@@ -34,6 +34,9 @@ export function createRallyVuetify(i18n: RallyI18n) {
       VAppBar: { flat: true, border: 'b' },
       VCard: { rounded: 'lg', flat: true, border: true },
       VBtn: { rounded: 'md', variant: 'flat' },
+      // v-card-actions turns its buttons to text; a dialog's main action is
+      // filled like everywhere else, Cancel says `variant="text"` itself.
+      VCardActions: { VBtn: { variant: 'flat' } },
       VSheet: { rounded: 'lg' },
       // Every input field alike, picked or typed: Vuetify's own default for
       // the pickers is filled and a size taller than a text field.
