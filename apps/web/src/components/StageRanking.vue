@@ -78,7 +78,7 @@ const legendMarks = computed<TimingMark[]>(() =>
       :placings="results.classification"
       :public-view="publicView"
     />
-    <v-table density="comfortable">
+    <v-table v-key-scroll density="comfortable">
       <thead>
         <tr>
           <th>{{ $t('table.pos') }}</th>
@@ -163,6 +163,7 @@ const legendMarks = computed<TimingMark[]>(() =>
     </v-table>
 
     <v-table
+      v-key-scroll
       v-if="results.nonFinishers.length > 0"
       density="comfortable"
       class="mt-4"

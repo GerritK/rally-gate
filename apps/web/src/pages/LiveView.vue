@@ -1199,30 +1199,30 @@ const load = useLoad(async () => {
     {
       detection: (event) => {
         flashGate(event.gateId);
-        if (preStartGateIds.value.has(event.gateId)) void loadAtStart();
+        if (preStartGateIds.value.has(event.gateId)) return loadAtStart();
       },
       gate: upsertGate,
       'stage-run': (run) => {
         upsertStageRun(run);
-        if (run.stageId === props.stageId) void loadAtStart();
+        if (run.stageId === props.stageId) return loadAtStart();
       },
       'stage-run-deleted': (run) => {
         removeStageRun(run);
-        if (run.stageId === props.stageId) void loadAtStart();
+        if (run.stageId === props.stageId) return loadAtStart();
       },
       'stage-run-split': upsertSplit,
       dns: applyDns,
       // Another screen moved a slot, delayed, froze or activated.
-      stage: ({ stageId }) => void reloadStage(stageId),
+      stage: ({ stageId }) => reloadStage(stageId),
       'pending-detections': ({ pending }) => {
         pendingDetections.value = pending;
       },
       'awaiting-detections': ({ awaiting }) => {
         awaitingDetections.value = awaiting;
-        void loadAtStart();
+        return loadAtStart();
       },
     },
-    () => void loadLive(),
+    loadLive,
   );
   await loadLive();
 });
@@ -1482,10 +1482,10 @@ onUnmounted(() => {
             @dismiss-all="onDismissAll([event, ...queued])"
           />
         </v-card-text>
-        <v-table density="comfortable">
+        <v-table v-key-scroll density="comfortable">
           <tbody>
             <tr v-for="car in onStage" :key="car.run.id">
-              <td style="width: 72px">
+              <td width="72">
                 <StartNumber :number="car.row.starter.startNumber" />
               </td>
               <td><CrewName :crew="car.row.starter" /></td>
@@ -1526,7 +1526,7 @@ onUnmounted(() => {
                   formatDuration(car.run.durationMs)
                 }}</template>
               </td>
-              <td style="width: 120px" class="text-no-wrap">
+              <td width="120" class="text-no-wrap">
                 <JumpStartChip
                   :run="car.run"
                   :tolerance-ms="jumpStartToleranceMs"
@@ -1543,7 +1543,7 @@ onUnmounted(() => {
                   {{ $t('live.overdue') }}
                 </v-chip>
               </td>
-              <td class="text-right rg-actions" style="width: 1%">
+              <td class="text-right rg-actions" width="1%">
                 <v-btn
                   v-if="can('timeRun', stage.id)"
                   size="small"
@@ -1588,11 +1588,11 @@ onUnmounted(() => {
   </div>
 
   <v-card v-if="stage && startOrder" class="mb-4">
-    <v-table density="comfortable" class="rg-marshal-table">
+    <v-table v-key-scroll density="comfortable" class="rg-marshal-table">
       <thead>
         <tr>
-          <th style="width: 56px">{{ $t('table.pos') }}</th>
-          <th style="width: 72px">#</th>
+          <th width="56">{{ $t('table.pos') }}</th>
+          <th width="72">#</th>
           <th>{{ $t('table.crew') }}</th>
           <th v-if="!startOrder.grouped">{{ $t('classes.class') }}</th>
           <th>{{ $t('table.status') }}</th>

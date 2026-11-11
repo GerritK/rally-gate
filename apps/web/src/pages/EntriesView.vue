@@ -64,7 +64,7 @@ const load = useLoad(refresh);
       </template>
     </v-card-item>
     <v-card-text>
-      <v-table density="comfortable">
+      <v-table v-key-scroll density="comfortable">
         <thead>
           <tr>
             <th>#</th>

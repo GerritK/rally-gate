@@ -133,6 +133,8 @@ Values live in `theme.ts`. The rules:
   widths, no `matchMedia`.
 - **The page never scrolls sideways**; only a table or a row of many items
   does, inside its card (the gate line keeps a minimum width per gate).
+  Every `v-table` carries `v-key-scroll` (`packages/ui`), which lets the
+  keyboard scroll it while it is wider than its card.
 - **What a marshal taps is on screen without a sideways scroll** on a
   portrait tablet. A table they work in mid-event pins its action column
   to the right edge (`.rg-actions` in `utilities.css`, on its `<th>` and
@@ -336,6 +338,9 @@ Values live in `theme.ts`. The rules:
   error Vue sees to `notifyError()`, and Vue sees a rejected promise from an
   event handler or lifecycle hook only if the handler returns it. A wrapper
   that calls an async function without `return` loses the error.
+  The live stream's handlers are the same case one level down:
+  `openLiveStream` reports a rejected promise a handler returns, so a
+  handler writes `return reload()`, never `void reload()`.
 - **A snackbar belongs to the page it was raised on** and goes when the
   path changes (`clearNotice()` in `apps/web`'s `router.ts`). A query change
   such as the class filter keeps it, and so does a message raised after the

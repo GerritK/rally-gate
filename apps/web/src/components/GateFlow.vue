@@ -106,6 +106,14 @@ function statusText(gate: Gate): string {
   animation: gate-flash-pulse 0.6s ease-out;
 }
 
+/* Still a signal without the motion: a ring for as long as the pulse lasts. */
+@media (prefers-reduced-motion: reduce) {
+  .gate-flash {
+    animation: none;
+    box-shadow: 0 0 0 3px rgba(var(--v-theme-primary), 0.7);
+  }
+}
+
 @keyframes gate-flash-pulse {
   0% {
     box-shadow: 0 0 0 0 rgba(var(--v-theme-primary), 0.7);

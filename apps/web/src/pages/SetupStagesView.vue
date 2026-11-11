@@ -90,7 +90,7 @@ const load = useLoad(refresh);
       </template>
     </v-card-item>
     <v-card-text>
-      <v-table density="comfortable" hover>
+      <v-table v-key-scroll density="comfortable" hover>
         <thead>
           <tr>
             <th>#</th>

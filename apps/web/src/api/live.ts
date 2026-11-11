@@ -4,6 +4,7 @@ import type {
   LiveEventType,
   RallyStatus,
 } from '@rally-gate/shared';
+import { notifyError } from '@rally-gate/ui';
 import { ref } from 'vue';
 import { API_BASE } from './client';
 import type { DetectionEventRecord } from './events';
@@ -26,8 +27,19 @@ interface LivePayloads {
 }
 
 export type LiveHandlers = {
-  [K in LiveEventType]?: (data: LivePayloads[K]) => void;
+  [K in LiveEventType]?: (data: LivePayloads[K]) => unknown;
 };
+
+/**
+ * A stream handler is no Vue event handler: a reload it starts that fails
+ * would vanish and leave stale times on screen without a word. So a handler
+ * returns its promise (never `void reload()`), and a rejection is reported.
+ */
+function reported<T>(handler: (data: T) => unknown): (data: T) => void {
+  return (data) => {
+    new Promise((resolve) => resolve(handler(data))).catch(notifyError);
+  };
+}
 
 /**
  * The open page's stream, for the app bar: `null` when the page has none.
@@ -47,14 +59,14 @@ export const liveStatus = ref<'connecting' | 'live' | 'offline' | null>(null);
  */
 export function openLiveStream(
   handlers: LiveHandlers,
-  onOpen: () => void,
+  onOpen: () => unknown,
 ): EventSource {
   const source = new EventSource(`${API_BASE}/live`);
   liveStatus.value = 'connecting';
   source.onopen = () => {
     liveStatus.value = 'live';
-    void fetchRallyInfo();
-    onOpen();
+    reported(fetchRallyInfo)(undefined);
+    reported(onOpen)(undefined);
   };
   // EventSource reconnects by itself; this is the gap until it does.
   source.onerror = () => {
@@ -64,10 +76,9 @@ export function openLiveStream(
     rally: applyRallyInfo,
     ...handlers,
   })) {
+    const report = reported(handler as (data: unknown) => unknown);
     source.addEventListener(type, (e) =>
-      (handler as (data: unknown) => void)(
-        JSON.parse((e as MessageEvent).data),
-      ),
+      report(JSON.parse((e as MessageEvent).data)),
     );
   }
   return source;

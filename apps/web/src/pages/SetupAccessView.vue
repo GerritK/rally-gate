@@ -173,7 +173,7 @@ const load = useLoad(async () => {
           class="mb-4"
           style="max-width: 24rem"
         />
-        <v-table density="comfortable">
+        <v-table v-key-scroll density="comfortable">
           <thead>
             <tr>
               <th>{{ $t('access.label') }}</th>
@@ -271,7 +271,7 @@ const load = useLoad(async () => {
     <v-card class="mb-4">
       <v-card-title>{{ $t('access.devices') }}</v-card-title>
       <v-card-text>
-        <v-table density="comfortable">
+        <v-table v-key-scroll density="comfortable">
           <thead>
             <tr>
               <th>{{ $t('access.label') }}</th>

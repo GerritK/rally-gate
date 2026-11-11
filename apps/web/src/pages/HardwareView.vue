@@ -331,7 +331,7 @@ onUnmounted(() => {
       >
         {{ $t('hardware.noneWaiting') }}
       </p>
-      <v-table density="comfortable">
+      <v-table v-key-scroll density="comfortable">
         <thead>
           <tr>
             <th>{{ $t('hardware.gate') }}</th>
@@ -562,7 +562,7 @@ onUnmounted(() => {
     <v-card-subtitle>
       {{ $t('hardware.knownHint') }}
     </v-card-subtitle>
-    <v-table density="comfortable">
+    <v-table v-key-scroll density="comfortable">
       <thead>
         <tr>
           <th>{{ $t('stages.id') }}</th>

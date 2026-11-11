@@ -7,6 +7,7 @@ import { createVueI18nAdapter } from 'vuetify/locale/adapters/vue-i18n';
 import { useI18n } from 'vue-i18n';
 import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
+import { KeyScroll } from './key-scroll';
 import { rallyGateDark } from './theme';
 import type { RallyI18n } from './i18n';
 
@@ -22,7 +23,7 @@ export function createRallyVuetify(i18n: RallyI18n) {
   return createVuetify({
     locale: { adapter: createVueI18nAdapter({ i18n, useI18n }) },
     components,
-    directives,
+    directives: { ...directives, KeyScroll },
     icons: {
       defaultSet: 'mdi',
     },

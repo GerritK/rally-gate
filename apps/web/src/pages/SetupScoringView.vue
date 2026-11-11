@@ -227,7 +227,7 @@ const load = useLoad(async () => {
       </v-card-item>
       <v-card-text>
         <p class="mb-4">{{ $t('penalties.explain') }}</p>
-        <v-table density="comfortable">
+        <v-table v-key-scroll density="comfortable">
           <thead>
             <tr>
               <th>{{ $t('stages.name') }}</th>
