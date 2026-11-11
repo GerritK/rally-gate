@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { useLoad } from '../load';
+import LoadError from '../components/LoadError.vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   fetchOverallClassification,
@@ -118,7 +120,7 @@ async function refresh() {
 
 watch(() => [props.stageId, route.query.classes], refresh);
 
-onMounted(async () => {
+const load = useLoad(async () => {
   [, stages.value, classes.value, entries.value] = await Promise.all([
     refresh(),
     fetchStages(),
@@ -145,7 +147,11 @@ function onStageChange(stageId: string) {
     <ClassFilter v-model="selectedClassIds" :classes="classes" />
   </div>
 
-  <v-card v-if="current">
+  <LoadError :load="load" />
+  <v-card v-if="load.state === 'loading'">
+    <v-card-text class="rg-empty">{{ $t('common.loading') }}</v-card-text>
+  </v-card>
+  <v-card v-else-if="current">
     <v-card-item>
       <v-card-title>{{ heading }}</v-card-title>
       <v-card-subtitle>

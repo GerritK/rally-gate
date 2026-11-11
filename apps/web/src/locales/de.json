@@ -1,5 +1,8 @@
 {
   "common": {
+    "loading": "Lädt…",
+    "loadFailed": "Die Seite konnte nicht geladen werden.",
+    "notLoaded": "Nicht geladen.",
     "all": "Alle",
     "cancel": "Abbrechen",
     "save": "Speichern",

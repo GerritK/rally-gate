@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useLoad } from '../load';
+import EmptyRow from '../components/EmptyRow.vue';
+import LoadError from '../components/LoadError.vue';
 import { can } from '../api/auth';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { ApiError } from '../api/client';
@@ -242,11 +245,14 @@ async function onRejectGate(gateId: string) {
   pairing.value = await fetchGatePairing();
 }
 
-onMounted(async () => {
+const load = useLoad(async () => {
   const [, eventInfo] = await Promise.all([refreshGates(), fetchEventInfo()]);
   if (eventInfo.switchable) {
     knownGates.value = await fetchKnownGates();
   }
+});
+
+onMounted(() => {
   gatesSource = openLiveStream(
     {
       gate: (gate) => upsert(gates.value, gate, 'id'),
@@ -269,6 +275,7 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <LoadError :load="load" />
   <v-card class="mb-6">
     <v-card-title class="d-flex align-center">
       {{ $t('hardware.gates') }}
@@ -519,11 +526,13 @@ onUnmounted(() => {
               </v-menu>
             </td>
           </tr>
-          <tr v-if="gates.length === 0 && !pairing?.waiting.length">
-            <td colspan="5" class="rg-empty">
-              {{ $t('hardware.empty') }}
-            </td>
-          </tr>
+          <EmptyRow
+            :load="load"
+            :empty="gates.length === 0 && !pairing?.waiting.length"
+            :colspan="5"
+          >
+            {{ $t('hardware.empty') }}
+          </EmptyRow>
         </tbody>
       </v-table>
     </v-card-text>
@@ -589,11 +598,9 @@ onUnmounted(() => {
             </v-menu>
           </td>
         </tr>
-        <tr v-if="knownGates.length === 0">
-          <td colspan="3" class="rg-empty">
-            {{ $t('hardware.knownEmpty') }}
-          </td>
-        </tr>
+        <EmptyRow :load="load" :empty="knownGates.length === 0" :colspan="3">
+          {{ $t('hardware.knownEmpty') }}
+        </EmptyRow>
       </tbody>
     </v-table>
   </v-card>

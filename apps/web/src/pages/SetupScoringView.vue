@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useLoad } from '../load';
+import EmptyRow from '../components/EmptyRow.vue';
+import LoadError from '../components/LoadError.vue';
 import { can } from '../api/auth';
 import {
   DEFAULT_NOTIONAL_PENALTY_MS,
@@ -8,7 +11,7 @@ import {
   RallyStatus,
   type PenaltyTier,
 } from '@rally-gate/shared';
-import { onMounted, ref } from 'vue';
+import { ref } from 'vue';
 import {
   createPenaltyType,
   deletePenaltyType,
@@ -141,7 +144,7 @@ async function onSavePenalty() {
   }
 }
 
-onMounted(async () => {
+const load = useLoad(async () => {
   types.value = await fetchPenaltyTypes();
   jumpStartTypeId.value = await fetchSetting(JUMP_START_PENALTY_TYPE_ID_KEY);
   const storedMs = Number(await fetchSetting(NOTIONAL_PENALTY_MS_KEY));
@@ -157,6 +160,7 @@ onMounted(async () => {
     {{ $t('setup.back') }}
   </v-btn>
 
+  <LoadError :load="load" />
   <RallyLockAlert :when="[RallyStatus.CLOSED]" />
   <v-card>
     <v-card-title>{{ $t('scoring.title') }}</v-card-title>
@@ -286,15 +290,13 @@ onMounted(async () => {
               </v-menu>
             </td>
           </tr>
-          <tr v-if="types.length === 0">
-            <td colspan="4" class="rg-empty">
-              {{
-                $t('penalties.emptyCatalogue', {
-                  action: $t('penalties.addType'),
-                })
-              }}
-            </td>
-          </tr>
+          <EmptyRow :load="load" :empty="types.length === 0" :colspan="4">
+            {{
+              $t('penalties.emptyCatalogue', {
+                action: $t('penalties.addType'),
+              })
+            }}
+          </EmptyRow>
         </tbody>
       </v-table>
     </v-card-text>

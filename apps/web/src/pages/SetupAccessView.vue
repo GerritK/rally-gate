@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import { useLoad } from '../load';
+import EmptyRow from '../components/EmptyRow.vue';
+import LoadError from '../components/LoadError.vue';
 import {
   AccessRole,
   type AuthDevice,
   type Invitation,
 } from '@rally-gate/shared';
 import { t } from '@rally-gate/ui';
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import {
   createInvitation,
   fetchDevices,
@@ -119,7 +122,7 @@ const print = (list: Invitation[]) =>
     serverUrl.value,
   );
 
-onMounted(async () => {
+const load = useLoad(async () => {
   stages.value = await fetchStages();
   await refresh();
 });
@@ -130,6 +133,7 @@ onMounted(async () => {
     {{ $t('setup.back') }}
   </v-btn>
 
+  <LoadError :load="load" />
   <v-alert v-if="forbidden" type="info" variant="tonal">
     {{ $t('access.organiserOnly') }}
     <template #append>
@@ -246,11 +250,13 @@ onMounted(async () => {
                 </template>
               </td>
             </tr>
-            <tr v-if="invitations.length === 0">
-              <td colspan="6" class="rg-empty">
-                {{ $t('access.empty', { action: $t('access.add') }) }}
-              </td>
-            </tr>
+            <EmptyRow
+              :load="load"
+              :empty="invitations.length === 0"
+              :colspan="6"
+            >
+              {{ $t('access.empty', { action: $t('access.add') }) }}
+            </EmptyRow>
           </tbody>
         </v-table>
       </v-card-text>
@@ -304,11 +310,9 @@ onMounted(async () => {
                 </v-btn>
               </td>
             </tr>
-            <tr v-if="devices.length === 0">
-              <td colspan="4" class="rg-empty">
-                {{ $t('access.devicesEmpty') }}
-              </td>
-            </tr>
+            <EmptyRow :load="load" :empty="devices.length === 0" :colspan="4">
+              {{ $t('access.devicesEmpty') }}
+            </EmptyRow>
           </tbody>
         </v-table>
       </v-card-text>

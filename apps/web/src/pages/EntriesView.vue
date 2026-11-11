@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { useLoad } from '../load';
+import EmptyRow from '../components/EmptyRow.vue';
+import LoadError from '../components/LoadError.vue';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { fetchEntries, type Entry } from '../api/entries';
 import { fetchEntryClasses, type EntryClass } from '../api/entry-classes';
@@ -30,10 +33,11 @@ async function refresh() {
   ]);
 }
 
-onMounted(refresh);
+const load = useLoad(refresh);
 </script>
 
 <template>
+  <LoadError :load="load" />
   <v-card>
     <v-card-title class="d-flex align-center">
       {{ $t('nav.entries') }}
@@ -103,11 +107,9 @@ onMounted(refresh);
               <EntryStatusActions :entry="entry" @saved="replace" />
             </td>
           </tr>
-          <tr v-if="entries.length === 0">
-            <td colspan="7" class="rg-empty">
-              {{ $t('entries.empty', { action: $t('entries.add') }) }}
-            </td>
-          </tr>
+          <EmptyRow :load="load" :empty="entries.length === 0" :colspan="7">
+            {{ $t('entries.empty', { action: $t('entries.add') }) }}
+          </EmptyRow>
         </tbody>
       </v-table>
     </v-card-text>

@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useLoad } from '../load';
+import EmptyRow from '../components/EmptyRow.vue';
+import LoadError from '../components/LoadError.vue';
 import { can } from '../api/auth';
-import { onMounted, ref } from 'vue';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { StageScoring, StageStatus } from '@rally-gate/shared';
 import {
@@ -60,7 +63,7 @@ async function onDeleteStage(stage: Stage) {
   notify(t('stages.deleted'));
 }
 
-onMounted(refresh);
+const load = useLoad(refresh);
 </script>
 
 <template>
@@ -68,6 +71,7 @@ onMounted(refresh);
     {{ $t('setup.back') }}
   </v-btn>
 
+  <LoadError :load="load" />
   <v-card>
     <v-card-title class="d-flex align-center">
       {{ $t('stages.title') }}
@@ -138,11 +142,9 @@ onMounted(refresh);
               </v-menu>
             </td>
           </tr>
-          <tr v-if="stages.length === 0">
-            <td colspan="5" class="rg-empty">
-              {{ $t('stages.empty', { action: $t('stages.add') }) }}
-            </td>
-          </tr>
+          <EmptyRow :load="load" :empty="stages.length === 0" :colspan="5">
+            {{ $t('stages.empty', { action: $t('stages.add') }) }}
+          </EmptyRow>
         </tbody>
       </v-table>
     </v-card-text>
