@@ -17,7 +17,7 @@ import StartCountdown from './StartCountdown.vue';
 import StartNumber from './StartNumber.vue';
 
 /**
- * Live Timing's Up next, the same in every start mode; only the buttons
+ * Live timing's Up next, the same in every start mode; only the buttons
  * differ (`docs/frontend-structure.md`). A car with `slot` set is counting
  * down; on a timetable the others show the slot from the start list. Fullscreen shows only this card, for a tablet at the line, and
  * `readonly` drops every button for a screen that only shows it.
@@ -90,7 +90,7 @@ watch(
   },
   { immediate: true },
 );
-// Off Live Timing a tone is for a car nobody is looking at.
+// Off Live timing a tone is for a car nobody is looking at.
 onUnmounted(() => cancelTonesExcept(new Set()));
 </script>
 

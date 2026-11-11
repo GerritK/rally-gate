@@ -110,7 +110,7 @@ describe('StartOrderService', () => {
   });
 
   it('keeps a frozen list as posted, a car since withdrawn included', async () => {
-    // Positions on a posted list must not shift; Live Timing shows the car
+    // Positions on a posted list must not shift; Live timing shows the car
     // as out instead.
     const { service } = makeService(
       {},

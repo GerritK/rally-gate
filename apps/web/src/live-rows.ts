@@ -12,7 +12,7 @@ import { countingRun } from './counting-run';
 import { isCountingDown, isQueued } from './countdown';
 import { runStatusColor } from './format';
 
-/** Live Timing's rows: what its header, On stage card and table all draw. */
+/** Live timing's rows: what its header, On stage card and table all draw. */
 
 export type RowState =
   | 'WAITING'

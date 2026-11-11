@@ -156,12 +156,12 @@
 }
 
 /*
- * The action column of a table a marshal works in mid-event (Live Timing,
+ * The action column of a table a marshal works in mid-event (Live timing,
  * Entries, Hardware): put .rg-actions on its <th> and <td>. When the table
  * is wider than a tablet it scrolls sideways, but this column stays put at
  * the right edge, so Start now or Check in never needs a sideways scroll.
  * Opaque, or scrolled cells show through; a row tint on top of it goes in
- * background-image (see Live Timing's next row).
+ * background-image (see Live timing's next row).
  */
 .v-table > .v-table__wrapper > table > thead > tr > th.rg-actions,
 .v-table > .v-table__wrapper > table > tbody > tr > td.rg-actions {

@@ -6,7 +6,7 @@ import { serverOffsetMs } from '../api/time';
 /**
  * A car's stage time while it's still running, ticking in tenths. Its own
  * timer, so only this text re-renders ten times a second, not the page
- * around it (Live Timing's clock ticks once a second).
+ * around it (Live timing's clock ticks once a second).
  */
 const props = defineProps<{ startTime: string }>();
 

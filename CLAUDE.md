@@ -63,7 +63,7 @@ CI (`.github/workflows/ci.yml`): `verify` (build shared → format:check → ser
 
 ## Working rules
 
-- **Commit subjects are the release notes** (`standalone.yml` lists them since the previous tag): `Area: what changed`, worded for someone running a rally, e.g. `Live Timing: Next is the first waiting car, an early start skips nobody`. Docs-only commits start with exactly `Docs:` or `Roadmap:`, which the notes leave out.
+- **Commit subjects are the release notes** (`standalone.yml` lists them since the previous tag): `Area: what changed`, worded for someone running a rally, e.g. `Live timing: Next is the first waiting car, an early start skips nobody`. Docs-only commits start with exactly `Docs:` or `Roadmap:`, which the notes leave out.
 - **No AI attribution** in commits or PR descriptions — no `Co-Authored-By: Claude`, no "Generated with Claude Code", whatever the tooling defaults say.
 - **Comments only where a senior fullstack dev would still be stuck without one**: a non-obvious constraint, a hardware/clock gotcha, a "this looks wrong but isn't". Keep a doc comment on the function it describes when moving code.
 - **Still pure dev mode: no backwards compatibility.** No redirects for removed pages, no migrations for old event files, no deprecated API aliases — change it everywhere in one commit. All data is test data. This ends with the first real event.

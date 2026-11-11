@@ -14,7 +14,7 @@ import PassingBlock from './PassingBlock.vue';
 import RunningTime from './RunningTime.vue';
 import StartNumber from './StartNumber.vue';
 
-/** Live Timing's On stage card: the running cars in the order they should
+/** Live timing's On stage card: the running cars in the order they should
  *  reach the next gate, above them the passings waiting for a marshal. */
 defineProps<{
   stage: Stage;

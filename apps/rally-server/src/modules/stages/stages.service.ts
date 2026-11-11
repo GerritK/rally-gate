@@ -267,7 +267,7 @@ export class StagesService {
   }
 
   /**
-   * Live Timing and the public page reload the stage and its start order:
+   * Live timing and the public page reload the stage and its start order:
    * a slot time posted at the line must never be stale on another screen.
    */
   changed(stageId: string): void {

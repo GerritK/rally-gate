@@ -60,7 +60,7 @@ const display = (stage: Stage) => STAGE_STATUS_DISPLAY[stage.status];
 </template>
 
 <style scoped>
-/* Same track as Live Timing's gate line, one level up: stages along the rally. */
+/* Same track as Live timing's gate line, one level up: stages along the rally. */
 .rg-stage-track-scroll {
   overflow-x: auto;
   padding: 4px 0;

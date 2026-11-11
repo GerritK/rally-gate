@@ -236,7 +236,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
    * A closed stage's unassigned passings can no longer be timed (assign 409s
    * on a closed stage), and once a gate is reused by another stage they'd be
    * read as that stage's. So they leave the list; the records stay as
-   * evidence. Live Timing's close confirmation says how many.
+   * evidence. Live timing's close confirmation says how many.
    */
   @OnEvent('stage.closed')
   async discardPassingsOfClosedStage({

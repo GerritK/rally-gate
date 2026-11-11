@@ -18,7 +18,7 @@ import StartNumber from './StartNumber.vue';
 import StatusChip from './StatusChip.vue';
 import TableLegend from './TableLegend.vue';
 
-/** Live Timing's table: every entry in start order with its run, voided
+/** Live timing's table: every entry in start order with its run, voided
  *  attempts under it, and the row's one direct action plus its menu. */
 const props = defineProps<{
   stage: Stage;

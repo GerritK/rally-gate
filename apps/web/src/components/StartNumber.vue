@@ -9,7 +9,7 @@ defineProps<{ number: number | null }>();
 
 <style scoped>
 /* A rally car's door plate. Sized by the surrounding font-size, so a table
-   cell and Live Timing's "Up next" show the same plate. */
+   cell and Live timing's "Up next" show the same plate. */
 .rg-start-number {
   display: inline-block;
   min-width: 2.4em;
