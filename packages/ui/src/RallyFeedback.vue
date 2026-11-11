@@ -15,6 +15,7 @@ function dismiss() {
   <v-dialog
     :model-value="!!pendingConfirm"
     max-width="480"
+    :aria-label="pendingConfirm?.options.title"
     @update:model-value="answer(null)"
   >
     <v-card v-if="pendingConfirm">
@@ -53,7 +54,12 @@ function dismiss() {
   >
     {{ notice?.text }}
     <template #actions>
-      <v-btn variant="text" icon="mdi-close" @click="dismiss" />
+      <v-btn
+        variant="text"
+        icon="mdi-close"
+        :aria-label="$t('ui.close')"
+        @click="dismiss"
+      />
     </template>
   </v-snackbar>
 </template>

@@ -694,6 +694,7 @@ onMounted(refresh);
     <v-dialog
       :model-value="!!shownChange"
       max-width="520"
+      :aria-label="shownChange && $t(`changes.actions.${shownChange.action}`)"
       :fullscreen="smAndDown"
       @update:model-value="shownChange = null"
     >

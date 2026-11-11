@@ -70,6 +70,7 @@
     "clockCorrected": "Die Uhr dieses Gates geht {lag}. Der Server korrigiert seine Zeiten automatisch — die Uhrzeit des Gates prüfen."
   },
   "nav": {
+    "menu": "Menü",
     "live": "Live-Zeiten",
     "results": "Ergebnisse",
     "entries": "Nennungen",

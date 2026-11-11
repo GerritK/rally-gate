@@ -598,7 +598,12 @@ onUnmounted(() => {
     </v-table>
   </v-card>
 
-  <v-dialog :model-value="confirmingPowerOff" max-width="480" persistent>
+  <v-dialog
+    :model-value="confirmingPowerOff"
+    max-width="480"
+    persistent
+    :aria-label="$t('hardware.shutDownTitle')"
+  >
     <v-card>
       <v-card-title>{{ $t('hardware.shutDownTitle') }}</v-card-title>
       <v-card-text v-if="!powerOffResults">

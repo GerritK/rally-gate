@@ -64,6 +64,7 @@ async function submit(event: SubmitEventPromise) {
   <v-dialog
     :model-value="open"
     :max-width="maxWidth ?? 560"
+    :aria-label="title"
     :fullscreen="smAndDown"
     @update:model-value="close"
   >
