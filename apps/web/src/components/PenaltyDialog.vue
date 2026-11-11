@@ -157,7 +157,7 @@ defineExpose({ add });
         :rules="[countRule]"
         density="compact"
         hide-details="auto"
-        style="max-width: 120px"
+        class="rg-field-short"
       />
     </div>
     <v-text-field
@@ -178,7 +178,7 @@ defineExpose({ add });
         :label="$t('penalties.time')"
         :rules="[timeRule]"
         placeholder="0:30"
-        style="max-width: 140px"
+        class="rg-field-short"
       />
     </div>
   </FormDialog>

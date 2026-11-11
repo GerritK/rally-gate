@@ -193,8 +193,21 @@
   outline-offset: 2px;
 }
 
-/* A lone field on a wide settings card: as wide as its content needs, not
-   the card. */
+/*
+ * A field as wide as what goes into it, not as its card: short for a number
+ * or a time, medium for a duration with its hint, narrow for a lone select
+ * or text field on a settings card. In a row of fields that wraps,
+ * .rg-field-min keeps each from being squeezed before the row breaks.
+ */
+.rg-field-short {
+  max-width: 120px;
+}
+.rg-field-medium {
+  max-width: 220px;
+}
 .rg-field-narrow {
   max-width: 420px;
+}
+.rg-field-min {
+  min-width: 220px;
 }

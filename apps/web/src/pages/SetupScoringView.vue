@@ -193,7 +193,7 @@ const load = useLoad(async () => {
             placeholder="2:00"
             density="comfortable"
             hide-details="auto"
-            style="max-width: 260px"
+            class="rg-field-medium"
           />
           <v-btn
             v-if="can('setup')"
