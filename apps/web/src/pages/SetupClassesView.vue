@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { useLoad } from '../load';
+import EmptyRow from '../components/EmptyRow.vue';
+import LoadError from '../components/LoadError.vue';
 import { can } from '../api/auth';
 import { RallyStatus } from '@rally-gate/shared';
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import {
   createEntryClass,
   deleteEntryClass,
@@ -82,7 +85,7 @@ async function onDeleteClass(entryClass: EntryClass) {
   notify(t('classes.deleted'));
 }
 
-onMounted(refresh);
+const load = useLoad(refresh);
 </script>
 
 <template>
@@ -90,6 +93,7 @@ onMounted(refresh);
     {{ $t('setup.back') }}
   </v-btn>
 
+  <LoadError :load="load" />
   <RallyLockAlert :when="[RallyStatus.RUNNING, RallyStatus.CLOSED]" />
   <v-card>
     <v-card-title class="d-flex align-center">
@@ -176,11 +180,9 @@ onMounted(refresh);
               </v-menu>
             </td>
           </tr>
-          <tr v-if="classes.length === 0">
-            <td colspan="4" class="rg-empty">
-              {{ $t('classes.empty', { action: $t('classes.add') }) }}
-            </td>
-          </tr>
+          <EmptyRow :load="load" :empty="classes.length === 0" :colspan="4">
+            {{ $t('classes.empty', { action: $t('classes.add') }) }}
+          </EmptyRow>
         </tbody>
       </v-table>
     </v-card-text>

@@ -267,6 +267,11 @@ Values live in `theme.ts`. The rules:
     the middle. Not an alert: those are for states that need attention.
     The same class marks an empty card ("No car on stage."). Only a page
     with nothing to show at all (no stages, unknown gate) gets an alert.
+  - **Empty only once loaded.** A page's first load goes through
+    `useLoad()` (`apps/web/src/load.ts`): until it answers the row reads
+    "Loading…" (`EmptyRow`), and when it fails a `LoadError` above the page
+    says why and offers Retry now. "No entries yet" on a server that didn't
+    answer sends an organiser retyping 80 entries.
 
 ## Confirmations
 
@@ -428,6 +433,8 @@ writing UI, check this list:
 - `StatusChip` (any `*_DISPLAY` map), `ClockTime` (a time with its hand-set
   mark), `ManualMark`, `GateOnlineChip`, `GateVersion`, `GateClockChips`.
 - `TableLegend`: see Tooltips, legends and links.
+- `LoadError`, `EmptyRow`: a page's first load and its table's empty row
+  (see Tables), with `useLoad()`.
 - `RallyLockAlert`: above a page the rally status locks, the reason its
   controls are disabled.
 - `TimeInput`: every typed clock time, `HH:MM:SS` 24 h. Typing is lenient

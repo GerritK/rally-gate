@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { useLoad } from '../load';
+import LoadError from '../components/LoadError.vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { useDisplay } from 'vuetify';
 import { isOutOfEvent, EntryStatus } from '@rally-gate/shared';
 import { fetchEntries, type Entry } from '../api/entries';
@@ -194,10 +196,11 @@ async function refresh() {
   ]);
 }
 
-onMounted(refresh);
+const load = useLoad(refresh);
 </script>
 
 <template>
+  <LoadError :load="load" />
   <v-btn
     variant="text"
     prepend-icon="mdi-arrow-left"
@@ -275,7 +278,15 @@ onMounted(refresh);
         </v-list-item>
       </v-list>
       <v-card-text v-else class="rg-empty">
-        {{ query ? $t('checkIn.noMatch') : $t(here.allDone) }}
+        <template v-if="load.state === 'loading'">
+          {{ $t('common.loading') }}
+        </template>
+        <template v-else-if="load.state === 'failed'">
+          {{ $t('common.notLoaded') }}
+        </template>
+        <template v-else>
+          {{ query ? $t('checkIn.noMatch') : $t(here.allDone) }}
+        </template>
       </v-card-text>
     </v-card>
 
