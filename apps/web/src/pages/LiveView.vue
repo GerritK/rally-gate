@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { useLoad } from '../load';
 import LoadError from '../components/LoadError.vue';
+import LiveRunTable from '../components/LiveRunTable.vue';
+import LiveStageHeader from '../components/LiveStageHeader.vue';
+import OnStageCard from '../components/OnStageCard.vue';
+import { buildRows, countStates, type Row } from '../live-rows';
 import {
   ApiErrorCode,
   COUNTDOWN_MS_KEY,
@@ -12,12 +16,10 @@ import {
   isScrutineered,
   JUMP_START_PENALTY_TYPE_ID_KEY,
   JUMP_START_TOLERANCE_MS_KEY,
-  StageRunStatus,
   StageScoring,
   StageStatus,
   StartMode,
   type DidNotStart,
-  type Starter,
 } from '@rally-gate/shared';
 import { computed, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -40,8 +42,7 @@ import { fetchGates, type Gate } from '../api/gates';
 import { serverNow } from '../api/time';
 import { fetchSetting } from '../api/settings';
 import { fetchPenalties, type Penalty } from '../api/penalties';
-import { countingRun } from '../counting-run';
-import { catchUpDelayMinutes, isCountingDown, isQueued } from '../countdown';
+import { catchUpDelayMinutes } from '../countdown';
 import FormDialog from '../components/FormDialog.vue';
 import { closeLiveStream, openLiveStream, upsert } from '../api/live';
 import { rallyName } from '../api/rally-info';
@@ -79,19 +80,9 @@ import {
   type StartOrder,
 } from '../api/start-order';
 import { fetchEntries, type Entry } from '../api/entries';
-import ClockTime from '../components/ClockTime.vue';
-import GateFlow from '../components/GateFlow.vue';
 import RunCorrectionDialog from '../components/RunCorrectionDialog.vue';
 import PenaltyDialog from '../components/PenaltyDialog.vue';
-import StatusChip from '../components/StatusChip.vue';
-import RunningTime from '../components/RunningTime.vue';
-import TableLegend from '../components/TableLegend.vue';
-import PassingBlock from '../components/PassingBlock.vue';
 import StagePicker from '../components/StagePicker.vue';
-import ClassChip from '../components/ClassChip.vue';
-import CrewName from '../components/CrewName.vue';
-import StartNumber from '../components/StartNumber.vue';
-import JumpStartChip from '../components/JumpStartChip.vue';
 import UpNextCard, { type UpNextRow } from '../components/UpNextCard.vue';
 import { driverName } from '../crew';
 import {
@@ -103,14 +94,7 @@ import {
 } from '@rally-gate/ui';
 import { carriersOf, suggestEntries } from '../passing-suggestions';
 import { printPdf, startListPdf } from '../pdf';
-import {
-  formatDuration,
-  formatGap,
-  formatStamp,
-  gateRoleLabel,
-  runStatusColor,
-  entryName,
-} from '../format';
+import { formatStamp, gateRoleLabel, entryName } from '../format';
 
 const props = defineProps<{ stageId?: string }>();
 const router = useRouter();
@@ -150,215 +134,22 @@ const entryById = computed(() => new Map(entries.value.map((v) => [v.id, v])));
 
 // ---- Rows: every entry in start order, with its run --------------------
 
-type RowState =
-  | 'WAITING'
-  | 'NEXT'
-  | 'QUEUED'
-  /** A timetable slot not yet counting down: shown as waiting. */
-  | 'SLOTTED'
-  | 'ON_STAGE'
-  | 'FINISHED'
-  | 'DNF'
-  | 'DNS'
-  | 'RERUN'
-  | 'OUT';
-
-interface Row {
-  starter: Starter;
-  /** The attempt that counts — on a shakedown the open run, else the fastest. */
-  run?: StageRun;
-  /** Non-voided runs; more than one only on a shakedown. */
-  runCount: number;
-  voidedRuns: StageRun[];
-  state: RowState;
-  /** Set on the first row of a main-class block. */
-  classHeader: string | null;
-}
-
-/** Labels are getters, so each read is in the current language. */
-const ROW_STATE_DISPLAY: Record<
-  RowState,
-  { label: string; color: string; icon: string }
-> = {
-  WAITING: {
-    get label() {
-      return t('rowState.waiting');
-    },
-    color: 'timing-idle',
-    icon: 'mdi-clock-outline',
-  },
-  NEXT: {
-    get label() {
-      return t('rowState.next');
-    },
-    color: 'info',
-    icon: 'mdi-arrow-right-bold',
-  },
-  QUEUED: {
-    get label() {
-      return t('rowState.queued');
-    },
-    color: 'info',
-    icon: 'mdi-timer-sand',
-  },
-  SLOTTED: {
-    get label() {
-      return t('rowState.waiting');
-    },
-    color: 'timing-idle',
-    icon: 'mdi-clock-outline',
-  },
-  ON_STAGE: {
-    get label() {
-      return t('runState.onStage');
-    },
-    color: runStatusColor(StageRunStatus.STARTED),
-    icon: 'mdi-car-sports',
-  },
-  FINISHED: {
-    get label() {
-      return t('rowState.finished');
-    },
-    color: runStatusColor(StageRunStatus.FINISHED),
-    icon: 'mdi-flag-checkered',
-  },
-  DNF: {
-    get label() {
-      return t('rowState.dnf');
-    },
-    color: runStatusColor(StageRunStatus.DNF),
-    icon: 'mdi-close',
-  },
-  DNS: {
-    get label() {
-      return t('rowState.dns');
-    },
-    color: 'warning',
-    icon: 'mdi-minus-circle-outline',
-  },
-  RERUN: {
-    get label() {
-      return t('rowState.rerun');
-    },
-    color: runStatusColor(StageRunStatus.VOIDED),
-    icon: 'mdi-cancel',
-  },
-  OUT: {
-    get label() {
-      return t('entryStatus.withdrawn');
-    },
-    color: 'timing-idle',
-    icon: 'mdi-account-off',
-  },
-};
-
 /** A shakedown is driven as often as a car likes; its fastest run counts. */
 const shakedown = computed(() => stage.value?.scoring === StageScoring.NONE);
 
-const rows = computed<Row[]>(() => {
-  const order = startOrder.value;
-  if (!order) return [];
-  const closed = stage.value?.status === StageStatus.CLOSED;
-  const runsByEntry = new Map<string, StageRun[]>();
-  for (const run of stageRuns.value) {
-    runsByEntry.set(run.entryId, [
-      ...(runsByEntry.get(run.entryId) ?? []),
-      run,
-    ]);
-  }
+const rows = computed(() =>
+  buildRows({
+    order: startOrder.value,
+    runs: stageRuns.value,
+    entryById: entryById.value,
+    dnsIds: dnsIds.value,
+    stageStatus: stage.value?.status,
+    now: serverNow.value,
+    countdownMs: countdownMs.value,
+  }),
+);
 
-  const base = order.starters.map((starter): Omit<Row, 'classHeader'> => {
-    const runs = runsByEntry.get(starter.entryId) ?? [];
-    const run = countingRun(runs);
-    const voidedRuns = runs
-      .filter((r) => r.voided)
-      .sort((a, b) => a.attempt - b.attempt);
-    const entry = entryById.value.get(starter.entryId);
-    let state: RowState;
-    if (isQueued(run, serverNow.value)) {
-      state = isCountingDown(
-        new Date(run!.startTime).getTime(),
-        serverNow.value,
-        countdownMs.value,
-      )
-        ? 'QUEUED'
-        : 'SLOTTED';
-    } else if (run?.status === StageRunStatus.STARTED) state = 'ON_STAGE';
-    else if (run?.status === StageRunStatus.FINISHED) state = 'FINISHED';
-    else if (run?.status === StageRunStatus.DNF) state = 'DNF';
-    else if (entry && isOutOfEvent(entry.status)) state = 'OUT';
-    else if (dnsIds.value.includes(starter.entryId)) state = 'DNS';
-    else if (voidedRuns.length > 0 && !closed) state = 'RERUN';
-    else state = 'WAITING';
-    return {
-      starter,
-      run,
-      runCount: runs.filter((r) => !r.voided).length,
-      voidedRuns,
-      state,
-    };
-  });
-
-  // Next = the first waiting car, even before one that started: an early start
-  // doesn't move anyone else's slot, and a no-show stays Next so the gap shows.
-  if (stage.value?.status === StageStatus.ACTIVE) {
-    const next = base.findIndex((row) => row.state === 'WAITING');
-    if (next !== -1) base[next].state = 'NEXT';
-  }
-
-  return base.map((row, i) => ({
-    ...row,
-    classHeader:
-      order.grouped &&
-      (i === 0 ||
-        base[i - 1].starter.mainClassName !== row.starter.mainClassName)
-        ? (row.starter.mainClassName ?? t('live.noMainClass'))
-        : null,
-  }));
-});
-
-/** Non-zero states only, NEXT and SLOTTED counted as waiting. */
-const stateCounts = computed(() => {
-  const counts = new Map<RowState, number>();
-  for (const row of rows.value) {
-    const state =
-      row.state === 'NEXT' || row.state === 'SLOTTED' ? 'WAITING' : row.state;
-    counts.set(state, (counts.get(state) ?? 0) + 1);
-  }
-  const order: RowState[] = [
-    'QUEUED',
-    'ON_STAGE',
-    'WAITING',
-    'FINISHED',
-    'DNF',
-    'DNS',
-    'RERUN',
-    'OUT',
-  ];
-  return order
-    .filter((state) => counts.has(state))
-    .map((state) => ({ state, count: counts.get(state)! }));
-});
-
-function isOverdue(run?: StageRun): boolean {
-  const expected = stage.value?.expectedDurationMs;
-  return (
-    run?.status === StageRunStatus.STARTED &&
-    !!expected &&
-    serverNow.value - new Date(run.startTime).getTime() > expected
-  );
-}
-
-function formatSplits(runId: string): string {
-  const splits = splitsByRun.value[runId];
-  if (!splits || splits.length === 0) return '-';
-  return splits
-    .map(
-      (s) =>
-        `${t('live.splitShort', { n: s.splitIndex })}: ${formatStageDuration(s.elapsedMs)}`,
-    )
-    .join(', ');
-}
+const stateCounts = computed(() => countStates(rows.value));
 
 // ---- On stage: running cars in expected arrival order -------------------
 
@@ -804,14 +595,6 @@ async function onStartNow(entryId: string) {
     startingEntryId.value = null;
   }
 }
-
-const anyManual = computed(() =>
-  rows.value.some((row) =>
-    [row.run, ...row.voidedRuns].some(
-      (run) => run && (run.startManual || (run.finishTime && run.finishManual)),
-    ),
-  ),
-);
 
 const correctionDialog = ref<InstanceType<typeof RunCorrectionDialog> | null>(
   null,
@@ -1302,105 +1085,23 @@ onUnmounted(() => {
     </i18n-t>
   </v-alert>
 
-  <v-card v-if="stage" class="mb-4">
-    <v-card-item>
-      <v-card-title> {{ stage.id }} · {{ stage.name }} </v-card-title>
-      <v-card-subtitle>
-        {{ startListStatus }}
-      </v-card-subtitle>
-      <template #append>
-        <div class="d-flex flex-wrap justify-end ga-2">
-          <v-btn
-            v-if="
-              stage.status === StageStatus.NOT_STARTED &&
-              !startOrder?.frozen &&
-              can('setup')
-            "
-            color="primary"
-            prepend-icon="mdi-lock"
-            @click="onFreeze"
-          >
-            {{ $t('live.freezeStartList') }}
-          </v-btn>
-          <v-btn
-            v-if="
-              stage.status === StageStatus.NOT_STARTED &&
-              startOrder?.frozen &&
-              can('setup')
-            "
-            variant="text"
-            prepend-icon="mdi-lock-open-variant"
-            @click="onUnfreeze"
-          >
-            {{ $t('live.unfreeze') }}
-          </v-btn>
-          <v-btn
-            variant="tonal"
-            prepend-icon="mdi-printer"
-            :disabled="!startOrder"
-            @click="printStartList"
-          >
-            {{ $t('live.printStartList') }}
-          </v-btn>
-          <v-btn
-            v-if="
-              stage.status === StageStatus.NOT_STARTED && can('activateStage')
-            "
-            :loading="activatingStage"
-            color="success"
-            variant="outlined"
-            prepend-icon="mdi-play"
-            @click="onActivateStage()"
-          >
-            {{ $t('live.activateStage') }}
-          </v-btn>
-          <v-btn
-            v-if="stage.status === StageStatus.ACTIVE && can('activateStage')"
-            :loading="closingStage"
-            color="error"
-            variant="outlined"
-            prepend-icon="mdi-flag-checkered"
-            @click="onCloseStage"
-          >
-            {{ $t('live.closeStage') }}
-          </v-btn>
-        </div>
-      </template>
-    </v-card-item>
-
-    <v-card-text>
-      <div class="d-flex flex-wrap align-center ga-2 mb-3">
-        <v-chip
-          v-for="{ state, count } in stateCounts"
-          :key="state"
-          :color="ROW_STATE_DISPLAY[state].color"
-          :prepend-icon="ROW_STATE_DISPLAY[state].icon"
-          variant="tonal"
-        >
-          {{ count }} {{ ROW_STATE_DISPLAY[state].label }}
-        </v-chip>
-      </div>
-      <GateFlow :nodes="gateFlow" :flashing="flashingGateIds" />
-      <v-alert
-        v-if="startOrder && !startOrder.frozen"
-        type="info"
-        variant="tonal"
-        density="compact"
-        class="mt-4"
-      >
-        <i18n-t keypath="live.liveStartList" scope="global">
-          <template #freeze>
-            <strong>{{ $t('live.freezeWhenPosted') }}</strong>
-          </template>
-          <template #link>
-            <router-link to="/setup/start" class="rg-link"
-              >{{ $t('nav.setup') }} → {{ $t('setup.start') }}</router-link
-            >
-          </template>
-        </i18n-t>
-      </v-alert>
-    </v-card-text>
-  </v-card>
+  <LiveStageHeader
+    v-if="stage"
+    class="mb-4"
+    :stage="stage"
+    :start-order="startOrder"
+    :start-list-status="startListStatus"
+    :state-counts="stateCounts"
+    :gate-flow="gateFlow"
+    :flashing-gate-ids="flashingGateIds"
+    :activating="activatingStage"
+    :closing="closingStage"
+    @freeze="onFreeze"
+    @unfreeze="onUnfreeze"
+    @print-start-list="printStartList"
+    @activate="onActivateStage()"
+    @close="onCloseStage"
+  />
 
   <v-alert
     v-if="passingsByStage.elsewhere.length > 0"
@@ -1449,478 +1150,63 @@ onUnmounted(() => {
     />
     <!-- Shown before activation too, so activating doesn't reflow the page. -->
     <div>
-      <v-card class="h-100">
-        <v-card-item>
-          <v-card-title class="d-flex align-center ga-2">
-            {{ $t('runState.onStage') }}
-            <v-chip
-              size="small"
-              :color="runStatusColor(StageRunStatus.STARTED)"
-            >
-              {{ onStage.length }}
-            </v-chip>
-          </v-card-title>
-          <v-card-subtitle>{{ $t('live.expectedOrder') }}</v-card-subtitle>
-        </v-card-item>
-        <!-- Every unidentified passing, a start included: a car that crossed
-             the start line is on stage, and Up next stays still while the
-             start marshal aims at Start now. -->
-        <v-card-text v-if="passingsByStage.here.length > 0" class="pb-0">
-          <PassingBlock
-            v-for="[event, ...queued] in [passingsByStage.here]"
-            :key="event.eventId"
-            :passing="event"
-            :queued="queued"
-            :role="gateRole(event.gateId)"
-            :gate-name="gateName(event.gateId)"
-            :entry-id="entryFor(event)"
-            :entry-options="entryOptionsFor(event)"
-            :readonly="!can('assignPassing', stage.id)"
-            @pick="(id) => (pickedEntryIds[event.eventId] = id)"
-            @assign="onAssign(event)"
-            @dismiss="onDismiss(event)"
-            @dismiss-all="onDismissAll([event, ...queued])"
-          />
-        </v-card-text>
-        <v-table v-key-scroll density="comfortable">
-          <tbody>
-            <tr v-for="car in onStage" :key="car.run.id">
-              <td width="72">
-                <StartNumber :number="car.row.starter.startNumber" />
-              </td>
-              <td><CrewName :crew="car.row.starter" /></td>
-              <td v-if="splitIndices.length > 0" class="text-no-wrap">
-                <v-icon
-                  v-for="index in splitIndices"
-                  :key="index"
-                  :icon="
-                    car.passed.has(index) ? 'mdi-circle' : 'mdi-circle-outline'
-                  "
-                  :color="car.passed.has(index) ? 'success' : undefined"
-                  v-tooltip:top="$t('gateRole.split', { n: index })"
-                  size="x-small"
-                  class="mr-1"
-                />
-                <v-icon
-                  icon="mdi-flag-checkered"
-                  size="x-small"
-                  v-tooltip:top="$t('gateRole.finish')"
-                  class="text-medium-emphasis"
-                />
-              </td>
-              <td class="rg-timing rg-time text-no-wrap">
-                <template v-if="car.last">
-                  {{ $t('live.splitShort', { n: car.last.splitIndex }) }}
-                  {{ formatStageDuration(car.last.elapsedMs) }}
-                  <span class="text-medium-emphasis">
-                    {{ car.gapMs ? formatGap(car.gapMs) : $t('live.best') }}
-                  </span>
-                </template>
-              </td>
-              <td class="rg-timing text-right text-h6">
-                <RunningTime
-                  v-if="car.run.status === StageRunStatus.STARTED"
-                  :start-time="car.run.startTime"
-                />
-                <template v-else>{{
-                  formatDuration(car.run.durationMs)
-                }}</template>
-              </td>
-              <td width="120" class="text-no-wrap">
-                <JumpStartChip
-                  :run="car.run"
-                  :tolerance-ms="jumpStartToleranceMs"
-                  :suggest="suggestsJumpPenalty(car.run)"
-                  @penalty="onJumpStartPenalty(car.run)"
-                  @dismiss="onDismissJumpStart(car.run)"
-                />
-                <v-chip
-                  v-if="isOverdue(car.run)"
-                  size="small"
-                  color="warning"
-                  prepend-icon="mdi-timer-alert-outline"
-                >
-                  {{ $t('live.overdue') }}
-                </v-chip>
-              </td>
-              <td class="text-right rg-actions" width="1%">
-                <v-btn
-                  v-if="can('timeRun', stage.id)"
-                  size="small"
-                  variant="tonal"
-                  prepend-icon="mdi-flag-checkered"
-                  :loading="finishingRunId === car.run.id"
-                  @click="onFinishNow(car.run)"
-                >
-                  {{ $t('live.finishNow') }}
-                </v-btn>
-                <v-menu v-if="canDnfDns">
-                  <template #activator="{ props: menu }">
-                    <v-btn
-                      v-bind="menu"
-                      size="small"
-                      variant="text"
-                      icon="mdi-dots-vertical"
-                      :aria-label="$t('common.moreActions')"
-                    />
-                  </template>
-                  <v-list density="compact">
-                    <v-list-item
-                      prepend-icon="mdi-close"
-                      :title="$t('live.markDnf')"
-                      @click="onMarkDnf(car.run)"
-                    />
-                  </v-list>
-                </v-menu>
-              </td>
-            </tr>
-          </tbody>
-        </v-table>
-        <v-card-text v-if="onStage.length === 0" class="rg-empty">
-          {{
-            stage.status === StageStatus.ACTIVE
-              ? $t('live.noneOnStage')
-              : $t('live.notActiveYet')
-          }}
-        </v-card-text>
-      </v-card>
+      <OnStageCard
+        class="h-100"
+        :stage="stage"
+        :cars="onStage"
+        :passings="passingsByStage.here"
+        :split-indices="splitIndices"
+        :jump-start-tolerance-ms="jumpStartToleranceMs"
+        :finishing-run-id="finishingRunId"
+        :can-dnf-dns="canDnfDns"
+        :gate-role="gateRole"
+        :gate-name="gateName"
+        :entry-for="entryFor"
+        :entry-options-for="entryOptionsFor"
+        :suggests-jump-penalty="suggestsJumpPenalty"
+        @pick="(eventId, entryId) => (pickedEntryIds[eventId] = entryId)"
+        @assign="onAssign"
+        @dismiss="onDismiss"
+        @dismiss-all="onDismissAll"
+        @finish-now="onFinishNow"
+        @mark-dnf="onMarkDnf"
+        @jump-penalty="onJumpStartPenalty"
+        @dismiss-jump-start="onDismissJumpStart"
+      />
     </div>
   </div>
 
-  <v-card v-if="stage && startOrder" class="mb-4">
-    <v-table v-key-scroll density="comfortable" class="rg-marshal-table">
-      <thead>
-        <tr>
-          <th width="56">{{ $t('table.pos') }}</th>
-          <th width="72">#</th>
-          <th>{{ $t('table.crew') }}</th>
-          <th v-if="!startOrder.grouped">{{ $t('classes.class') }}</th>
-          <th>{{ $t('table.status') }}</th>
-          <th v-if="shakedown">{{ $t('table.runs') }}</th>
-          <th class="rg-time">
-            {{ $t('gateRole.start') }}<span class="rg-time-mark" />
-          </th>
-          <th class="rg-time">{{ $t('live.splits') }}</th>
-          <th class="rg-time">
-            {{ $t('gateRole.finish') }}<span class="rg-time-mark" />
-          </th>
-          <th class="rg-time">{{ $t('table.time') }}</th>
-          <th class="rg-actions">
-            <span class="d-sr-only">{{ $t('table.actions') }}</span>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        <template v-for="row in rows" :key="row.starter.entryId">
-          <tr v-if="row.classHeader" class="rg-class-row">
-            <td :colspan="shakedown ? 11 : 10">
-              {{ row.classHeader }}
-            </td>
-          </tr>
-          <tr :class="{ 'rg-next-row': row.state === 'NEXT' }">
-            <td class="rg-timing">{{ row.starter.position }}</td>
-            <td>
-              <StartNumber :number="row.starter.startNumber" />
-            </td>
-            <td><CrewName :crew="row.starter" /></td>
-            <td v-if="!startOrder.grouped">
-              <ClassChip
-                v-if="row.starter.mainClassName"
-                :name="row.starter.mainClassName"
-                main
-              />
-            </td>
-            <td class="text-no-wrap">
-              <StatusChip :display="ROW_STATE_DISPLAY[row.state]" />
-              <v-chip
-                v-if="isOverdue(row.run)"
-                size="small"
-                color="warning"
-                prepend-icon="mdi-timer-alert-outline"
-                class="ml-1"
-              >
-                {{ $t('live.overdue') }}
-              </v-chip>
-              <JumpStartChip
-                v-if="row.run"
-                :run="row.run"
-                :tolerance-ms="jumpStartToleranceMs"
-                :suggest="suggestsJumpPenalty(row.run)"
-                @penalty="onJumpStartPenalty(row.run)"
-                @dismiss="onDismissJumpStart(row.run)"
-              />
-              <v-chip
-                v-if="!row.run && unscrutineered(row.starter.entryId)"
-                size="small"
-                variant="outlined"
-                color="warning"
-                prepend-icon="mdi-clipboard-alert-outline"
-                class="ml-1"
-              >
-                {{ $t('live.notScrutineered') }}
-              </v-chip>
-              <span
-                v-if="row.run && row.run.attempt > 1 && !shakedown"
-                class="text-caption text-medium-emphasis ml-1"
-              >
-                {{ $t('live.attempt', { n: row.run.attempt }) }}
-              </span>
-            </td>
-            <td v-if="shakedown" class="rg-timing">{{ row.runCount }}</td>
-            <!-- On a slot stage the slot is the start time; before activation
-                 the posted one. -->
-            <td
-              class="rg-time text-no-wrap"
-              :class="{ 'font-weight-bold': row.starter.slotMoved }"
-            >
-              <v-icon
-                v-if="row.starter.slotMoved"
-                icon="mdi-calendar-arrow-right"
-                size="x-small"
-                class="mr-1"
-                v-tooltip:top="$t('timetable.slotMoved')"
-              />
-              <ClockTime
-                v-if="row.run"
-                :time="row.run.startTime"
-                :manual="row.run.startManual"
-              />
-              <ClockTime
-                v-else-if="row.starter.slotTime"
-                :time="row.starter.slotTime"
-              />
-            </td>
-            <td class="rg-timing rg-time text-no-wrap">
-              {{ row.run ? formatSplits(row.run.id) : '' }}
-            </td>
-            <td class="rg-time">
-              <ClockTime
-                v-if="row.run?.finishTime"
-                :time="row.run.finishTime"
-                :manual="row.run.finishManual"
-              />
-            </td>
-            <td class="rg-timing rg-time">
-              <template
-                v-if="row.state === 'QUEUED' || row.state === 'SLOTTED'"
-              />
-              <RunningTime
-                v-else-if="row.run?.status === StageRunStatus.STARTED"
-                :start-time="row.run.startTime"
-              />
-              <template v-else-if="row.run">{{
-                formatDuration(row.run.durationMs)
-              }}</template>
-            </td>
-            <td class="text-no-wrap text-right rg-actions">
-              <v-btn
-                v-if="row.run && can('correctRun', stage.id)"
-                size="small"
-                variant="text"
-                prepend-icon="mdi-pencil"
-                class="rg-row-action"
-                @click="correctionDialog?.correct(row.run)"
-              >
-                <span class="rg-row-action-label">{{
-                  $t('live.correct')
-                }}</span>
-              </v-btn>
-              <v-btn
-                v-if="
-                  (!row.run || row.state === 'FINISHED') &&
-                  canStart(row) &&
-                  upNextAction
-                "
-                size="small"
-                variant="text"
-                :prepend-icon="
-                  upNextAction === 'countdown'
-                    ? 'mdi-timer-play-outline'
-                    : 'mdi-play'
-                "
-                :loading="startingEntryId === row.starter.entryId"
-                class="rg-row-action"
-                @click="
-                  upNextAction === 'countdown'
-                    ? onCountdown(row.starter.entryId)
-                    : onStartNow(row.starter.entryId)
-                "
-              >
-                <span class="rg-row-action-label">{{
-                  upNextAction === 'countdown'
-                    ? $t('countdown.start')
-                    : $t('live.startNow')
-                }}</span>
-              </v-btn>
-              <v-menu
-                v-if="
-                  !row.run &&
-                  stage.status !== StageStatus.NOT_STARTED &&
-                  (can('timeRun', stage.id) ||
-                    can('penalties') ||
-                    canMarkDns(row.starter.entryId) ||
-                    (row.state === 'DNS' && canDnfDns))
-                "
-              >
-                <template #activator="{ props: menu }">
-                  <v-btn
-                    v-bind="menu"
-                    size="small"
-                    variant="text"
-                    icon="mdi-dots-vertical"
-                    :aria-label="$t('common.moreActions')"
-                  />
-                </template>
-                <v-list density="compact">
-                  <v-list-item
-                    v-if="can('timeRun', stage.id)"
-                    prepend-icon="mdi-timer-edit-outline"
-                    :title="$t('live.enterTime')"
-                    @click="correctionDialog?.enter(row.starter.entryId)"
-                  />
-                  <v-list-item
-                    v-if="can('penalties')"
-                    prepend-icon="mdi-flag-variant-outline"
-                    :title="$t('penalties.add')"
-                    @click="penaltyDialog?.add(row.starter.entryId, stage.id)"
-                  />
-                  <v-list-item
-                    v-if="canMarkDns(row.starter.entryId)"
-                    prepend-icon="mdi-minus-circle-outline"
-                    :title="$t('live.markDns')"
-                    @click="onMarkDns(row.starter.entryId)"
-                  />
-                  <v-list-item
-                    v-if="row.state === 'DNS' && canDnfDns"
-                    prepend-icon="mdi-undo"
-                    :title="$t('live.undoDns')"
-                    @click="onUndoDns(row.starter.entryId)"
-                  />
-                </v-list>
-              </v-menu>
-              <v-menu
-                v-if="
-                  row.run &&
-                  (can('penalties') ||
-                    can('voidRun') ||
-                    (canDnfDns && ['ON_STAGE', 'DNF'].includes(row.state)))
-                "
-              >
-                <template #activator="{ props: menu }">
-                  <v-btn
-                    v-bind="menu"
-                    size="small"
-                    variant="text"
-                    icon="mdi-dots-vertical"
-                    :aria-label="$t('common.moreActions')"
-                  />
-                </template>
-                <v-list density="compact">
-                  <v-list-item
-                    v-if="can('penalties')"
-                    prepend-icon="mdi-flag-variant-outline"
-                    :title="$t('penalties.add')"
-                    @click="penaltyDialog?.add(row.run!.entryId, stage.id)"
-                  />
-                  <v-list-item
-                    v-if="canDnfDns && row.state === 'ON_STAGE'"
-                    prepend-icon="mdi-close"
-                    :title="$t('live.markDnf')"
-                    @click="onMarkDnf(row.run!)"
-                  />
-                  <v-list-item
-                    v-if="canDnfDns && row.state === 'DNF'"
-                    prepend-icon="mdi-undo"
-                    :title="$t('live.undoDnf')"
-                    @click="onUndoDnf(row.run!)"
-                  />
-                  <v-list-item
-                    v-if="can('voidRun')"
-                    prepend-icon="mdi-cancel"
-                    :title="$t('live.removeRun')"
-                    base-color="error"
-                    @click="onRemoveRun(row.run!)"
-                  />
-                </v-list>
-              </v-menu>
-            </td>
-          </tr>
-          <tr
-            v-for="voided in row.voidedRuns"
-            :key="voided.id"
-            class="rg-voided-row"
-          >
-            <td colspan="3"></td>
-            <td v-if="!startOrder.grouped"></td>
-            <td class="text-no-wrap">
-              <v-chip size="small" variant="outlined" prepend-icon="mdi-cancel">
-                {{ $t('live.voided') }}
-              </v-chip>
-              <span class="text-caption ml-1">{{
-                $t('live.attempt', { n: voided.attempt })
-              }}</span>
-            </td>
-            <td v-if="shakedown"></td>
-            <td class="rg-time">
-              <ClockTime
-                :time="voided.startTime"
-                :manual="voided.startManual"
-              />
-            </td>
-            <td class="rg-timing rg-time">{{ formatSplits(voided.id) }}</td>
-            <td class="rg-time">
-              <ClockTime
-                v-if="voided.finishTime"
-                :time="voided.finishTime"
-                :manual="voided.finishManual"
-              />
-            </td>
-            <td class="rg-timing rg-time">
-              {{ formatDuration(voided.durationMs) }}
-            </td>
-            <td class="text-no-wrap text-right">
-              <v-btn
-                v-if="can('voidRun')"
-                size="small"
-                variant="text"
-                prepend-icon="mdi-restore"
-                @click="onUnvoidRun(voided)"
-              >
-                {{ $t('live.restore') }}
-              </v-btn>
-              <v-menu v-if="can('voidRun')">
-                <template #activator="{ props: menu }">
-                  <v-btn
-                    v-bind="menu"
-                    size="small"
-                    variant="text"
-                    icon="mdi-dots-vertical"
-                    :aria-label="$t('common.moreActions')"
-                  />
-                </template>
-                <v-list density="compact">
-                  <v-list-item
-                    prepend-icon="mdi-delete"
-                    :title="$t('live.deleteRun')"
-                    base-color="error"
-                    @click="onDeleteRun(voided)"
-                  />
-                </v-list>
-              </v-menu>
-            </td>
-          </tr>
-        </template>
-        <tr v-if="rows.length === 0">
-          <td :colspan="shakedown ? 11 : 10" class="rg-empty">
-            {{ $t('live.noEntries') }}
-          </td>
-        </tr>
-      </tbody>
-    </v-table>
-    <div class="px-4 pb-3">
-      <TableLegend :marks="anyManual ? ['manual'] : []" />
-    </div>
-  </v-card>
+  <LiveRunTable
+    v-if="stage && startOrder"
+    class="mb-4"
+    :stage="stage"
+    :start-order="startOrder"
+    :rows="rows"
+    :shakedown="shakedown"
+    :splits-by-run="splitsByRun"
+    :jump-start-tolerance-ms="jumpStartToleranceMs"
+    :start-action="upNextAction"
+    :starting-entry-id="startingEntryId"
+    :can-dnf-dns="canDnfDns"
+    :suggests-jump-penalty="suggestsJumpPenalty"
+    :unscrutineered="unscrutineered"
+    :can-start="canStart"
+    :can-mark-dns="canMarkDns"
+    @jump-penalty="onJumpStartPenalty"
+    @dismiss-jump-start="onDismissJumpStart"
+    @correct="(run) => correctionDialog?.correct(run)"
+    @countdown="onCountdown"
+    @start-now="onStartNow"
+    @enter-time="(entryId) => correctionDialog?.enter(entryId)"
+    @add-penalty="(entryId) => penaltyDialog?.add(entryId, stage!.id)"
+    @mark-dns="onMarkDns"
+    @undo-dns="onUndoDns"
+    @mark-dnf="onMarkDnf"
+    @undo-dnf="onUndoDnf"
+    @remove-run="onRemoveRun"
+    @unvoid-run="onUnvoidRun"
+    @delete-run="onDeleteRun"
+  />
 
   <RunCorrectionDialog
     v-if="props.stageId"
@@ -1982,33 +1268,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* On a phone the row's action is its icon alone, so the crew's name fits
-   beside it; the label stays for a screen reader. Up next carries the same
-   action spelled out. */
-@media (max-width: 599px) {
-  .rg-row-action {
-    min-width: 0;
-    padding-inline: 10px;
-  }
-  .rg-row-action :deep(.v-btn__prepend) {
-    margin-inline: 0;
-  }
-  .rg-row-action-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-}
-.rg-class-row td {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-weight: 600;
-  font-size: 1.05rem;
-  background: rgba(var(--v-theme-on-surface), 0.06);
-}
-
 /* Up next beside On stage; stacked below Vuetify's md breakpoint. */
 .rg-stage-flow {
   display: grid;
@@ -2020,21 +1279,5 @@ onUnmounted(() => {
   .rg-stage-flow {
     grid-template-columns: minmax(0, 1fr);
   }
-}
-
-/* The next car is a marshal's main cue, so it gets more than the chip. */
-/* An image, so it also tints the opaque .rg-actions cell. */
-.rg-next-row td {
-  background-image: linear-gradient(
-    rgba(var(--v-theme-info), 0.12),
-    rgba(var(--v-theme-info), 0.12)
-  );
-}
-.rg-next-row td:first-child {
-  box-shadow: inset 3px 0 0 rgb(var(--v-theme-info));
-}
-
-.rg-voided-row td {
-  opacity: 0.6;
 }
 </style>

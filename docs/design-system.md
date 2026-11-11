@@ -462,6 +462,10 @@ writing UI, check this list:
   with seconds; the icon is no tab stop.
 - `RunningTime`: a running stage time ticking in tenths, its own timer so
   only it re-renders.
+- Live Timing's cards: `LiveStageHeader`, `UpNextCard`, `OnStageCard`,
+  `LiveRunTable`. `LiveView` holds the state and the actions and hands
+  each card its part; what a row is and which state it is in is
+  `live-rows.ts`.
 - Live Timing's own: `GateFlow` (the gate line), `RunCorrectionDialog`,
   `PenaltyDialog` (also on the entry page), `UpNextCard` (with
   `StartCountdown`, the lights and seconds on their own 100 ms timer),
